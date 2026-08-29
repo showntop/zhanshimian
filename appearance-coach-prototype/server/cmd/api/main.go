@@ -38,7 +38,10 @@ func main() {
 		logger.Error("migrate database", "error", err)
 		os.Exit(1)
 	}
-	objects, err := storage.NewLocal(cfg.UploadDir)
+	objects, err := storage.New(storage.Config{
+		Provider: cfg.StorageProvider, LocalRoot: cfg.UploadDir,
+		COS: storage.COSConfig{BucketURL: cfg.COSBucketURL, SecretID: cfg.COSSecretID, SecretKey: cfg.COSSecretKey, KeyPrefix: cfg.COSKeyPrefix},
+	})
 	if err != nil {
 		logger.Error("create storage", "error", err)
 		os.Exit(1)
@@ -59,10 +62,22 @@ func main() {
 		logger.Error("create outfit diagnosis provider", "provider", cfg.OutfitDiagnosisProvider, "error", err)
 		os.Exit(1)
 	}
+	weather, err := buildWeather(cfg)
+	if err != nil {
+		logger.Error("create weather provider", "provider", cfg.WeatherProvider, "error", err)
+		os.Exit(1)
+	}
+	wechat, err := buildWeChat(cfg)
+	if err != nil {
+		logger.Error("create wechat login provider", "error", err)
+		os.Exit(1)
+	}
 	logger.Info("analysis provider configured", "provider", cfg.AIProvider, "fallback_to_demo", cfg.AIProvider == "openai" && cfg.AIFallbackToDemo)
 	logger.Info("hair preview provider configured", "provider", cfg.HairPreviewProvider, "fallback_to_demo", cfg.HairPreviewProvider == "openai" && cfg.HairPreviewFallbackToDemo)
 	logger.Info("outfit diagnosis provider configured", "provider", cfg.OutfitDiagnosisProvider, "fallback_to_demo", cfg.OutfitDiagnosisProvider == "openai" && cfg.OutfitDiagnosisFallbackToDemo)
-	svc := service.New(repo, objects, analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{Hair: hairGenerator, Outfit: outfitAdvisor})
+	svc := service.New(repo, objects, analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
+		Hair: hairGenerator, Outfit: outfitAdvisor, Weather: weather, WeChat: wechat, AssetURLTTL: cfg.AssetURLTTL,
+	})
 	if cfg.RunWorker {
 		go svc.RunWorker(ctx, cfg.AnalysisPollTime)
 	}
@@ -71,6 +86,10 @@ func main() {
 	root.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(cfg.AssetDir))))
 	root.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadDir))))
 	root.Handle("/", httpapi.New(svc, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
+		Environment:             cfg.Environment,
+		StorageProvider:         cfg.StorageProvider,
+		WeatherProvider:         cfg.WeatherProvider,
+		WeChatLoginConfigured:   wechat != nil,
 		AnalysisProvider:        cfg.AIProvider,
 		FallbackEnabled:         cfg.AIProvider == "openai" && cfg.AIFallbackToDemo,
 		HairPreviewProvider:     cfg.HairPreviewProvider,
@@ -94,6 +113,30 @@ func main() {
 	if err := server.Shutdown(shutdown); err != nil {
 		logger.Error("shutdown", "error", err)
 	}
+}
+
+func buildWeChat(cfg config.Config) (provider.WeChatAuthenticator, error) {
+	if cfg.WeChatAppID == "" || cfg.WeChatAppSecret == "" {
+		if cfg.DevLoginEnabled {
+			return nil, nil
+		}
+		return nil, errors.New("wechat credentials are required when development login is disabled")
+	}
+	return provider.NewWeChatCodeExchanger(provider.WeChatConfig{
+		AppID: cfg.WeChatAppID, AppSecret: cfg.WeChatAppSecret,
+		BaseURL: cfg.WeChatAPIBaseURL, Timeout: cfg.WeChatRequestTimeout,
+	}, nil)
+}
+
+func buildWeather(cfg config.Config) (provider.WeatherProvider, error) {
+	if cfg.WeatherProvider == "demo" {
+		return provider.NewDemoWeatherProvider(), nil
+	}
+	return provider.NewAMapWeatherProvider(provider.AMapWeatherConfig{
+		APIKey: cfg.AMapWebServiceKey, BaseURL: cfg.AMapAPIBaseURL,
+		DefaultCity: cfg.AMapDefaultCity, DefaultCode: cfg.AMapDefaultAdcode,
+		Timeout: cfg.WeatherRequestTimeout,
+	}, nil)
 }
 
 func buildOutfitAdvisor(cfg config.Config, repo *postgres.Store, objects storage.ObjectStorage) (provider.OutfitAdvisor, error) {

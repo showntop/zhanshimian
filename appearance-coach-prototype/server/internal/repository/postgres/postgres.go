@@ -242,8 +242,8 @@ func (s *Store) CompleteAnalysis(ctx context.Context, job domain.AnalysisJob, ou
 	for _, plan := range output.Plans {
 		var planID string
 		err = tx.QueryRow(ctx, `
-			INSERT INTO plans(report_id,user_id,name,slug,image_url,recommended,descriptor,why,outcome_tags,difference_tags,sort_order)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id::text`, reportID, job.UserID, plan.Name, plan.Slug, plan.ImageURL, plan.Recommended, plan.Descriptor, plan.Why, plan.OutcomeTags, plan.DifferenceTags, plan.Sort).Scan(&planID)
+			INSERT INTO plans(report_id,user_id,scene,name,slug,image_url,recommended,descriptor,why,outcome_tags,difference_tags,sort_order)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id::text`, reportID, job.UserID, "general", plan.Name, plan.Slug, plan.ImageURL, plan.Recommended, plan.Descriptor, plan.Why, plan.OutcomeTags, plan.DifferenceTags, plan.Sort).Scan(&planID)
 		if err != nil {
 			return "", err
 		}
@@ -309,14 +309,17 @@ func (s *Store) GetReport(ctx context.Context, userID, reportID string) (domain.
 
 func scanPlan(row pgx.Row) (domain.Plan, error) {
 	var item domain.Plan
-	err := row.Scan(&item.ID, &item.ReportID, &item.Name, &item.Slug, &item.ImageURL, &item.Recommended, &item.Descriptor, &item.Why, &item.OutcomeTags, &item.DifferenceTags, &item.Sort, &item.Selected)
+	err := row.Scan(&item.ID, &item.ReportID, &item.Scene, &item.Name, &item.Slug, &item.ImageURL, &item.Recommended, &item.Descriptor, &item.Why, &item.OutcomeTags, &item.DifferenceTags, &item.Sort, &item.Selected)
 	return item, err
 }
 
-const planSelect = `SELECT id::text,report_id::text,name,slug,image_url,recommended,descriptor,why,outcome_tags,difference_tags,sort_order,(selected_at IS NOT NULL) FROM plans`
+const planSelect = `SELECT id::text,report_id::text,scene,name,slug,image_url,recommended,descriptor,why,outcome_tags,difference_tags,sort_order,(selected_at IS NOT NULL) FROM plans`
 
-func (s *Store) ListPlans(ctx context.Context, userID, reportID string) ([]domain.Plan, error) {
-	rows, err := s.pool.Query(ctx, planSelect+` WHERE report_id=$1 AND user_id=$2 ORDER BY sort_order`, reportID, userID)
+func (s *Store) ListPlans(ctx context.Context, userID, reportID, scene string) ([]domain.Plan, error) {
+	if scene == "" {
+		scene = "general"
+	}
+	rows, err := s.pool.Query(ctx, planSelect+` WHERE report_id=$1 AND user_id=$2 AND scene=$3 ORDER BY sort_order`, reportID, userID, scene)
 	if err != nil {
 		return nil, err
 	}
@@ -330,6 +333,51 @@ func (s *Store) ListPlans(ctx context.Context, userID, reportID string) ([]domai
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+func (s *Store) CreateScenePlans(ctx context.Context, userID, reportID string, input domain.ScenePlanInput, plans []domain.Plan) ([]domain.Plan, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM reports WHERE id=$1 AND user_id=$2)`, reportID, userID).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, repository.ErrNotFound
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM plans WHERE report_id=$1 AND user_id=$2 AND scene=$3`, reportID, userID, input.Scene); err != nil {
+		return nil, err
+	}
+	brief, err := json.Marshal(input)
+	if err != nil {
+		return nil, err
+	}
+	created := make([]domain.Plan, 0, len(plans))
+	for _, plan := range plans {
+		plan.ID = ""
+		plan.ReportID = reportID
+		plan.Scene = input.Scene
+		err := tx.QueryRow(ctx, `
+			INSERT INTO plans(report_id,user_id,scene,scene_brief,name,slug,image_url,recommended,descriptor,why,outcome_tags,difference_tags,sort_order)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id::text`,
+			reportID, userID, input.Scene, brief, plan.Name, plan.Slug, plan.ImageURL, plan.Recommended, plan.Descriptor, plan.Why, plan.OutcomeTags, plan.DifferenceTags, plan.Sort).Scan(&plan.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, step := range plan.Steps {
+			if _, err := tx.Exec(ctx, `INSERT INTO plan_steps(plan_id,category,title,summary,details,sort_order) VALUES($1,$2,$3,$4,$5,$6)`, plan.ID, step.Category, step.Title, step.Summary, step.Details, step.Sort); err != nil {
+				return nil, err
+			}
+		}
+		created = append(created, plan)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return created, nil
 }
 
 func (s *Store) GetPlan(ctx context.Context, userID, planID string) (domain.Plan, error) {
@@ -358,11 +406,11 @@ func (s *Store) SelectPlan(ctx context.Context, userID, planID string) error {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	var reportID string
-	if err = tx.QueryRow(ctx, `SELECT report_id::text FROM plans WHERE id=$1 AND user_id=$2 FOR UPDATE`, planID, userID).Scan(&reportID); err != nil {
+	var reportID, scene string
+	if err = tx.QueryRow(ctx, `SELECT report_id::text,scene FROM plans WHERE id=$1 AND user_id=$2 FOR UPDATE`, planID, userID).Scan(&reportID, &scene); err != nil {
 		return mapNotFound(err)
 	}
-	if _, err = tx.Exec(ctx, `UPDATE plans SET selected_at=NULL WHERE report_id=$1`, reportID); err != nil {
+	if _, err = tx.Exec(ctx, `UPDATE plans SET selected_at=NULL WHERE report_id=$1 AND scene=$2`, reportID, scene); err != nil {
 		return err
 	}
 	if _, err = tx.Exec(ctx, `UPDATE plans SET selected_at=now() WHERE id=$1`, planID); err != nil {
@@ -626,6 +674,24 @@ func (s *Store) DeleteUserData(ctx context.Context, userID string) ([]string, er
 		keys = append(keys, key)
 	}
 	rows.Close()
+	if _, err = tx.Exec(ctx, `DELETE FROM share_cards WHERE user_id=$1`, userID); err != nil {
+		return nil, err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM today_plans WHERE user_id=$1`, userID); err != nil {
+		return nil, err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM wardrobe_outfits WHERE user_id=$1`, userID); err != nil {
+		return nil, err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM wardrobe_items WHERE user_id=$1`, userID); err != nil {
+		return nil, err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM advisor_conversations WHERE user_id=$1`, userID); err != nil {
+		return nil, err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM product_events WHERE user_id=$1`, userID); err != nil {
+		return nil, err
+	}
 	if _, err = tx.Exec(ctx, `DELETE FROM tool_results WHERE user_id=$1`, userID); err != nil {
 		return nil, err
 	}

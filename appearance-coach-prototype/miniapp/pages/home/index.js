@@ -9,16 +9,25 @@ Page({
     tools: [
       { id: 'hair', label: '发型预览', note: '先看再决定', icon: '/assets/capture/face-line.png', badge: '推荐' },
       { id: 'outfit', label: '穿搭诊断', note: '今天怎么改', icon: '/assets/icons/document.svg' },
-      { id: 'purchase', label: '购买判断', note: '这件适合吗', icon: '/assets/icons/bookmark.svg' }
+      { id: 'purchase', label: '购买判断', note: '这件适合吗', icon: '/assets/icons/bookmark.svg' },
+      { id: 'advisor', label: '问顾问', note: '继续调整方案', icon: '/assets/icons/sparkles.svg' }
     ],
     hasProfile: false,
     reportID: '',
     todayLookUrl: '/assets/plans/sharp.webp',
+    todayPlan: null,
     previewOpen: false
   },
   onShow() {
+	const api = require('../../services/api')
+	api.trackEvent('page_view', { page: 'home' }).catch(() => {})
     const reportID = wx.getStorageSync('jianwo_report_id') || ''
     this.setData({ hasProfile: Boolean(reportID), reportID })
+    if (reportID) {
+      api.getTodayPlan().then((todayPlan) => {
+        if (todayPlan) this.setData({ todayPlan, todayLookUrl: todayPlan.image_url })
+      }).catch(() => {})
+    }
   },
   chooseScene(event) {
     const scene = event.currentTarget.dataset.scene
@@ -26,10 +35,10 @@ Page({
   },
   openTool(event) {
     const tool = event.currentTarget.dataset.tool
-    const routes = { hair: '/pages/hair/index', outfit: '/pages/outfit/index', purchase: '/pages/purchase/index' }
+    const routes = { hair: '/pages/hair/index', outfit: '/pages/outfit/index', purchase: '/pages/purchase/index', advisor: '/pages/advisor/index' }
     wx.navigateTo({ url: routes[tool] })
   },
-  openToday() { wx.navigateTo({ url: '/pages/scene/index?scene=daily' }) },
+  openToday() { wx.navigateTo({ url: '/pages/today/index' }) },
   previewTodayLook() {
     this.setData({ previewOpen: true })
   },

@@ -30,7 +30,10 @@ func main() {
 		os.Exit(1)
 	}
 	defer pool.Close()
-	objects, err := storage.NewLocal(cfg.UploadDir)
+	objects, err := storage.New(storage.Config{
+		Provider: cfg.StorageProvider, LocalRoot: cfg.UploadDir,
+		COS: storage.COSConfig{BucketURL: cfg.COSBucketURL, SecretID: cfg.COSSecretID, SecretKey: cfg.COSSecretKey, KeyPrefix: cfg.COSKeyPrefix},
+	})
 	if err != nil {
 		logger.Error("create storage", "error", err)
 		os.Exit(1)
@@ -54,7 +57,9 @@ func main() {
 	logger.Info("analysis provider configured", "provider", cfg.AIProvider, "fallback_to_demo", cfg.AIProvider == "openai" && cfg.AIFallbackToDemo)
 	logger.Info("hair preview provider configured", "provider", cfg.HairPreviewProvider, "fallback_to_demo", cfg.HairPreviewProvider == "openai" && cfg.HairPreviewFallbackToDemo)
 	logger.Info("outfit diagnosis provider configured", "provider", cfg.OutfitDiagnosisProvider, "fallback_to_demo", cfg.OutfitDiagnosisProvider == "openai" && cfg.OutfitDiagnosisFallbackToDemo)
-	svc := service.New(repo, objects, analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{Hair: hairGenerator, Outfit: outfitAdvisor})
+	svc := service.New(repo, objects, analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
+		Hair: hairGenerator, Outfit: outfitAdvisor, AssetURLTTL: cfg.AssetURLTTL,
+	})
 	svc.RunWorker(ctx, cfg.AnalysisPollTime)
 }
 

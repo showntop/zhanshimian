@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/example/jianwo/server/internal/domain"
@@ -26,7 +27,8 @@ type Repository interface {
 	CompleteAnalysis(context.Context, domain.AnalysisJob, domain.AnalysisOutput) (string, error)
 	FailAnalysis(context.Context, domain.AnalysisJob, error) error
 	GetReport(context.Context, string, string) (domain.Report, error)
-	ListPlans(context.Context, string, string) ([]domain.Plan, error)
+	ListPlans(context.Context, string, string, string) ([]domain.Plan, error)
+	CreateScenePlans(context.Context, string, string, domain.ScenePlanInput, []domain.Plan) ([]domain.Plan, error)
 	GetPlan(context.Context, string, string) (domain.Plan, error)
 	SelectPlan(context.Context, string, string) error
 	GetChecklist(context.Context, string, string) ([]domain.ChecklistItem, error)
@@ -41,5 +43,22 @@ type Repository interface {
 	CompleteHairPreview(context.Context, domain.HairPreviewJob, string, string, string) error
 	FailHairPreview(context.Context, domain.HairPreviewJob, error) error
 	SaveHairPreview(context.Context, string, string) (domain.HairPreview, error)
+	GetTodayPlan(context.Context, string) (domain.TodayPlan, error)
+	SaveTodayPlan(context.Context, string, domain.TodayPlan) (domain.TodayPlan, error)
+	ActivateTodayPlan(context.Context, string, string) (domain.TodayPlan, error)
+	FeedbackTodayPlan(context.Context, string, string, string) (domain.TodayPlan, error)
+	CreateShareCard(context.Context, string, domain.ShareCardInput, json.RawMessage) (domain.ShareCard, error)
+	GetShareCard(context.Context, string) (domain.ShareCard, error)
+	RevokeShareCard(context.Context, string, string) error
+	CreateWardrobeItem(context.Context, string, domain.WardrobeItemInput, string) (domain.WardrobeItem, error)
+	ListWardrobeItems(context.Context, string) ([]domain.WardrobeItem, error)
+	DeleteWardrobeItem(context.Context, string, string) error
+	CreateWardrobeOutfit(context.Context, string, []domain.WardrobeItem, json.RawMessage) (domain.WardrobeOutfit, error)
+	MarkWardrobeOutfitWorn(context.Context, string, string) (domain.WardrobeOutfit, error)
+	CreateAdvisorConversation(context.Context, string, json.RawMessage) (domain.AdvisorConversation, error)
+	AddAdvisorExchange(context.Context, string, string, string, string, []domain.AdvisorAction) (domain.AdvisorMessage, error)
+	ListAdvisorMessages(context.Context, string, string) ([]domain.AdvisorMessage, error)
+	ApplyAdvisorAction(context.Context, string, string) (domain.AdvisorAction, error)
+	TrackProductEvent(context.Context, string, domain.ProductEventInput) error
 	DeleteUserData(context.Context, string) ([]string, error)
 }

@@ -31,5 +31,6 @@ Page({
       wx.navigateTo({ url: `/pages/checklist/index?id=${this.data.id}` })
     }).catch((error) => wx.showToast({ title: error.message, icon: 'none' })).finally(() => this.setData({ selecting: false }))
   },
+  sharePlan() { wx.navigateTo({ url: `/pages/share/index?type=plan&id=${this.data.id}` }) },
   onShareAppMessage() { return { title: `${this.data.plan ? this.data.plan.name : ''}形象方案｜见我`, path: '/pages/home/index' } }
 })

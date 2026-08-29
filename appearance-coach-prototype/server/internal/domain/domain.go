@@ -89,6 +89,7 @@ type PlanStep struct {
 type Plan struct {
 	ID             string     `json:"id"`
 	ReportID       string     `json:"report_id"`
+	Scene          string     `json:"scene,omitempty"`
 	Name           string     `json:"name"`
 	Slug           string     `json:"slug"`
 	ImageURL       string     `json:"image_url"`
@@ -100,6 +101,151 @@ type Plan struct {
 	Sort           int        `json:"sort"`
 	Selected       bool       `json:"selected"`
 	Steps          []PlanStep `json:"steps,omitempty"`
+}
+
+// ScenePlanInput is the lightweight brief used to tailor a saved image
+// profile to a specific upcoming occasion. It deliberately excludes photos
+// and body measurements because an existing report is reused.
+type ScenePlanInput struct {
+	Scene   string            `json:"scene"`
+	Answers map[string]string `json:"answers"`
+
+	// Legacy fields keep clients from earlier development builds compatible.
+	// New clients send Answers, whose keys vary by scene.
+	Time       string `json:"time,omitempty"`
+	Budget     string `json:"budget,omitempty"`
+	Formality  string `json:"formality,omitempty"`
+	Impression string `json:"impression,omitempty"`
+}
+
+type TodayContext struct {
+	Date        string `json:"date"`
+	City        string `json:"city"`
+	Condition   string `json:"condition"`
+	Temperature int    `json:"temperature"`
+	DayType     string `json:"day_type"`
+	Schedule    string `json:"schedule"`
+}
+
+type TodayPlanStep struct {
+	Category string `json:"category"`
+	Label    string `json:"label"`
+	Title    string `json:"title"`
+	Copy     string `json:"copy"`
+}
+
+type TodayPlan struct {
+	ID              string          `json:"id"`
+	ReportID        string          `json:"report_id,omitempty"`
+	Context         TodayContext    `json:"context"`
+	Title           string          `json:"title"`
+	Summary         string          `json:"summary"`
+	ImageURL        string          `json:"image_url"`
+	Steps           []TodayPlanStep `json:"steps"`
+	Active          bool            `json:"active"`
+	Feedback        string          `json:"feedback,omitempty"`
+	RegenerateCount int             `json:"regenerate_count"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
+}
+
+type TodayPlanInput struct {
+	ReportID string `json:"report_id,omitempty"`
+	City     string `json:"city,omitempty"`
+	Schedule string `json:"schedule,omitempty"`
+	Refresh  bool   `json:"refresh,omitempty"`
+}
+
+type ShareCardInput struct {
+	SourceType   string `json:"source_type"`
+	SourceID     string `json:"source_id"`
+	IncludePhoto bool   `json:"include_photo"`
+}
+
+type ShareCard struct {
+	ID           string          `json:"id"`
+	Token        string          `json:"token"`
+	SourceType   string          `json:"source_type"`
+	SourceID     string          `json:"source_id"`
+	Snapshot     json.RawMessage `json:"snapshot"`
+	IncludePhoto bool            `json:"include_photo"`
+	Revoked      bool            `json:"revoked"`
+	ExpiresAt    time.Time       `json:"expires_at"`
+	CreatedAt    time.Time       `json:"created_at"`
+}
+
+type WardrobeItemInput struct {
+	MediaID   string   `json:"media_id,omitempty"`
+	Name      string   `json:"name"`
+	Category  string   `json:"category"`
+	Color     string   `json:"color"`
+	Season    string   `json:"season,omitempty"`
+	Formality string   `json:"formality,omitempty"`
+	Scenes    []string `json:"scenes,omitempty"`
+}
+
+type WardrobeItem struct {
+	ID        string    `json:"id"`
+	MediaID   string    `json:"media_id,omitempty"`
+	Name      string    `json:"name"`
+	Category  string    `json:"category"`
+	Color     string    `json:"color"`
+	Season    string    `json:"season"`
+	Formality string    `json:"formality"`
+	Scenes    []string  `json:"scenes"`
+	ImageURL  string    `json:"image_url"`
+	Favorite  bool      `json:"favorite"`
+	WearCount int       `json:"wear_count"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type WardrobeOutfit struct {
+	ID        string          `json:"id"`
+	Title     string          `json:"title"`
+	Note      string          `json:"note"`
+	Context   json.RawMessage `json:"context"`
+	ItemIDs   []string        `json:"item_ids"`
+	Items     []WardrobeItem  `json:"items"`
+	Worn      bool            `json:"worn"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
+type AdvisorConversation struct {
+	ID        string          `json:"id"`
+	Title     string          `json:"title"`
+	Context   json.RawMessage `json:"context"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+type AdvisorMessageInput struct {
+	ConversationID string `json:"conversation_id,omitempty"`
+	Content        string `json:"content"`
+	ReportID       string `json:"report_id,omitempty"`
+	TodayPlanID    string `json:"today_plan_id,omitempty"`
+}
+
+type AdvisorAction struct {
+	ID      string          `json:"id"`
+	Kind    string          `json:"kind"`
+	Label   string          `json:"label"`
+	Payload json.RawMessage `json:"payload"`
+	Applied bool            `json:"applied"`
+}
+
+type AdvisorMessage struct {
+	ID             string          `json:"id"`
+	ConversationID string          `json:"conversation_id"`
+	Role           string          `json:"role"`
+	Content        string          `json:"content"`
+	Actions        []AdvisorAction `json:"actions,omitempty"`
+	CreatedAt      time.Time       `json:"created_at"`
+}
+
+type ProductEventInput struct {
+	Name    string          `json:"name"`
+	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
 type ChecklistItem struct {

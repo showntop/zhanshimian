@@ -9,7 +9,7 @@
 3. 首页点击“开始形象分析”。
 4. 在照片页点击“使用示例照片体验”，即可跑通报告、三套方案、完整方案、改造清单和反馈。
 
-真机联调时，需把 `app.js` 的 `apiBaseURL` 改为同一局域网可访问的 HTTPS 地址，并在微信公众平台配置 request/uploadFile 合法域名。
+开发版默认请求 `http://127.0.0.1:58000`。体验版和正式版不会回退到本地地址：发布前必须在 `config/runtime.js` 分别填写 `trial`/`release` HTTPS API 域名（第三方平台代开发也可通过 `extConfig.apiBaseURL` 注入），并在微信公众平台配置 request/uploadFile 合法域名。未配置时客户端会明确报错，不会尝试开发登录。
 
 页面结构：
 

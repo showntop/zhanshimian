@@ -45,4 +45,27 @@ go run ./cmd/api
 
 OpenAI 分析与穿搭 Provider 使用 Responses API 的图像输入与严格 JSON Schema 输出，并在模型响应后再次执行服务端字段、枚举、数量和安全措辞校验。发型 Provider 使用异步图像编辑任务，生成文件经格式/大小校验后写入对象存储。三个回退开关适合演示环境保持流程可用；生产评估与灰度阶段应设为 `false`，避免将降级示例误当作真实结果。分析请求使用 `store: false`，但应用自身的照片保存与删除策略仍需按隐私条款执行。
 
-生产环境应关闭 `DEV_LOGIN_ENABLED`，实现微信 `jscode2session` 适配器，并将 `LocalStorage` 替换为私有 COS/OSS。正式放量前按 [`docs/ai-evaluation.md`](../docs/ai-evaluation.md) 建立固定评测集和人工复核门槛。
+## 发布基础配置
+
+正式微信登录、腾讯云 COS 私有对象读写/预签名 URL 和高德实时天气均已提供适配器。生产环境设置 `APP_ENV=production` 后会执行启动门禁：开发登录必须关闭，API/COS 必须使用非本机 HTTPS 地址，微信密钥、COS 密钥和高德 Web 服务 Key 必须齐全，存储和天气 Provider 不允许继续使用 Demo。
+
+```bash
+APP_ENV=production
+PUBLIC_BASE_URL=https://prompt.wuyill.com/zhanshimian
+DEV_LOGIN_ENABLED=false
+WECHAT_APP_ID=wx911e0fbcba0b24d0
+WECHAT_APP_SECRET=...
+STORAGE_PROVIDER=cos
+ASSET_BUCKET=wuyill-1252214184
+ASSET_S3_ENDPOINT=https://cos.ap-beijing.myqcloud.com
+ASSET_REGION=ap-beijing
+COS_SECRET_ID=...
+COS_SECRET_KEY=...
+COS_KEY_PREFIX=zhanshimian/production
+WEATHER_PROVIDER=amap
+AMAP_WEB_SERVICE_KEY=...
+```
+
+如果直接使用 Docker Compose，可从 `server/.env.production.example` 复制。`ASSET_BUCKET + ASSET_S3_ENDPOINT` 会自动转换为 COS SDK 所需的 `COS_BUCKET_URL`；也可以直接填写完整 `COS_BUCKET_URL` 覆盖自动推导。
+
+COS 桶应保持私有；服务端只返回默认 15 分钟有效的 GET 预签名 URL。COS 子账号只授予目标前缀的 Put/Get/DeleteObject 权限，密钥不得提交仓库。微信 AppSecret 与高德 Key 同样只通过部署平台 Secret 注入。正式放量前还需按 [`docs/ai-evaluation.md`](../docs/ai-evaluation.md) 建立固定评测集和人工复核门槛。

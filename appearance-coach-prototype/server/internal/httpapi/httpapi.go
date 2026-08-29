@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/example/jianwo/server/internal/domain"
+	"github.com/example/jianwo/server/internal/provider"
 	"github.com/example/jianwo/server/internal/repository"
 	"github.com/example/jianwo/server/internal/service"
 	"github.com/google/uuid"
@@ -26,6 +27,10 @@ type API struct {
 }
 
 type RuntimeInfo struct {
+	Environment             string
+	StorageProvider         string
+	WeatherProvider         string
+	WeChatLoginConfigured   bool
 	AnalysisProvider        string
 	FallbackEnabled         bool
 	HairPreviewProvider     string
@@ -48,6 +53,7 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("GET /v1/analyses/{id}", api.auth(http.HandlerFunc(api.getAnalysis)))
 	mux.Handle("GET /v1/reports/{id}", api.auth(http.HandlerFunc(api.getReport)))
 	mux.Handle("GET /v1/reports/{id}/plans", api.auth(http.HandlerFunc(api.listPlans)))
+	mux.Handle("POST /v1/reports/{id}/scene-plans", api.auth(http.HandlerFunc(api.createScenePlans)))
 	mux.Handle("GET /v1/plans/{id}", api.auth(http.HandlerFunc(api.getPlan)))
 	mux.Handle("POST /v1/plans/{id}/select", api.auth(http.HandlerFunc(api.selectPlan)))
 	mux.Handle("GET /v1/plans/{id}/checklist", api.auth(http.HandlerFunc(api.getChecklist)))
@@ -59,6 +65,23 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("GET /v1/hair-previews", api.auth(http.HandlerFunc(api.listSavedHairPreviews)))
 	mux.Handle("GET /v1/hair-previews/{id}", api.auth(http.HandlerFunc(api.getHairPreview)))
 	mux.Handle("POST /v1/hair-previews/{id}/save", api.auth(http.HandlerFunc(api.saveHairPreview)))
+	mux.Handle("GET /v1/today/context", api.auth(http.HandlerFunc(api.getTodayContext)))
+	mux.Handle("GET /v1/today/plans/current", api.auth(http.HandlerFunc(api.getTodayPlan)))
+	mux.Handle("POST /v1/today/plans", api.auth(http.HandlerFunc(api.createTodayPlan)))
+	mux.Handle("POST /v1/today/plans/{id}/activate", api.auth(http.HandlerFunc(api.activateTodayPlan)))
+	mux.Handle("POST /v1/today/plans/{id}/feedback", api.auth(http.HandlerFunc(api.feedbackTodayPlan)))
+	mux.Handle("POST /v1/share-cards", api.auth(http.HandlerFunc(api.createShareCard)))
+	mux.HandleFunc("GET /v1/share/{token}", api.getShareCard)
+	mux.Handle("POST /v1/share-cards/{id}/revoke", api.auth(http.HandlerFunc(api.revokeShareCard)))
+	mux.Handle("GET /v1/wardrobe/items", api.auth(http.HandlerFunc(api.listWardrobeItems)))
+	mux.Handle("POST /v1/wardrobe/items", api.auth(http.HandlerFunc(api.createWardrobeItem)))
+	mux.Handle("DELETE /v1/wardrobe/items/{id}", api.auth(http.HandlerFunc(api.deleteWardrobeItem)))
+	mux.Handle("POST /v1/wardrobe/outfits", api.auth(http.HandlerFunc(api.createWardrobeOutfit)))
+	mux.Handle("POST /v1/wardrobe/outfits/{id}/wear", api.auth(http.HandlerFunc(api.wearWardrobeOutfit)))
+	mux.Handle("GET /v1/advisor/conversations/{id}/messages", api.auth(http.HandlerFunc(api.listAdvisorMessages)))
+	mux.Handle("POST /v1/advisor/messages", api.auth(http.HandlerFunc(api.sendAdvisorMessage)))
+	mux.Handle("POST /v1/advisor/actions/{id}/apply", api.auth(http.HandlerFunc(api.applyAdvisorAction)))
+	mux.Handle("POST /v1/events", api.auth(http.HandlerFunc(api.trackProductEvent)))
 	mux.Handle("DELETE /v1/me/data", api.auth(http.HandlerFunc(api.deleteData)))
 	return requestMiddleware(logger, mux)
 }
@@ -102,6 +125,10 @@ func currentUser(r *http.Request) domain.User { return r.Context().Value(userKey
 func (a *API) health(w http.ResponseWriter, _ *http.Request) {
 	writeData(w, http.StatusOK, map[string]any{
 		"status":                    "ok",
+		"environment":               a.runtime.Environment,
+		"storage_provider":          a.runtime.StorageProvider,
+		"weather_provider":          a.runtime.WeatherProvider,
+		"wechat_login_configured":   a.runtime.WeChatLoginConfigured,
 		"analysis_provider":         a.runtime.AnalysisProvider,
 		"fallback_enabled":          a.runtime.FallbackEnabled,
 		"hair_preview_provider":     a.runtime.HairPreviewProvider,
@@ -138,13 +165,12 @@ func (a *API) wechatLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "validation_error", "微信登录 code 不能为空")
 		return
 	}
-	if !a.devLoginEnabled {
-		writeError(w, r, http.StatusNotImplemented, "wechat_adapter_required", "请配置微信 jscode2session 适配器")
-		return
+	session, err := a.service.WeChatLogin(r.Context(), input.Code, input.Nickname)
+	if errors.Is(err, provider.ErrWeChatUnavailable) && a.devLoginEnabled {
+		session, err = a.service.DevLogin(r.Context(), input.Nickname)
 	}
-	session, err := a.service.DevLogin(r.Context(), input.Nickname)
 	if err != nil {
-		a.internalError(w, r, err)
+		a.writeServiceError(w, r, err)
 		return
 	}
 	writeData(w, http.StatusCreated, session)
@@ -225,12 +251,25 @@ func (a *API) getReport(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, item)
 }
 func (a *API) listPlans(w http.ResponseWriter, r *http.Request) {
-	items, err := a.service.ListPlans(r.Context(), currentUser(r).ID, r.PathValue("id"))
+	items, err := a.service.ListPlans(r.Context(), currentUser(r).ID, r.PathValue("id"), r.URL.Query().Get("scene"))
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
 	}
 	writeData(w, http.StatusOK, items)
+}
+func (a *API) createScenePlans(w http.ResponseWriter, r *http.Request) {
+	var input domain.ScenePlanInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+	items, err := a.service.CreateScenePlans(r.Context(), currentUser(r).ID, r.PathValue("id"), input)
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusCreated, items)
 }
 func (a *API) getPlan(w http.ResponseWriter, r *http.Request) {
 	item, err := a.service.GetPlan(r.Context(), currentUser(r).ID, r.PathValue("id"))
@@ -344,6 +383,198 @@ func (a *API) saveHairPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	writeData(w, http.StatusOK, preview)
 }
+
+func (a *API) getTodayContext(w http.ResponseWriter, r *http.Request) {
+	item, err := a.service.GetTodayContext(r.Context(), r.URL.Query().Get("city"), r.URL.Query().Get("schedule"))
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, item)
+}
+
+func (a *API) getTodayPlan(w http.ResponseWriter, r *http.Request) {
+	item, err := a.service.GetTodayPlan(r.Context(), currentUser(r).ID)
+	if errors.Is(err, repository.ErrNotFound) {
+		writeData(w, http.StatusOK, nil)
+		return
+	}
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, item)
+}
+
+func (a *API) createTodayPlan(w http.ResponseWriter, r *http.Request) {
+	var input domain.TodayPlanInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+	item, err := a.service.GenerateTodayPlan(r.Context(), currentUser(r).ID, input)
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusCreated, item)
+}
+
+func (a *API) activateTodayPlan(w http.ResponseWriter, r *http.Request) {
+	item, err := a.service.ActivateTodayPlan(r.Context(), currentUser(r).ID, r.PathValue("id"))
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, item)
+}
+
+func (a *API) feedbackTodayPlan(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Feedback string `json:"feedback"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+	item, err := a.service.FeedbackTodayPlan(r.Context(), currentUser(r).ID, r.PathValue("id"), input.Feedback)
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, item)
+}
+
+func (a *API) createShareCard(w http.ResponseWriter, r *http.Request) {
+	var input domain.ShareCardInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+	item, err := a.service.CreateShareCard(r.Context(), currentUser(r).ID, input)
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusCreated, item)
+}
+
+func (a *API) getShareCard(w http.ResponseWriter, r *http.Request) {
+	item, err := a.service.GetShareCard(r.Context(), r.PathValue("token"))
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, item)
+}
+
+func (a *API) revokeShareCard(w http.ResponseWriter, r *http.Request) {
+	if err := a.service.RevokeShareCard(r.Context(), currentUser(r).ID, r.PathValue("id")); err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]bool{"revoked": true})
+}
+
+func (a *API) listWardrobeItems(w http.ResponseWriter, r *http.Request) {
+	items, err := a.service.ListWardrobeItems(r.Context(), currentUser(r).ID)
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, items)
+}
+
+func (a *API) createWardrobeItem(w http.ResponseWriter, r *http.Request) {
+	var input domain.WardrobeItemInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+	item, err := a.service.CreateWardrobeItem(r.Context(), currentUser(r).ID, input)
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusCreated, item)
+}
+
+func (a *API) deleteWardrobeItem(w http.ResponseWriter, r *http.Request) {
+	if err := a.service.DeleteWardrobeItem(r.Context(), currentUser(r).ID, r.PathValue("id")); err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]bool{"deleted": true})
+}
+
+func (a *API) createWardrobeOutfit(w http.ResponseWriter, r *http.Request) {
+	var input domain.TodayContext
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+	item, err := a.service.CreateWardrobeOutfit(r.Context(), currentUser(r).ID, input)
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusCreated, item)
+}
+
+func (a *API) wearWardrobeOutfit(w http.ResponseWriter, r *http.Request) {
+	item, err := a.service.MarkWardrobeOutfitWorn(r.Context(), currentUser(r).ID, r.PathValue("id"))
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, item)
+}
+
+func (a *API) sendAdvisorMessage(w http.ResponseWriter, r *http.Request) {
+	var input domain.AdvisorMessageInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+	item, err := a.service.SendAdvisorMessage(r.Context(), currentUser(r).ID, input)
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusCreated, item)
+}
+
+func (a *API) listAdvisorMessages(w http.ResponseWriter, r *http.Request) {
+	items, err := a.service.ListAdvisorMessages(r.Context(), currentUser(r).ID, r.PathValue("id"))
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, items)
+}
+
+func (a *API) applyAdvisorAction(w http.ResponseWriter, r *http.Request) {
+	item, err := a.service.ApplyAdvisorAction(r.Context(), currentUser(r).ID, r.PathValue("id"))
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, item)
+}
+
+func (a *API) trackProductEvent(w http.ResponseWriter, r *http.Request) {
+	var input domain.ProductEventInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+	if err := a.service.TrackProductEvent(r.Context(), currentUser(r).ID, input); err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusAccepted, map[string]bool{"accepted": true})
+}
+
 func (a *API) deleteData(w http.ResponseWriter, r *http.Request) {
 	if err := a.service.DeleteUserData(r.Context(), currentUser(r).ID); err != nil {
 		a.internalError(w, r, err)
@@ -363,6 +594,12 @@ func decodeJSON(r *http.Request, target any) error {
 
 func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
+	case errors.Is(err, provider.ErrWeChatCodeRejected):
+		writeError(w, r, http.StatusUnauthorized, "wechat_code_invalid", "微信登录凭证已失效，请重新进入小程序")
+	case errors.Is(err, provider.ErrWeChatRateLimited):
+		writeError(w, r, http.StatusTooManyRequests, "wechat_login_limited", "登录请求过于频繁，请稍后再试")
+	case errors.Is(err, provider.ErrWeChatUnavailable):
+		writeError(w, r, http.StatusBadGateway, "wechat_unavailable", "微信登录服务暂时不可用，请稍后再试")
 	case errors.Is(err, service.ErrValidation):
 		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), service.ErrValidation.Error()+": "))
 	case errors.Is(err, repository.ErrNotFound):

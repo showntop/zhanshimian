@@ -19,12 +19,32 @@ services:
     build:
       context: ./server
     environment:
+      APP_ENV: ${APP_ENV:-development}
       ADDR: ${ADDR:-:8080}
       DATABASE_URL: ${DATABASE_URL:-postgres://jianwo:jianwo@postgres:5432/jianwo?sslmode=disable}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:58000}
       UPLOAD_DIR: ${UPLOAD_DIR:-data/uploads}
       ASSET_DIR: ${ASSET_DIR:-assets}
       DEV_LOGIN_ENABLED: ${DEV_LOGIN_ENABLED:-true}
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
+      WECHAT_API_BASE_URL: ${WECHAT_API_BASE_URL:-https://api.weixin.qq.com/sns/jscode2session}
+      WECHAT_REQUEST_TIMEOUT_SECONDS: ${WECHAT_REQUEST_TIMEOUT_SECONDS:-5}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      ASSET_URL_TTL_SECONDS: ${ASSET_URL_TTL_SECONDS:-900}
+      COS_BUCKET_URL: ${COS_BUCKET_URL:-}
+      ASSET_BUCKET: ${ASSET_BUCKET:-}
+      ASSET_S3_ENDPOINT: ${ASSET_S3_ENDPOINT:-}
+      ASSET_REGION: ${ASSET_REGION:-}
+      COS_SECRET_ID: ${COS_SECRET_ID:-}
+      COS_SECRET_KEY: ${COS_SECRET_KEY:-}
+      COS_KEY_PREFIX: ${COS_KEY_PREFIX:-jianwo}
+      WEATHER_PROVIDER: ${WEATHER_PROVIDER:-demo}
+      WEATHER_REQUEST_TIMEOUT_SECONDS: ${WEATHER_REQUEST_TIMEOUT_SECONDS:-5}
+      AMAP_WEB_SERVICE_KEY: ${AMAP_WEB_SERVICE_KEY:-}
+      AMAP_API_BASE_URL: ${AMAP_API_BASE_URL:-https://restapi.amap.com/v3/weather/weatherInfo}
+      AMAP_DEFAULT_CITY: ${AMAP_DEFAULT_CITY:-上海}
+      AMAP_DEFAULT_ADCODE: ${AMAP_DEFAULT_ADCODE:-310000}
       RUN_WORKER: ${RUN_WORKER:-true}
       AI_PROVIDER: ${AI_PROVIDER:-demo}
       AI_FALLBACK_TO_DEMO: ${AI_FALLBACK_TO_DEMO:-true}

@@ -1,0 +1,6 @@
+{
+  "usingComponents": {
+    "app-header": "/components/app-header/index",
+    "primary-button": "/components/primary-button/index"
+  }
+}

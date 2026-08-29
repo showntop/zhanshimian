@@ -1,6 +1,24 @@
+const runtime = require('./config/runtime')
+
+function environmentVersion() {
+  try {
+    const account = wx.getAccountInfoSync()
+    return account && account.miniProgram && account.miniProgram.envVersion || 'develop'
+  } catch (_) {
+    return 'develop'
+  }
+}
+
+function resolveAPIBaseURL() {
+  let extConfig = {}
+  try { extConfig = wx.getExtConfigSync ? wx.getExtConfigSync() || {} : {} } catch (_) {}
+  const configured = extConfig.apiBaseURL || runtime.apiBaseURLs[environmentVersion()] || ''
+  return configured.replace(/\/$/, '')
+}
+
 App({
   globalData: {
-    apiBaseURL: 'http://127.0.0.1:58000',
+    apiBaseURL: resolveAPIBaseURL(),
     token: '',
     user: null,
     analysisID: '',

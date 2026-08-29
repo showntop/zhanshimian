@@ -25,22 +25,22 @@
 
     <view wx:else class="today-card fade-up delay-1">
       <view class="today-card-head">
-        <view class="weather-line"><image src="/assets/icons/sun.svg" /><text>上海 · 多云 · 24–30°C</text></view>
-        <text class="day-kind">周五 · 工作日</text>
+        <view class="weather-line"><image src="/assets/icons/sun.svg" /><text>{{todayPlan ? todayPlan.context.city + ' · ' + todayPlan.context.condition + ' · ' + todayPlan.context.temperature + '°C' : '上海 · 多云 · 26°C'}}</text></view>
+        <text class="day-kind">{{todayPlan ? todayPlan.context.day_type + ' · ' + todayPlan.context.schedule : '工作日 · 通勤'}}</text>
       </view>
       <view class="today-body">
         <view class="today-details">
-          <text class="today-title">轻薄西装，清爽不单薄</text>
-          <view class="style-detail"><text class="detail-label">发型</text><text>轻盈侧分 · 发根蓬松</text></view>
-          <view class="style-detail"><text class="detail-label">妆造</text><text>轻透底妆 · 柔和眉眼</text></view>
-          <view class="style-detail"><text class="detail-label">穿搭</text><text>米白薄西装 · 垂感长裤</text></view>
+          <text class="today-title">{{todayPlan ? todayPlan.title : '轻薄利落，清爽不单薄'}}</text>
+          <view class="style-detail"><text class="detail-label">发型</text><text>{{todayPlan ? todayPlan.steps[0].title : '轻盈侧分 · 发根蓬松'}}</text></view>
+          <view class="style-detail"><text class="detail-label">妆造</text><text>{{todayPlan ? todayPlan.steps[1].title : '轻透底妆 · 柔和眉眼'}}</text></view>
+          <view class="style-detail"><text class="detail-label">穿搭</text><text>{{todayPlan ? todayPlan.steps[2].title : '米白薄西装 · 垂感长裤'}}</text></view>
         </view>
         <button class="today-thumb-wrap pressable" bindtap="previewTodayLook" aria-label="查看今日穿搭大图">
           <image class="today-thumb" src="{{todayLookUrl}}" mode="aspectFill" />
           <text class="today-thumb-hint">点开看大图</text>
         </button>
       </view>
-      <button class="today-action pressable" bindtap="openToday">生成我的日常方案 <text>›</text></button>
+      <button class="today-action pressable" bindtap="openToday">{{todayPlan ? '查看今日完整方案' : '生成我的今日方案'}} <text>›</text></button>
     </view>
 
     <view wx:if="{{hasProfile}}" class="product-section scene-section fade-up delay-2">

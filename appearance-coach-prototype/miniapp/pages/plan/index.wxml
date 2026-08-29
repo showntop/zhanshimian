@@ -23,6 +23,7 @@
     <text class="time-note">预计 20 分钟可完成 · 无需购买全套新品</text>
     <primary-button text="生成我的改造清单" loading="{{selecting}}" bind:tap="createChecklist" />
     <button class="save-action" bindtap="toggleSaved">{{saved ? '已保存方案' : '保存方案'}}</button>
+    <button class="save-action" bindtap="sharePlan">生成方案分享卡</button>
   </view>
   <view wx:else class="skeleton loading-card" />
 </view>

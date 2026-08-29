@@ -2,15 +2,15 @@ const api = require('../../services/api')
 const { lookImage } = require('../../utils/media')
 
 Page({
-  data: { reportId: '', plans: [], savedHair: [], selected: 0, showCurrent: false, loading: true, sceneLabel: '', asTab: false },
+  data: { reportId: '', scene: '', plans: [], savedHair: [], selected: 0, showCurrent: false, loading: true, sceneLabel: '', asTab: false },
   onLoad(options) {
     const labels = { interview: '面试', wedding: '婚礼', date: '约会', daily: '日常' }
-    this.setData({ reportId: options.reportId || wx.getStorageSync('jianwo_report_id'), sceneLabel: labels[options.scene] || '', asTab: options.tab === '1' })
+    this.setData({ reportId: options.reportId || wx.getStorageSync('jianwo_report_id'), scene: options.scene || '', sceneLabel: labels[options.scene] || '', asTab: options.tab === '1' })
     this.load()
   },
   retry() { this.setData({ loading: true }); this.load() },
   load() {
-	const planRequest = this.data.reportId ? api.getPlans(this.data.reportId) : Promise.resolve([])
+	const planRequest = this.data.reportId ? api.getPlans(this.data.reportId, this.data.scene) : Promise.resolve([])
 	Promise.all([planRequest, api.getSavedHairPreviews()]).then(([plans, savedHair]) => {
       const mapped = plans.map((plan) => ({
         ...plan,

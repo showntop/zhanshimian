@@ -14,6 +14,10 @@
     "pages/checklist/index",
     "pages/feedback/index",
     "pages/profile/index"
+    ,"pages/today/index"
+    ,"pages/share/index"
+    ,"pages/wardrobe/index"
+    ,"pages/advisor/index"
   ],
   "window": {
     "navigationStyle": "custom",

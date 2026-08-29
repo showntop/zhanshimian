@@ -90,4 +90,37 @@ purchase_result_id="$(printf '%s' "$purchase_json" | jq -r '.data.id')"
 purchase_saved_json="$(curl -fsS -X POST "$api_base/v1/tools/$purchase_result_id/save" -H "Authorization: Bearer $token")"
 test "$(printf '%s' "$purchase_saved_json" | jq -r '.data.saved')" = "true"
 
-printf 'e2e passed: report=4 findings, plans=3, checklist=3, async hair preview and advisor tools persisted\n'
+curl -fsS -X POST "$api_base/v1/events" -H "Authorization: Bearer $token" -H 'content-type: application/json' -d '{"name":"page_view","payload":{"page":"e2e"}}' | jq -e '.data.accepted == true' >/dev/null
+today_context="$(curl -fsS "$api_base/v1/today/context?city=%E6%9D%AD%E5%B7%9E&schedule=%E9%80%9A%E5%8B%A4" -H "Authorization: Bearer $token" | jq -c '.data')"
+test "$(printf '%s' "$today_context" | jq -r '.city')" = "杭州"
+today_plan="$(curl -fsS -X POST "$api_base/v1/today/plans" -H "Authorization: Bearer $token" -H 'content-type: application/json' -d "{\"report_id\":\"$report_id\",\"city\":\"杭州\",\"schedule\":\"通勤\"}" | jq -c '.data')"
+today_plan_id="$(printf '%s' "$today_plan" | jq -r '.id')"
+curl -fsS -X POST "$api_base/v1/today/plans/$today_plan_id/activate" -H "Authorization: Bearer $token" | jq -e '.data.active == true' >/dev/null
+curl -fsS -X POST "$api_base/v1/today/plans/$today_plan_id/feedback" -H "Authorization: Bearer $token" -H 'content-type: application/json' -d '{"feedback":"适合我"}' | jq -e '.data.feedback == "适合我"' >/dev/null
+
+share_card="$(curl -fsS -X POST "$api_base/v1/share-cards" -H "Authorization: Bearer $token" -H 'content-type: application/json' -d "{\"source_type\":\"today\",\"source_id\":\"$today_plan_id\",\"include_photo\":false}" | jq -c '.data')"
+share_id="$(printf '%s' "$share_card" | jq -r '.id')"
+share_token="$(printf '%s' "$share_card" | jq -r '.token')"
+curl -fsS "$api_base/v1/share/$share_token" | jq -e '.data.snapshot.title | length > 0' >/dev/null
+curl -fsS -X POST "$api_base/v1/share-cards/$share_id/revoke" -H "Authorization: Bearer $token" | jq -e '.data.revoked == true' >/dev/null
+test "$(curl -sS -o /dev/null -w '%{http_code}' "$api_base/v1/share/$share_token")" = "404"
+
+curl -fsS -X POST "$api_base/v1/wardrobe/items" -H "Authorization: Bearer $token" -H 'content-type: application/json' -d '{"name":"针织衫","category":"top","color":"米白","scenes":["daily"]}' >/dev/null
+curl -fsS -X POST "$api_base/v1/wardrobe/items" -H "Authorization: Bearer $token" -H 'content-type: application/json' -d '{"name":"长裤","category":"bottom","color":"藏蓝","scenes":["daily"]}' >/dev/null
+wardrobe_outfit="$(curl -fsS -X POST "$api_base/v1/wardrobe/outfits" -H "Authorization: Bearer $token" -H 'content-type: application/json' -d "$today_context" | jq -c '.data')"
+wardrobe_outfit_id="$(printf '%s' "$wardrobe_outfit" | jq -r '.id')"
+worn_outfit="$(curl -fsS -X POST "$api_base/v1/wardrobe/outfits/$wardrobe_outfit_id/wear" -H "Authorization: Bearer $token" | jq -c '.data')"
+printf '%s' "$worn_outfit" | jq -e '.worn == true and (.items | length) == 2 and ([.items[].wear_count] | min) >= 1' >/dev/null
+
+advisor_message="$(curl -fsS -X POST "$api_base/v1/advisor/messages" -H "Authorization: Bearer $token" -H 'content-type: application/json' -d "{\"content\":\"只用现有衣橱\",\"report_id\":\"$report_id\",\"today_plan_id\":\"$today_plan_id\"}" | jq -c '.data')"
+printf '%s' "$advisor_message" | jq -e '(.content | contains("米白针织衫")) and (.content | contains("藏蓝长裤")) and (.actions | length) == 1' >/dev/null
+advisor_action_id="$(printf '%s' "$advisor_message" | jq -r '.actions[0].id')"
+curl -fsS -X POST "$api_base/v1/advisor/actions/$advisor_action_id/apply" -H "Authorization: Bearer $token" | jq -e '.data.applied == true' >/dev/null
+
+privacy_share="$(curl -fsS -X POST "$api_base/v1/share-cards" -H "Authorization: Bearer $token" -H 'content-type: application/json' -d "{\"source_type\":\"today\",\"source_id\":\"$today_plan_id\",\"include_photo\":false}" | jq -r '.data.token')"
+curl -fsS -X DELETE "$api_base/v1/me/data" -H "Authorization: Bearer $token" -o /dev/null
+test "$(curl -fsS "$api_base/v1/today/plans/current" -H "Authorization: Bearer $token" | jq -r '.data')" = "null"
+test "$(curl -fsS "$api_base/v1/wardrobe/items" -H "Authorization: Bearer $token" | jq '.data | length')" -eq 0
+test "$(curl -sS -o /dev/null -w '%{http_code}' "$api_base/v1/share/$privacy_share")" = "404"
+
+printf 'e2e passed: analysis, scene plans, tools, today, share, wardrobe, grounded advisor, events and privacy deletion\n'

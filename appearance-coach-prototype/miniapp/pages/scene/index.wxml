@@ -2,37 +2,19 @@
 <view class="page scene-page">
   <view class="scene-summary fade-up">
     <view class="scene-mark"><image src="{{scene.icon}}" /></view>
-    <view><text class="summary-label">{{scene.label}}方案</text><text class="summary-copy">补充 4 个选择，约 30 秒</text></view>
+    <view><text class="summary-label">{{scene.label}}方案</text><text class="summary-copy">{{briefCopy}}</text></view>
     <text class="profile-reuse">{{hasProfile ? '复用档案' : '稍后建档'}}</text>
   </view>
 
   <view class="brief-card fade-up delay-1">
-    <view class="question-block">
-      <view class="question-head"><text>什么时候需要？</text><text>1 / 4</text></view>
-      <view class="choice-grid compact">
-        <button wx:for="{{timeOptions}}" wx:key="value" class="choice {{time === item.value ? 'active' : ''}}" data-field="time" data-value="{{item.value}}" bindtap="selectOne">{{item.label}}</button>
-      </view>
-    </view>
-    <view class="question-block">
-      <view class="question-head"><text>本次预算</text><text>2 / 4</text></view>
-      <view class="choice-grid">
-        <button wx:for="{{budgetOptions}}" wx:key="value" class="choice {{budget === item.value ? 'active' : ''}}" data-field="budget" data-value="{{item.value}}" bindtap="selectOne">{{item.label}}</button>
-      </view>
-    </view>
-    <view class="question-block">
-      <view class="question-head"><text>正式程度</text><text>3 / 4</text></view>
-      <view class="choice-grid">
-        <button wx:for="{{formalOptions}}" wx:key="value" class="choice {{formality === item.value ? 'active' : ''}}" data-field="formality" data-value="{{item.value}}" bindtap="selectOne">{{item.label}}</button>
-      </view>
-    </view>
-    <view class="question-block last">
-      <view class="question-head"><text>最想呈现的感觉</text><text>4 / 4</text></view>
-      <view class="choice-grid two-col">
-        <button wx:for="{{impressionOptions}}" wx:key="value" class="choice {{impression === item.value ? 'active' : ''}}" data-field="impression" data-value="{{item.value}}" bindtap="selectOne">{{item.label}}</button>
+    <view wx:for="{{questions}}" wx:key="key" wx:for-item="question" class="question-block {{question.last ? 'last' : ''}}">
+      <view class="question-head"><text>{{question.label}}</text><text>{{question.position}}</text></view>
+      <view class="choice-grid {{question.grid}}">
+        <button wx:for="{{question.options}}" wx:for-item="option" wx:key="value" class="choice {{option.active ? 'active' : ''}}" data-field="{{question.key}}" data-value="{{option.value}}" bindtap="selectOne">{{option.label}}</button>
       </view>
     </view>
   </view>
 
   <view class="reuse-note fade-up delay-2"><image src="/assets/icons/shield-check.svg" /><text>{{hasProfile ? '不会重复索要照片和身体数据' : '完成选择后只需建立一次形象档案'}}</text></view>
-  <view class="scene-action fade-up delay-2"><primary-button text="{{hasProfile ? '生成' + scene.label + '方案' : '下一步：建立形象档案'}}" bind:tap="continueFlow" /></view>
+  <view class="scene-action fade-up delay-2"><primary-button text="{{hasProfile ? '生成' + scene.label + '方案' : '下一步：建立形象档案'}}" loading="{{creating}}" bind:tap="continueFlow" /></view>
 </view>

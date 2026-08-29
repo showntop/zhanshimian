@@ -9,8 +9,10 @@
 3. 创建异步分析任务并展示进度。
 4. 查看当前形象报告、可提升 Tag、优先建议。
 5. 对比三套本人方案，查看完整发型/妆容/穿搭建议。
-6. 生成并勾选改造清单，保存方案并提交反馈。
-7. 用户可删除照片和分析数据。
+6. 已有档案时，提交场景化 Brief（如面试形式、婚礼身份、约会活动或当日环境），生成该场合专属的三套方案。
+7. 生成并勾选改造清单，保存方案并提交反馈。
+8. 用户可删除照片和分析数据。
+9. 回访用户可获得今日造型、复用轻量衣橱、继续询问私人顾问并分享主动选择的方案。
 
 本仓库内的 Demo Provider 会生成稳定、可复现的分析结果，保证没有第三方模型凭据时也能端到端运行；OpenAI Provider 已实现三张用户照片的真实结构化视觉分析。虚拟试妆/试衣与对象存储继续通过接口替换，不侵入业务层。
 
@@ -79,10 +81,15 @@ PostgreSQL ── analysis_jobs ── Worker ── provider
 - `analyses`：一次分析快照，含状态、进度、失败原因。
 - `analysis_jobs`：异步队列、重试次数、锁与下次执行时间。
 - `reports` / `report_findings`：当前印象、可提升点和首要建议。
-- `plans` / `plan_steps`：三套方案及发型、妆容、穿搭拆解。
+- `plans` / `plan_steps`：基础方案与按场合生成的三套方案，以及发型、妆容、穿搭拆解。方案按 `report_id + scene` 分组，记录生成时的轻量场合 Brief。
 - `checklist_items`：用户执行清单与完成状态。
 - `feedback`：真实使用后的感受，供下一次推荐调整。
 - `tool_results`：发型预览、穿搭诊断、购买判断的结构化结果和收藏状态；可关联形象档案与上传素材。
+- `today_plans`：按用户和日期唯一保存当天上下文、三项执行步骤、采用状态与反馈。
+- `share_cards`：保存不可变方案快照、公开随机 Token、有效期与撤销状态；公开读取不访问用户实时档案。
+- `wardrobe_items` / `wardrobe_outfits`：轻量常穿单品、组合快照与穿着次数，不承担商城或完整衣橱管理。
+- `advisor_conversations` / `advisor_messages` / `advisor_actions`：上下文对话、结构化动作与应用状态。
+- `product_events`：统一产品事件；Payload 仅接收 4 KB 内 JSON 对象，隐私删除时按用户清理。
 
 删除策略：用户主动删除时在一个事务中删除业务数据，并异步清理对象存储；审计日志只保留不可反推照片的操作元数据。
 
@@ -98,7 +105,8 @@ PostgreSQL ── analysis_jobs ── Worker ── provider
 | POST | `/v1/analyses` | 创建分析，提交三个 media id 与场景 |
 | GET | `/v1/analyses/{id}` | 轮询进度；完成后返回 report id |
 | GET | `/v1/reports/{id}` | 获取报告与 Findings |
-| GET | `/v1/reports/{id}/plans` | 获取三套方案摘要 |
+| GET | `/v1/reports/{id}/plans?scene={scene}` | 获取基础方案或指定场合的三套方案摘要；不传 `scene` 时返回基础方案 |
+| POST | `/v1/reports/{id}/scene-plans` | 复用已有档案，提交 `{scene,answers}` 场景化 Brief，并生成/更新该场合的三套方案 |
 | GET | `/v1/plans/{id}` | 获取完整方案与步骤 |
 | POST | `/v1/plans/{id}/select` | 选择并生成清单 |
 | GET | `/v1/plans/{id}/checklist` | 获取执行清单 |
@@ -110,6 +118,21 @@ PostgreSQL ── analysis_jobs ── Worker ── provider
 | GET | `/v1/hair-previews` | 获取已保存的本人发型预览 |
 | GET | `/v1/hair-previews/{id}` | 轮询生成进度与获取原图/效果图 |
 | POST | `/v1/hair-previews/{id}/save` | 保存本人发型预览 |
+| GET | `/v1/today/context` | 获取 Weather Provider 归一化后的日期、城市、天气与日程上下文 |
+| GET | `/v1/today/plans/current` | 获取当天方案；尚未生成时返回 `data: null` |
+| POST | `/v1/today/plans` | 生成或刷新当天发型、妆造与穿搭方案 |
+| POST | `/v1/today/plans/{id}/activate` | 加入今日执行清单 |
+| POST | `/v1/today/plans/{id}/feedback` | 保存当天反馈 |
+| POST | `/v1/share-cards` | 为今日方案或长期方案创建不可变分享快照 |
+| GET | `/v1/share/{token}` | 公开读取有效分享卡 |
+| POST | `/v1/share-cards/{id}/revoke` | 撤销分享，公开 Token 立即失效 |
+| GET/POST/DELETE | `/v1/wardrobe/items` | 查询、录入或移除衣橱 Lite 单品 |
+| POST | `/v1/wardrobe/outfits` | 按当天上下文生成现有衣橱组合 |
+| POST | `/v1/wardrobe/outfits/{id}/wear` | 记录穿着并返回完整水合单品 |
+| POST | `/v1/advisor/messages` | 结合报告、当天方案和衣橱生成顾问回复与动作 |
+| GET | `/v1/advisor/conversations/{id}/messages` | 获取本人顾问会话历史 |
+| POST | `/v1/advisor/actions/{id}/apply` | 应用顾问动作 |
+| POST | `/v1/events` | 写入受约束的产品事件 |
 | DELETE | `/v1/me/data` | 删除用户照片和分析数据 |
 
 统一错误：
@@ -149,8 +172,21 @@ PostgreSQL ── analysis_jobs ── Worker ── provider
 5. `provider_version` 写入结果 Payload。Demo 降级在 UI 标为“效果示例”，真实响应标为“AI 真实诊断”。
 6. 建议默认优先卷袖、换内搭、调整腰线或配色等低成本动作，不引导用户购买整套新品。
 
+### 6.3 今日上下文与顾问 Grounding
+
+1. `WeatherProvider.Current` 只返回城市、天气和温度三个稳定字段；服务层补充日期、工作日/休息日和日程，供应商响应不会进入领域模型。
+2. Demo Provider 用于开发与自动化；生产实现已接高德 Web 服务天气实况，并在 Provider 内处理超时、密钥保护和供应商错误映射。
+3. 顾问发送消息前并行语义上汇总当天方案、关联报告和用户衣橱；任一可选上下文不存在时安全降级，新用户仍可提问。
+4. 回复中的操作按钮保存报告、当天方案和衣橱单品 ID 快照，后续接入 LLM 时仍由服务端校验动作白名单和资源归属。
+5. 当前关键词回复器是可预测的第一阶段实现，不伪装成开放式智能；升级模型时保持相同的 `AdvisorMessage` / `AdvisorAction` 契约。
+
 ## 7. 安全、隐私与合规
 
+- `APP_ENV=production` 是服务端硬门禁：拒绝开发登录、本地/HTTP API 地址、本地文件存储和 Demo 天气。
+- 微信登录使用 `wx.login → /v1/auth/wechat → jscode2session`；服务端持久化 OpenID 对应关系，不保存微信 `session_key`，应用 token 仅保存 SHA-256 摘要。
+- 用户照片进入私有腾讯云 COS；数据库保存对象 Key，接口按需返回短时 GET 预签名 URL，COS 子账号权限限制到对应环境前缀。
+- 今日造型生产上下文使用高德天气实况，微信、COS 与高德密钥均只由部署 Secret 注入，不进入仓库或日志。
+- 小程序 API 地址按 `develop / trial / release` 分开，体验版与正式版缺少 HTTPS 域名时直接失败，不回退到开发接口。
 - 首次上传前展示用途、保存期限、删除入口和 AI 预览说明。
 - 只收集完成建议所需的数据；体重、三围不是第一阶段必填。
 - 上传限制：JPEG/PNG/WEBP、单张 10 MB、服务端重新识别 MIME、随机对象 Key。
@@ -169,7 +205,8 @@ PostgreSQL ── analysis_jobs ── Worker ── provider
 - 图片始终标注“当前/方案”，避免把 AI 预览误解为真实效果承诺。
 - 五张已确认视觉稿继续约束暖白、石墨、苔绿、真实人物图片与克制卡片语言；首页依据最新产品决策收敛为原生 APP 工作台，减少落地页式大标题、口号和长纵向营销节奏。
 - 首页采用新用户/回访用户双状态，并固定 `首页 / 方案 / 我的` 三项底部导航；快捷工具为发型预览、穿搭诊断和购买判断，最近方案承担连续使用入口。
-- “开始形象分析”与场景入口是两条并列入口。场景入口统一收集时间、预算、正式程度和目标印象四项单页信息；首次使用再补齐三图档案，已有报告时直接复用档案，不重复采集长表单。
+- “开始形象分析”与场景入口是两条并列入口。场景入口保持四项单页选择和统一交互，但内容按场景变化：面试看面试形式与准备范围，婚礼看身份与着装分寸，约会看活动与时段，日常看行程与环境；首次使用再补齐三图档案，已有报告时直接复用档案，不重复采集长表单。
+- 场景方案再生成是同步的轻量用例：输入仅为场合 Brief，不再次上传照片或运行视觉分析；同一报告同一场景始终保留最新的一组三套方案，重新生成会替换该场景旧方案及其未完成清单。每个场景可独立选定一套方案，不会取消其他场景的选择。
 - AR、3D 与试衣能力集中到体验实验室，以功能状态和 AI 预览标识管理用户预期；体重和三围始终为按需选填，不阻塞基础闭环。
 
 ## 9. 可观测性与指标
@@ -182,7 +219,7 @@ PostgreSQL ── analysis_jobs ── Worker ── provider
 ## 10. 测试与发布
 
 - Go：Service/Provider 单元测试、HTTP Handler 测试、PostgreSQL Repository 集成测试。
-- 小程序：纯函数与 API 映射 Node 测试，微信开发者工具进行页面和真机验证。
+- 小程序：纯函数与 API 映射 Node 测试，`miniprogram-ci` 官方编译器验证，微信开发者工具进行页面渲染和真机验证。
 - 当前仓库提供 `miniapp/scripts/validate.mjs` 做页面、组件、本地素材和 WXML 受限语法的静态检查；正式发布前仍需在目标基础库和至少一台 iOS/Android 真机完成相机、相册与安全区回归。
 - CI：`go test ./...`、`go vet ./...`、迁移校验、小程序脚本测试、敏感信息扫描。
 - 发布：迁移先行且向后兼容；API/Worker 滚动发布；模型输出带 `provider_version` 便于回放。

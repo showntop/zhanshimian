@@ -1,0 +1,19 @@
+<app-header title="方案分享卡" back="{{true}}" />
+<view class="page share-page">
+  <view wx:if="{{snapshot}}" class="poster fade-up">
+    <view class="poster-brand"><text>见我</text><text>私人形象顾问</text></view>
+    <text class="poster-label">{{snapshot.label}}</text>
+    <text class="poster-title serif">{{snapshot.title}}</text>
+    <text class="poster-summary">{{snapshot.summary}}</text>
+    <image wx:if="{{snapshot.image_url}}" src="{{snapshot.image_url}}" mode="aspectFill" />
+    <view class="poster-tags"><text>发型</text><text>妆容</text><text>穿搭</text></view>
+    <view class="poster-foot"><text>方案由本人主动分享</text><text>原始照片默认不公开</text></view>
+  </view>
+  <view wx:if="{{snapshot}}" class="share-actions">
+    <button class="primary" open-type="share">分享给微信好友</button>
+    <button bindtap="savePoster" loading="{{saving}}">保存分享卡</button>
+    <button wx:if="{{owner}}" class="revoke" bindtap="revoke">撤销这张分享卡</button>
+  </view>
+  <view wx:else class="loading skeleton" />
+</view>
+<canvas type="2d" id="shareCanvas" class="export-canvas" />

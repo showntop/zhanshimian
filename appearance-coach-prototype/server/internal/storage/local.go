@@ -7,12 +7,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type ObjectStorage interface {
 	Save(context.Context, string, io.Reader) (string, error)
 	Open(context.Context, string) (io.ReadCloser, error)
 	Delete(context.Context, string) error
+}
+
+// SignedURLStorage is implemented by private object stores that can grant
+// short-lived read access without making the bucket public.
+type SignedURLStorage interface {
+	SignedURL(context.Context, string, time.Duration) (string, error)
 }
 
 type Local struct{ Root string }

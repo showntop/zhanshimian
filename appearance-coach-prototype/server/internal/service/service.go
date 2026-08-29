@@ -30,20 +30,29 @@ type Service struct {
 	analyzer      provider.Analyzer
 	hairGenerator provider.HairPreviewGenerator
 	outfitAdvisor provider.OutfitAdvisor
+	weather       provider.WeatherProvider
+	wechat        provider.WeChatAuthenticator
 	publicBaseURL string
+	assetURLTTL   time.Duration
 	sessionTTL    time.Duration
 	maxUpload     int64
 	logger        *slog.Logger
 }
 
 type ProviderOptions struct {
-	Hair   provider.HairPreviewGenerator
-	Outfit provider.OutfitAdvisor
+	Hair        provider.HairPreviewGenerator
+	Outfit      provider.OutfitAdvisor
+	Weather     provider.WeatherProvider
+	WeChat      provider.WeChatAuthenticator
+	AssetURLTTL time.Duration
 }
 
 func New(repo repository.Repository, storage storage.ObjectStorage, analyzer provider.Analyzer, publicBaseURL string, sessionTTL time.Duration, maxUpload int64, logger *slog.Logger, options ...ProviderOptions) *Service {
 	hairGenerator := provider.HairPreviewGenerator(provider.NewDemoHairGenerator())
 	outfitAdvisor := provider.OutfitAdvisor(provider.NewDemoOutfitAdvisor())
+	weather := provider.WeatherProvider(provider.NewDemoWeatherProvider())
+	var wechat provider.WeChatAuthenticator
+	assetURLTTL := 15 * time.Minute
 	if len(options) > 0 {
 		if options[0].Hair != nil {
 			hairGenerator = options[0].Hair
@@ -51,11 +60,33 @@ func New(repo repository.Repository, storage storage.ObjectStorage, analyzer pro
 		if options[0].Outfit != nil {
 			outfitAdvisor = options[0].Outfit
 		}
+		if options[0].Weather != nil {
+			weather = options[0].Weather
+		}
+		wechat = options[0].WeChat
+		if options[0].AssetURLTTL > 0 {
+			assetURLTTL = options[0].AssetURLTTL
+		}
 	}
-	return &Service{repo: repo, storage: storage, analyzer: analyzer, hairGenerator: hairGenerator, outfitAdvisor: outfitAdvisor, publicBaseURL: strings.TrimSuffix(publicBaseURL, "/"), sessionTTL: sessionTTL, maxUpload: maxUpload, logger: logger}
+	return &Service{repo: repo, storage: storage, analyzer: analyzer, hairGenerator: hairGenerator, outfitAdvisor: outfitAdvisor, weather: weather, wechat: wechat, publicBaseURL: strings.TrimSuffix(publicBaseURL, "/"), assetURLTTL: assetURLTTL, sessionTTL: sessionTTL, maxUpload: maxUpload, logger: logger}
 }
 
 func (s *Service) DevLogin(ctx context.Context, nickname string) (domain.Session, error) {
+	return s.createSession(ctx, "dev:"+uuid.NewString(), nickname)
+}
+
+func (s *Service) WeChatLogin(ctx context.Context, code, nickname string) (domain.Session, error) {
+	if s.wechat == nil {
+		return domain.Session{}, provider.ErrWeChatUnavailable
+	}
+	identity, err := s.wechat.ExchangeCode(ctx, code)
+	if err != nil {
+		return domain.Session{}, err
+	}
+	return s.createSession(ctx, identity.OpenID, nickname)
+}
+
+func (s *Service) createSession(ctx context.Context, openID, nickname string) (domain.Session, error) {
 	if strings.TrimSpace(nickname) == "" {
 		nickname = "见我用户"
 	}
@@ -66,7 +97,6 @@ func (s *Service) DevLogin(ctx context.Context, nickname string) (domain.Session
 	token := base64.RawURLEncoding.EncodeToString(tokenBytes)
 	digest := sha256.Sum256([]byte(token))
 	expiresAt := time.Now().Add(s.sessionTTL)
-	openID := "dev:" + uuid.NewString()
 	user, err := s.repo.CreateSession(ctx, openID, nickname, digest[:], expiresAt)
 	if err != nil {
 		return domain.Session{}, err
@@ -89,7 +119,7 @@ func (s *Service) Authenticate(ctx context.Context, token string) (domain.User, 
 func (s *Service) UploadMedia(ctx context.Context, userID, kind, filename, mimeType string, size int64, reader io.Reader) (domain.MediaAsset, error) {
 	_ = filename
 	_ = mimeType
-	validKind := map[string]bool{"face": true, "side": true, "body": true, "feedback": true, "outfit": true, "product": true}
+	validKind := map[string]bool{"face": true, "side": true, "body": true, "feedback": true, "outfit": true, "product": true, "wardrobe": true}
 	if !validKind[kind] {
 		return domain.MediaAsset{}, fmt.Errorf("%w: unsupported photo kind", ErrValidation)
 	}
@@ -117,7 +147,7 @@ func (s *Service) UploadMedia(ctx context.Context, userID, kind, filename, mimeT
 		_ = s.storage.Delete(ctx, storedKey)
 		return domain.MediaAsset{}, err
 	}
-	asset.URL = s.publicBaseURL + "/uploads/" + storedKey
+	asset.URL = s.absoluteURL("/uploads/" + storedKey)
 	return asset, nil
 }
 
@@ -128,7 +158,7 @@ func detectImageType(header []byte) (string, string) {
 }
 
 func (s *Service) CreateDemoMedia(ctx context.Context, userID, kind string) (domain.MediaAsset, error) {
-	validKind := map[string]bool{"face": true, "side": true, "body": true, "outfit": true, "product": true}
+	validKind := map[string]bool{"face": true, "side": true, "body": true, "outfit": true, "product": true, "wardrobe": true}
 	if !validKind[kind] {
 		return domain.MediaAsset{}, fmt.Errorf("%w: unsupported photo kind", ErrValidation)
 	}
@@ -171,8 +201,8 @@ func (s *Service) GetReport(ctx context.Context, userID, id string) (domain.Repo
 	}
 	return report, err
 }
-func (s *Service) ListPlans(ctx context.Context, userID, reportID string) ([]domain.Plan, error) {
-	plans, err := s.repo.ListPlans(ctx, userID, reportID)
+func (s *Service) ListPlans(ctx context.Context, userID, reportID, scene string) ([]domain.Plan, error) {
+	plans, err := s.repo.ListPlans(ctx, userID, reportID, scene)
 	for i := range plans {
 		plans[i].ImageURL = s.absoluteURL(plans[i].ImageURL)
 	}
@@ -479,6 +509,21 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 func (s *Service) absoluteURL(value string) string {
 	if strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "https://") {
 		return value
+	}
+	// Bundled mini-program assets must stay relative. Turning them into a local
+	// HTTP URL makes WeChat 3.17+ reject the image even in development tools.
+	if strings.HasPrefix(value, "/assets/") {
+		return value
+	}
+	if strings.HasPrefix(value, "/uploads/") {
+		if signer, ok := s.storage.(storage.SignedURLStorage); ok {
+			key := strings.TrimPrefix(value, "/uploads/")
+			if signed, err := signer.SignedURL(context.Background(), key, s.assetURLTTL); err == nil {
+				return signed
+			} else if s.logger != nil {
+				s.logger.Error("sign asset URL", "error", err)
+			}
+		}
 	}
 	return s.publicBaseURL + "/" + strings.TrimPrefix(value, "/")
 }

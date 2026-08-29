@@ -31,6 +31,16 @@
 
   <view class="section-head fade-up delay-2"><text class="section-title">个人资料</text><text>让推荐更贴合你</text></view>
   <view class="data-list surface fade-up delay-2">
+    <button class="data-row" bindtap="openWardrobe">
+      <image class="row-icon" src="/assets/icons/bookmark.svg" />
+      <view><text class="archive-title">我的衣橱 Lite</text><text>先录入最常穿的 8 件单品</text></view>
+      <image class="row-chevron" src="/assets/icons/arrow-left.svg" />
+    </button>
+    <button class="data-row" bindtap="openAdvisor">
+      <image class="row-icon" src="/assets/icons/sparkles.svg" />
+      <view><text class="archive-title">私人顾问对话</text><text>继续问这件怎么穿、明天怎么搭</text></view>
+      <image class="row-chevron" src="/assets/icons/arrow-left.svg" />
+    </button>
     <button class="data-row" bindtap="editBasic">
       <image class="row-icon" src="/assets/icons/user.svg" />
       <view><text class="archive-title">基础信息</text><text>身高 165 cm · 产品经理</text></view>

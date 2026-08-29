@@ -1,0 +1,20 @@
+<app-header title="我的衣橱 Lite" back="{{true}}" />
+<view class="page wardrobe-page">
+  <view class="wardrobe-head fade-up"><view><text class="wardrobe-count">{{items.length}} / 8</text><text class="wardrobe-title serif">先从最常穿的单品开始</text><text class="wardrobe-copy">不用整理整个衣柜，8 件就能让日常推荐更具体。</text></view><button bindtap="openAdd">＋ 添加</button></view>
+  <view class="progress"><view style="width: {{items.length >= 8 ? 100 : items.length * 12.5}}%" /></view>
+  <scroll-view class="category-rail" scroll-x show-scrollbar="{{false}}"><view class="category-row"><button class="{{active === 'all' ? 'active' : ''}}" data-value="all" bindtap="filter">全部</button><button wx:for="{{categories}}" wx:key="value" class="{{active === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="filter">{{item.label}}</button></view></scroll-view>
+
+  <view wx:if="{{filtered.length}}" class="item-grid fade-up delay-1">
+    <view wx:for="{{filtered}}" wx:key="id" class="item-card">
+      <image src="{{item.image_url}}" mode="aspectFill" /><button class="delete" data-id="{{item.id}}" bindtap="remove">×</button>
+      <text class="item-name">{{item.name}}</text><text class="item-meta">{{item.color}} · {{item.wear_count ? '穿过 ' + item.wear_count + ' 次' : '新加入'}}</text>
+    </view>
+  </view>
+  <view wx:else class="empty surface"><image src="/assets/icons/bookmark.svg" /><text>衣橱还是空的</text><text>先加入一件最常穿的上装</text><button bindtap="openAdd">添加第一件</button></view>
+
+  <view class="outfit-action"><primary-button text="用我的衣橱生成今日搭配" disabled="{{items.length < 2}}" bind:tap="createOutfit" /><text>{{items.length < 2 ? '至少添加 2 件后可体验' : '优先组合不同类别，不引导购买'}}</text></view>
+</view>
+
+<view wx:if="{{adding}}" class="sheet-mask" catchtap="closeAdd"><view class="add-sheet" catchtap="stop"><view class="sheet-head"><text>添加常穿单品</text><button bindtap="closeAdd">完成后关闭</button></view><button class="photo-picker" bindtap="choosePhoto"><image wx:if="{{form.path}}" src="{{form.path}}" mode="aspectFill" /><text wx:else>＋ 拍照或从相册选择</text></button><input placeholder="单品名称，如：米白针织衫" value="{{form.name}}" bindinput="inputName" /><input placeholder="主颜色，如：米白" value="{{form.color}}" bindinput="inputColor" /><view class="form-categories"><button wx:for="{{categories}}" wx:key="value" class="{{form.category === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="chooseCategory">{{item.label}}</button></view><primary-button text="加入我的衣橱" loading="{{saving}}" bind:tap="saveItem" /></view></view>
+
+<view wx:if="{{outfit}}" class="sheet-mask" catchtap="closeOutfit"><view class="outfit-sheet" catchtap="stop"><text class="outfit-kicker">现有衣橱组合</text><text class="outfit-title serif">{{outfit.title}}</text><text class="outfit-note">{{outfit.note}}</text><view class="outfit-items"><view wx:for="{{outfit.items}}" wx:key="id"><image src="{{item.image_url}}" mode="aspectFill" /><text>{{item.name}}</text></view></view><primary-button text="{{outfit.worn ? '今天已经穿了' : '记录：今天穿这套'}}" disabled="{{outfit.worn}}" bind:tap="wearOutfit" /></view></view>

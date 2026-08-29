@@ -7,6 +7,9 @@ function appData() {
 
 function request(path, options = {}) {
   const data = appData()
+  if (!data.apiBaseURL) {
+    return Promise.reject(new Error('当前版本尚未配置 HTTPS API 域名'))
+  }
   return new Promise((resolve, reject) => {
     wx.request({
       url: `${data.apiBaseURL}${path}`,
@@ -23,7 +26,7 @@ function request(path, options = {}) {
           resolve(response.data && response.data.data)
           return
         }
-        if (response.statusCode === 401 && !options.retried) {
+        if (response.statusCode === 401 && !path.startsWith('/v1/auth/') && !options.retried) {
           data.token = ''
           data.user = null
           wx.removeStorageSync(TOKEN_KEY)
@@ -44,9 +47,11 @@ function ensureSession() {
   const data = appData()
   if (data.token) return Promise.resolve(data.user)
   return new Promise((resolve) => {
-    wx.login({ success: resolve, fail: () => resolve({ code: 'dev' }) })
-  }).then(({ code }) => request('/v1/auth/wechat', { method: 'POST', data: { code: code || 'dev', nickname: '见我用户' } }))
-    .catch(() => request('/v1/auth/dev', { method: 'POST', data: { nickname: '见我用户' } }))
+    wx.login({ success: resolve, fail: (error) => resolve({ error }) })
+  }).then(({ code, error }) => {
+    if (!code) throw new Error(error && error.errMsg || '微信登录失败，请重新进入小程序')
+    return request('/v1/auth/wechat', { method: 'POST', data: { code, nickname: '见我用户' } })
+  })
     .then((session) => {
       data.token = session.token
       data.user = session.user
@@ -84,7 +89,8 @@ module.exports = {
   createAnalysis: (data) => request('/v1/analyses', { method: 'POST', data }),
   getAnalysis: (id) => request(`/v1/analyses/${id}`),
   getReport: (id) => request(`/v1/reports/${id}`),
-  getPlans: (id) => request(`/v1/reports/${id}/plans`),
+  getPlans: (id, scene = '') => request(`/v1/reports/${id}/plans${scene ? `?scene=${encodeURIComponent(scene)}` : ''}`),
+  createScenePlans: (id, data) => request(`/v1/reports/${id}/scene-plans`, { method: 'POST', data }),
   getPlan: (id) => request(`/v1/plans/${id}`),
   selectPlan: (id) => request(`/v1/plans/${id}/select`, { method: 'POST' }),
   getChecklist: (id) => request(`/v1/plans/${id}/checklist`),
@@ -104,5 +110,22 @@ module.exports = {
 	getHairPreview: (id) => ensureSession().then(() => request(`/v1/hair-previews/${id}`)),
 	getSavedHairPreviews: () => ensureSession().then(() => request('/v1/hair-previews')),
 	saveHairPreview: (id) => ensureSession().then(() => request(`/v1/hair-previews/${id}/save`, { method: 'POST' })),
+  getTodayContext: () => ensureSession().then(() => request('/v1/today/context')),
+  getTodayPlan: () => ensureSession().then(() => request('/v1/today/plans/current')),
+  createTodayPlan: (data) => ensureSession().then(() => request('/v1/today/plans', { method: 'POST', data })),
+  activateTodayPlan: (id) => request(`/v1/today/plans/${id}/activate`, { method: 'POST' }),
+  feedbackTodayPlan: (id, feedback) => request(`/v1/today/plans/${id}/feedback`, { method: 'POST', data: { feedback } }),
+  createShareCard: (data) => request('/v1/share-cards', { method: 'POST', data }),
+  getShareCard: (token) => request(`/v1/share/${token}`),
+  revokeShareCard: (id) => request(`/v1/share-cards/${id}/revoke`, { method: 'POST' }),
+  getWardrobeItems: () => ensureSession().then(() => request('/v1/wardrobe/items')),
+  createWardrobeItem: (data) => request('/v1/wardrobe/items', { method: 'POST', data }),
+  deleteWardrobeItem: (id) => request(`/v1/wardrobe/items/${id}`, { method: 'DELETE' }),
+  createWardrobeOutfit: (data) => request('/v1/wardrobe/outfits', { method: 'POST', data }),
+  wearWardrobeOutfit: (id) => request(`/v1/wardrobe/outfits/${id}/wear`, { method: 'POST' }),
+  sendAdvisorMessage: (data) => ensureSession().then(() => request('/v1/advisor/messages', { method: 'POST', data, timeout: 20000 })),
+  getAdvisorMessages: (id) => request(`/v1/advisor/conversations/${id}/messages`),
+  applyAdvisorAction: (id) => request(`/v1/advisor/actions/${id}/apply`, { method: 'POST' }),
+  trackEvent: (name, payload = {}) => ensureSession().then(() => request('/v1/events', { method: 'POST', data: { name, payload } })),
   deleteData: () => request('/v1/me/data', { method: 'DELETE' })
 }
