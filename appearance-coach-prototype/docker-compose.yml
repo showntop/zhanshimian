@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: jianwo
       POSTGRES_PASSWORD: jianwo
     ports:
-      - "54329:5432"
+      - "127.0.0.1:55432:5432"
     volumes:
       - jianwo_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -21,7 +21,7 @@ services:
     environment:
       ADDR: ${ADDR:-:8080}
       DATABASE_URL: ${DATABASE_URL:-postgres://jianwo:jianwo@postgres:5432/jianwo?sslmode=disable}
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:58000}
       UPLOAD_DIR: ${UPLOAD_DIR:-data/uploads}
       ASSET_DIR: ${ASSET_DIR:-assets}
       DEV_LOGIN_ENABLED: ${DEV_LOGIN_ENABLED:-true}
@@ -42,7 +42,7 @@ services:
       OUTFIT_DIAGNOSIS_TIMEOUT_SECONDS: ${OUTFIT_DIAGNOSIS_TIMEOUT_SECONDS:-60}
       OPENAI_OUTFIT_MODEL: ${OPENAI_OUTFIT_MODEL:-gpt-5-mini}
     ports:
-      - "8080:8080"
+      - "127.0.0.1:58000:8080"
     volumes:
       - jianwo_uploads:/app/data/uploads
     depends_on:

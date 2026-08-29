@@ -1,10 +1,10 @@
 # 见我微信小程序
 
-这是原生微信小程序工程。用微信开发者工具直接导入 `miniapp/`，开发模式 API 默认是 `http://localhost:8080`，`project.config.json` 已关闭本地域名校验。
+这是原生微信小程序工程。用微信开发者工具直接导入 `miniapp/`，开发模式 API 默认是 `http://127.0.0.1:58000`，`project.config.json` 已关闭本地域名校验。
 
 首次体验：
 
-1. 启动根目录 `docker compose up --build`。
+1. 启动根目录 `docker compose --env-file server/.env up --build`。
 2. 在微信开发者工具导入此目录。
 3. 首页点击“开始形象分析”。
 4. 在照片页点击“使用示例照片体验”，即可跑通报告、三套方案、完整方案、改造清单和反馈。

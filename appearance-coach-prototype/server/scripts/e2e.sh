@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-api_base="${API_BASE_URL:-http://127.0.0.1:8080}"
+api_base="${API_BASE_URL:-http://127.0.0.1:58000}"
 
 login_json="$(curl -fsS -X POST "$api_base/v1/auth/dev" -H 'content-type: application/json' -d '{"nickname":"端到端测试"}')"
 token="$(printf '%s' "$login_json" | jq -r '.data.token')"

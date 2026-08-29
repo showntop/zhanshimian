@@ -7,7 +7,7 @@ Go 1.24 + PostgreSQL 16。API 启动时自动执行向前迁移，开发模式�
 ```bash
 cp server/.env.example server/.env
 docker compose --env-file server/.env up -d --build
-curl http://localhost:8080/healthz
+curl http://127.0.0.1:58000/healthz
 ```
 
 Compose 会从 `server/.env` 加载 API 环境变量；`server/.env` 不应提交到 Git。
@@ -21,7 +21,8 @@ Compose 会从 `server/.env` 加载 API 环境变量；`server/.env` 不应提�
 本地不使用 Docker 运行 API：
 
 ```bash
-export DATABASE_URL='postgres://jianwo:jianwo@localhost:54329/jianwo?sslmode=disable'
+export ADDR=':58000'
+export DATABASE_URL='postgres://jianwo:jianwo@localhost:55432/jianwo?sslmode=disable'
 go run ./cmd/api
 ```
 

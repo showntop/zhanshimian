@@ -60,7 +60,7 @@ func TestAnalysisMediaLoaderEnforcesProviderLimit(t *testing.T) {
 	}
 	loader := NewAnalysisMediaLoader(mediaRepositoryStub{assets: []domain.MediaAsset{
 		{ID: "face-id", Kind: "face", StorageKey: "user/face.jpg", MIMEType: "image/jpeg"},
-	}}, objects, "http://localhost:8080", 3)
+	}}, objects, "http://127.0.0.1:58000", 3)
 
 	if _, err := loader.Load(context.Background(), []string{"face-id"}); err == nil {
 		t.Fatal("expected oversized provider image to be rejected")

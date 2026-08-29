@@ -38,9 +38,9 @@ type Config struct {
 func Load() (Config, error) {
 	aiProvider := env("AI_PROVIDER", "demo")
 	cfg := Config{
-		Addr:                          env("ADDR", ":8080"),
-		DatabaseURL:                   env("DATABASE_URL", "postgres://jianwo:jianwo@localhost:54329/jianwo?sslmode=disable"),
-		PublicBaseURL:                 env("PUBLIC_BASE_URL", "http://localhost:8080"),
+		Addr:                          env("ADDR", ":58000"),
+		DatabaseURL:                   env("DATABASE_URL", "postgres://jianwo:jianwo@localhost:55432/jianwo?sslmode=disable"),
+		PublicBaseURL:                 env("PUBLIC_BASE_URL", "http://localhost:58000"),
 		UploadDir:                     env("UPLOAD_DIR", "data/uploads"),
 		AssetDir:                      env("ASSET_DIR", "assets"),
 		DevLoginEnabled:               envBool("DEV_LOGIN_ENABLED", true),

@@ -1,6 +1,6 @@
 App({
   globalData: {
-    apiBaseURL: 'http://localhost:8080',
+    apiBaseURL: 'http://127.0.0.1:58000',
     token: '',
     user: null,
     analysisID: '',
