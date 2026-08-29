@@ -21,7 +21,7 @@ Page({
     if (this.data.loading) return
     this.setData({ loading: true, error: '' })
     api.createDemoMedia('outfit').then((asset) => this.setData({
-      photo: '/assets/looks/natural.webp', mediaID: asset.id, analyzed: false, result: null, loading: false
+      photo: '/assets/looks/natural.jpg', mediaID: asset.id, analyzed: false, result: null, loading: false
     })).catch((error) => this.setData({ error: error.message, loading: false }))
   },
   selectContext(event) {

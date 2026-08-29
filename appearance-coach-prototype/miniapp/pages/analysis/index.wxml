@@ -1,7 +1,7 @@
 <app-header title="正在分析" back="{{true}}" />
 <view class="page analysis-page">
   <view class="scan-wrap fade-up">
-    <image class="scan-image" src="/assets/looks/natural.webp" mode="aspectFill" />
+    <image class="scan-image" src="/assets/looks/natural.jpg" mode="aspectFill" />
     <view class="scan-mask" />
     <view class="scan-line" />
     <view class="focus-point p1" /><view class="focus-point p2" /><view class="focus-point p3" />

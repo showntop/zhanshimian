@@ -62,6 +62,7 @@ See `src/mobile/COMPONENTS.md` for the full component and gesture contract.
 - Home has first-use and returning-user states. Keep `开始形象分析` as the independent primary action; returning users see their saved profile/report state and a compact contextual outfit card. The card may combine season, local weather, weekday/workday-or-rest-day state and the saved image profile to show hairstyle, makeup and outfit suggestions; it must not repeat the image-analysis report. The right-side outfit image is tappable and opens a large preview. Add quick tools for hair preview, outfit diagnosis, and purchase diagnosis without displacing the core analysis flow.
 - Scene shortcuts always open one lightweight scene-brief page for time, budget, formality, and desired impression. Reuse the saved image profile when it exists; never force a multi-step questionnaire before generating a scene plan.
 - Keep the three bottom destinations `首页 / 方案 / 我的`. Do not add marketplace, community, or discovery tabs. Experimental 3D/AR capabilities live under a secondary `体验实验室` entry and do not compete with the home primary action.
+- Mini-program image assets must be PNG or JPEG, not WebP — WebP rendered as blank in the WeChat build and blanked the home comparison card. PNG files under `assets/` are masters ignored by `project.config.json` packing; shipped photos are JPEG (~40-60 KB each).
 
 ## Keyboard Rule
 

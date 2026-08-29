@@ -1,24 +1,24 @@
 const LOCAL_LOOKS = {
   natural: {
-    full: '/assets/looks/natural.webp',
-    portrait: '/assets/portraits/natural.webp',
-    report: '/assets/reports/natural.webp',
-    hair: '/assets/hair/natural.webp',
-    plan: '/assets/plans/natural.webp'
+    full: '/assets/looks/natural.jpg',
+    portrait: '/assets/portraits/natural.jpg',
+    report: '/assets/reports/natural.jpg',
+    hair: '/assets/hair/natural.jpg',
+    plan: '/assets/plans/natural.jpg'
   },
   sharp: {
-    full: '/assets/looks/sharp.webp',
-    portrait: '/assets/portraits/sharp.webp',
-    report: '/assets/reports/sharp.webp',
-    hair: '/assets/hair/sharp.webp',
-    plan: '/assets/plans/sharp.webp'
+    full: '/assets/looks/sharp.jpg',
+    portrait: '/assets/portraits/sharp.jpg',
+    report: '/assets/reports/sharp.jpg',
+    hair: '/assets/hair/sharp.jpg',
+    plan: '/assets/plans/sharp.jpg'
   },
   warm: {
-    full: '/assets/looks/warm.webp',
-    portrait: '/assets/portraits/warm.webp',
-    report: '/assets/reports/warm.webp',
-    hair: '/assets/hair/warm.webp',
-    plan: '/assets/plans/warm.webp'
+    full: '/assets/looks/warm.jpg',
+    portrait: '/assets/portraits/warm.jpg',
+    report: '/assets/reports/warm.jpg',
+    hair: '/assets/hair/warm.jpg',
+    plan: '/assets/plans/warm.jpg'
   }
 }
 

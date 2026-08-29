@@ -58,8 +58,8 @@
       <view class="section-head"><view><text class="section-heading">{{hasProfile ? '最近方案' : '你会得到什么'}}</text><text class="section-note">当前与方案一眼对比</text></view><button wx:if="{{hasProfile}}" class="text-action" bindtap="openExample">全部方案</button></view>
       <button class="comparison-card pressable" bindtap="openExample">
         <view class="comparison-images">
-          <view class="comparison-half"><image src="/assets/reports/natural.webp" mode="aspectFill" /><text class="image-chip">当前</text></view>
-          <view class="comparison-half"><image src="/assets/reports/sharp.webp" mode="aspectFill" /><text class="image-chip plan-chip">方案</text></view>
+          <view class="comparison-half"><image src="/assets/reports/natural.jpg" mode="aspectFill" /><text class="image-chip">当前</text></view>
+          <view class="comparison-half"><image src="/assets/reports/sharp.jpg" mode="aspectFill" /><text class="image-chip plan-chip">方案</text></view>
           <view class="comparison-arrow">→</view>
         </view>
         <view class="comparison-footer"><view class="comparison-copy"><text class="comparison-title">清晰利落</text><text class="comparison-sub">发型 · 妆容 · 穿搭已组合</text></view><text class="example-link">查看 ›</text></view>

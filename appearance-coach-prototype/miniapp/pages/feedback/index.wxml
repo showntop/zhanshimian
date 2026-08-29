@@ -1,7 +1,7 @@
 <app-header title="实际反馈" back="{{true}}" />
 <view class="page feedback-page">
   <view wx:if="{{!done}}">
-    <view class="feedback-visual fade-up"><button class="upload-side" bindtap="choosePhoto"><image wx:if="{{feedbackImage}}" src="{{feedbackImage}}" mode="aspectFill" /><block wx:else><text class="upload-title serif">上传今天的实拍</text><text>可选 · 仅自己可见</text></block></button><image src="/assets/looks/sharp.webp" mode="aspectFill" /><text class="reference">方案参考</text></view>
+    <view class="feedback-visual fade-up"><button class="upload-side" bindtap="choosePhoto"><image wx:if="{{feedbackImage}}" src="{{feedbackImage}}" mode="aspectFill" /><block wx:else><text class="upload-title serif">上传今天的实拍</text><text>可选 · 仅自己可见</text></block></button><image src="/assets/looks/sharp.jpg" mode="aspectFill" /><text class="reference">方案参考</text></view>
     <view class="feedback-copy fade-up delay-1"><text class="eyebrow">这套方案在现实中怎么样？</text><text class="title">你的感受比 AI 判断更重要</text></view>
     <view class="rating-grid fade-up delay-2"><button wx:for="{{tags}}" wx:key="label" class="{{item.active ? 'active' : ''}}" data-tag="{{item.label}}" bindtap="toggle">{{item.label}}</button></view>
     <textarea class="comment surface" maxlength="500" placeholder="还有什么想告诉我？（选填）" value="{{comment}}" bindinput="input" />

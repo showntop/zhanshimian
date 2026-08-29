@@ -2,9 +2,9 @@ const api = require('../../services/api')
 const { lookImage } = require('../../utils/media')
 
 const fallbackStyles = [
-  { id: 'sharp', name: '锁骨层次发', note: '首选推荐', image: '/assets/hair/sharp.webp', reason: '提高视觉重心并保留脸侧空气感。', tags: ['重心提高', '肩颈更清晰'] },
-  { id: 'warm', name: '空气微卷', note: '柔和表达', image: '/assets/hair/warm.webp', reason: '柔和的发尾弧度能保留亲和感。', tags: ['自然柔和', '上镜'] },
-  { id: 'natural', name: '自然偏分', note: '低维护', image: '/assets/hair/natural.webp', reason: '只调整分缝与耳侧线条，最容易维持。', tags: ['改动小', '低维护'] }
+  { id: 'sharp', name: '锁骨层次发', note: '首选推荐', image: '/assets/hair/sharp.jpg', reason: '提高视觉重心并保留脸侧空气感。', tags: ['重心提高', '肩颈更清晰'] },
+  { id: 'warm', name: '空气微卷', note: '柔和表达', image: '/assets/hair/warm.jpg', reason: '柔和的发尾弧度能保留亲和感。', tags: ['自然柔和', '上镜'] },
+  { id: 'natural', name: '自然偏分', note: '低维护', image: '/assets/hair/natural.jpg', reason: '只调整分缝与耳侧线条，最容易维持。', tags: ['改动小', '低维护'] }
 ]
 
 Page({
