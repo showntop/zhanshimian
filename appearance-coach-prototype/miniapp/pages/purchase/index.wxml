@@ -1,0 +1,28 @@
+<app-header title="购买判断" back="{{true}}" />
+<view class="page purchase-page">
+  <view class="tool-intro fade-up"><text class="intro-title">买之前，先看它适不适合你</text><text class="intro-note">上传商品截图，我会结合你的档案和使用场景判断</text></view>
+  <view class="purchase-layout fade-up delay-1">
+    <button class="product-shot" bindtap="chooseProduct">
+      <image wx:if="{{photo}}" src="{{photo}}" mode="aspectFill" />
+      <view wx:else><view class="upload-icon"><image src="/assets/icons/bookmark.svg" /></view><text>上传商品截图</text><text>支持衣服、鞋包和配饰</text></view>
+      <text wx:if="{{photo}}" class="replace-chip">更换</text>
+    </button>
+    <view class="product-context">
+      <text>准备在哪里穿？</text>
+      <view><button wx:for="{{contexts}}" wx:key="*this" class="{{context === item ? 'active' : ''}}" data-value="{{item}}" bindtap="selectContext">{{item}}</button></view>
+    </view>
+  </view>
+  <button wx:if="{{!photo}}" class="demo-action" bindtap="useDemo">使用示例商品体验</button>
+  <text wx:if="{{error}}" class="tool-error-copy">{{error}}</text>
+  <view class="purchase-action"><primary-button text="{{loading ? '正在判断…' : '判断是否适合我'}}" loading="{{loading}}" disabled="{{!photo || loading}}" bind:tap="analyze" /></view>
+
+  <view wx:if="{{result}}" class="purchase-result fade-up">
+    <view class="result-summary"><view class="result-mark">✓</view><view><text>结论：{{result.conclusion}}</text><text>{{result.priority_title}}</text></view></view>
+    <view class="result-list">
+      <view wx:for="{{result.findings}}" wx:key="label"><text class="{{item.tone === 'caution' ? 'caution' : 'positive'}}">{{item.tone === 'caution' ? '注意' : '适合'}}</text><text>{{item.label}}</text></view>
+    </view>
+    <view class="closet-match"><text>你的衣橱可以这样搭</text><view><text wx:for="{{result.tags}}" wx:key="*this">{{item}}</text></view></view>
+    <text class="result-reason">{{result.priority_copy}}</text>
+    <button class="save-product" disabled="{{saving || result.saved}}" bindtap="saveProduct">{{result.saved ? '已加入下次方案' : (saving ? '正在保存…' : '加入下次方案')}}</button>
+  </view>
+</view>

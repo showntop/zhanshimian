@@ -1,0 +1,66 @@
+<app-header title="我的档案" back="{{true}}" />
+<view class="page page-with-nav profile-page">
+  <view class="profile-hero fade-up">
+    <view class="avatar-wrap">
+      <image src="/assets/hair/natural.webp" mode="aspectFill" />
+      <view class="avatar-status"></view>
+    </view>
+    <view class="profile-copy">
+      <text class="profile-kicker">私人形象顾问</text>
+      <text class="profile-name serif">我的形象档案</text>
+      <text class="profile-note">照片与建议仅你可见</text>
+    </view>
+  </view>
+
+  <view class="archive surface fade-up delay-1">
+    <view class="archive-intro">
+      <view><text class="archive-eyebrow">我的内容</text><text class="archive-summary">回看分析，继续完成你的方案</text></view>
+      <text class="archive-state">{{hasReport ? '档案已建立' : '等待建立'}}</text>
+    </view>
+    <button class="archive-row {{!hasReport ? 'disabled' : ''}}" bindtap="openReport" disabled="{{!hasReport}}">
+      <image class="row-icon" src="/assets/icons/document.svg" />
+      <view><text class="archive-title">最近的分析报告</text><text>{{hasReport ? '查看当前印象和改造重点' : '完成首次分析后显示'}}</text></view>
+      <image class="row-chevron" src="/assets/icons/arrow-left.svg" />
+    </button>
+    <button class="archive-row {{!hasPlan ? 'disabled' : ''}}" bindtap="openPlan" disabled="{{!hasPlan}}">
+      <image class="row-icon" src="/assets/icons/bookmark.svg" />
+      <view><text class="archive-title">已保存的方案</text><text>{{hasPlan ? '继续查看或打开执行清单' : '尚未保存方案'}}</text></view>
+      <image class="row-chevron" src="/assets/icons/arrow-left.svg" />
+    </button>
+  </view>
+
+  <view class="section-head fade-up delay-2"><text class="section-title">个人资料</text><text>让推荐更贴合你</text></view>
+  <view class="data-list surface fade-up delay-2">
+    <button class="data-row" bindtap="editBasic">
+      <image class="row-icon" src="/assets/icons/user.svg" />
+      <view><text class="archive-title">基础信息</text><text>身高 165 cm · 产品经理</text></view>
+      <image class="row-chevron" src="/assets/icons/arrow-left.svg" />
+    </button>
+    <button class="data-row" bindtap="editBody">
+      <image class="row-icon" src="/assets/icons/sparkles.svg" />
+      <view><text class="archive-title">身体数据 <text class="optional-tag">选填</text></text><text>体重与三围需要时再补充</text></view>
+      <image class="row-chevron" src="/assets/icons/arrow-left.svg" />
+    </button>
+  </view>
+
+  <view class="section-head"><text class="section-title">探索更多</text><text>按需体验</text></view>
+  <view class="explore surface">
+    <button class="explore-row" bindtap="openLab">
+      <image class="explore-icon" src="/assets/icons/sparkles.svg" />
+      <view><text class="archive-title">体验实验室</text><text>发型预览 · 3D 形象 Lite · 上半身试衣</text></view>
+      <image class="row-chevron" src="/assets/icons/arrow-left.svg" />
+    </button>
+  </view>
+
+  <view class="section-head"><text class="section-title">隐私与数据</text><text>由你掌控</text></view>
+  <view class="privacy surface">
+    <view><text class="archive-title">照片用途</text><text>仅用于生成你的形象分析和方案，不公开展示。</text></view>
+    <view><text class="archive-title">保存与删除</text><text>你可以随时删除自己的照片、报告和方案。</text></view>
+  </view>
+
+  <view class="danger-zone">
+    <view><text class="danger-title">删除形象档案</text><text>照片、报告和方案会一并清除，且无法恢复。</text></view>
+    <button class="delete" loading="{{deleting}}" bindtap="deleteData">删除我的数据</button>
+  </view>
+</view>
+<bottom-nav active="mine" />

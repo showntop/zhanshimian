@@ -1,0 +1,3 @@
+These interface icons are adapted from Heroicons (MIT License).
+Copyright (c) 2020 Refactoring UI Inc.
+https://heroicons.com/

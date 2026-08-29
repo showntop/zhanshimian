@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: jianwo
+      POSTGRES_USER: jianwo
+      POSTGRES_PASSWORD: jianwo
+    ports:
+      - "54329:5432"
+    volumes:
+      - jianwo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jianwo -d jianwo"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./server
+    environment:
+      ADDR: :8080
+      DATABASE_URL: postgres://jianwo:jianwo@postgres:5432/jianwo?sslmode=disable
+      PUBLIC_BASE_URL: http://localhost:8080
+      DEV_LOGIN_ENABLED: "true"
+      RUN_WORKER: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - jianwo_uploads:/app/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  jianwo_pgdata:
+  jianwo_uploads:

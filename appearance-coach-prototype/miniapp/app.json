@@ -1,0 +1,25 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/scene/index",
+    "pages/hair/index",
+    "pages/outfit/index",
+    "pages/purchase/index",
+    "pages/lab/index",
+    "pages/capture/index",
+    "pages/analysis/index",
+    "pages/report/index",
+    "pages/plans/index",
+    "pages/plan/index",
+    "pages/checklist/index",
+    "pages/feedback/index",
+    "pages/profile/index"
+  ],
+  "window": {
+    "navigationStyle": "custom",
+    "backgroundColor": "#f8f5f0",
+    "backgroundTextStyle": "dark"
+  },
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

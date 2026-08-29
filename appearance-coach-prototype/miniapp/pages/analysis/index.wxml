@@ -1,0 +1,17 @@
+<app-header title="正在分析" back="{{true}}" />
+<view class="page analysis-page">
+  <view class="scan-wrap fade-up">
+    <image class="scan-image" src="/assets/looks/natural.webp" mode="aspectFill" />
+    <view class="scan-mask" />
+    <view class="scan-line" />
+    <view class="focus-point p1" /><view class="focus-point p2" /><view class="focus-point p3" />
+  </view>
+  <view wx:if="{{!failed}}" class="analysis-copy fade-up delay-1">
+    <text class="eyebrow">正在组合你的专属方案</text>
+    <text class="analysis-title serif">{{stage}}</text>
+    <view class="progress"><view class="progress-value" style="width: {{progress}}%" /></view>
+    <text class="progress-number">{{progress}}%</text>
+    <view class="stage-row"><text class="{{progress >= 24 ? 'done' : ''}}">读取轮廓</text><text class="{{progress >= 56 ? 'done' : ''}}">匹配方向</text><text class="{{progress >= 86 ? 'done' : ''}}">生成方案</text></view>
+  </view>
+  <view wx:else class="analysis-copy"><text class="analysis-title serif">这次没有分析完成</text><text class="lede">照片不会丢失，你可以返回后重新提交。</text><button class="retry" bindtap="retry">返回重试</button></view>
+</view>

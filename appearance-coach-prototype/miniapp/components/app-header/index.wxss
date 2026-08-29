@@ -1,0 +1,13 @@
+.header { position: fixed; z-index: 50; left: 0; right: 0; top: 0; height: 192rpx; padding: 88rpx 32rpx 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; background: rgba(248,247,243,.96); border-bottom: 1rpx solid var(--line); backdrop-filter: blur(20rpx); }
+.header.transparent { background: rgba(248,247,243,.86); border-bottom-color: transparent; }
+.side { min-width: 100rpx; display: flex; align-items: center; }
+.side.right { padding-right: 118rpx; justify-content: flex-end; }
+.wordmark { font-size: 46rpx; font-weight: 700; letter-spacing: -4rpx; }
+.header-title { font-size: 31rpx; font-weight: 700; letter-spacing: 1rpx; }
+.icon-button, .profile-button { width: 72rpx; height: 72rpx; margin: 0; padding: 14rpx; display: flex; align-items: center; justify-content: center; background: transparent; }
+.header-icon { width: 40rpx; height: 40rpx; }
+.profile-button { padding: 12rpx; border: 2rpx solid var(--moss); border-radius: 50%; }
+.profile-icon { width: 42rpx; height: 42rpx; }
+.header-help { margin: 0; padding: 18rpx 0; background: transparent; color: var(--moss); font-size: 24rpx; line-height: 1; }
+.right { gap: 4rpx; }
+.action-hover { opacity: .5; }

@@ -1,0 +1,16 @@
+<app-header title="我的改造清单" back="{{true}}" />
+<view class="page checklist-page">
+  <block wx:if="{{plan}}">
+    <view class="check-hero fade-up"><image src="{{plan.image_url}}" mode="aspectFill" /><view><text class="eyebrow">你选择了</text><text class="check-title serif">{{plan.name}}</text><text class="muted">{{plan.descriptor}}</text></view></view>
+    <view class="progress-card surface fade-up delay-1"><view><text>完成进度</text><text class="progress-count">{{completed}} / {{items.length}}</text></view><view class="progress"><view style="width: {{items.length ? completed / items.length * 100 : 0}}%" /></view></view>
+    <view class="task-list fade-up delay-2">
+      <button wx:for="{{items}}" wx:key="id" class="task {{item.completed ? 'done' : ''}}" data-index="{{index}}" bindtap="toggle">
+        <view class="check"><icon wx:if="{{item.completed}}" type="success_no_circle" size="22" color="#ffffff" /></view>
+        <view class="task-copy"><text class="task-category">{{item.category === 'hair' ? '发型' : item.category === 'makeup' ? '妆容' : '穿搭'}}</text><text class="task-title">{{item.title}}</text><text class="task-description">{{item.description}}</text><text class="task-meta">{{item.meta}}</text></view>
+      </button>
+    </view>
+    <view class="finish-note surface"><text class="serif">真正的变化，来自一次次小行动</text><text>完成后上传实拍，你的下一次建议会更准确。</text></view>
+    <primary-button text="完成后回来反馈" bind:tap="feedback" />
+  </block>
+  <view wx:else class="skeleton checklist-loading" />
+</view>

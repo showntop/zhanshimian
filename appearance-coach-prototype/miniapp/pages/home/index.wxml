@@ -1,0 +1,90 @@
+<app-header transparent="{{true}}" />
+<scroll-view class="home-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+  <view class="home page-with-nav">
+    <view class="advisor-head fade-up">
+      <view>
+        <text class="advisor-kicker">私人形象顾问</text>
+        <text class="advisor-greeting">{{hasProfile ? '上午好，今日造型穿搭建议' : '你好，我是你的私人形象顾问'}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{!hasProfile}}" class="profile-card first-card fade-up delay-1">
+      <view class="card-topline"><text>形象档案</text><text>约 3 分钟</text></view>
+      <text class="profile-title">先让我认识真实的你</text>
+      <text class="profile-subtitle">上传 3 张照片，获得当前形象分析和 3 套本人方案</text>
+      <view class="photo-types">
+        <view class="photo-type"><view class="photo-icon"><image src="/assets/capture/face-line.png" mode="aspectFill" /></view><text>正脸</text></view>
+        <view class="photo-connector" />
+        <view class="photo-type"><view class="photo-icon"><image src="/assets/capture/side-line.png" mode="aspectFill" /></view><text>侧脸</text></view>
+        <view class="photo-connector" />
+        <view class="photo-type"><view class="photo-icon"><image src="/assets/capture/body-line.png" mode="aspectFill" /></view><text>全身</text></view>
+      </view>
+      <primary-button text="开始形象分析" bind:tap="start" />
+      <view class="privacy-line"><image src="/assets/icons/shield-check.svg" /><text>照片可随时删除，仅用于生成分析</text></view>
+    </view>
+
+    <view wx:else class="today-card fade-up delay-1">
+      <view class="today-card-head">
+        <view class="weather-line"><image src="/assets/icons/sun.svg" /><text>上海 · 多云 · 24–30°C</text></view>
+        <text class="day-kind">周五 · 工作日</text>
+      </view>
+      <view class="today-body">
+        <view class="today-details">
+          <text class="today-title">轻薄西装，清爽不单薄</text>
+          <view class="style-detail"><text class="detail-label">发型</text><text>轻盈侧分 · 发根蓬松</text></view>
+          <view class="style-detail"><text class="detail-label">妆造</text><text>轻透底妆 · 柔和眉眼</text></view>
+          <view class="style-detail"><text class="detail-label">穿搭</text><text>米白薄西装 · 垂感长裤</text></view>
+        </view>
+        <button class="today-thumb-wrap pressable" bindtap="previewTodayLook" aria-label="查看今日穿搭大图">
+          <image class="today-thumb" src="{{todayLookUrl}}" mode="aspectFill" />
+          <text class="today-thumb-hint">点开看大图</text>
+        </button>
+      </view>
+      <button class="today-action pressable" bindtap="openToday">生成我的日常方案 <text>›</text></button>
+    </view>
+
+    <view wx:if="{{hasProfile}}" class="product-section scene-section fade-up delay-2">
+      <view class="section-head"><view><text class="section-heading">你准备去哪里？</text><text class="section-note">选一个场合，我来组合适合你的方案</text></view></view>
+      <view class="scene-grid">
+        <button wx:for="{{scenes}}" wx:key="id" class="scene-item pressable" data-scene="{{item.id}}" bindtap="chooseScene">
+          <view class="scene-icon"><image src="{{item.icon}}" mode="aspectFit" /></view>
+          <text class="scene-name">{{item.label}}</text>
+          <text class="scene-note">{{item.note}}</text>
+        </button>
+      </view>
+    </view>
+
+    <view class="product-section result-section fade-up delay-2">
+      <view class="section-head"><view><text class="section-heading">{{hasProfile ? '最近方案' : '你会得到什么'}}</text><text class="section-note">当前与方案一眼对比</text></view><button wx:if="{{hasProfile}}" class="text-action" bindtap="openExample">全部方案</button></view>
+      <button class="comparison-card pressable" bindtap="openExample">
+        <view class="comparison-images">
+          <view class="comparison-half"><image src="/assets/reports/natural.webp" mode="aspectFill" /><text class="image-chip">当前</text></view>
+          <view class="comparison-half"><image src="/assets/reports/sharp.webp" mode="aspectFill" /><text class="image-chip plan-chip">方案</text></view>
+          <view class="comparison-arrow">→</view>
+        </view>
+        <view class="comparison-footer"><view class="comparison-copy"><text class="comparison-title">清晰利落</text><text class="comparison-sub">发型 · 妆容 · 穿搭已组合</text></view><text class="example-link">查看 ›</text></view>
+      </button>
+    </view>
+
+    <view wx:if="{{hasProfile}}" class="product-section tool-section fade-up delay-3">
+      <view class="section-head"><view><text class="section-heading">快捷工具</text><text class="section-note">处理今天眼前的一件事</text></view></view>
+      <scroll-view class="tool-rail" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="tool-row">
+          <button wx:for="{{tools}}" wx:key="id" class="tool-card pressable" data-tool="{{item.id}}" bindtap="openTool">
+            <view class="tool-icon"><image src="{{item.icon}}" mode="aspectFit" /></view>
+            <view><text class="tool-name">{{item.label}}</text><text class="tool-note">{{item.note}}</text></view>
+            <text wx:if="{{item.badge}}" class="tool-badge">{{item.badge}}</text>
+          </button>
+        </view>
+      </scroll-view>
+    </view>
+
+  </view>
+</scroll-view>
+<bottom-nav active="home" />
+<view wx:if="{{previewOpen}}" class="look-lightbox" catchtap="closeTodayLook">
+  <view class="look-lightbox-inner" catchtap="noop">
+    <image src="{{todayLookUrl}}" mode="aspectFit" />
+    <text>点击任意处关闭</text>
+  </view>
+</view>

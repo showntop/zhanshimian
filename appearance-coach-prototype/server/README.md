@@ -1,0 +1,44 @@
+# 见我 API
+
+Go 1.24 + PostgreSQL 16。API 启动时自动执行向前迁移，开发模式在 API 进程内运行分析 Worker。
+
+除三图分析、报告、方案、清单和反馈外，API 也提供异步本人发型预览、真实穿搭诊断、购买判断及结果保存接口。默认 Demo Provider 返回稳定示例；配置 OpenAI Provider 后，系统会读取用户照片并生成结构化报告、发型编辑图和单图穿搭建议。
+
+```bash
+docker compose up --build
+curl http://localhost:8080/healthz
+```
+
+健康接口同时返回当前分析模式与是否允许 Demo 回退：
+
+```json
+{"data":{"status":"ok","analysis_provider":"demo","hair_preview_provider":"demo","outfit_diagnosis_provider":"demo","fallback_enabled":false}}
+```
+
+本地不使用 Docker 运行 API：
+
+```bash
+export DATABASE_URL='postgres://jianwo:jianwo@localhost:54329/jianwo?sslmode=disable'
+go run ./cmd/api
+```
+
+启用真实三图分析：
+
+```bash
+export AI_PROVIDER=openai
+export OPENAI_API_KEY='...'
+export OPENAI_VISION_MODEL=gpt-5-mini
+export HAIR_PREVIEW_PROVIDER=openai
+export OPENAI_IMAGE_MODEL=gpt-image-2
+export OPENAI_IMAGE_QUALITY=medium
+export OUTFIT_DIAGNOSIS_PROVIDER=openai
+export OPENAI_OUTFIT_MODEL=gpt-5-mini
+export AI_FALLBACK_TO_DEMO=false
+export HAIR_PREVIEW_FALLBACK_TO_DEMO=false
+export OUTFIT_DIAGNOSIS_FALLBACK_TO_DEMO=false
+go run ./cmd/api
+```
+
+OpenAI 分析与穿搭 Provider 使用 Responses API 的图像输入与严格 JSON Schema 输出，并在模型响应后再次执行服务端字段、枚举、数量和安全措辞校验。发型 Provider 使用异步图像编辑任务，生成文件经格式/大小校验后写入对象存储。三个回退开关适合演示环境保持流程可用；生产评估与灰度阶段应设为 `false`，避免将降级示例误当作真实结果。分析请求使用 `store: false`，但应用自身的照片保存与删除策略仍需按隐私条款执行。
+
+生产环境应关闭 `DEV_LOGIN_ENABLED`，实现微信 `jscode2session` 适配器，并将 `LocalStorage` 替换为私有 COS/OSS。正式放量前按 [`docs/ai-evaluation.md`](../docs/ai-evaluation.md) 建立固定评测集和人工复核门槛。

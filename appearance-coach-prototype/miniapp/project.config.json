@@ -1,0 +1,46 @@
+{
+  "description": "见我 AI 私人形象顾问",
+  "packOptions": {
+    "ignore": [
+      { "type": "glob", "value": "assets/looks/**/*.png" },
+      { "type": "glob", "value": "assets/reports/**/*.png" },
+      { "type": "glob", "value": "assets/portraits/**/*.png" },
+      { "type": "glob", "value": "assets/plans/**/*.png" },
+      { "type": "glob", "value": "assets/hair/**/*.png" }
+    ],
+    "include": []
+  },
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "coverView": true,
+    "showShadowRootInWxmlPanel": true,
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  },
+  "compileType": "miniprogram",
+  "libVersion": "trial",
+  "appid": "wx911e0fbcba0b24d0",
+  "projectname": "jianwo-miniapp",
+  "condition": {},
+  "simulatorPluginLibVersion": {},
+  "editorSetting": {},
+  "isGameTourist": false
+}

@@ -1,0 +1,66 @@
+page {
+  min-height: 100%;
+  --app-bg: #f8f7f3;
+  --surface: rgba(255,255,255,.78);
+  --surface-strong: #ffffff;
+  --ink: #292d29;
+  --ink-secondary: #656b64;
+  --ink-tertiary: #747a73;
+  --moss: #567243;
+  --moss-pressed: #486238;
+  --moss-soft: #edf2e9;
+  --line: rgba(69,78,64,.14);
+  --radius-sm: 16rpx;
+  --radius-md: 20rpx;
+  --radius-lg: 24rpx;
+  --radius-xl: 28rpx;
+  --page-gutter: 32rpx;
+  background: var(--app-bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+}
+
+view, text, image, button, scroll-view, swiper, swiper-item { box-sizing: border-box; }
+button { font: inherit; }
+button::after { border: 0; }
+
+.page {
+  min-height: 100vh;
+  padding: 200rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 48rpx);
+  background: var(--app-bg);
+}
+
+.page-with-nav { padding-bottom: calc(env(safe-area-inset-bottom) + 164rpx); }
+.serif { font-family: "Songti SC", "STSong", serif; }
+.eyebrow { color: #587344; font-size: 23rpx; font-weight: 600; letter-spacing: 4rpx; }
+.title { margin: 18rpx 0; font-family: "Songti SC", "STSong", serif; font-size: 50rpx; line-height: 1.26; font-weight: 700; letter-spacing: -1rpx; }
+.lede { color: var(--ink-secondary); font-size: 26rpx; line-height: 1.65; }
+.section-title { margin: 40rpx 0 20rpx; color: var(--ink); font-size: 32rpx; font-weight: 700; }
+.muted { color: var(--ink-tertiary); }
+.sage { color: var(--moss); }
+
+.pill-row { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.pill { padding: 10rpx 18rpx; border-radius: 999rpx; background: #efeee9; color: #566052; font-size: 22rpx; }
+.pill.active { background: var(--moss); color: #fff; }
+
+.surface { background: var(--surface); border: 1rpx solid var(--line); border-radius: var(--radius-lg); }
+.hairline { height: 1rpx; background: #e4e1da; }
+.safe-bottom { height: calc(env(safe-area-inset-bottom) + 20rpx); }
+
+.fade-up { animation: fade-up .52s cubic-bezier(.2,.8,.2,1) both; }
+.fade-up.delay-1 { animation-delay: .08s; }
+.fade-up.delay-2 { animation-delay: .16s; }
+.fade-up.delay-3 { animation-delay: .24s; }
+@keyframes fade-up { from { opacity: 0; transform: translateY(22rpx); } to { opacity: 1; transform: translateY(0); } }
+
+.pressable { transition: transform .16s ease, opacity .16s ease; }
+.pressable:active { transform: scale(.985); opacity: .88; }
+
+.skeleton { position: relative; overflow: hidden; background: #ebe8e1; }
+.skeleton::after { content: ""; position: absolute; inset: 0; background: rgba(255,255,255,.35); transform: translateX(-100%); animation: shimmer 1.3s infinite; }
+@keyframes shimmer { to { transform: translateX(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up, .skeleton::after { animation: none !important; }
+}

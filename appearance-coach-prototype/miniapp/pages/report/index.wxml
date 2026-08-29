@@ -1,0 +1,29 @@
+<app-header title="形象分析报告" back="{{true}}" />
+<view class="page report-page">
+  <view wx:if="{{loading}}" class="loading-view"><view class="skeleton skeleton-title" /><view class="skeleton skeleton-photo" /></view>
+  <block wx:else-if="{{report}}">
+    <view class="status fade-up"><icon type="success" size="18" color="#587344" /><text>分析完成 · 已保存至形象档案</text></view>
+    <text class="report-title serif fade-up">你的形象特点，
+已经看清楚了</text>
+    <view class="current-card fade-up delay-1">
+      <image src="{{image}}" mode="aspectFill" />
+      <text class="current-label">当前形象</text>
+      <view wx:for="{{annotations}}" wx:key="id" class="finding tag-{{index}}"><text class="number">{{index + 1}}</text><text>{{item.label}}</text><view class="connector" /></view>
+    </view>
+    <view class="impression fade-up delay-2">
+      <text class="impression-title serif">你的当前印象</text>
+      <view class="pill-row"><text wx:for="{{report.impression_tags}}" wx:key="*this" class="pill">{{item}}</text></view>
+    </view>
+    <view class="priority surface fade-up delay-2">
+      <view class="priority-star"><image src="/assets/icons/sparkles.svg" /></view>
+      <view class="priority-content"><text class="priority-label">最值得先改的一处</text><text class="priority-title serif">{{report.priority_title}}</text><text class="priority-copy">{{report.priority_copy}}</text></view>
+    </view>
+    <view class="suggestions fade-up delay-3">
+      <text class="section-title">给你的 3 个建议</text>
+      <view class="suggestion-row"><image src="/assets/icons/sparkles.svg" /><text class="suggestion-type">发型</text><text>增加颅顶蓬松度，露出下颌线</text><text class="chevron">〉</text></view>
+      <view class="suggestion-row"><image src="/assets/icons/user.svg" /><text class="suggestion-type">妆容</text><text>强化眉形与眼部对比</text><text class="chevron">〉</text></view>
+      <view class="suggestion-row"><image src="/assets/icons/briefcase.svg" /><text class="suggestion-type">穿搭</text><text>选择清晰肩线和更明亮的上身配色</text><text class="chevron">〉</text></view>
+    </view>
+    <view class="report-action"><primary-button text="查看 3 套本人方案" bind:tap="viewPlans" /></view>
+  </block>
+</view>

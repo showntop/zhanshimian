@@ -1,0 +1,1 @@
+<button class="primary {{disabled ? 'disabled' : ''}} {{loading ? 'loading' : ''}}" disabled="{{disabled || loading}}" loading="{{loading}}" bindtap="tap" hover-class="primary-hover">{{loading ? '请稍候…' : text}}</button>

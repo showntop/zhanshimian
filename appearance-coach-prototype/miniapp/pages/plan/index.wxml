@@ -1,0 +1,28 @@
+<app-header title="{{plan ? plan.name + '方案' : '完整方案'}}" back="{{true}}" bookmark="{{true}}" bind:bookmark="toggleSaved" />
+<view class="page plan-page">
+  <view wx:if="{{plan}}">
+    <text class="plan-meta fade-up">方案 1 / 3 · {{plan.recommended ? '首选推荐' : '为你定制'}}</text>
+    <text class="plan-title serif fade-up">把自然亲和，
+变成清晰可靠</text>
+    <view class="hero fade-up delay-1">
+      <image class="hero-image" src="{{showCurrent ? plan.current_image_url : plan.image_url}}" mode="aspectFill" />
+      <image class="current-thumb" src="{{showCurrent ? plan.image_url : plan.current_image_url}}" mode="aspectFill" />
+      <text class="current-label">{{showCurrent ? '方案' : '当前'}}</text>
+      <text class="scheme-label">{{showCurrent ? '当前' : '方案'}}</text>
+      <button class="compare-button" bindtap="compare">对比</button>
+      <text class="compare-note">点按查看变化前后</text>
+    </view>
+    <view class="outcomes fade-up delay-2"><view wx:for="{{plan.outcome_tags}}" wx:key="*this"><icon type="success_no_circle" size="18" color="#587344" /><text>{{item}}</text></view></view>
+    <text class="section-title">这套方案，具体怎么改</text>
+    <view class="tabs"><button wx:for="{{categories}}" wx:key="*this" class="{{active === index ? 'active' : ''}}" data-index="{{index}}" bindtap="changeTab">{{item}}</button></view>
+    <view class="step surface fade-up" wx:if="{{plan.steps[active]}}">
+      <view class="step-copy"><text class="step-title serif">{{plan.steps[active].title}}</text><text class="step-summary">{{plan.steps[active].summary}}</text><view class="detail-row" wx:for="{{plan.steps[active].details}}" wx:key="label"><text>{{item.label}}</text><text>{{item.value}}</text></view></view>
+      <view class="detail-visual"><image src="{{active === 2 ? plan.image_url : plan.detail_image_url}}" mode="aspectFill" /><view class="mark m1" /><view class="mark m2" /><view class="mark m3" /></view>
+    </view>
+    <view class="collapsed"><view wx:for="{{plan.steps}}" wx:if="{{index !== active}}" wx:key="id" class="collapsed-row" data-index="{{index}}" bindtap="changeTab"><text class="collapsed-type">{{categories[index]}}</text><text>{{item.title}}</text><text class="more">查看</text></view></view>
+    <text class="time-note">预计 20 分钟可完成 · 无需购买全套新品</text>
+    <primary-button text="生成我的改造清单" loading="{{selecting}}" bind:tap="createChecklist" />
+    <button class="save-action" bindtap="toggleSaved">{{saved ? '已保存方案' : '保存方案'}}</button>
+  </view>
+  <view wx:else class="skeleton loading-card" />
+</view>

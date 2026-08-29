@@ -1,0 +1,13 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+
+# WeChat Mini Program CI credentials
+miniapp/*.key
+
+# Runtime data and local secrets
+server/data/
+server/.env
+*.env
+coverage.out

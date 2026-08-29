@@ -1,0 +1,13 @@
+<view class="header {{transparent ? 'transparent' : ''}}">
+  <view class="side">
+    <button wx:if="{{back}}" class="icon-button" bindtap="goBack" hover-class="action-hover" aria-label="返回"><image class="header-icon" src="/assets/icons/arrow-left.svg" /></button>
+    <text wx:else class="wordmark serif">见我</text>
+  </view>
+  <text class="header-title">{{title}}</text>
+  <view class="side right">
+    <button wx:if="{{help}}" class="header-help" bindtap="emitHelp" hover-class="action-hover">拍摄帮助</button>
+    <button wx:if="{{bookmark}}" class="icon-button" bindtap="emitBookmark" hover-class="action-hover" aria-label="收藏"><image class="header-icon" src="/assets/icons/bookmark.svg" /></button>
+    <button wx:if="{{share}}" class="icon-button" open-type="share" hover-class="action-hover" aria-label="分享"><image class="header-icon" src="/assets/icons/share.svg" /></button>
+    <button wx:if="{{profile}}" class="profile-button" bindtap="openProfile" hover-class="action-hover" aria-label="我的档案"><image class="profile-icon" src="/assets/icons/user.svg" /></button>
+  </view>
+</view>
