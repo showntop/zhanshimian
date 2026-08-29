@@ -5,9 +5,12 @@ Go 1.24 + PostgreSQL 16。API 启动时自动执行向前迁移，开发模式�
 除三图分析、报告、方案、清单和反馈外，API 也提供异步本人发型预览、真实穿搭诊断、购买判断及结果保存接口。默认 Demo Provider 返回稳定示例；配置 OpenAI Provider 后，系统会读取用户照片并生成结构化报告、发型编辑图和单图穿搭建议。
 
 ```bash
-docker compose up --build
+cp server/.env.example server/.env
+docker compose --env-file server/.env up -d --build
 curl http://localhost:8080/healthz
 ```
+
+Compose 会从 `server/.env` 加载 API 环境变量；`server/.env` 不应提交到 Git。
 
 健康接口同时返回当前分析模式与是否允许 Demo 回退：
 

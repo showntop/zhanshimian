@@ -19,11 +19,28 @@ services:
     build:
       context: ./server
     environment:
-      ADDR: :8080
-      DATABASE_URL: postgres://jianwo:jianwo@postgres:5432/jianwo?sslmode=disable
-      PUBLIC_BASE_URL: http://localhost:8080
-      DEV_LOGIN_ENABLED: "true"
-      RUN_WORKER: "true"
+      ADDR: ${ADDR:-:8080}
+      DATABASE_URL: ${DATABASE_URL:-postgres://jianwo:jianwo@postgres:5432/jianwo?sslmode=disable}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      UPLOAD_DIR: ${UPLOAD_DIR:-data/uploads}
+      ASSET_DIR: ${ASSET_DIR:-assets}
+      DEV_LOGIN_ENABLED: ${DEV_LOGIN_ENABLED:-true}
+      RUN_WORKER: ${RUN_WORKER:-true}
+      AI_PROVIDER: ${AI_PROVIDER:-demo}
+      AI_FALLBACK_TO_DEMO: ${AI_FALLBACK_TO_DEMO:-true}
+      AI_REQUEST_TIMEOUT_SECONDS: ${AI_REQUEST_TIMEOUT_SECONDS:-90}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_VISION_MODEL: ${OPENAI_VISION_MODEL:-gpt-5-mini}
+      HAIR_PREVIEW_PROVIDER: ${HAIR_PREVIEW_PROVIDER:-demo}
+      HAIR_PREVIEW_FALLBACK_TO_DEMO: ${HAIR_PREVIEW_FALLBACK_TO_DEMO:-true}
+      HAIR_PREVIEW_TIMEOUT_SECONDS: ${HAIR_PREVIEW_TIMEOUT_SECONDS:-150}
+      OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-2}
+      OPENAI_IMAGE_QUALITY: ${OPENAI_IMAGE_QUALITY:-medium}
+      OUTFIT_DIAGNOSIS_PROVIDER: ${OUTFIT_DIAGNOSIS_PROVIDER:-demo}
+      OUTFIT_DIAGNOSIS_FALLBACK_TO_DEMO: ${OUTFIT_DIAGNOSIS_FALLBACK_TO_DEMO:-true}
+      OUTFIT_DIAGNOSIS_TIMEOUT_SECONDS: ${OUTFIT_DIAGNOSIS_TIMEOUT_SECONDS:-60}
+      OPENAI_OUTFIT_MODEL: ${OPENAI_OUTFIT_MODEL:-gpt-5-mini}
     ports:
       - "8080:8080"
     volumes:
