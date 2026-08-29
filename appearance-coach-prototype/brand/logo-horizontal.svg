@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="480" viewBox="0 0 1600 480" role="img" aria-labelledby="title desc">
+  <title id="title">怎么打扮</title>
+  <desc id="desc">怎么打扮 AI 形象顾问横版品牌标志</desc>
+  <g transform="translate(92 38)">
+    <text x="0" y="244" fill="#252725" font-family="Songti SC, STSong, Noto Serif CJK SC, serif" font-size="218" font-weight="700" letter-spacing="-14">怎么打</text>
+    <text x="626" y="244" fill="#587344" font-family="Songti SC, STSong, Noto Serif CJK SC, serif" font-size="218" font-weight="700">扮</text>
+    <line x1="2" y1="324" x2="192" y2="324" stroke="#587344" stroke-width="8" stroke-linecap="round"/>
+    <text x="228" y="346" fill="#252725" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="58" font-weight="500" letter-spacing="18">AI 形象顾问</text>
+    <line x1="704" y1="324" x2="894" y2="324" stroke="#587344" stroke-width="8" stroke-linecap="round"/>
+  </g>
+</svg>

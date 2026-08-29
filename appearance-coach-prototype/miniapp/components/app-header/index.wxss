@@ -2,7 +2,8 @@
 .header.transparent { background: rgba(248,247,243,.86); border-bottom-color: transparent; }
 .side { min-width: 100rpx; display: flex; align-items: center; }
 .side.right { padding-right: 118rpx; justify-content: flex-end; }
-.wordmark { font-size: 46rpx; font-weight: 700; letter-spacing: -4rpx; }
+.wordmark { display: flex; white-space: nowrap; font-size: 34rpx; font-weight: 700; letter-spacing: -2rpx; }
+.wordmark-accent { color: var(--moss); }
 .header-title { font-size: 31rpx; font-weight: 700; letter-spacing: 1rpx; }
 .icon-button, .profile-button { width: 72rpx; height: 72rpx; margin: 0; padding: 14rpx; display: flex; align-items: center; justify-content: center; background: transparent; }
 .header-icon { width: 40rpx; height: 40rpx; }

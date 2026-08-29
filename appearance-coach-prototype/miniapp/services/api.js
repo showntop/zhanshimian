@@ -50,7 +50,7 @@ function ensureSession() {
     wx.login({ success: resolve, fail: (error) => resolve({ error }) })
   }).then(({ code, error }) => {
     if (!code) throw new Error(error && error.errMsg || '微信登录失败，请重新进入小程序')
-    return request('/v1/auth/wechat', { method: 'POST', data: { code, nickname: '见我用户' } })
+    return request('/v1/auth/wechat', { method: 'POST', data: { code, nickname: '怎么打扮用户' } })
   })
     .then((session) => {
       data.token = session.token

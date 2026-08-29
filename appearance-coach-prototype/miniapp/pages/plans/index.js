@@ -26,5 +26,5 @@ Page({
   selectThumb(event) { this.setData({ selected: Number(event.currentTarget.dataset.index), showCurrent: false }) },
   toggleCompare(event) { this.setData({ showCurrent: event.currentTarget.dataset.mode === 'current' }) },
   openPlan() { const plan = this.data.plans[this.data.selected]; if (plan) wx.navigateTo({ url: `/pages/plan/index?id=${plan.id}` }) },
-  onShareAppMessage() { return { title: '同一个我，三种更适合的表达｜见我', path: '/pages/home/index' } }
+  onShareAppMessage() { return { title: '同一个我，三种更适合的表达｜怎么打扮', path: '/pages/home/index' } }
 })

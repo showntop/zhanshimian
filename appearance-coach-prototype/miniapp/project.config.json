@@ -1,5 +1,5 @@
 {
-  "description": "见我 AI 私人形象顾问",
+  "description": "怎么打扮 AI 形象顾问",
   "packOptions": {
     "ignore": [
       { "type": "glob", "value": "assets/looks/**/*.png" },

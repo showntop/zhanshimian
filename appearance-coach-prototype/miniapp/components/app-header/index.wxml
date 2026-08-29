@@ -1,7 +1,7 @@
 <view class="header {{transparent ? 'transparent' : ''}}">
   <view class="side">
     <button wx:if="{{back}}" class="icon-button" bindtap="goBack" hover-class="action-hover" aria-label="返回"><image class="header-icon" src="/assets/icons/arrow-left.svg" /></button>
-    <text wx:else class="wordmark serif">见我</text>
+    <view wx:else class="wordmark serif"><text>怎么打</text><text class="wordmark-accent">扮</text></view>
   </view>
   <text class="header-title">{{title}}</text>
   <view class="side right">

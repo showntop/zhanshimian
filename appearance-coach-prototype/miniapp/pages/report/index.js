@@ -2,7 +2,7 @@ const api = require('../../services/api')
 const { lookImage } = require('../../utils/media')
 
 Page({
-  data: { id: '', scene: '', loading: true, report: null, annotations: [], image: '/assets/reports/natural.webp' },
+  data: { id: '', scene: '', loading: true, report: null, annotations: [], image: '/assets/reports/natural.jpg' },
   onLoad(options) {
     const id = options.id || getApp().globalData.reportID || wx.getStorageSync('jianwo_report_id')
     this.setData({ id, scene: options.scene || '' })
@@ -22,5 +22,5 @@ Page({
     const scene = this.data.scene ? `&scene=${this.data.scene}` : ''
     wx.navigateTo({ url: `/pages/plans/index?reportId=${this.data.id}${scene}` })
   },
-  onShareAppMessage() { return { title: '我的形象分析报告｜见我', path: '/pages/home/index' } }
+  onShareAppMessage() { return { title: '我的形象分析报告｜怎么打扮', path: '/pages/home/index' } }
 })

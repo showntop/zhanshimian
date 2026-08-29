@@ -88,7 +88,7 @@ func (s *Service) WeChatLogin(ctx context.Context, code, nickname string) (domai
 
 func (s *Service) createSession(ctx context.Context, openID, nickname string) (domain.Session, error) {
 	if strings.TrimSpace(nickname) == "" {
-		nickname = "见我用户"
+		nickname = "怎么打扮用户"
 	}
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {

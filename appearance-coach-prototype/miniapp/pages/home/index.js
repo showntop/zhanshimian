@@ -14,7 +14,7 @@ Page({
     ],
     hasProfile: false,
     reportID: '',
-    todayLookUrl: '/assets/plans/sharp.webp',
+    todayLookUrl: '/assets/plans/sharp.jpg',
     todayPlan: null,
     previewOpen: false
   },
@@ -53,5 +53,5 @@ Page({
     else wx.navigateTo({ url: '/pages/capture/index?scene=general&demo=1' })
   },
   openLab() { wx.navigateTo({ url: '/pages/lab/index' }) },
-  onShareAppMessage() { return { title: '见我｜你的私人形象顾问', path: '/pages/home/index' } }
+  onShareAppMessage() { return { title: '怎么打扮｜你的 AI 形象顾问', path: '/pages/home/index' } }
 })

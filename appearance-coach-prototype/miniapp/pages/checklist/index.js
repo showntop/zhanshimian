@@ -19,5 +19,5 @@ Page({
     api.setChecklistItem(before.id, !before.completed).catch(() => this.setData({ items: this.data.items.map((item, itemIndex) => itemIndex === index ? before : item) }))
   },
   feedback() { wx.navigateTo({ url: `/pages/feedback/index?planId=${this.data.id}` }) },
-  onShareAppMessage() { return { title: '我的形象改造清单｜见我', path: '/pages/home/index' } }
+  onShareAppMessage() { return { title: '我的形象改造清单｜怎么打扮', path: '/pages/home/index' } }
 })
