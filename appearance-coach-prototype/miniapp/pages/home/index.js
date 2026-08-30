@@ -1,3 +1,6 @@
+const api = require('../../services/api')
+const { lookImage, userImage } = require('../../utils/media')
+
 Page({
   data: {
     scenes: [
@@ -15,17 +18,27 @@ Page({
     hasProfile: false,
     reportID: '',
     todayLookUrl: '/assets/plans/sharp.jpg',
+    currentLookUrl: '',
+    referenceLookUrl: '/assets/reports/sharp.jpg',
+    comparisonTitle: '清晰利落',
     todayPlan: null,
     previewOpen: false
   },
   onShow() {
-	const api = require('../../services/api')
 	api.trackEvent('page_view', { page: 'home' }).catch(() => {})
     const reportID = wx.getStorageSync('jianwo_report_id') || ''
-    this.setData({ hasProfile: Boolean(reportID), reportID })
+    this.setData({ hasProfile: Boolean(reportID), reportID, currentLookUrl: '' })
     if (reportID) {
       api.getTodayPlan().then((todayPlan) => {
         if (todayPlan) this.setData({ todayPlan, todayLookUrl: todayPlan.image_url })
+      }).catch(() => {})
+      Promise.all([api.getReport(reportID), api.getPlans(reportID)]).then(([report, plans]) => {
+        const featured = plans.find((item) => item.recommended) || plans[0]
+        this.setData({
+          currentLookUrl: userImage(report.current_image_url),
+          referenceLookUrl: featured ? lookImage(featured.image_url, featured.slug, 'report') : '/assets/reports/sharp.jpg',
+          comparisonTitle: featured ? featured.name : '清晰利落'
+        })
       }).catch(() => {})
     }
   },

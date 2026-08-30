@@ -68,7 +68,10 @@ Page({
     this.setData({ loading: true })
     const mediaIDs = this.data.shots.map((item) => item.asset.id)
     api.createAnalysis({ scene: this.data.scene, media_ids: mediaIDs, profile: { height_cm: 165, role: '', budget: '' } }).then((analysis) => {
-      getApp().globalData.analysisID = analysis.id
+      const localMedia = this.data.shots.map((item) => ({ id: item.asset.id, kind: item.kind, url: item.path || item.asset.url || '' }))
+      const app = getApp()
+      app.globalData.analysisID = analysis.id
+      app.globalData.analysisMedia = analysis.media && analysis.media.length ? analysis.media : localMedia
       wx.navigateTo({ url: `/pages/analysis/index?id=${analysis.id}&scene=${this.data.scene}` })
     }).catch((error) => wx.showToast({ title: error.message, icon: 'none' })).finally(() => this.setData({ loading: false }))
   }

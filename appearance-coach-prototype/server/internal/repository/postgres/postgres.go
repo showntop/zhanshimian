@@ -174,10 +174,10 @@ func (s *Store) CreateAnalysis(ctx context.Context, userID string, input domain.
 func (s *Store) GetAnalysis(ctx context.Context, userID, analysisID string) (domain.Analysis, error) {
 	var item domain.Analysis
 	err := s.pool.QueryRow(ctx, `
-		SELECT a.id::text,a.status,a.progress,a.stage,a.error_message,coalesce(r.id::text,''),a.created_at,a.updated_at
+		SELECT a.id::text,a.status,a.progress,a.stage,a.media_ids::text[],a.error_message,coalesce(r.id::text,''),a.created_at,a.updated_at
 		FROM analyses a LEFT JOIN reports r ON r.analysis_id=a.id
 		WHERE a.id=$1 AND a.user_id=$2`, analysisID, userID).
-		Scan(&item.ID, &item.Status, &item.Progress, &item.Stage, &item.ErrorMessage, &item.ReportID, &item.CreatedAt, &item.UpdatedAt)
+		Scan(&item.ID, &item.Status, &item.Progress, &item.Stage, &item.MediaIDs, &item.ErrorMessage, &item.ReportID, &item.CreatedAt, &item.UpdatedAt)
 	return item, mapNotFound(err)
 }
 
@@ -309,17 +309,17 @@ func (s *Store) GetReport(ctx context.Context, userID, reportID string) (domain.
 
 func scanPlan(row pgx.Row) (domain.Plan, error) {
 	var item domain.Plan
-	err := row.Scan(&item.ID, &item.ReportID, &item.Scene, &item.Name, &item.Slug, &item.ImageURL, &item.Recommended, &item.Descriptor, &item.Why, &item.OutcomeTags, &item.DifferenceTags, &item.Sort, &item.Selected)
+	err := row.Scan(&item.ID, &item.ReportID, &item.Scene, &item.Name, &item.Slug, &item.ImageURL, &item.Recommended, &item.Descriptor, &item.Why, &item.OutcomeTags, &item.DifferenceTags, &item.Sort, &item.Selected, &item.CurrentImageURL)
 	return item, err
 }
 
-const planSelect = `SELECT id::text,report_id::text,scene,name,slug,image_url,recommended,descriptor,why,outcome_tags,difference_tags,sort_order,(selected_at IS NOT NULL) FROM plans`
+const planSelect = `SELECT p.id::text,p.report_id::text,p.scene,p.name,p.slug,p.image_url,p.recommended,p.descriptor,p.why,p.outcome_tags,p.difference_tags,p.sort_order,(p.selected_at IS NOT NULL),r.current_image_url FROM plans p JOIN reports r ON r.id=p.report_id`
 
 func (s *Store) ListPlans(ctx context.Context, userID, reportID, scene string) ([]domain.Plan, error) {
 	if scene == "" {
 		scene = "general"
 	}
-	rows, err := s.pool.Query(ctx, planSelect+` WHERE report_id=$1 AND user_id=$2 AND scene=$3 ORDER BY sort_order`, reportID, userID, scene)
+	rows, err := s.pool.Query(ctx, planSelect+` WHERE p.report_id=$1 AND p.user_id=$2 AND p.scene=$3 ORDER BY p.sort_order`, reportID, userID, scene)
 	if err != nil {
 		return nil, err
 	}
@@ -381,7 +381,7 @@ func (s *Store) CreateScenePlans(ctx context.Context, userID, reportID string, i
 }
 
 func (s *Store) GetPlan(ctx context.Context, userID, planID string) (domain.Plan, error) {
-	item, err := scanPlan(s.pool.QueryRow(ctx, planSelect+` WHERE id=$1 AND user_id=$2`, planID, userID))
+	item, err := scanPlan(s.pool.QueryRow(ctx, planSelect+` WHERE p.id=$1 AND p.user_id=$2`, planID, userID))
 	if err != nil {
 		return item, mapNotFound(err)
 	}

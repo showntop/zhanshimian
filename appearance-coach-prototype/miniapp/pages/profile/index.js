@@ -1,8 +1,20 @@
 const api = require('../../services/api')
+const { userImage } = require('../../utils/media')
 
 Page({
-  data: { hasReport: false, hasPlan: false, deleting: false },
-  onShow() { this.setData({ hasReport: Boolean(wx.getStorageSync('jianwo_report_id')), hasPlan: Boolean(wx.getStorageSync('jianwo_plan_id')) }) },
+  data: { hasReport: false, hasPlan: false, deleting: false, profileImage: '' },
+  onShow() {
+    const reportID = wx.getStorageSync('jianwo_report_id') || ''
+    this.setData({ hasReport: Boolean(reportID), hasPlan: Boolean(wx.getStorageSync('jianwo_plan_id')), profileImage: '' })
+    if (!reportID) return
+    api.getReport(reportID)
+      .then((report) => api.getAnalysis(report.analysis_id))
+      .then((analysis) => {
+        const face = (analysis.media || []).find((item) => item.kind === 'face')
+        this.setData({ profileImage: userImage(face && face.url) })
+      })
+      .catch(() => {})
+  },
   openReport() { const id = wx.getStorageSync('jianwo_report_id'); if (id) wx.navigateTo({ url: `/pages/report/index?id=${id}` }) },
   openPlan() { const id = wx.getStorageSync('jianwo_plan_id'); if (id) wx.navigateTo({ url: `/pages/plan/index?id=${id}` }) },
   editBasic() { wx.showToast({ title: '基础资料编辑将在下一版开放', icon: 'none' }) },
@@ -16,7 +28,7 @@ Page({
       this.setData({ deleting: true })
       api.deleteData().then(() => {
         wx.removeStorageSync('jianwo_report_id'); wx.removeStorageSync('jianwo_plan_id'); wx.removeStorageSync('jianwo_saved_plan_id')
-        this.setData({ hasReport: false, hasPlan: false })
+        this.setData({ hasReport: false, hasPlan: false, profileImage: '' })
         wx.showToast({ title: '档案已删除', icon: 'success' })
       }).catch((error) => wx.showToast({ title: error.message, icon: 'none' })).finally(() => this.setData({ deleting: false }))
     } })

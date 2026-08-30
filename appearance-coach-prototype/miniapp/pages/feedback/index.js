@@ -1,4 +1,5 @@
 const api = require('../../services/api')
+const { lookImage } = require('../../utils/media')
 
 Page({
   data: {
@@ -7,10 +8,16 @@ Page({
     selected: [],
     comment: '',
     feedbackImage: '',
+    referenceImage: '/assets/looks/sharp.jpg',
     loading: false,
     done: false
   },
-  onLoad(options) { this.setData({ planId: options.planId || wx.getStorageSync('jianwo_plan_id') }) },
+  onLoad(options) {
+    const planId = options.planId || wx.getStorageSync('jianwo_plan_id')
+    this.setData({ planId })
+    if (!planId) return
+    api.getPlan(planId).then((plan) => this.setData({ referenceImage: lookImage(plan.image_url, plan.slug, 'full') })).catch(() => {})
+  },
   toggle(event) {
     const tag = event.currentTarget.dataset.tag
     const selected = this.data.selected.includes(tag) ? this.data.selected.filter((item) => item !== tag) : [...this.data.selected, tag]

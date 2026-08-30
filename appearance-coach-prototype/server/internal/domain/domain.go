@@ -46,14 +46,17 @@ type Profile struct {
 }
 
 type Analysis struct {
-	ID           string    `json:"id"`
-	Status       string    `json:"status"`
-	Progress     int       `json:"progress"`
-	Stage        string    `json:"stage"`
-	ReportID     string    `json:"report_id,omitempty"`
-	ErrorMessage string    `json:"error_message,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID              string       `json:"id"`
+	Status          string       `json:"status"`
+	Progress        int          `json:"progress"`
+	Stage           string       `json:"stage"`
+	PreviewImageURL string       `json:"preview_image_url,omitempty"`
+	Media           []MediaAsset `json:"media,omitempty"`
+	MediaIDs        []string     `json:"-"`
+	ReportID        string       `json:"report_id,omitempty"`
+	ErrorMessage    string       `json:"error_message,omitempty"`
+	CreatedAt       time.Time    `json:"created_at"`
+	UpdatedAt       time.Time    `json:"updated_at"`
 }
 
 type Finding struct {
@@ -87,20 +90,21 @@ type PlanStep struct {
 }
 
 type Plan struct {
-	ID             string     `json:"id"`
-	ReportID       string     `json:"report_id"`
-	Scene          string     `json:"scene,omitempty"`
-	Name           string     `json:"name"`
-	Slug           string     `json:"slug"`
-	ImageURL       string     `json:"image_url"`
-	Recommended    bool       `json:"recommended"`
-	Descriptor     string     `json:"descriptor"`
-	Why            string     `json:"why"`
-	OutcomeTags    []string   `json:"outcome_tags"`
-	DifferenceTags []string   `json:"difference_tags"`
-	Sort           int        `json:"sort"`
-	Selected       bool       `json:"selected"`
-	Steps          []PlanStep `json:"steps,omitempty"`
+	ID              string     `json:"id"`
+	ReportID        string     `json:"report_id"`
+	Scene           string     `json:"scene,omitempty"`
+	Name            string     `json:"name"`
+	Slug            string     `json:"slug"`
+	ImageURL        string     `json:"image_url"`
+	CurrentImageURL string     `json:"current_image_url,omitempty"`
+	Recommended     bool       `json:"recommended"`
+	Descriptor      string     `json:"descriptor"`
+	Why             string     `json:"why"`
+	OutcomeTags     []string   `json:"outcome_tags"`
+	DifferenceTags  []string   `json:"difference_tags"`
+	Sort            int        `json:"sort"`
+	Selected        bool       `json:"selected"`
+	Steps           []PlanStep `json:"steps,omitempty"`
 }
 
 // ScenePlanInput is the lightweight brief used to tailor a saved image

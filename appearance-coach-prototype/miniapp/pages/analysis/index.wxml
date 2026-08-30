@@ -1,10 +1,12 @@
 <app-header title="正在分析" back="{{true}}" />
 <view class="page analysis-page">
   <view class="scan-wrap fade-up">
-    <image class="scan-image" src="/assets/looks/natural.jpg" mode="aspectFill" />
+    <image wx:if="{{previewImage}}" class="scan-image" src="{{previewImage}}" mode="{{previewMode}}" />
+    <view wx:else class="scan-empty"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>正在准备照片</text></view>
     <view class="scan-mask" />
     <view class="scan-line" />
     <view class="focus-point p1" /><view class="focus-point p2" /><view class="focus-point p3" />
+    <text class="scan-photo-kind">{{previewLabel}}</text>
   </view>
   <view wx:if="{{!failed}}" class="analysis-copy fade-up delay-1">
     <text class="eyebrow">正在组合你的专属方案</text>

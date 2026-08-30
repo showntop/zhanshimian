@@ -2,7 +2,8 @@
 <view class="page page-with-nav profile-page">
   <view class="profile-hero fade-up">
     <view class="avatar-wrap">
-      <image src="/assets/hair/natural.jpg" mode="aspectFill" />
+      <image wx:if="{{profileImage}}" src="{{profileImage}}" mode="aspectFill" />
+      <image wx:else src="/assets/capture/face-line.png" mode="aspectFit" />
       <view class="avatar-status"></view>
     </view>
     <view class="profile-copy">

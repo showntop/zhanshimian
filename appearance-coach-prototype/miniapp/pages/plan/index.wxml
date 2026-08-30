@@ -5,12 +5,13 @@
     <text class="plan-title serif fade-up">把自然亲和，
 变成清晰可靠</text>
     <view class="hero fade-up delay-1">
-      <image class="hero-image" src="{{showCurrent ? plan.current_image_url : plan.image_url}}" mode="aspectFill" />
-      <image class="current-thumb" src="{{showCurrent ? plan.image_url : plan.current_image_url}}" mode="aspectFill" />
-      <text class="current-label">{{showCurrent ? '方案' : '当前'}}</text>
-      <text class="scheme-label">{{showCurrent ? '当前' : '方案'}}</text>
-      <button class="compare-button" bindtap="compare">对比</button>
-      <text class="compare-note">点按查看变化前后</text>
+      <image class="hero-image" src="{{showCurrent && plan.current_image_url ? plan.current_image_url : plan.image_url}}" mode="aspectFill" />
+      <image wx:if="{{showCurrent || !plan.current_image_url}}" class="current-thumb" src="{{plan.image_url}}" mode="aspectFill" />
+      <image wx:else class="current-thumb" src="{{plan.current_image_url}}" mode="aspectFill" />
+      <text class="current-label">{{showCurrent ? '风格参考' : '我的当前'}}</text>
+      <text class="scheme-label">{{showCurrent ? '我的当前' : '风格参考'}}</text>
+      <button class="compare-button" bindtap="compare">{{showCurrent ? '参考' : '当前'}}</button>
+      <text class="compare-note">风格参考不等同于生成效果图</text>
     </view>
     <view class="outcomes fade-up delay-2"><view wx:for="{{plan.outcome_tags}}" wx:key="*this"><icon type="success_no_circle" size="18" color="#587344" /><text>{{item}}</text></view></view>
     <text class="section-title">这套方案，具体怎么改</text>

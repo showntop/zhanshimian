@@ -1,15 +1,23 @@
 const api = require('../../services/api')
+const { userImage } = require('../../utils/media')
 
 Page({
-  data: { id: '', scene: 'general', progress: 8, stage: '正在安全上传照片', failed: false },
+  data: { id: '', scene: 'general', progress: 8, stage: '正在安全上传照片', failed: false, media: [], previewImage: '', previewKind: 'face', previewLabel: '正脸照', previewMode: 'aspectFill' },
   onLoad(options) {
-    this.setData({ id: options.id || getApp().globalData.analysisID, scene: options.scene || 'general' })
+    const app = getApp()
+    const initialMedia = app.globalData.analysisMedia || []
+    this.setData({ id: options.id || app.globalData.analysisID, scene: options.scene || 'general' })
+    this.updateMedia(initialMedia, this.data.progress)
     this.poll()
   },
   onUnload() { if (this.timer) clearTimeout(this.timer) },
   poll() {
     api.getAnalysis(this.data.id).then((analysis) => {
       this.setData({ progress: analysis.progress, stage: analysis.stage, failed: analysis.status === 'failed' })
+      if (Array.isArray(analysis.media) && analysis.media.length) {
+        getApp().globalData.analysisMedia = analysis.media
+        this.updateMedia(analysis.media, analysis.progress)
+      }
       if (analysis.status === 'completed') {
         getApp().globalData.reportID = analysis.report_id
         wx.setStorageSync('jianwo_report_id', analysis.report_id)
@@ -18,6 +26,18 @@ Page({
       }
       if (analysis.status !== 'failed') this.timer = setTimeout(() => this.poll(), 700)
     }).catch(() => { this.timer = setTimeout(() => this.poll(), 1200) })
+  },
+  updateMedia(media, progress) {
+    const normalized = (media || []).map((item) => ({ ...item, url: userImage(item.url) }))
+    const desiredKind = progress < 54 ? 'face' : (progress < 84 ? 'side' : 'body')
+    const preview = normalized.find((item) => item.kind === desiredKind && item.url) || normalized.find((item) => item.kind === 'face' && item.url) || normalized.find((item) => item.url)
+    this.setData({
+      media: normalized,
+      previewImage: preview ? preview.url : '',
+      previewKind: preview ? preview.kind : desiredKind,
+      previewLabel: ({ face: '正脸照', side: '侧脸照', body: '全身照' })[preview ? preview.kind : desiredKind] || '照片',
+      previewMode: preview && preview.kind === 'body' ? 'aspectFit' : 'aspectFill'
+    })
   },
   createPendingScenePlans(reportID) {
     const brief = wx.getStorageSync('jianwo_scene_brief')

@@ -1,8 +1,8 @@
 const api = require('../../services/api')
-const { lookImage } = require('../../utils/media')
+const { userImage } = require('../../utils/media')
 
 Page({
-  data: { id: '', scene: '', loading: true, report: null, annotations: [], image: '/assets/reports/natural.jpg' },
+  data: { id: '', scene: '', loading: true, report: null, annotations: [], image: '' },
   onLoad(options) {
     const id = options.id || getApp().globalData.reportID || wx.getStorageSync('jianwo_report_id')
     this.setData({ id, scene: options.scene || '' })
@@ -13,7 +13,7 @@ Page({
     api.getReport(this.data.id).then((report) => {
       wx.setStorageSync('jianwo_report_id', this.data.id)
       const findings = report.findings || []
-      this.setData({ report: { ...report, findings }, annotations: findings.slice(0, 2), image: lookImage(report.current_image_url, 'natural', 'report'), loading: false })
+      this.setData({ report: { ...report, findings }, annotations: findings.slice(0, 2), image: userImage(report.current_image_url), loading: false })
     }).catch((error) => {
       wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false })
     })

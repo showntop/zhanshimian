@@ -1,5 +1,5 @@
 const api = require('../../services/api')
-const { lookImage } = require('../../utils/media')
+const { lookImage, userImage } = require('../../utils/media')
 
 const fallbackStyles = [
   { id: 'sharp', name: '锁骨层次发', note: '首选推荐', image: '/assets/hair/sharp.jpg', reason: '提高视觉重心并保留脸侧空气感。', tags: ['重心提高', '肩颈更清晰'] },
@@ -11,9 +11,9 @@ Page({
   data: {
     styles: fallbackStyles, activeIndex: 0, activeStyle: fallbackStyles[0], loading: true, error: '',
     sourceMediaID: '', currentImage: '', resultImage: '', previewID: '', previewStatus: '', progress: 0,
-    stage: '', showCurrent: false, generating: false, saving: false, saved: false, isDemo: false
+    stage: '', showCurrent: false, generating: false, saving: false, saved: false, isDemo: false, usingProfilePhoto: false
   },
-  onLoad() { this.loadRecommendations() },
+  onLoad() { this.loadRecommendations(); this.loadProfilePhoto() },
   onUnload() { this.stopPolling() },
   loadRecommendations() {
     this.setData({ loading: true, error: '' })
@@ -35,13 +35,27 @@ Page({
   uploadPhoto(path) {
     wx.showLoading({ title: '安全上传中' })
     api.uploadMedia('face', path).then((asset) => {
-      this.setData({ sourceMediaID: asset.id, currentImage: path, resultImage: '', previewID: '', showCurrent: true, saved: false })
+      this.setData({ sourceMediaID: asset.id, currentImage: path, resultImage: '', previewID: '', showCurrent: true, saved: false, usingProfilePhoto: false })
       wx.vibrateShort({ type: 'light' })
     }).catch((error) => wx.showToast({ title: error.message, icon: 'none' })).finally(() => wx.hideLoading())
   },
   useDemoPhoto() {
-    api.createDemoMedia('face').then((asset) => this.setData({ sourceMediaID: asset.id, currentImage: lookImage(asset.url, 'natural', 'portrait'), resultImage: '', previewID: '', showCurrent: true }))
+    api.createDemoMedia('face').then((asset) => this.setData({ sourceMediaID: asset.id, currentImage: lookImage(asset.url, 'natural', 'portrait'), resultImage: '', previewID: '', showCurrent: true, usingProfilePhoto: false }))
       .catch((error) => wx.showToast({ title: error.message, icon: 'none' }))
+  },
+  loadProfilePhoto() {
+    const reportID = wx.getStorageSync('jianwo_report_id') || ''
+    if (!reportID) return
+    api.getReport(reportID)
+      .then((report) => api.getAnalysis(report.analysis_id))
+      .then((analysis) => {
+        if (this.data.sourceMediaID) return
+        const face = (analysis.media || []).find((item) => item.kind === 'face')
+        const currentImage = face && userImage(face.url)
+        if (!face || !currentImage) return
+        this.setData({ sourceMediaID: face.id, currentImage, showCurrent: true, usingProfilePhoto: true })
+      })
+      .catch(() => {})
   },
   primaryAction() {
     if (this.data.resultImage) return this.savePreview()
@@ -61,7 +75,7 @@ Page({
     if (!this.data.previewID) return
     api.getHairPreview(this.data.previewID).then((preview) => {
       if (preview.status === 'completed') {
-        this.setData({ generating: false, previewStatus: preview.status, progress: 100, stage: preview.stage, currentImage: lookImage(preview.source_image_url, 'natural', 'portrait'), resultImage: lookImage(preview.result_image_url, this.data.activeStyle.id, 'hair'), showCurrent: false, isDemo: (preview.provider_version || '').indexOf('demo') === 0 })
+        this.setData({ generating: false, previewStatus: preview.status, progress: 100, stage: preview.stage, currentImage: userImage(preview.source_image_url) || this.data.currentImage, resultImage: lookImage(preview.result_image_url, this.data.activeStyle.id, 'hair'), showCurrent: false, isDemo: (preview.provider_version || '').indexOf('demo') === 0 })
         wx.vibrateShort({ type: 'light' })
         return
       }

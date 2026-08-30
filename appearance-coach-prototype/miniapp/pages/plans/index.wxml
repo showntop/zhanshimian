@@ -6,10 +6,10 @@
     <swiper class="plan-swiper" current="{{selected}}" previous-margin="42rpx" next-margin="42rpx" bindchange="swiperChange" duration="380">
       <swiper-item wx:for="{{plans}}" wx:key="id">
         <view class="plan-card {{selected === index ? 'active' : ''}}">
-          <image src="{{showCurrent && selected === index ? item.current_image_url : item.image_url}}" mode="aspectFill" />
+          <image src="{{showCurrent && selected === index && item.current_image_url ? item.current_image_url : item.image_url}}" mode="aspectFill" />
           <view class="photo-shade" />
           <text wx:if="{{item.recommended}}" class="recommend">首选推荐</text>
-          <view class="compare" wx:if="{{selected === index}}"><button class="{{showCurrent ? 'active' : ''}}" data-mode="current" bindtap="toggleCompare">当前</button><button class="{{!showCurrent ? 'active' : ''}}" data-mode="plan" bindtap="toggleCompare">方案</button></view>
+          <view class="compare" wx:if="{{selected === index}}"><button class="{{showCurrent ? 'active' : ''}}" data-mode="current" bindtap="toggleCompare">我的当前</button><button class="{{!showCurrent ? 'active' : ''}}" data-mode="plan" bindtap="toggleCompare">风格参考</button></view>
           <view class="card-copy"><text class="card-name serif">{{item.name}}</text><text>{{item.descriptor}}</text></view>
         </view>
       </swiper-item>

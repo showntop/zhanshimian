@@ -1,5 +1,5 @@
 const api = require('../../services/api')
-const { lookImage } = require('../../utils/media')
+const { lookImage, userImage } = require('../../utils/media')
 
 Page({
   data: { id: '', plan: null, active: 0, loading: true, selecting: false, showCurrent: false, saved: false, categories: ['发型', '妆容', '穿搭'] },
@@ -8,14 +8,20 @@ Page({
     api.getPlan(this.data.id).then((plan) => {
       const slug = plan.slug || 'sharp'
       plan.image_url = lookImage(plan.image_url, slug, 'plan')
-      plan.current_image_url = lookImage('', 'natural', 'plan')
+      plan.current_image_url = userImage(plan.current_image_url)
       plan.detail_image_url = lookImage('', slug, 'hair')
       plan.steps = (plan.steps || []).map((step) => ({ ...step, details: Array.isArray(step.details) ? step.details : [] }))
       this.setData({ plan, loading: false, saved: wx.getStorageSync('jianwo_saved_plan_id') === plan.id })
     }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false }) })
   },
   changeTab(event) { this.setData({ active: Number(event.currentTarget.dataset.index) }); wx.vibrateShort({ type: 'light' }) },
-  compare() { this.setData({ showCurrent: !this.data.showCurrent }) },
+  compare() {
+    if (!this.data.plan || !this.data.plan.current_image_url) {
+      wx.showToast({ title: '当前照片暂时不可用', icon: 'none' })
+      return
+    }
+    this.setData({ showCurrent: !this.data.showCurrent })
+  },
   toggleSaved() {
     const saved = !this.data.saved
     this.setData({ saved })

@@ -174,11 +174,7 @@ func (s *Service) CreateDemoMedia(ctx context.Context, userID, kind string) (dom
 	if err != nil {
 		return domain.MediaAsset{}, err
 	}
-	assetName := "natural.png"
-	if kind == "product" {
-		assetName = "warm.png"
-	}
-	asset.URL = s.publicBaseURL + "/assets/looks/" + assetName
+	asset.URL = s.demoMediaURL(kind)
 	return asset, nil
 }
 
@@ -196,11 +192,72 @@ func (s *Service) CreateAnalysis(ctx context.Context, userID string, input domai
 	if input.Scene == "" {
 		input.Scene = "general"
 	}
-	return s.repo.CreateAnalysis(ctx, userID, input)
+	analysis, err := s.repo.CreateAnalysis(ctx, userID, input)
+	if err != nil {
+		return domain.Analysis{}, err
+	}
+	analysis.MediaIDs = input.MediaIDs
+	return s.hydrateAnalysisMedia(ctx, userID, analysis)
 }
 
 func (s *Service) GetAnalysis(ctx context.Context, userID, id string) (domain.Analysis, error) {
-	return s.repo.GetAnalysis(ctx, userID, id)
+	analysis, err := s.repo.GetAnalysis(ctx, userID, id)
+	if err != nil {
+		return domain.Analysis{}, err
+	}
+	return s.hydrateAnalysisMedia(ctx, userID, analysis)
+}
+
+// hydrateAnalysisMedia makes the exact user-owned photos available to every
+// analysis state. Keeping the lookup server-side avoids trusting temporary
+// mini-program paths and keeps a resumed analysis visually consistent.
+func (s *Service) hydrateAnalysisMedia(ctx context.Context, userID string, analysis domain.Analysis) (domain.Analysis, error) {
+	assets, err := s.repo.GetMediaAssetsForUser(ctx, userID, analysis.MediaIDs)
+	if err != nil {
+		return domain.Analysis{}, err
+	}
+	for index := range assets {
+		assets[index].URL = s.mediaAssetURL(assets[index])
+		if assets[index].Kind == "face" && analysis.PreviewImageURL == "" {
+			analysis.PreviewImageURL = assets[index].URL
+		}
+	}
+	if analysis.PreviewImageURL == "" && len(assets) > 0 {
+		analysis.PreviewImageURL = assets[0].URL
+	}
+	analysis.Media = assets
+	return analysis, nil
+}
+
+func (s *Service) analysisPreviewURL(ctx context.Context, userID string, mediaIDs []string) (string, error) {
+	assets, err := s.repo.GetMediaAssetsForUser(ctx, userID, mediaIDs)
+	if err != nil {
+		return "", err
+	}
+	for _, asset := range assets {
+		if asset.Kind == "face" {
+			return s.mediaAssetURL(asset), nil
+		}
+	}
+	if len(assets) == 0 {
+		return "", repository.ErrNotFound
+	}
+	return s.mediaAssetURL(assets[0]), nil
+}
+
+func (s *Service) mediaAssetURL(asset domain.MediaAsset) string {
+	if strings.HasPrefix(asset.StorageKey, "demo/") {
+		return s.demoMediaURL(asset.Kind)
+	}
+	return s.absoluteURL("/uploads/" + strings.TrimPrefix(asset.StorageKey, "/"))
+}
+
+func (s *Service) demoMediaURL(kind string) string {
+	assetName := "natural.png"
+	if kind == "product" {
+		assetName = "warm.png"
+	}
+	return s.absoluteURL("/assets/looks/" + assetName)
 }
 func (s *Service) GetReport(ctx context.Context, userID, id string) (domain.Report, error) {
 	report, err := s.repo.GetReport(ctx, userID, id)
@@ -213,6 +270,7 @@ func (s *Service) ListPlans(ctx context.Context, userID, reportID, scene string)
 	plans, err := s.repo.ListPlans(ctx, userID, reportID, scene)
 	for i := range plans {
 		plans[i].ImageURL = s.absoluteURL(plans[i].ImageURL)
+		plans[i].CurrentImageURL = s.absoluteURL(plans[i].CurrentImageURL)
 	}
 	return plans, err
 }
@@ -220,6 +278,7 @@ func (s *Service) GetPlan(ctx context.Context, userID, planID string) (domain.Pl
 	plan, err := s.repo.GetPlan(ctx, userID, planID)
 	if err == nil {
 		plan.ImageURL = s.absoluteURL(plan.ImageURL)
+		plan.CurrentImageURL = s.absoluteURL(plan.CurrentImageURL)
 	}
 	return plan, err
 }
@@ -538,6 +597,15 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 		_ = s.repo.FailAnalysis(ctx, job, err)
 		return
 	}
+	currentImageURL, err := s.analysisPreviewURL(ctx, job.UserID, job.Input.MediaIDs)
+	if err != nil {
+		_ = s.repo.FailAnalysis(ctx, job, err)
+		return
+	}
+	// The "current" image is source evidence, never a provider-generated or
+	// stock reference. This keeps every provider and fallback on the same
+	// user-photo contract.
+	output.CurrentImageURL = currentImageURL
 	_ = s.repo.UpdateAnalysisProgress(ctx, job.AnalysisID, 86, "组合发型、妆容与穿搭方案")
 	if _, err := s.repo.CompleteAnalysis(ctx, job, output); err != nil {
 		s.logger.Error("complete analysis", "analysis_id", job.AnalysisID, "error", err)

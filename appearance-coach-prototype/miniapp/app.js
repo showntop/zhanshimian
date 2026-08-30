@@ -22,6 +22,7 @@ App({
     token: '',
     user: null,
     analysisID: '',
+    analysisMedia: [],
     reportID: '',
     planID: ''
   },

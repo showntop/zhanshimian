@@ -22,8 +22,9 @@ const LOCAL_LOOKS = {
   }
 }
 
-function isUsableExternalImage(value) {
-  return value && !value.includes('localhost') && !value.includes('127.0.0.1') && !value.startsWith('http://')
+function isDisplayableImage(value) {
+  if (typeof value !== 'string' || !value) return false
+  return value.startsWith('https://') || value.startsWith('http://') || value.startsWith('/assets/') || value.startsWith('wxfile://') || value.startsWith('file://')
 }
 
 function localLook(slug = 'natural', variant = 'full') {
@@ -32,8 +33,14 @@ function localLook(slug = 'natural', variant = 'full') {
 }
 
 function lookImage(value, slug = 'natural', variant = 'full') {
-  if (isUsableExternalImage(value)) return value
+  if (isDisplayableImage(value)) return value
   return localLook(slug, variant)
 }
 
-module.exports = { LOCAL_LOOKS, localLook, lookImage }
+// Use this for user photos. A missing or invalid URL must stay visibly empty
+// instead of silently turning into a stock model image.
+function userImage(value) {
+  return isDisplayableImage(value) ? value : ''
+}
+
+module.exports = { LOCAL_LOOKS, localLook, lookImage, userImage, isDisplayableImage }

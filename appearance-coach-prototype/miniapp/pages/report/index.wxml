@@ -6,7 +6,8 @@
     <text class="report-title serif fade-up">你的形象特点，
 已经看清楚了</text>
     <view class="current-card fade-up delay-1">
-      <image src="{{image}}" mode="aspectFill" />
+      <image wx:if="{{image}}" src="{{image}}" mode="aspectFill" />
+      <view wx:else class="image-unavailable"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>当前照片加载中</text></view>
       <text class="current-label">当前形象</text>
       <view wx:for="{{annotations}}" wx:key="id" class="finding tag-{{index}}"><text class="number">{{index + 1}}</text><text>{{item.label}}</text><view class="connector" /></view>
     </view>
