@@ -87,7 +87,16 @@ func main() {
 	}))
 	writeTimeout := 30 * time.Second
 	if cfg.AIRoutingSource != "" {
-		writeTimeout = 190 * time.Second
+		writeTimeout = 30 * time.Second
+		for _, model := range cfg.AIRouting.Models {
+			modelTimeout := time.Duration(model.TimeoutSeconds) * time.Second
+			if modelTimeout <= 0 {
+				modelTimeout = 90 * time.Second
+			}
+			if modelTimeout+10*time.Second > writeTimeout {
+				writeTimeout = modelTimeout + 10*time.Second
+			}
+		}
 	}
 	if cfg.OutfitDiagnosisProvider == "openai" && cfg.OutfitDiagnosisTimeout+10*time.Second > writeTimeout {
 		writeTimeout = cfg.OutfitDiagnosisTimeout + 10*time.Second

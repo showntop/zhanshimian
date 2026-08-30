@@ -516,7 +516,9 @@ func (r *AIRuntime) resolveImage(ctx context.Context, model AIModel, encoded, im
 		if err := validateGeneratedImageURL(imageURL, strings.HasPrefix(model.BaseURL, "http://")); err != nil {
 			return nil, "", err
 		}
-		request, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
+		downloadCtx, cancel := context.WithTimeout(ctx, model.Timeout)
+		defer cancel()
+		request, err := http.NewRequestWithContext(downloadCtx, http.MethodGet, imageURL, nil)
 		if err != nil {
 			return nil, "", err
 		}
