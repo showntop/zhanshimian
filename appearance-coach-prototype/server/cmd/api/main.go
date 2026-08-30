@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/example/jianwo/server/internal/bootstrap"
 	"github.com/example/jianwo/server/internal/config"
 	"github.com/example/jianwo/server/internal/database"
 	"github.com/example/jianwo/server/internal/httpapi"
@@ -47,19 +48,9 @@ func main() {
 		os.Exit(1)
 	}
 	repo := postgres.New(pool)
-	analyzer, err := buildAnalyzer(cfg, repo, objects)
+	ai, err := bootstrap.BuildAI(cfg, repo, objects, logger)
 	if err != nil {
-		logger.Error("create analysis provider", "provider", cfg.AIProvider, "error", err)
-		os.Exit(1)
-	}
-	hairGenerator, err := buildHairGenerator(cfg, repo, objects)
-	if err != nil {
-		logger.Error("create hair preview provider", "provider", cfg.HairPreviewProvider, "error", err)
-		os.Exit(1)
-	}
-	outfitAdvisor, err := buildOutfitAdvisor(cfg, repo, objects)
-	if err != nil {
-		logger.Error("create outfit diagnosis provider", "provider", cfg.OutfitDiagnosisProvider, "error", err)
+		logger.Error("create AI capability providers", "routing_source", cfg.AIRoutingSource, "error", err)
 		os.Exit(1)
 	}
 	weather, err := buildWeather(cfg)
@@ -72,11 +63,9 @@ func main() {
 		logger.Error("create wechat login provider", "error", err)
 		os.Exit(1)
 	}
-	logger.Info("analysis provider configured", "provider", cfg.AIProvider, "fallback_to_demo", cfg.AIProvider == "openai" && cfg.AIFallbackToDemo)
-	logger.Info("hair preview provider configured", "provider", cfg.HairPreviewProvider, "fallback_to_demo", cfg.HairPreviewProvider == "openai" && cfg.HairPreviewFallbackToDemo)
-	logger.Info("outfit diagnosis provider configured", "provider", cfg.OutfitDiagnosisProvider, "fallback_to_demo", cfg.OutfitDiagnosisProvider == "openai" && cfg.OutfitDiagnosisFallbackToDemo)
-	svc := service.New(repo, objects, analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
-		Hair: hairGenerator, Outfit: outfitAdvisor, Weather: weather, WeChat: wechat, AssetURLTTL: cfg.AssetURLTTL,
+	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
+	svc := service.New(repo, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
+		Hair: ai.Hair, Outfit: ai.Outfit, Purchase: ai.Purchase, Advisor: ai.Advisor, Weather: weather, WeChat: wechat, AssetURLTTL: cfg.AssetURLTTL,
 	})
 	if cfg.RunWorker {
 		go svc.RunWorker(ctx, cfg.AnalysisPollTime)
@@ -94,8 +83,12 @@ func main() {
 		FallbackEnabled:         cfg.AIProvider == "openai" && cfg.AIFallbackToDemo,
 		HairPreviewProvider:     cfg.HairPreviewProvider,
 		OutfitDiagnosisProvider: cfg.OutfitDiagnosisProvider,
+		AIRoutes:                ai.Routes,
 	}))
 	writeTimeout := 30 * time.Second
+	if cfg.AIRoutingSource != "" {
+		writeTimeout = 190 * time.Second
+	}
 	if cfg.OutfitDiagnosisProvider == "openai" && cfg.OutfitDiagnosisTimeout+10*time.Second > writeTimeout {
 		writeTimeout = cfg.OutfitDiagnosisTimeout + 10*time.Second
 	}
@@ -137,57 +130,4 @@ func buildWeather(cfg config.Config) (provider.WeatherProvider, error) {
 		DefaultCity: cfg.AMapDefaultCity, DefaultCode: cfg.AMapDefaultAdcode,
 		Timeout: cfg.WeatherRequestTimeout,
 	}, nil)
-}
-
-func buildOutfitAdvisor(cfg config.Config, repo *postgres.Store, objects storage.ObjectStorage) (provider.OutfitAdvisor, error) {
-	demo := provider.OutfitAdvisor(provider.NewDemoOutfitAdvisor())
-	if cfg.OutfitDiagnosisProvider == "demo" {
-		return demo, nil
-	}
-	loader := service.NewAnalysisMediaLoader(repo, objects, cfg.PublicBaseURL, cfg.MaxUploadBytes)
-	realAdvisor, err := provider.NewOpenAIOutfitAdvisor(provider.OpenAIConfig{APIKey: cfg.OpenAIAPIKey, BaseURL: cfg.OpenAIBaseURL, Model: cfg.OpenAIOutfitModel, Timeout: cfg.OutfitDiagnosisTimeout}, loader, nil)
-	if err != nil {
-		return nil, err
-	}
-	if cfg.OutfitDiagnosisFallbackToDemo {
-		return provider.NewFallbackOutfitAdvisor(realAdvisor, demo), nil
-	}
-	return realAdvisor, nil
-}
-
-func buildHairGenerator(cfg config.Config, repo *postgres.Store, objects storage.ObjectStorage) (provider.HairPreviewGenerator, error) {
-	demo := provider.HairPreviewGenerator(provider.NewDemoHairGenerator())
-	if cfg.HairPreviewProvider == "demo" {
-		return demo, nil
-	}
-	loader := service.NewAnalysisMediaLoader(repo, objects, cfg.PublicBaseURL, cfg.MaxUploadBytes)
-	realGenerator, err := provider.NewOpenAIHairGenerator(provider.OpenAIHairConfig{
-		APIKey: cfg.OpenAIAPIKey, BaseURL: cfg.OpenAIBaseURL, Model: cfg.OpenAIImageModel,
-		Quality: cfg.OpenAIImageQuality, Timeout: cfg.HairPreviewTimeout,
-	}, loader, nil)
-	if err != nil {
-		return nil, err
-	}
-	if cfg.HairPreviewFallbackToDemo {
-		return provider.NewFallbackHairGenerator(realGenerator, demo), nil
-	}
-	return realGenerator, nil
-}
-
-func buildAnalyzer(cfg config.Config, repo *postgres.Store, objects storage.ObjectStorage) (provider.Analyzer, error) {
-	demo := provider.Analyzer(provider.NewDemoAnalyzer())
-	if cfg.AIProvider == "demo" {
-		return demo, nil
-	}
-	loader := service.NewAnalysisMediaLoader(repo, objects, cfg.PublicBaseURL, cfg.MaxUploadBytes)
-	realAnalyzer, err := provider.NewOpenAIAnalyzer(provider.OpenAIConfig{
-		APIKey: cfg.OpenAIAPIKey, BaseURL: cfg.OpenAIBaseURL, Model: cfg.OpenAIVisionModel, Timeout: cfg.AIRequestTimeout,
-	}, loader, nil)
-	if err != nil {
-		return nil, err
-	}
-	if cfg.AIFallbackToDemo {
-		return provider.NewFallbackAnalyzer(realAnalyzer, demo), nil
-	}
-	return realAnalyzer, nil
 }

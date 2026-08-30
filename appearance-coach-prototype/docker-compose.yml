@@ -46,6 +46,10 @@ services:
       AMAP_DEFAULT_CITY: ${AMAP_DEFAULT_CITY:-上海}
       AMAP_DEFAULT_ADCODE: ${AMAP_DEFAULT_ADCODE:-310000}
       RUN_WORKER: ${RUN_WORKER:-true}
+      AI_ROUTING_FILE: ${AI_ROUTING_FILE:-}
+      AI_ROUTING_JSON: ${AI_ROUTING_JSON:-}
+      ALIYUN_API_KEY: ${ALIYUN_API_KEY:-}
+      VOLCENGINE_API_KEY: ${VOLCENGINE_API_KEY:-}
       AI_PROVIDER: ${AI_PROVIDER:-demo}
       AI_FALLBACK_TO_DEMO: ${AI_FALLBACK_TO_DEMO:-true}
       AI_REQUEST_TIMEOUT_SECONDS: ${AI_REQUEST_TIMEOUT_SECONDS:-90}
@@ -65,6 +69,7 @@ services:
       - "127.0.0.1:58000:8080"
     volumes:
       - jianwo_uploads:/app/data/uploads
+      - ${AI_ROUTING_HOST_FILE:-./server/config/ai-routing.example.json}:/app/config/ai-routing.json:ro
     depends_on:
       postgres:
         condition: service_healthy

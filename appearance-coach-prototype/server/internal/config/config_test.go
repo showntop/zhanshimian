@@ -1,6 +1,10 @@
 package config
 
-import "testing"
+import (
+	"encoding/json"
+	"os"
+	"testing"
+)
 
 func TestLoadAIProviderDefaults(t *testing.T) {
 	clearReleaseEnvironment(t)
@@ -42,6 +46,44 @@ func TestLoadRejectsUnknownAIProvider(t *testing.T) {
 	}
 }
 
+func TestLoadParsesUnifiedAIRouting(t *testing.T) {
+	clearReleaseEnvironment(t)
+	t.Setenv("AI_ROUTING_JSON", `{
+		"models":{"qwen":{"vendor":"aliyun","protocol":"openai_chat_completions","model":"qwen3.7-plus","base_url":"https://example.com/v1","api_key_env":"ALIYUN_API_KEY","structured_mode":"json_schema","parameters":{"enable_thinking":false}}},
+		"routes":{"appearance_analysis":{"primary":"qwen","policy":"quality_first","max_cost_cny":0.08}}
+	}`)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := cfg.AIRouting.Models["qwen"]
+	if cfg.AIRoutingSource != "AI_ROUTING_JSON" || model.Protocol != "openai_chat_completions" || model.Parameters["enable_thinking"] != false || cfg.AIRouting.Routes["appearance_analysis"].Primary != "qwen" {
+		t.Fatalf("unexpected AI routing config: %#v", cfg.AIRouting)
+	}
+}
+
+func TestLoadRejectsUnknownAIRoutingProtocol(t *testing.T) {
+	clearReleaseEnvironment(t)
+	t.Setenv("AI_ROUTING_JSON", `{"models":{"x":{"vendor":"x","protocol":"unknown","model":"x","base_url":"https://example.com","api_key_env":"X_KEY"}},"routes":{"appearance_analysis":{"primary":"x"}}}`)
+	if _, err := Load(); err == nil {
+		t.Fatal("expected unsupported AI protocol to be rejected")
+	}
+}
+
+func TestExampleAIRoutingConfigIsValid(t *testing.T) {
+	data, err := os.ReadFile("../../config/ai-routing.example.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var routing AIRoutingConfig
+	if err := json.Unmarshal(data, &routing); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateAIRouting(routing); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestLoadRejectsUnsafeProductionConfiguration(t *testing.T) {
 	clearReleaseEnvironment(t)
 	t.Setenv("APP_ENV", "production")
@@ -65,6 +107,20 @@ func TestLoadAcceptsProductionReleaseProviders(t *testing.T) {
 	t.Setenv("COS_SECRET_KEY", "test-key")
 	t.Setenv("WEATHER_PROVIDER", "amap")
 	t.Setenv("AMAP_WEB_SERVICE_KEY", "test-weather-key")
+	t.Setenv("ALIYUN_API_KEY", "test-ai-key")
+	t.Setenv("AI_ROUTING_JSON", `{
+		"models":{
+			"qwen":{"vendor":"aliyun","protocol":"openai_chat_completions","model":"qwen","base_url":"https://ai.example.com/v1","api_key_env":"ALIYUN_API_KEY"},
+			"image":{"vendor":"aliyun","protocol":"dashscope_wan","model":"wan","base_url":"https://images.example.com/generate","api_key_env":"ALIYUN_API_KEY"}
+		},
+		"routes":{
+			"appearance_analysis":{"primary":"qwen"},
+			"outfit_diagnosis":{"primary":"qwen"},
+			"purchase_diagnosis":{"primary":"qwen"},
+			"advisor_chat":{"primary":"qwen"},
+			"hair_edit":{"primary":"image"}
+		}
+	}`)
 
 	cfg, err := Load()
 	if err != nil {
@@ -99,6 +155,8 @@ func clearReleaseEnvironment(t *testing.T) {
 		"APP_ENV", "DEV_LOGIN_ENABLED", "PUBLIC_BASE_URL", "WECHAT_APP_ID", "WECHAT_APP_SECRET",
 		"STORAGE_PROVIDER", "COS_BUCKET_URL", "COS_SECRET_ID", "COS_SECRET_KEY",
 		"ASSET_BUCKET", "ASSET_S3_ENDPOINT", "ASSET_REGION", "WEATHER_PROVIDER", "AMAP_WEB_SERVICE_KEY",
+		"AI_PROVIDER", "HAIR_PREVIEW_PROVIDER", "OUTFIT_DIAGNOSIS_PROVIDER", "OPENAI_API_KEY",
+		"AI_ROUTING_FILE", "AI_ROUTING_JSON", "ALIYUN_API_KEY", "VOLCENGINE_API_KEY",
 	} {
 		t.Setenv(key, "")
 	}

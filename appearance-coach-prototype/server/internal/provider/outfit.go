@@ -90,7 +90,7 @@ func (a *OpenAIOutfitAdvisor) Diagnose(ctx context.Context, input domain.ToolInp
 		return domain.ToolResult{}, fmt.Errorf("expected one outfit photo")
 	}
 	content := []map[string]any{
-		{"type": "input_text", "text": outfitPrompt(input.Scene)},
+		{"type": "input_text", "text": outfitPrompt(input)},
 		{"type": "input_image", "detail": "high", "image_url": dataURL(images[0].MIMEType, images[0].Data)},
 	}
 	body := map[string]any{
@@ -148,11 +148,18 @@ func (a *OpenAIOutfitAdvisor) Diagnose(ctx context.Context, input domain.ToolInp
 }
 
 func validateOutfitPayload(payload outfitPayload) error {
+	return validateDiagnosisPayload(payload, map[string]bool{"improve": true, "positive": true, "optional": true})
+}
+
+func validatePurchasePayload(payload outfitPayload) error {
+	return validateDiagnosisPayload(payload, map[string]bool{"positive": true, "caution": true, "optional": true})
+}
+
+func validateDiagnosisPayload(payload outfitPayload, tones map[string]bool) error {
 	if !safeText(payload.Conclusion) || !safeText(payload.PriorityTitle) || !safeText(payload.PriorityCopy) || len(payload.Tags) != 3 || len(payload.Findings) != 3 {
 		return fmt.Errorf("outfit provider output is incomplete or unsafe")
 	}
 	categories := map[string]bool{"color": true, "silhouette": true, "proportion": true, "fabric": true, "styling": true}
-	tones := map[string]bool{"improve": true, "positive": true, "optional": true}
 	for _, tag := range payload.Tags {
 		if !safeText(tag) {
 			return fmt.Errorf("outfit provider output contains unsafe tag")
@@ -167,10 +174,18 @@ func validateOutfitPayload(payload outfitPayload) error {
 }
 
 func outfitSchema() map[string]any {
+	return diagnosisSchema([]string{"improve", "positive", "optional"})
+}
+
+func purchaseSchema() map[string]any {
+	return diagnosisSchema([]string{"positive", "caution", "optional"})
+}
+
+func diagnosisSchema(tones []string) map[string]any {
 	finding := map[string]any{"type": "object", "additionalProperties": false, "required": []string{"label", "category", "tone", "anchor_x", "anchor_y"}, "properties": map[string]any{
 		"label":    map[string]any{"type": "string", "minLength": 1, "maxLength": 36},
 		"category": map[string]any{"type": "string", "enum": []string{"color", "silhouette", "proportion", "fabric", "styling"}},
-		"tone":     map[string]any{"type": "string", "enum": []string{"improve", "positive", "optional"}},
+		"tone":     map[string]any{"type": "string", "enum": tones},
 		"anchor_x": map[string]any{"type": "number", "minimum": 0, "maximum": 1}, "anchor_y": map[string]any{"type": "number", "minimum": 0, "maximum": 1},
 	}}
 	return map[string]any{"type": "object", "additionalProperties": false,
@@ -185,9 +200,30 @@ func outfitSchema() map[string]any {
 	}
 }
 
-func outfitPrompt(scene string) string {
+func outfitPrompt(input domain.ToolInput) string {
 	scenes := map[string]string{"general": "通用", "daily": "日常", "interview": "面试", "wedding": "婚礼", "date": "约会"}
-	return "请诊断这张" + scenes[scene] + "场景的正面全身穿搭照。只指出三处可见的颜色、廓形、比例、材质或搭配信息，并选出最值得先改的一处。建议优先利用现有衣服，通过卷袖、塞衣角、换内搭、调整腰线、配色或鞋包完成，不评价人的身体。"
+	return "请诊断这张" + scenes[input.Scene] + "场景的正面全身穿搭照。只指出三处可见的颜色、廓形、比例、材质或搭配信息，并选出最值得先改的一处。建议优先利用现有衣服，通过卷袖、塞衣角、换内搭、调整腰线、配色或鞋包完成，不评价人的身体。" + toolContextPrompt(input.Context)
+}
+
+func toolContextPrompt(context *domain.ToolContext) string {
+	if context == nil {
+		return ""
+	}
+	parts := make([]string, 0, 2)
+	if context.PriorityTitle != "" {
+		parts = append(parts, fmt.Sprintf("用户已有形象档案：当前印象标签为%s；既有最高优先级是%s（%s）。把它作为搭配连续性的参考，但若与本次图片证据冲突，以本次可见证据为准。", strings.Join(context.ImpressionTags, "、"), context.PriorityTitle, context.PriorityCopy))
+	}
+	if len(context.Wardrobe) > 0 {
+		items := make([]string, 0, len(context.Wardrobe))
+		for _, item := range context.Wardrobe {
+			items = append(items, item.Color+item.Name+"（"+item.Category+"）")
+		}
+		parts = append(parts, "用户已录入的衣橱单品只有："+strings.Join(items, "、")+"。搭配建议优先引用这些真实单品；没有录入的单品只能标为可选基础款，不得假装用户已经拥有。")
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "\n" + strings.Join(parts, "\n")
 }
 
 type FallbackOutfitAdvisor struct{ primary, fallback OutfitAdvisor }

@@ -35,6 +35,7 @@ type RuntimeInfo struct {
 	FallbackEnabled         bool
 	HairPreviewProvider     string
 	OutfitDiagnosisProvider string
+	AIRoutes                map[string]string
 }
 
 type contextKey string
@@ -133,6 +134,7 @@ func (a *API) health(w http.ResponseWriter, _ *http.Request) {
 		"fallback_enabled":          a.runtime.FallbackEnabled,
 		"hair_preview_provider":     a.runtime.HairPreviewProvider,
 		"outfit_diagnosis_provider": a.runtime.OutfitDiagnosisProvider,
+		"ai_routes":                 a.runtime.AIRoutes,
 	})
 }
 

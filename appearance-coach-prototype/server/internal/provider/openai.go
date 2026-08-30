@@ -174,7 +174,7 @@ func (a *OpenAIAnalyzer) Analyze(ctx context.Context, input domain.CreateAnalysi
 	if err := validateAnalysisPayload(payload); err != nil {
 		return domain.AnalysisOutput{}, err
 	}
-	return payload.toDomain(images, a.config.Model)
+	return payload.toDomain(images, "openai-responses:"+a.config.Model)
 }
 
 func responseText(response responsesAPIResponse) (string, string) {
@@ -216,7 +216,7 @@ func dataURL(mimeType string, data []byte) string {
 	return "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(data)
 }
 
-func (payload analysisPayload) toDomain(images []AnalysisImage, model string) (domain.AnalysisOutput, error) {
+func (payload analysisPayload) toDomain(images []AnalysisImage, providerVersion string) (domain.AnalysisOutput, error) {
 	currentURL := ""
 	for _, image := range images {
 		if currentURL == "" || image.Kind == "face" {
@@ -229,7 +229,7 @@ func (payload analysisPayload) toDomain(images []AnalysisImage, model string) (d
 	output := domain.AnalysisOutput{
 		CurrentImageURL: currentURL, ImpressionTags: payload.ImpressionTags,
 		PriorityTitle: payload.PriorityTitle, PriorityCopy: payload.PriorityCopy,
-		ProviderVersion: "openai-responses:" + model,
+		ProviderVersion: providerVersion,
 	}
 	for _, finding := range payload.Findings {
 		output.Findings = append(output.Findings, domain.Finding{

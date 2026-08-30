@@ -1,0 +1,87 @@
+{
+  "models": {
+    "aliyun/qwen3.7-plus": {
+      "vendor": "aliyun",
+      "protocol": "openai_chat_completions",
+      "model": "qwen3.7-plus",
+      "base_url": "https://YOUR_WORKSPACE_ID.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "api_key_env": "ALIYUN_API_KEY",
+      "structured_mode": "json_schema",
+      "parameters": {"enable_thinking": false},
+      "timeout_seconds": 90,
+      "input_cost_per_million": 2,
+      "output_cost_per_million": 8
+    },
+    "aliyun/qwen3.7-flash": {
+      "vendor": "aliyun",
+      "protocol": "openai_chat_completions",
+      "model": "qwen3.7-flash",
+      "base_url": "https://YOUR_WORKSPACE_ID.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "api_key_env": "ALIYUN_API_KEY",
+      "structured_mode": "json_object",
+      "parameters": {"enable_thinking": false},
+      "timeout_seconds": 60,
+      "input_cost_per_million": 0.2,
+      "output_cost_per_million": 0.8
+    },
+    "aliyun/wan2.7-image-pro": {
+      "vendor": "aliyun",
+      "protocol": "dashscope_wan",
+      "model": "wan2.7-image-pro",
+      "base_url": "https://YOUR_WORKSPACE_ID.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      "api_key_env": "ALIYUN_API_KEY",
+      "timeout_seconds": 180,
+      "output_image_cost": 0.5
+    },
+    "volcengine/seedream-4.5": {
+      "vendor": "volcengine",
+      "protocol": "ark_image",
+      "model": "doubao-seedream-4-5-251128",
+      "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+      "api_key_env": "VOLCENGINE_API_KEY",
+      "timeout_seconds": 180,
+      "output_image_cost": 0.25
+    }
+  },
+  "routes": {
+    "appearance_analysis": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.7-plus",
+      "fallbacks": ["aliyun/qwen3.7-flash"],
+      "max_cost_cny": 0.08
+    },
+    "outfit_diagnosis": {
+      "policy": "value_first",
+      "primary": "aliyun/qwen3.7-flash",
+      "fallbacks": ["aliyun/qwen3.7-plus"]
+    },
+    "purchase_diagnosis": {
+      "policy": "value_first",
+      "primary": "aliyun/qwen3.7-flash",
+      "fallbacks": ["aliyun/qwen3.7-plus"]
+    },
+    "advisor_chat": {
+      "policy": "value_first",
+      "primary": "aliyun/qwen3.7-flash",
+      "fallbacks": ["aliyun/qwen3.7-plus"]
+    },
+    "hair_edit": {
+      "policy": "quality_first",
+      "primary": "aliyun/wan2.7-image-pro",
+      "fallbacks": ["volcengine/seedream-4.5"],
+      "max_cost_cny": 0.6
+    },
+    "makeup_edit": {
+      "policy": "quality_first",
+      "primary": "aliyun/wan2.7-image-pro",
+      "fallbacks": ["volcengine/seedream-4.5"],
+      "max_cost_cny": 0.6
+    },
+    "full_look_edit": {
+      "policy": "quality_first",
+      "primary": "aliyun/wan2.7-image-pro",
+      "fallbacks": ["volcengine/seedream-4.5"],
+      "max_cost_cny": 0.6
+    }
+  }
+}

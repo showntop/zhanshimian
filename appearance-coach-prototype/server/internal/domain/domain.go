@@ -266,10 +266,27 @@ type FeedbackInput struct {
 }
 
 type ToolInput struct {
-	Kind     string `json:"kind"`
-	ReportID string `json:"report_id,omitempty"`
-	MediaID  string `json:"media_id,omitempty"`
-	Scene    string `json:"scene,omitempty"`
+	Kind     string       `json:"kind"`
+	ReportID string       `json:"report_id,omitempty"`
+	MediaID  string       `json:"media_id,omitempty"`
+	Scene    string       `json:"scene,omitempty"`
+	Context  *ToolContext `json:"-"`
+}
+
+type ToolContext struct {
+	ImpressionTags []string
+	PriorityTitle  string
+	PriorityCopy   string
+	Wardrobe       []ToolWardrobeItem
+}
+
+type ToolWardrobeItem struct {
+	Name      string
+	Category  string
+	Color     string
+	Season    string
+	Formality string
+	Scenes    []string
 }
 
 type ToolFinding struct {

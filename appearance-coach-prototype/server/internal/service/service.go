@@ -25,23 +25,27 @@ var ErrValidation = errors.New("validation error")
 var ErrForbidden = errors.New("forbidden")
 
 type Service struct {
-	repo          repository.Repository
-	storage       storage.ObjectStorage
-	analyzer      provider.Analyzer
-	hairGenerator provider.HairPreviewGenerator
-	outfitAdvisor provider.OutfitAdvisor
-	weather       provider.WeatherProvider
-	wechat        provider.WeChatAuthenticator
-	publicBaseURL string
-	assetURLTTL   time.Duration
-	sessionTTL    time.Duration
-	maxUpload     int64
-	logger        *slog.Logger
+	repo            repository.Repository
+	storage         storage.ObjectStorage
+	analyzer        provider.Analyzer
+	hairGenerator   provider.HairPreviewGenerator
+	outfitAdvisor   provider.OutfitAdvisor
+	purchaseAdvisor provider.OutfitAdvisor
+	advisorChat     provider.AdvisorChat
+	weather         provider.WeatherProvider
+	wechat          provider.WeChatAuthenticator
+	publicBaseURL   string
+	assetURLTTL     time.Duration
+	sessionTTL      time.Duration
+	maxUpload       int64
+	logger          *slog.Logger
 }
 
 type ProviderOptions struct {
 	Hair        provider.HairPreviewGenerator
 	Outfit      provider.OutfitAdvisor
+	Purchase    provider.OutfitAdvisor
+	Advisor     provider.AdvisorChat
 	Weather     provider.WeatherProvider
 	WeChat      provider.WeChatAuthenticator
 	AssetURLTTL time.Duration
@@ -50,6 +54,8 @@ type ProviderOptions struct {
 func New(repo repository.Repository, storage storage.ObjectStorage, analyzer provider.Analyzer, publicBaseURL string, sessionTTL time.Duration, maxUpload int64, logger *slog.Logger, options ...ProviderOptions) *Service {
 	hairGenerator := provider.HairPreviewGenerator(provider.NewDemoHairGenerator())
 	outfitAdvisor := provider.OutfitAdvisor(provider.NewDemoOutfitAdvisor())
+	var purchaseAdvisor provider.OutfitAdvisor
+	var advisorChat provider.AdvisorChat
 	weather := provider.WeatherProvider(provider.NewDemoWeatherProvider())
 	var wechat provider.WeChatAuthenticator
 	assetURLTTL := 15 * time.Minute
@@ -60,6 +66,8 @@ func New(repo repository.Repository, storage storage.ObjectStorage, analyzer pro
 		if options[0].Outfit != nil {
 			outfitAdvisor = options[0].Outfit
 		}
+		purchaseAdvisor = options[0].Purchase
+		advisorChat = options[0].Advisor
 		if options[0].Weather != nil {
 			weather = options[0].Weather
 		}
@@ -68,7 +76,7 @@ func New(repo repository.Repository, storage storage.ObjectStorage, analyzer pro
 			assetURLTTL = options[0].AssetURLTTL
 		}
 	}
-	return &Service{repo: repo, storage: storage, analyzer: analyzer, hairGenerator: hairGenerator, outfitAdvisor: outfitAdvisor, weather: weather, wechat: wechat, publicBaseURL: strings.TrimSuffix(publicBaseURL, "/"), assetURLTTL: assetURLTTL, sessionTTL: sessionTTL, maxUpload: maxUpload, logger: logger}
+	return &Service{repo: repo, storage: storage, analyzer: analyzer, hairGenerator: hairGenerator, outfitAdvisor: outfitAdvisor, purchaseAdvisor: purchaseAdvisor, advisorChat: advisorChat, weather: weather, wechat: wechat, publicBaseURL: strings.TrimSuffix(publicBaseURL, "/"), assetURLTTL: assetURLTTL, sessionTTL: sessionTTL, maxUpload: maxUpload, logger: logger}
 }
 
 func (s *Service) DevLogin(ctx context.Context, nickname string) (domain.Session, error) {
@@ -246,10 +254,31 @@ func (s *Service) RunTool(ctx context.Context, userID string, input domain.ToolI
 	if !validScenes[input.Scene] {
 		return domain.ToolResult{}, fmt.Errorf("%w: 不支持的使用场景", ErrValidation)
 	}
+	toolContext := &domain.ToolContext{}
 	if input.ReportID != "" {
 		if _, err := uuid.Parse(input.ReportID); err != nil {
 			return domain.ToolResult{}, fmt.Errorf("%w: 无效的形象档案", ErrValidation)
 		}
+		report, err := s.repo.GetReport(ctx, userID, input.ReportID)
+		if err != nil {
+			return domain.ToolResult{}, err
+		}
+		toolContext.ImpressionTags, toolContext.PriorityTitle, toolContext.PriorityCopy = report.ImpressionTags, report.PriorityTitle, report.PriorityCopy
+	}
+	if input.Kind == "purchase" {
+		items, err := s.repo.ListWardrobeItems(ctx, userID)
+		if err != nil {
+			return domain.ToolResult{}, err
+		}
+		for index, item := range items {
+			if index == 20 {
+				break
+			}
+			toolContext.Wardrobe = append(toolContext.Wardrobe, domain.ToolWardrobeItem{Name: item.Name, Category: item.Category, Color: item.Color, Season: item.Season, Formality: item.Formality, Scenes: item.Scenes})
+		}
+	}
+	if input.ReportID != "" || len(toolContext.Wardrobe) > 0 {
+		input.Context = toolContext
 	}
 	if input.Kind != "hair" && input.MediaID == "" {
 		return domain.ToolResult{}, fmt.Errorf("%w: 请先上传需要判断的照片", ErrValidation)
@@ -271,6 +300,11 @@ func (s *Service) RunTool(ctx context.Context, userID string, input domain.ToolI
 	var err error
 	if input.Kind == "outfit" {
 		result, err = s.outfitAdvisor.Diagnose(ctx, input)
+		if err != nil {
+			return domain.ToolResult{}, err
+		}
+	} else if input.Kind == "purchase" && s.purchaseAdvisor != nil {
+		result, err = s.purchaseAdvisor.Diagnose(ctx, input)
 		if err != nil {
 			return domain.ToolResult{}, err
 		}
@@ -470,7 +504,12 @@ func (s *Service) processHairPreview(ctx context.Context, job domain.HairPreview
 	}
 	resultURL, storageKey := output.ImageURL, ""
 	if len(output.ImageData) > 0 {
-		storageKey = fmt.Sprintf("%s/generated/hair/%s.png", job.UserID, uuid.NewString())
+		extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
+		if extension == "" {
+			_ = s.repo.FailHairPreview(ctx, job, errors.New("hair preview provider returned an unsupported image format"))
+			return
+		}
+		storageKey = fmt.Sprintf("%s/generated/hair/%s%s", job.UserID, uuid.NewString(), extension)
 		storedKey, saveErr := s.storage.Save(ctx, storageKey, bytes.NewReader(output.ImageData))
 		if saveErr != nil {
 			_ = s.repo.FailHairPreview(ctx, job, saveErr)

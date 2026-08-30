@@ -224,6 +224,34 @@ type advisorGrounding struct {
 	Report   *domain.Report
 }
 
+func advisorContextForAI(grounding advisorGrounding) map[string]any {
+	result := map[string]any{}
+	if grounding.Report != nil {
+		findings := make([]map[string]string, 0, len(grounding.Report.Findings))
+		for _, finding := range grounding.Report.Findings {
+			findings = append(findings, map[string]string{"label": finding.Label, "category": finding.Category})
+		}
+		result["appearance"] = map[string]any{
+			"impression_tags": grounding.Report.ImpressionTags,
+			"priority_title":  grounding.Report.PriorityTitle,
+			"priority_copy":   grounding.Report.PriorityCopy,
+			"findings":        findings,
+		}
+	}
+	if grounding.Today != nil {
+		result["today"] = map[string]any{"context": grounding.Today.Context, "title": grounding.Today.Title, "summary": grounding.Today.Summary, "steps": grounding.Today.Steps, "feedback": grounding.Today.Feedback}
+	}
+	wardrobe := make([]map[string]any, 0, min(len(grounding.Wardrobe), 20))
+	for index, item := range grounding.Wardrobe {
+		if index == 20 {
+			break
+		}
+		wardrobe = append(wardrobe, map[string]any{"name": item.Name, "category": item.Category, "color": item.Color, "season": item.Season, "formality": item.Formality, "scenes": item.Scenes, "favorite": item.Favorite})
+	}
+	result["wardrobe"] = wardrobe
+	return result
+}
+
 func itemNames(items []domain.WardrobeItem, limit int) string {
 	names := make([]string, 0, limit)
 	for _, item := range items {
@@ -327,6 +355,12 @@ func (s *Service) SendAdvisorMessage(ctx context.Context, userID string, input d
 		return domain.AdvisorMessage{}, err
 	}
 	reply, actions := advisorReply(input.Content, grounding)
+	if s.advisorChat != nil {
+		reply, err = s.advisorChat.Reply(ctx, input.Content, advisorContextForAI(grounding))
+		if err != nil {
+			return domain.AdvisorMessage{}, err
+		}
+	}
 	return s.repo.AddAdvisorExchange(ctx, userID, conversationID, input.Content, reply, actions)
 }
 

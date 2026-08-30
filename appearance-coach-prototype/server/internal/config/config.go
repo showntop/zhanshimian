@@ -54,10 +54,16 @@ type Config struct {
 	OutfitDiagnosisFallbackToDemo bool
 	OutfitDiagnosisTimeout        time.Duration
 	OpenAIOutfitModel             string
+	AIRouting                     AIRoutingConfig
+	AIRoutingSource               string
 }
 
 func Load() (Config, error) {
 	aiProvider := env("AI_PROVIDER", "demo")
+	aiRouting, aiRoutingSource, err := loadAIRouting()
+	if err != nil {
+		return Config{}, err
+	}
 	cfg := Config{
 		Environment:                   env("APP_ENV", "development"),
 		Addr:                          env("ADDR", ":58000"),
@@ -103,6 +109,8 @@ func Load() (Config, error) {
 		OutfitDiagnosisFallbackToDemo: envBool("OUTFIT_DIAGNOSIS_FALLBACK_TO_DEMO", true),
 		OutfitDiagnosisTimeout:        time.Duration(envInt("OUTFIT_DIAGNOSIS_TIMEOUT_SECONDS", 60)) * time.Second,
 		OpenAIOutfitModel:             env("OPENAI_OUTFIT_MODEL", "gpt-5-mini"),
+		AIRouting:                     aiRouting,
+		AIRoutingSource:               aiRoutingSource,
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
@@ -158,6 +166,29 @@ func Load() (Config, error) {
 		}
 		if err := validateHTTPSURL(cfg.AMapAPIBaseURL); err != nil {
 			return Config{}, fmt.Errorf("AMAP_API_BASE_URL: %w", err)
+		}
+		if cfg.AIRoutingSource == "" {
+			return Config{}, fmt.Errorf("AI_ROUTING_FILE or AI_ROUTING_JSON is required in production")
+		} else {
+			for _, capability := range []string{"appearance_analysis", "outfit_diagnosis", "purchase_diagnosis", "advisor_chat", "hair_edit"} {
+				if _, ok := cfg.AIRouting.Routes[capability]; !ok {
+					return Config{}, fmt.Errorf("production AI routing requires %q", capability)
+				}
+			}
+			for id, model := range cfg.AIRouting.Models {
+				if strings.EqualFold(model.Vendor, "demo") {
+					return Config{}, fmt.Errorf("production AI model %q must not use demo vendor", id)
+				}
+				if strings.TrimSpace(os.Getenv(model.APIKeyEnv)) == "" {
+					return Config{}, fmt.Errorf("%s is required by AI model %q", model.APIKeyEnv, id)
+				}
+				if strings.Contains(strings.ToUpper(model.BaseURL), "YOUR_") || strings.Contains(model.BaseURL, "<") {
+					return Config{}, fmt.Errorf("AI model %q base_url still contains a placeholder", id)
+				}
+				if err := validateHTTPSURL(model.BaseURL); err != nil {
+					return Config{}, fmt.Errorf("AI model %q base_url: %w", id, err)
+				}
+			}
 		}
 	}
 	return cfg, nil

@@ -16,6 +16,7 @@ WORKDIR /app
 COPY --from=build --chown=jianwo:jianwo /out/jianwo-api /app/jianwo-api
 COPY --from=build --chown=jianwo:jianwo /out/data /app/data
 COPY --chown=jianwo:jianwo assets /app/assets
+COPY --chown=jianwo:jianwo config /app/config
 USER jianwo
 EXPOSE 8080
 ENTRYPOINT ["/app/jianwo-api"]

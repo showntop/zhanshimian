@@ -9,5 +9,7 @@ miniapp/*.key
 # Runtime data and local secrets
 server/data/
 server/.env
+server/config/ai-routing.*.json
+!server/config/ai-routing.example.json
 *.env
 coverage.out
