@@ -28,12 +28,12 @@ go run ./cmd/api
 
 ## 启用统一真实 AI 路由（推荐）
 
-复制模型目录后只需替换百炼 Workspace ID；密钥继续放环境变量，不能写进 JSON：
+复制模型目录后只需在 `.env` 填写百炼 Workspace ID；密钥继续放环境变量，不能写进 JSON：
 
 ```bash
 cp server/config/ai-routing.example.json server/config/ai-routing.local.json
-# 编辑 ai-routing.local.json 中的 YOUR_WORKSPACE_ID
 export AI_ROUTING_FILE="$PWD/server/config/ai-routing.local.json"
+export BAILIAN_WORKSPACE_ID='<你的百炼 Workspace ID>'
 export ALIYUN_API_KEY='...'
 export VOLCENGINE_API_KEY='...'
 go run ./cmd/api
@@ -44,9 +44,12 @@ Docker Compose 使用：
 ```bash
 AI_ROUTING_FILE=/app/config/ai-routing.json
 AI_ROUTING_HOST_FILE=./server/config/ai-routing.production.json
+BAILIAN_WORKSPACE_ID=你的百炼WorkspaceID
 ALIYUN_API_KEY=...
 VOLCENGINE_API_KEY=...
 ```
+
+路由 JSON 支持 `${VAR}` 环境变量插值。当前示例中的百炼 Qwen 与万相 endpoint 共用 `BAILIAN_WORKSPACE_ID`；变量未填写时会在启动校验阶段明确报错，不会静默生成错误地址。
 
 路由配置把业务能力与模型解耦。目前支持 `appearance_analysis`、`outfit_diagnosis`、`purchase_diagnosis`、`advisor_chat`、`hair_edit`、`makeup_edit` 和 `full_look_edit`；协议适配器支持 OpenAI Responses、OpenAI Chat Completions、OpenAI Images Edit、阿里万相与火山 Ark 图片生成。主备模型、超时、成本单价和单次预算都在同一个目录内调整，业务 Service 不需要改动。
 

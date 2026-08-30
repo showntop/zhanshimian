@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -71,16 +72,40 @@ func TestLoadRejectsUnknownAIRoutingProtocol(t *testing.T) {
 }
 
 func TestExampleAIRoutingConfigIsValid(t *testing.T) {
+	t.Setenv("BAILIAN_WORKSPACE_ID", "workspace-test")
 	data, err := os.ReadFile("../../config/ai-routing.example.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var routing AIRoutingConfig
-	if err := json.Unmarshal(data, &routing); err != nil {
+	routingData := expandAIRoutingEnv(data)
+	if err := json.Unmarshal(routingData, &routing); err != nil {
 		t.Fatal(err)
 	}
 	if err := validateAIRouting(routing); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLoadExpandsAIRoutingEnvironmentPlaceholders(t *testing.T) {
+	clearReleaseEnvironment(t)
+	t.Setenv("BAILIAN_WORKSPACE_ID", "workspace-test")
+	t.Setenv("AI_ROUTING_JSON", `{"models":{"x":{"vendor":"aliyun","protocol":"openai_chat_completions","model":"qwen","base_url":"https://${BAILIAN_WORKSPACE_ID}.example.com/v1","api_key_env":"ALIYUN_API_KEY"}},"routes":{"advisor_chat":{"primary":"x"}}}`)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.AIRouting.Models["x"].BaseURL; got != "https://workspace-test.example.com/v1" {
+		t.Fatalf("placeholder was not expanded: %s", got)
+	}
+}
+
+func TestLoadKeepsMissingAIRoutingPlaceholderVisible(t *testing.T) {
+	clearReleaseEnvironment(t)
+	t.Setenv("AI_ROUTING_JSON", `{"models":{"x":{"vendor":"aliyun","protocol":"openai_chat_completions","model":"qwen","base_url":"https://${BAILIAN_WORKSPACE_ID}.example.com/v1","api_key_env":"ALIYUN_API_KEY"}},"routes":{"advisor_chat":{"primary":"x"}}}`)
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "base_url") {
+		t.Fatalf("expected missing placeholder to fail validation, got %v", err)
 	}
 }
 
@@ -157,6 +182,7 @@ func clearReleaseEnvironment(t *testing.T) {
 		"ASSET_BUCKET", "ASSET_S3_ENDPOINT", "ASSET_REGION", "WEATHER_PROVIDER", "AMAP_WEB_SERVICE_KEY",
 		"AI_PROVIDER", "HAIR_PREVIEW_PROVIDER", "OUTFIT_DIAGNOSIS_PROVIDER", "OPENAI_API_KEY",
 		"AI_ROUTING_FILE", "AI_ROUTING_JSON", "ALIYUN_API_KEY", "VOLCENGINE_API_KEY",
+		"BAILIAN_WORKSPACE_ID",
 	} {
 		t.Setenv(key, "")
 	}

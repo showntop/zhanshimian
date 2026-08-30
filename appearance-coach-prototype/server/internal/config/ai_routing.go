@@ -57,6 +57,7 @@ func loadAIRouting() (AIRoutingConfig, string, error) {
 	if err != nil {
 		return AIRoutingConfig{}, "", fmt.Errorf("read AI routing config: %w", err)
 	}
+	data = expandAIRoutingEnv(data)
 	var routing AIRoutingConfig
 	if err := json.Unmarshal(data, &routing); err != nil {
 		return AIRoutingConfig{}, "", fmt.Errorf("decode AI routing config: %w", err)
@@ -65,6 +66,19 @@ func loadAIRouting() (AIRoutingConfig, string, error) {
 		return AIRoutingConfig{}, "", err
 	}
 	return routing, source, nil
+}
+
+// expandAIRoutingEnv resolves ${VAR} placeholders in the non-secret routing
+// catalog. Unset variables remain visible so validation can report the exact
+// missing placeholder instead of silently producing a malformed URL.
+func expandAIRoutingEnv(data []byte) []byte {
+	return []byte(os.Expand(string(data), func(key string) string {
+		value, ok := os.LookupEnv(key)
+		if !ok || strings.TrimSpace(value) == "" {
+			return "${" + key + "}"
+		}
+		return value
+	}))
 }
 
 func validateAIRouting(routing AIRoutingConfig) error {
@@ -89,6 +103,9 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		}
 		if model.BaseURL == "" || model.APIKeyEnv == "" {
 			return fmt.Errorf("AI model %q requires base_url and api_key_env", id)
+		}
+		if strings.Contains(model.BaseURL, "${") {
+			return fmt.Errorf("AI model %q base_url contains an unset environment placeholder", id)
 		}
 		if model.StructuredMode != "" && model.StructuredMode != "json_schema" && model.StructuredMode != "json_object" {
 			return fmt.Errorf("AI model %q has unsupported structured_mode %q", id, model.StructuredMode)
