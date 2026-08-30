@@ -13,6 +13,7 @@ Page({
   onUnload() { if (this.timer) clearTimeout(this.timer) },
   poll() {
     api.getAnalysis(this.data.id).then((analysis) => {
+      this.failures = 0
       this.setData({ progress: analysis.progress, stage: analysis.stage, failed: analysis.status === 'failed' })
       if (Array.isArray(analysis.media) && analysis.media.length) {
         getApp().globalData.analysisMedia = analysis.media
@@ -25,7 +26,21 @@ Page({
         return
       }
       if (analysis.status !== 'failed') this.timer = setTimeout(() => this.poll(), 700)
-    }).catch(() => { this.timer = setTimeout(() => this.poll(), 1200) })
+    }).catch((error) => {
+      // A 404 means the analysis is gone (data was cleared mid-run); anything
+      // else may be transient. Either way, stop retrying silently forever —
+      // surface the failure UI so the page never looks stuck.
+      if (error && error.statusCode === 404) {
+        this.setData({ failed: true })
+        return
+      }
+      this.failures = (this.failures || 0) + 1
+      if (this.failures >= 5) {
+        this.setData({ failed: true })
+        return
+      }
+      this.timer = setTimeout(() => this.poll(), 1200)
+    })
   },
   updateMedia(media, progress) {
     const normalized = (media || []).map((item) => ({ ...item, url: userImage(item.url) }))

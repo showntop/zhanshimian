@@ -6,7 +6,7 @@
       "model": "qwen3.7-plus",
       "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
       "api_key_env": "ALIYUN_API_KEY",
-      "structured_mode": "json_schema",
+      "structured_mode": "json_object",
       "parameters": {"enable_thinking": false},
       "timeout_seconds": 90,
       "input_cost_per_million": 2,

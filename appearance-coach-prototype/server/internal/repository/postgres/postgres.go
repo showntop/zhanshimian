@@ -12,6 +12,7 @@ import (
 	"github.com/example/jianwo/server/internal/repository"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -24,6 +25,14 @@ func mapNotFound(err error) error {
 		return repository.ErrNotFound
 	}
 	return err
+}
+
+// isForeignKeyViolation reports a Postgres 23503 error raised because the row
+// referenced by the named constraint disappeared underneath an in-flight
+// worker job (for example a user data wipe cascading to analyses).
+func isForeignKeyViolation(err error, constraint string) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == constraint
 }
 
 func (s *Store) CreateSession(ctx context.Context, openID, nickname string, digest []byte, expiresAt time.Time) (domain.User, error) {
@@ -231,6 +240,9 @@ func (s *Store) CompleteAnalysis(ctx context.Context, job domain.AnalysisJob, ou
 		INSERT INTO reports(analysis_id,user_id,current_image_url,impression_tags,priority_title,priority_copy,provider_version)
 		VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text`, job.AnalysisID, job.UserID, output.CurrentImageURL, output.ImpressionTags, output.PriorityTitle, output.PriorityCopy, output.ProviderVersion).Scan(&reportID)
 	if err != nil {
+		if isForeignKeyViolation(err, "reports_analysis_id_fkey") {
+			return "", repository.ErrAnalysisRemoved
+		}
 		return "", err
 	}
 	for index, finding := range output.Findings {

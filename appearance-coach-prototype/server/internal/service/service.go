@@ -608,6 +608,10 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 	output.CurrentImageURL = currentImageURL
 	_ = s.repo.UpdateAnalysisProgress(ctx, job.AnalysisID, 86, "组合发型、妆容与穿搭方案")
 	if _, err := s.repo.CompleteAnalysis(ctx, job, output); err != nil {
+		if errors.Is(err, repository.ErrAnalysisRemoved) {
+			s.logger.Info("analysis removed while processing; discarding result", "analysis_id", job.AnalysisID)
+			return
+		}
 		s.logger.Error("complete analysis", "analysis_id", job.AnalysisID, "error", err)
 		_ = s.repo.FailAnalysis(ctx, job, err)
 	}

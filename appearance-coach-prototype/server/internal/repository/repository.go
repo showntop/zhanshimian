@@ -3,12 +3,18 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/example/jianwo/server/internal/domain"
 )
 
 var ErrNotFound = errNotFound("resource not found")
+
+// ErrAnalysisRemoved marks a worker job whose analysis row was deleted while
+// it was being processed (for example via DELETE /v1/me/data). It is not a
+// failure worth retrying: the user discarded the data, so the result is moot.
+var ErrAnalysisRemoved = errors.New("analysis removed while processing")
 
 type errNotFound string
 
