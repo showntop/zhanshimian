@@ -132,6 +132,17 @@ func TestAIRuntimeFallsBackWhenDomainValidationRejectsOutput(t *testing.T) {
 	}
 }
 
+func TestNormalizeStructuredJSONOnlyUnwrapsSingletonObjectArray(t *testing.T) {
+	if got := string(normalizeStructuredJSON([]byte(`[{"ok":true}]`))); got != `{"ok":true}` {
+		t.Fatalf("singleton object array was not normalized: %s", got)
+	}
+	for _, input := range []string{`[{"ok":true},{"ok":false}]`, `[1]`, `{"ok":true}`, `not-json`} {
+		if got := string(normalizeStructuredJSON([]byte(input))); got != input {
+			t.Fatalf("unexpected normalization of %s: %s", input, got)
+		}
+	}
+}
+
 func TestAIRuntimeArkImageEditAcceptsBase64AndBudgetSkipsExpensivePrimary(t *testing.T) {
 	t.Setenv("AI_TEST_ARK_KEY", "ark-key")
 	png := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00}

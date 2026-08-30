@@ -179,6 +179,7 @@ func (r *AIRuntime) Structured(ctx context.Context, capability string, input Str
 			result, err = r.openAIResponses(ctx, capability, model, input)
 		}
 		if err == nil {
+			result.JSON = normalizeStructuredJSON(result.JSON)
 			if input.Validate != nil {
 				err = input.Validate(result.JSON)
 			}
@@ -198,6 +199,30 @@ func (r *AIRuntime) Structured(ctx context.Context, capability string, input Str
 		r.logInvocation(failedMeta, err)
 	}
 	return StructuredResult{}, fmt.Errorf("all AI models failed for %s: %s", capability, strings.Join(causes, "; "))
+}
+
+// normalizeStructuredJSON handles a provider quirk seen in some compatible
+// endpoints where a single JSON object is wrapped in an array. It is
+// deliberately narrow: multi-item arrays are not unwrapped, and the domain
+// validator still enforces the complete output contract afterwards.
+func normalizeStructuredJSON(data []byte) []byte {
+	var value any
+	if json.Unmarshal(data, &value) != nil {
+		return data
+	}
+	items, ok := value.([]any)
+	if !ok || len(items) != 1 {
+		return data
+	}
+	object, ok := items[0].(map[string]any)
+	if !ok {
+		return data
+	}
+	normalized, err := json.Marshal(object)
+	if err != nil {
+		return data
+	}
+	return normalized
 }
 
 func (r *AIRuntime) EditImage(ctx context.Context, capability string, input ImageEditRequest) (ImageEditResult, error) {

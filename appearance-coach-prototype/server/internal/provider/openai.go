@@ -197,8 +197,8 @@ func responseText(response responsesAPIResponse) (string, string) {
 func analysisPrompt(input domain.CreateAnalysisInput) string {
 	return fmt.Sprintf(`请根据依次提供的正脸、侧脸和全身照，为用户生成中文形象分析。
 场景：%s；职业：%s；身高：%d cm；预算：%s。
-只描述能从照片直接观察到的发型重心、眉眼对比、头肩比例、服装轮廓和配色。不要给出颜值或身材评分，不推断敏感属性。
-输出 3 个当前印象标签、4 个可提升点、一个最优先建议，以及严格 3 套方案。每套方案必须包含 hair、makeup、outfit 三个步骤和可执行细节。`, input.Scene, input.Profile.Role, input.Profile.HeightCM, input.Profile.Budget)
+	只描述能从照片直接观察到的发型重心、眉眼对比、头肩比例、服装轮廓和配色。不要给出颜值或身材评分，不推断敏感属性。
+	输出 3 个当前印象标签、4 个可提升点、一个最优先建议，以及严格 3 套方案。每套方案必须包含 hair、makeup、outfit 三个步骤和可执行细节。顶层必须输出一个 JSON 对象，不要输出数组、Markdown 或额外解释。`, input.Scene, input.Profile.Role, input.Profile.HeightCM, input.Profile.Budget)
 }
 
 func photoKindName(kind string) string {
