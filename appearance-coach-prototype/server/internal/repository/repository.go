@@ -32,6 +32,10 @@ type Repository interface {
 	UpdateAnalysisProgress(context.Context, string, int, string) error
 	CompleteAnalysis(context.Context, domain.AnalysisJob, domain.AnalysisOutput) (string, error)
 	FailAnalysis(context.Context, domain.AnalysisJob, error) error
+	// RejectAnalysis marks a job permanently failed with a user-facing reason
+	// (for example photos that do not show the required subject). Unlike
+	// FailAnalysis it never requeues.
+	RejectAnalysis(context.Context, domain.AnalysisJob, string) error
 	GetReport(context.Context, string, string) (domain.Report, error)
 	ListPlans(context.Context, string, string, string) ([]domain.Plan, error)
 	CreateScenePlans(context.Context, string, string, domain.ScenePlanInput, []domain.Plan) ([]domain.Plan, error)

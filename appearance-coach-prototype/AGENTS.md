@@ -63,6 +63,7 @@ See `src/mobile/COMPONENTS.md` for the full component and gesture contract.
 - Scene shortcuts always open one lightweight scene-brief page for time, budget, formality, and desired impression. Reuse the saved image profile when it exists; never force a multi-step questionnaire before generating a scene plan.
 - Keep the three bottom destinations `首页 / 方案 / 我的`. Do not add marketplace, community, or discovery tabs. Experimental 3D/AR capabilities live under a secondary `体验实验室` entry and do not compete with the home primary action.
 - Mini-program image assets must be PNG or JPEG, not WebP — WebP rendered as blank in the WeChat build and blanked the home comparison card. PNG files under `assets/` are masters ignored by `project.config.json` packing; shipped photos are JPEG (~40-60 KB each).
+- Analysis photo gating: when the AI routing file defines a `photo_check` route, the worker validates the three photos with the vision model before running appearance analysis (frontal face / 90° side profile / full body, real person, clear). A definitive mismatch fails the analysis immediately (no retries) with a per-photo Chinese reason shown on the analysis failure view; without the route the gate is skipped so code can deploy before config.
 
 ## Keyboard Rule
 

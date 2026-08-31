@@ -2,7 +2,7 @@ const api = require('../../services/api')
 const { userImage } = require('../../utils/media')
 
 Page({
-  data: { id: '', scene: 'general', progress: 8, stage: '正在安全上传照片', failed: false, media: [], previewImage: '', previewKind: 'face', previewLabel: '正脸照', previewMode: 'aspectFill' },
+  data: { id: '', scene: 'general', progress: 8, stage: '正在安全上传照片', failed: false, errorMessage: '', media: [], previewImage: '', previewKind: 'face', previewLabel: '正脸照', previewMode: 'aspectFill' },
   onLoad(options) {
     const app = getApp()
     const initialMedia = app.globalData.analysisMedia || []
@@ -14,7 +14,7 @@ Page({
   poll() {
     api.getAnalysis(this.data.id).then((analysis) => {
       this.failures = 0
-      this.setData({ progress: analysis.progress, stage: analysis.stage, failed: analysis.status === 'failed' })
+      this.setData({ progress: analysis.progress, stage: analysis.stage, failed: analysis.status === 'failed', errorMessage: analysis.error_message || '' })
       if (Array.isArray(analysis.media) && analysis.media.length) {
         getApp().globalData.analysisMedia = analysis.media
         this.updateMedia(analysis.media, analysis.progress)

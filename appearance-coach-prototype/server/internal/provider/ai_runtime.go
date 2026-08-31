@@ -20,6 +20,7 @@ import (
 
 const (
 	CapabilityAppearanceAnalysis = "appearance_analysis"
+	CapabilityPhotoCheck         = "photo_check"
 	CapabilityOutfitDiagnosis    = "outfit_diagnosis"
 	CapabilityPurchaseDiagnosis  = "purchase_diagnosis"
 	CapabilityAdvisorChat        = "advisor_chat"

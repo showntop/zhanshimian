@@ -297,6 +297,21 @@ func (s *Store) FailAnalysis(ctx context.Context, job domain.AnalysisJob, cause 
 	return err
 }
 
+func (s *Store) RejectAnalysis(ctx context.Context, job domain.AnalysisJob, message string) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, `UPDATE analysis_jobs SET status='failed',last_error=$2,updated_at=now() WHERE id=$1`, job.ID, message); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE analyses SET status='failed',stage='照片未通过检查',error_message=$2,updated_at=now() WHERE id=$1`, job.AnalysisID, message); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (s *Store) GetReport(ctx context.Context, userID, reportID string) (domain.Report, error) {
 	var report domain.Report
 	err := s.pool.QueryRow(ctx, `SELECT id::text,analysis_id::text,current_image_url,impression_tags,priority_title,priority_copy,provider_version,generated_at FROM reports WHERE id=$1 AND user_id=$2`, reportID, userID).

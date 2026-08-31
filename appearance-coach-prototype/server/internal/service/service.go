@@ -591,9 +591,16 @@ func (s *Service) processHairPreview(ctx context.Context, job domain.HairPreview
 }
 
 func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
-	_ = s.repo.UpdateAnalysisProgress(ctx, job.AnalysisID, 56, "匹配你的形象特征与场景")
+	_ = s.repo.UpdateAnalysisProgress(ctx, job.AnalysisID, 32, "正在检查照片并读取面部特征")
 	output, err := s.analyzer.Analyze(ctx, job.Input)
 	if err != nil {
+		var rejected *provider.PhotoRejectedError
+		if errors.As(err, &rejected) {
+			if failErr := s.repo.RejectAnalysis(ctx, job, rejected.UserMessage()); failErr != nil {
+				s.logger.Error("reject analysis", "analysis_id", job.AnalysisID, "error", failErr)
+			}
+			return
+		}
 		_ = s.repo.FailAnalysis(ctx, job, err)
 		return
 	}

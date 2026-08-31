@@ -35,6 +35,11 @@ func (a *RoutedAnalyzer) Analyze(ctx context.Context, input domain.CreateAnalysi
 	if len(images) != 3 {
 		return domain.AnalysisOutput{}, fmt.Errorf("expected three analysis photos, got %d", len(images))
 	}
+	if a.runtime.HasRoute(CapabilityPhotoCheck) {
+		if err := a.checkPhotos(ctx, images); err != nil {
+			return domain.AnalysisOutput{}, err
+		}
+	}
 	result, err := a.runtime.Structured(ctx, CapabilityAppearanceAnalysis, StructuredRequest{
 		Instructions: appearanceInstructions, Prompt: analysisPrompt(input), Images: images,
 		SchemaName: CapabilityAppearanceAnalysis, Schema: analysisSchema(), MaxOutputTokens: 6000,

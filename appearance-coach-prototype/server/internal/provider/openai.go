@@ -198,7 +198,8 @@ func analysisPrompt(input domain.CreateAnalysisInput) string {
 	return fmt.Sprintf(`请根据依次提供的正脸、侧脸和全身照，为用户生成中文形象分析。
 场景：%s；职业：%s；身高：%d cm；预算：%s。
 	只描述能从照片直接观察到的发型重心、眉眼对比、头肩比例、服装轮廓和配色。不要给出颜值或身材评分，不推断敏感属性。
-	输出 3 个当前印象标签、4 个可提升点、一个最优先建议，以及严格 3 套方案。每套方案必须包含 hair、makeup、outfit 三个步骤和可执行细节。顶层必须输出一个 JSON 对象，不要输出数组、Markdown 或额外解释。`, input.Scene, input.Profile.Role, input.Profile.HeightCM, input.Profile.Budget)
+	输出 3 个当前印象标签、4 个可提升点、一个最优先建议，以及严格 3 套方案。每套方案必须包含 hair、makeup、outfit 三个步骤和可执行细节。顶层必须输出一个 JSON 对象，不要输出数组、Markdown 或额外解释。
+	每个可提升点必须包含 label、category（只能填 hair、makeup、outfit、color 之一）、severity（只能填 low、medium、high）、anchor_x 和 anchor_y（0 到 1 之间的小数，表示在照片上的相对位置，不要用百分比或像素）。3 套方案的 slug 必须分别是 sharp、warm、natural，且恰好一套 recommended 为 true。`, input.Scene, input.Profile.Role, input.Profile.HeightCM, input.Profile.Budget)
 }
 
 func photoKindName(kind string) string {
@@ -258,18 +259,27 @@ func (payload analysisPayload) toDomain(images []AnalysisImage, providerVersion 
 	return output, nil
 }
 
+// preview trims model copy for log messages so validation errors stay one line.
+func preview(value string) string {
+	runes := []rune(strings.TrimSpace(value))
+	if len(runes) > 40 {
+		return string(runes[:40]) + "…"
+	}
+	return string(runes)
+}
+
 func validateAnalysisPayload(payload analysisPayload) error {
 	if len(payload.ImpressionTags) != 3 || len(payload.Findings) != 4 || len(payload.Plans) != 3 {
-		return fmt.Errorf("provider output has invalid collection sizes")
+		return fmt.Errorf("provider output has invalid collection sizes: tags=%d findings=%d plans=%d, want 3/4/3", len(payload.ImpressionTags), len(payload.Findings), len(payload.Plans))
 	}
 	if !safeText(payload.PriorityTitle) || !safeText(payload.PriorityCopy) {
-		return fmt.Errorf("provider output contains unsafe or empty priority copy")
+		return fmt.Errorf("provider output contains unsafe or empty priority copy: title=%q copy=%q", preview(payload.PriorityTitle), preview(payload.PriorityCopy))
 	}
 	allowedCategories := map[string]bool{"hair": true, "makeup": true, "outfit": true, "color": true}
 	allowedSeverity := map[string]bool{"low": true, "medium": true, "high": true}
-	for _, finding := range payload.Findings {
+	for index, finding := range payload.Findings {
 		if !safeText(finding.Label) || !allowedCategories[finding.Category] || !allowedSeverity[finding.Severity] || finding.AnchorX < 0 || finding.AnchorX > 1 || finding.AnchorY < 0 || finding.AnchorY > 1 {
-			return fmt.Errorf("provider output contains invalid finding")
+			return fmt.Errorf("provider output contains invalid finding %d: category=%q severity=%q anchor=(%.2f,%.2f) label=%q", index+1, finding.Category, finding.Severity, finding.AnchorX, finding.AnchorY, preview(finding.Label))
 		}
 	}
 	allowedSlugs := map[string]bool{"sharp": true, "warm": true, "natural": true}
@@ -277,7 +287,7 @@ func validateAnalysisPayload(payload analysisPayload) error {
 	seenSlugs := map[string]bool{}
 	for _, plan := range payload.Plans {
 		if !allowedSlugs[plan.Slug] || seenSlugs[plan.Slug] || !safeText(plan.Name) || !safeText(plan.Descriptor) || !safeText(plan.Why) || len(plan.OutcomeTags) != 3 || len(plan.DifferenceTags) != 3 || len(plan.Steps) != 3 {
-			return fmt.Errorf("provider output contains invalid plan")
+			return fmt.Errorf("provider output contains invalid plan %q: name=%q outcome_tags=%d difference_tags=%d steps=%d (want slug sharp/warm/natural unique, 3/3/3)", plan.Slug, preview(plan.Name), len(plan.OutcomeTags), len(plan.DifferenceTags), len(plan.Steps))
 		}
 		seenSlugs[plan.Slug] = true
 		if plan.Recommended {
@@ -286,22 +296,22 @@ func validateAnalysisPayload(payload analysisPayload) error {
 		seenCategories := map[string]bool{}
 		for _, step := range plan.Steps {
 			if !map[string]bool{"hair": true, "makeup": true, "outfit": true}[step.Category] || seenCategories[step.Category] || !safeText(step.Title) || !safeText(step.Summary) || len(step.Details) < 2 || len(step.Details) > 4 {
-				return fmt.Errorf("provider output contains invalid plan step")
+				return fmt.Errorf("provider output contains invalid step in plan %q: category=%q details=%d (want hair/makeup/outfit unique, 2-4) title=%q", plan.Slug, step.Category, len(step.Details), preview(step.Title))
 			}
 			seenCategories[step.Category] = true
 			for _, detail := range step.Details {
 				if !safeText(detail.Label) || !safeText(detail.Value) {
-					return fmt.Errorf("provider output contains invalid plan detail")
+					return fmt.Errorf("provider output contains unsafe or empty detail in plan %q step %q: label=%q value=%q", plan.Slug, step.Category, preview(detail.Label), preview(detail.Value))
 				}
 			}
 		}
 	}
 	if recommended != 1 {
-		return fmt.Errorf("provider output must recommend exactly one plan")
+		return fmt.Errorf("provider output must recommend exactly one plan, got %d", recommended)
 	}
 	for _, tag := range payload.ImpressionTags {
 		if !safeText(tag) {
-			return fmt.Errorf("provider output contains invalid impression tag")
+			return fmt.Errorf("provider output contains invalid impression tag %q", preview(tag))
 		}
 	}
 	return nil

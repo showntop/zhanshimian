@@ -92,7 +92,7 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		"dashscope_wan":           true,
 		"ark_image":               true,
 	}
-	structuredCapabilities := map[string]bool{"appearance_analysis": true, "outfit_diagnosis": true, "purchase_diagnosis": true, "advisor_chat": true}
+	structuredCapabilities := map[string]bool{"appearance_analysis": true, "photo_check": true, "outfit_diagnosis": true, "purchase_diagnosis": true, "advisor_chat": true}
 	imageCapabilities := map[string]bool{"hair_edit": true, "makeup_edit": true, "full_look_edit": true}
 	for id, model := range routing.Models {
 		if strings.TrimSpace(id) == "" || strings.TrimSpace(model.Vendor) == "" || strings.TrimSpace(model.Model) == "" {
