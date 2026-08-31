@@ -5,6 +5,55 @@ function appData() {
   return app.globalData
 }
 
+// WeChat 3.17+ refuses to render http:// URLs in <image>, which breaks user
+// photos served by the local dev API (http://localhost:58000/...). Download
+// such images once and swap in the temp file path; https URLs (trial/release)
+// are returned untouched, so production behavior never hits downloadFile.
+const IMAGE_URL_PATTERN = /^http:\/\/\S+\.(png|jpe?g|webp)(\?\S*)?$/i
+const imageDownloads = new Map()
+
+function downloadImage(url) {
+  if (!imageDownloads.has(url)) {
+    imageDownloads.set(url, new Promise((resolve) => {
+      wx.downloadFile({
+        url,
+        success(response) {
+          const ok = response.statusCode >= 200 && response.statusCode < 300 && response.tempFilePath
+          resolve(ok ? response.tempFilePath : '')
+        },
+        fail() { resolve('') }
+      })
+    }))
+  }
+  return imageDownloads.get(url)
+}
+
+function collectImageURLs(value, found = new Set()) {
+  if (Array.isArray(value)) value.forEach((item) => collectImageURLs(item, found))
+  else if (value && typeof value === 'object') Object.keys(value).forEach((key) => collectImageURLs(value[key], found))
+  else if (typeof value === 'string' && IMAGE_URL_PATTERN.test(value)) found.add(value)
+  return found
+}
+
+function swapImageURLs(value, resolved) {
+  if (Array.isArray(value)) return value.map((item) => swapImageURLs(item, resolved))
+  if (value && typeof value === 'object') {
+    const copy = {}
+    Object.keys(value).forEach((key) => { copy[key] = swapImageURLs(value[key], resolved) })
+    return copy
+  }
+  return typeof value === 'string' && resolved.has(value) ? resolved.get(value) : value
+}
+
+function localizeDevImages(data) {
+  const urls = [...collectImageURLs(data)]
+  if (!urls.length) return Promise.resolve(data)
+  return Promise.all(urls.map((url) => downloadImage(url).then((local) => [url, local]))).then((entries) => {
+    const resolved = new Map(entries.filter(([, local]) => Boolean(local)))
+    return swapImageURLs(data, resolved)
+  })
+}
+
 function request(path, options = {}) {
   const data = appData()
   if (!data.apiBaseURL) {
@@ -23,7 +72,9 @@ function request(path, options = {}) {
       },
       success(response) {
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          resolve(response.data && response.data.data)
+          localizeDevImages(response.data && response.data.data)
+            .then(resolve)
+            .catch(() => resolve(response.data && response.data.data))
           return
         }
         if (response.statusCode === 401 && !path.startsWith('/v1/auth/') && !options.retried) {
