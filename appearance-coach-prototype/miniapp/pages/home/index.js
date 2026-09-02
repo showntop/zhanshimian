@@ -31,7 +31,9 @@ Page({
   onShow() {
 	api.trackEvent('page_view', { page: 'home' }).catch(() => {})
     const reportID = wx.getStorageSync('jianwo_report_id') || ''
-    this.setData({ hasProfile: Boolean(reportID), reportID, currentLookUrl: '', todayOpening: false, tasks: [] })
+    // Keep previous image URLs while refreshing so the screen doesn't flash
+    // from empty/placeholder back to real images when returning from another tab.
+    this.setData({ hasProfile: Boolean(reportID), reportID, todayOpening: false, tasks: [] })
     this.refreshTasks(reportID)
     if (reportID) {
       api.getTodayPlan().then((todayPlan) => {
