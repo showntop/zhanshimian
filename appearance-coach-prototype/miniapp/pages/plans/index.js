@@ -5,7 +5,7 @@ Page({
   data: {
     reportId: '', scene: '', plans: [], savedHair: [], selected: 0, showCurrent: false, loading: true,
     sceneLabel: '', asTab: true, generating: false, allIdle: false, allFailed: false, allReady: false,
-    generationCount: 0, currentFaceUrl: '', currentBodyUrl: '', generationFailureMessage: ''
+    generationCount: 0, currentFaceUrl: '', currentBodyUrl: ''
   },
   onLoad() {
     this.applyIntent(true)
@@ -40,7 +40,6 @@ Page({
         isDemo,
         generating: status === 'queued' || status === 'processing',
         generateFailed: status === 'failed',
-        generationFailureMessage: status === 'failed' ? friendlyGenerationFailure(plan.generation_error) : '',
         display_url: generatedURL || lookImage(plan.image_url, plan.slug, 'plan'),
         display_mode: generatedURL ? 'aspectFit' : 'aspectFill',
         current_image_url: currentBodyUrl || currentFaceUrl || userImage(plan.current_image_url),
@@ -72,8 +71,7 @@ Page({
       const allFailed = mapped.length > 0 && mapped.every((item) => item.generateFailed)
       const allReady = mapped.length > 0 && mapped.every((item) => item.generated)
       const generationCount = mapped.filter((item) => item.generated).length
-      const firstFailure = mapped.find((item) => item.generateFailed)
-      this.setData({ plans: mapped, savedHair: mappedHair, allIdle, allFailed, allReady, generationCount, currentFaceUrl, currentBodyUrl, generationFailureMessage: firstFailure ? firstFailure.generationFailureMessage : '', selected: Math.max(0, mapped.findIndex((item) => item.recommended)), loading: false })
+      this.setData({ plans: mapped, savedHair: mappedHair, allIdle, allFailed, allReady, generationCount, currentFaceUrl, currentBodyUrl, selected: Math.max(0, mapped.findIndex((item) => item.recommended)), loading: false })
       if (allReady) wx.removeStorageSync('jianwo_active_plan_generation')
       this.schedulePoll(mapped)
     }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false }) })
@@ -97,7 +95,7 @@ Page({
     api.generatePlanLooks(this.data.reportId, this.data.scene, refresh)
       .then((plans) => {
         const mapped = this.mapPlans(plans)
-        this.setData({ plans: mapped, allIdle: false, allFailed: false, generationFailureMessage: '' })
+        this.setData({ plans: mapped, allIdle: false, allFailed: false })
         this.schedulePoll(mapped)
       })
       .catch((error) => wx.showToast({ title: error.message || '生成暂时不可用', icon: 'none' }))
@@ -129,14 +127,3 @@ Page({
   },
   onShareAppMessage() { return { title: '同一个我，三种更适合的表达｜怎么打扮', path: '/pages/home/index' } }
 })
-
-// Provider errors are retained in the API for diagnostics, but should not be
-// shown verbatim in the mini-program. In particular, credentials and vendor
-// request IDs must never become user-facing copy.
-function friendlyGenerationFailure(value) {
-  const message = String(value || '')
-  if (/401|403|AccessDenied|Unauthorized|Authentication|quota|unpurchased/i.test(message)) {
-    return '本人方案生成服务暂时不可用，请稍后再试。'
-  }
-  return '这套方案暂时没有生成成功，请稍后重试。'
-}

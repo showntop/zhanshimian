@@ -24,12 +24,11 @@
 .gen-overlay.fail { color: #7a6a45; }
 .gen-retry { margin: 6rpx 0 0; padding: 10rpx 34rpx; border: 1rpx solid #587344; border-radius: 999rpx; background: transparent; color: #587344; font-size: 23rpx; line-height: 1.6; }
 .gen-retry::after { border: none; }
-.generation-fail { margin: 92rpx 56rpx 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.generation-fail { min-height: 56vh; margin: 0 56rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .generation-fail-badge { width: 128rpx; height: 128rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(122,106,69,.1); }
 .generation-fail-badge image { width: 66rpx; height: 66rpx; opacity: .72; }
 .generation-fail-title { margin-top: 30rpx; color: #353a34; font-size: 38rpx; font-weight: 700; }
 .generation-fail-copy { margin-top: 22rpx; color: #747873; font-size: 26rpx; line-height: 1.7; }
-.generation-fail-note { margin-top: 16rpx; color: #9a8b6c; font-size: 22rpx; line-height: 1.6; }
 .generation-fail-retry { width: 100%; margin-top: 46rpx; border: none; border-radius: 22rpx; background: #587344; color: #fff; font-size: 28rpx; font-weight: 600; }
 .generation-fail-retry::after { border: none; }
 .thumbs { padding: 8rpx 128rpx 0; display: grid; grid-template-columns: repeat(3,1fr); gap: 12rpx; }

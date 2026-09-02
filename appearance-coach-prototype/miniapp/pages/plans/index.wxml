@@ -1,6 +1,6 @@
 <app-header title="我的形象方案" />
 <view class="page plans-page">
-  <view class="intro fade-up"><text wx:if="{{sceneLabel}}" class="scene-context">{{sceneLabel}} · 针对性方案</text><text class="plans-title serif">同一个你，三种更适合的表达</text><text class="lede">发型、妆容与穿搭已为你组合好</text></view>
+  <view class="intro fade-up" wx:if="{{!allFailed}}"><text wx:if="{{sceneLabel}}" class="scene-context">{{sceneLabel}} · 针对性方案</text><text class="plans-title serif">同一个你，三种更适合的表达</text><text class="lede">发型、妆容与穿搭已为你组合好</text></view>
   <block wx:if="{{!loading && plans.length && !allFailed}}">
     <view wx:if="{{allIdle}}" class="gen-cta fade-up"><primary-button text="生成 3 套本人方案" bind:tap="generate" /></view>
     <view wx:elif="{{generationCount < plans.length}}" class="generation-summary"><view class="gen-spinner" /><text>正在生成本人整体方案</text><text>{{generationCount}} / {{plans.length}} 套完成 · 发型、妆容和穿搭会一起呈现</text></view>
@@ -31,7 +31,6 @@
     <view class="generation-fail-badge"><image src="/assets/icons/sparkles.svg" mode="aspectFit" /></view>
     <text class="generation-fail-title serif">本人方案暂时生成失败</text>
     <text class="generation-fail-copy">你的分析报告已保存，方案图片生成服务暂时不可用。稍后可以重新尝试。</text>
-    <text wx:if="{{generationFailureMessage}}" class="generation-fail-note">{{generationFailureMessage}}</text>
     <button class="generation-fail-retry" bindtap="generate">重新生成</button>
   </view>
   <view wx:elif="{{loading}}" class="skeleton plan-placeholder" />
