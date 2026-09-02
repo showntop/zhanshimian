@@ -8,7 +8,7 @@
     <swiper class="plan-swiper" current="{{selected}}" previous-margin="42rpx" next-margin="42rpx" bindchange="swiperChange" duration="380">
       <swiper-item wx:for="{{plans}}" wx:key="id">
         <view class="plan-card {{selected === index ? 'active' : ''}}">
-          <image wx:if="{{!item.generateFailed}}" class="{{!showCurrent && item.generated ? 'generated-look' : ''}}" src="{{showCurrent && selected === index && item.current_image_url ? item.current_image_url : item.display_url}}" mode="{{showCurrent && selected === index ? item.current_image_mode : item.display_mode}}" />
+          <image wx:if="{{!item.generateFailed}}" class="{{!showCurrent && item.generated ? 'generated-look' : ''}}" src="{{showCurrent && selected === index && item.current_image_url ? item.current_image_url : item.display_url}}" mode="{{showCurrent && selected === index ? item.current_image_mode : item.display_mode}}" fade-show="{{false}}" />
           <view wx:if="{{!item.generateFailed}}" class="photo-shade" />
           <text wx:if="{{item.recommended && !item.generateFailed}}" class="recommend">首选推荐</text>
           <view class="compare" wx:if="{{selected === index && !item.generating && !item.generateFailed}}"><button class="{{showCurrent ? 'active' : ''}}" data-mode="current" bindtap="toggleCompare">我的当前</button><button class="{{!showCurrent ? 'active' : ''}}" data-mode="plan" bindtap="toggleCompare">{{item.compare_label}}</button></view>

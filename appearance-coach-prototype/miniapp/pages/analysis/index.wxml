@@ -2,7 +2,7 @@
 <view class="page analysis-page">
   <block wx:if="{{!failed}}">
     <view class="scan-wrap fade-up">
-      <image wx:if="{{previewImage}}" class="scan-image scan-image-{{previewKind}}" src="{{previewImage}}" mode="{{previewMode}}" />
+      <image wx:if="{{previewImage}}" class="scan-image scan-image-{{previewKind}}" src="{{previewImage}}" mode="{{previewMode}}" fade-show="{{false}}" />
       <view wx:else class="scan-empty"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>正在准备照片</text></view>
       <view class="scan-mask" />
       <view class="scan-line" />
