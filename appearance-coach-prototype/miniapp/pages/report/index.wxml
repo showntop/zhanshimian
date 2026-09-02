@@ -8,7 +8,7 @@
       <image wx:if="{{image}}" src="{{image}}" mode="aspectFill" />
       <view wx:else class="image-unavailable"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>当前照片加载中</text></view>
       <text class="current-label">当前形象</text>
-      <view wx:for="{{annotations}}" wx:key="id" class="finding tag-{{index}}"><text class="number">{{index + 1}}</text><text>{{item.label}}</text><view class="connector" /></view>
+      <view wx:for="{{annotations}}" wx:key="id" class="finding {{item.alignClass}}" style="left: {{item.styleLeft}}; top: {{item.styleTop}};"><text class="number">{{index + 1}}</text><text>{{item.label}}</text><view class="connector" /></view>
     </view>
     <view class="impression fade-up delay-2">
       <text class="impression-title serif">你的当前印象</text>

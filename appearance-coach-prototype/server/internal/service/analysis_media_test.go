@@ -36,7 +36,7 @@ func TestGetAnalysisReturnsOwnedMediaPreview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if analysis.PreviewImageURL != "https://api.example.test/uploads/user/face.jpg" {
+	if analysis.PreviewImageURL != "https://api.example.test/uploads/user/body.jpg" {
 		t.Fatalf("unexpected preview image: %q", analysis.PreviewImageURL)
 	}
 	if len(analysis.Media) != 3 || analysis.Media[1].URL != "https://api.example.test/uploads/user/side.jpg" {
@@ -52,7 +52,7 @@ func TestAnalysisMediaUsesBundledDemoAsset(t *testing.T) {
 	}
 }
 
-func TestAnalysisPreviewURLUsesFacePhotoRegardlessOfProvider(t *testing.T) {
+func TestAnalysisPreviewURLPrefersBodyPhoto(t *testing.T) {
 	repo := analysisMediaRepositoryStub{assets: []domain.MediaAsset{
 		{ID: "body-1", Kind: "body", StorageKey: "user/body.jpg"},
 		{ID: "face-1", Kind: "face", StorageKey: "user/face.jpg"},
@@ -62,7 +62,7 @@ func TestAnalysisPreviewURLUsesFacePhotoRegardlessOfProvider(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if url != "https://api.example.test/uploads/user/face.jpg" {
-		t.Fatalf("expected face image, got %q", url)
+	if url != "https://api.example.test/uploads/user/body.jpg" {
+		t.Fatalf("expected body image, got %q", url)
 	}
 }

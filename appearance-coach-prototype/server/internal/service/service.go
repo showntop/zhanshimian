@@ -222,15 +222,28 @@ func (s *Service) hydrateAnalysisMedia(ctx context.Context, userID string, analy
 	}
 	for index := range assets {
 		assets[index].URL = s.mediaAssetURL(assets[index])
-		if assets[index].Kind == "face" && analysis.PreviewImageURL == "" {
-			analysis.PreviewImageURL = assets[index].URL
-		}
 	}
-	if analysis.PreviewImageURL == "" && len(assets) > 0 {
-		analysis.PreviewImageURL = assets[0].URL
+	if analysis.PreviewImageURL == "" {
+		analysis.PreviewImageURL = s.pickReportPreviewImage(assets)
 	}
 	analysis.Media = assets
 	return analysis, nil
+}
+
+// pickReportPreviewImage chooses the full-body photo as the report hero image
+// when available, falling back to face and then to any uploaded photo.
+func (s *Service) pickReportPreviewImage(assets []domain.MediaAsset) string {
+	for _, kind := range []string{"body", "face"} {
+		for _, asset := range assets {
+			if asset.Kind == kind {
+				return asset.URL
+			}
+		}
+	}
+	if len(assets) > 0 {
+		return assets[0].URL
+	}
+	return ""
 }
 
 func (s *Service) analysisPreviewURL(ctx context.Context, userID string, mediaIDs []string) (string, error) {
@@ -238,15 +251,13 @@ func (s *Service) analysisPreviewURL(ctx context.Context, userID string, mediaID
 	if err != nil {
 		return "", err
 	}
-	for _, asset := range assets {
-		if asset.Kind == "face" {
-			return s.mediaAssetURL(asset), nil
-		}
+	for index := range assets {
+		assets[index].URL = s.mediaAssetURL(assets[index])
 	}
-	if len(assets) == 0 {
-		return "", repository.ErrNotFound
+	if url := s.pickReportPreviewImage(assets); url != "" {
+		return url, nil
 	}
-	return s.mediaAssetURL(assets[0]), nil
+	return "", repository.ErrNotFound
 }
 
 func (s *Service) mediaAssetURL(asset domain.MediaAsset) string {

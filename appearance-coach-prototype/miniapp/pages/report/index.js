@@ -17,9 +17,21 @@ Page({
     api.getReport(this.data.id).then((report) => {
       wx.setStorageSync('jianwo_report_id', this.data.id)
       const findings = report.findings || []
+      const annotations = findings.slice(0, 2).map((item, index) => {
+        const x = (item.anchor_x == null ? 0.5 : item.anchor_x) * 100
+        const y = (item.anchor_y == null ? 0.5 : item.anchor_y) * 100
+        const placeRight = x < 50
+        return {
+          ...item,
+          index,
+          styleLeft: placeRight ? `${Math.min(92, x + 3)}%` : `${Math.max(8, x - 3)}%`,
+          styleTop: `${Math.max(8, Math.min(92, y))}%`,
+          alignClass: placeRight ? 'finding-right' : 'finding-left'
+        }
+      })
       this.setData({
         report: { ...report, findings },
-        annotations: findings.slice(0, 2),
+        annotations,
         findingItems: findings.map((item, index) => ({
           ...item,
           index: index + 1,
