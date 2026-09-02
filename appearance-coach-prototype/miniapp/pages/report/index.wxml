@@ -38,7 +38,7 @@
     </view>
     <view class="report-action"><primary-button text="{{ctaText}}" loading="{{generating}}" disabled="{{generating}}" bind:tap="viewPlans" /><button class="reanalyze-action" bindtap="reanalyze">重新上传 3 张照片并更新分析</button></view>
   </block>
-  <view wx:elif="{{loadError}}" class="report-error fade-up">
+  <view wx:else-if="{{loadError}}" class="report-error fade-up">
     <image src="/assets/icons/sparkles.svg" mode="aspectFit" />
     <text class="serif">报告加载失败</text>
     <text>请检查网络后重试。</text>
