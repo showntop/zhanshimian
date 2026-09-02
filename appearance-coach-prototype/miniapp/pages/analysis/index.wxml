@@ -20,9 +20,9 @@
       <text class="eyebrow">第 {{currentPhotoIndex}} / 3 张 · {{previewLabel}}</text>
       <text class="analysis-title serif">正在分析{{analysisFocus}}</text>
       <text class="analysis-detail">{{stage}}</text>
-      <view class="progress-head"><text>整体分析进度</text><text>{{progress}}%</text></view>
+      <view class="progress-head"><text>整体分析进度</text><text>{{displayProgress}}%</text></view>
       <view class="progress"><view class="progress-value" style="width: {{progress}}%" /></view>
-      <view class="stage-row"><text class="{{progress >= 24 ? 'done' : ''}}">读取轮廓</text><text class="{{progress >= 56 ? 'done' : ''}}">匹配方向</text><text class="{{progress >= 86 ? 'done' : ''}}">生成方案</text></view>
+      <view class="stage-row"><text class="{{progress >= 22 ? 'done' : ''}}">读取轮廓</text><text class="{{progress >= 48 ? 'done' : ''}}">匹配方向</text><text class="{{progress >= 82 ? 'done' : ''}}">生成方案</text></view>
     </view>
   </block>
   <view wx:else class="fail-wrap fade-up">

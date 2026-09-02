@@ -235,7 +235,7 @@ func (s *Store) ClaimAnalysisJob(ctx context.Context) (domain.AnalysisJob, bool,
 	job.Attempt++
 	_, err = tx.Exec(ctx, `UPDATE analysis_jobs SET status='running',attempts=$2,locked_at=now(),updated_at=now() WHERE id=$1`, job.ID, job.Attempt)
 	if err == nil {
-		_, err = tx.Exec(ctx, `UPDATE analyses SET status='processing',progress=24,stage='读取面部与头肩比例',updated_at=now() WHERE id=$1`, job.AnalysisID)
+		_, err = tx.Exec(ctx, `UPDATE analyses SET status='processing',progress=15,stage='正在排队等待分析',updated_at=now() WHERE id=$1`, job.AnalysisID)
 	}
 	if err != nil {
 		return domain.AnalysisJob{}, false, err

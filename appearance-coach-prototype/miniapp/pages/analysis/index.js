@@ -40,10 +40,10 @@ function analysisView(progress, kind) {
   const activeIndex = Math.max(0, PHOTO_STEPS.findIndex((item) => item.kind === kind))
   const step = PHOTO_STEPS[activeIndex] || PHOTO_STEPS[0]
   let focus = step.focus
-  if (kind === 'face' && progress < 22) focus = '照片清晰度与拍摄角度'
-  if (kind === 'face' && progress >= 38) focus = '眉眼关系、脸型与面部重心'
-  if (kind === 'side' && progress >= 70) focus = '发型轮廓与侧脸重心'
-  if (kind === 'body' && progress >= 92) focus = '整合三张照片的形象特点'
+  if (kind === 'face' && progress < 32) focus = '照片清晰度与拍摄角度'
+  if (kind === 'face' && progress >= 48) focus = '眉眼关系、脸型与面部重心'
+  if (kind === 'side' && progress >= 64) focus = '发型轮廓与侧脸重心'
+  if (kind === 'body' && progress >= 82) focus = '整合三张照片的形象特点'
   return {
     currentPhotoIndex: step.index,
     analysisFocus: focus,
@@ -74,7 +74,7 @@ function failureView(stage, message) {
 
 Page({
   data: {
-    id: '', scene: 'general', progress: 8, stage: '正在安全上传照片', failed: false,
+    id: '', scene: 'general', progress: 8, displayProgress: 8, stage: '正在安全上传照片', failed: false,
     errorMessage: '', failTitle: '', failureItems: [], failTip: '', failAction: '返回重试', failMessage: '',
     media: [], previewImage: '', previewKind: 'face', previewLabel: '正脸照', previewMode: 'aspectFill',
     currentPhotoIndex: 1, analysisFocus: '照片清晰度与拍摄角度', analysisSummary: '面部轮廓与五官比例',
@@ -83,20 +83,29 @@ Page({
   onLoad(options) {
     const app = getApp()
     const initialMedia = app.globalData.analysisMedia || []
-    this.setData({ id: options.id || app.globalData.analysisID, scene: options.scene || 'general' })
-    this.updateMedia(initialMedia, this.data.progress)
+    const initialProgress = this.data.progress
+    this.setData({ id: options.id || app.globalData.analysisID, scene: options.scene || 'general', displayProgress: initialProgress })
+    this.updateMedia(initialMedia, initialProgress)
     this.poll()
   },
-  onUnload() { if (this.timer) clearTimeout(this.timer) },
+  onUnload() {
+    if (this.timer) clearTimeout(this.timer)
+    if (this._progressTimer) {
+      clearInterval(this._progressTimer)
+      this._progressTimer = null
+    }
+  },
   poll() {
     api.getAnalysis(this.data.id).then((analysis) => {
       this.failures = 0
       const failed = analysis.status === 'failed'
       const errorMessage = analysis.error_message || ''
-      this.setData({ progress: analysis.progress, stage: analysis.stage, failed, errorMessage, ...(failed ? failureView(analysis.stage, errorMessage) : {}) })
+      const targetProgress = analysis.progress
+      this.setData({ progress: targetProgress, stage: analysis.stage, failed, errorMessage, ...(failed ? failureView(analysis.stage, errorMessage) : {}) })
+      this.animateProgressTo(targetProgress)
       const nextMedia = Array.isArray(analysis.media) && analysis.media.length ? analysis.media : this.data.media
       if (Array.isArray(analysis.media) && analysis.media.length) getApp().globalData.analysisMedia = analysis.media
-      this.updateMedia(nextMedia, analysis.progress)
+      this.updateMedia(nextMedia, targetProgress)
       if (analysis.status === 'completed') {
         wx.removeStorageSync('jianwo_active_analysis_id')
         getApp().globalData.reportID = analysis.report_id
@@ -121,9 +130,28 @@ Page({
       this.timer = setTimeout(() => this.poll(), 1200)
     })
   },
+  animateProgressTo(target) {
+    if (this._progressTimer) clearInterval(this._progressTimer)
+    const start = this.data.displayProgress
+    const distance = target - start
+    if (distance === 0) return
+    const duration = 500
+    const startTime = Date.now()
+    this._progressTimer = setInterval(() => {
+      const elapsed = Date.now() - startTime
+      if (elapsed >= duration) {
+        clearInterval(this._progressTimer)
+        this._progressTimer = null
+        this.setData({ displayProgress: target })
+        return
+      }
+      const next = Math.round(start + distance * (elapsed / duration))
+      this.setData({ displayProgress: next })
+    }, 30)
+  },
   updateMedia(media, progress) {
     const normalized = (media || []).map((item) => ({ ...item, url: userImage(item.url) }))
-    const desiredKind = progress < 54 ? 'face' : (progress < 84 ? 'side' : 'body')
+    const desiredKind = progress < 55 ? 'face' : (progress < 68 ? 'side' : 'body')
     const preview = normalized.find((item) => item.kind === desiredKind && item.url) || normalized.find((item) => item.kind === 'face' && item.url) || normalized.find((item) => item.url)
     const previewKind = preview ? preview.kind : desiredKind
     this.setData({

@@ -6,9 +6,40 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/example/jianwo/server/internal/domain"
 )
+
+type progressStage struct {
+	progress int
+	stage    string
+}
+
+// runProgressAnimation emits timed progress updates while a long-running
+// operation is in flight. Call the returned stop function when the operation
+// finishes so no further updates are emitted.
+func runProgressAnimation(ctx context.Context, stages []progressStage) func() {
+	if ProgressReporter(ctx) == nil || len(stages) == 0 {
+		return func() {}
+	}
+	stop := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
+		for _, s := range stages {
+			select {
+			case <-stop:
+				return
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				reportProgress(ctx, s.progress, s.stage)
+			}
+		}
+	}()
+	return func() { close(stop) }
+}
 
 const appearanceInstructions = "你是审慎、尊重用户的私人形象顾问。只分析照片中可见的造型、比例、色彩和轮廓，不评价颜值，不推断健康、族裔、年龄、人格或社会身份。所有建议必须具体、温和、可执行。"
 
@@ -27,7 +58,14 @@ func NewRoutedAnalyzer(runtime *AIRuntime, loader MediaLoader) (*RoutedAnalyzer,
 	return &RoutedAnalyzer{runtime: runtime, loader: loader}, nil
 }
 
+func reportProgress(ctx context.Context, progress int, stage string) {
+	if r := ProgressReporter(ctx); r != nil {
+		r(progress, stage)
+	}
+}
+
 func (a *RoutedAnalyzer) Analyze(ctx context.Context, input domain.CreateAnalysisInput) (domain.AnalysisOutput, error) {
+	reportProgress(ctx, 22, "正在读取三张照片")
 	images, err := a.loader.Load(ctx, input.MediaIDs)
 	if err != nil {
 		return domain.AnalysisOutput{}, fmt.Errorf("load analysis photos: %w", err)
@@ -36,10 +74,18 @@ func (a *RoutedAnalyzer) Analyze(ctx context.Context, input domain.CreateAnalysi
 		return domain.AnalysisOutput{}, fmt.Errorf("expected three analysis photos, got %d", len(images))
 	}
 	if a.runtime.HasRoute(CapabilityPhotoCheck) {
+		reportProgress(ctx, 32, "正在确认照片是否符合要求")
 		if err := a.checkPhotos(ctx, images); err != nil {
 			return domain.AnalysisOutput{}, err
 		}
 	}
+	reportProgress(ctx, 42, "正在提取面部轮廓")
+	reportProgress(ctx, 48, "正在分析五官比例")
+	stopProgress := runProgressAnimation(ctx, []progressStage{
+		{progress: 56, stage: "正在分析侧脸线条"},
+		{progress: 64, stage: "正在分析全身比例"},
+		{progress: 72, stage: "正在整合三张照片的形象特点"},
+	})
 	result, err := a.runtime.Structured(ctx, CapabilityAppearanceAnalysis, StructuredRequest{
 		Instructions: appearanceInstructions, Prompt: analysisPrompt(input), Images: images,
 		SchemaName: CapabilityAppearanceAnalysis, Schema: analysisSchema(), MaxOutputTokens: 6000,
@@ -51,6 +97,7 @@ func (a *RoutedAnalyzer) Analyze(ctx context.Context, input domain.CreateAnalysi
 			return validateAnalysisPayload(candidate)
 		},
 	})
+	stopProgress()
 	if err != nil {
 		return domain.AnalysisOutput{}, err
 	}

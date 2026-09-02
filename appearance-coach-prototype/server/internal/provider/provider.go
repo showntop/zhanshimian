@@ -11,6 +11,24 @@ type Analyzer interface {
 	Analyze(context.Context, domain.CreateAnalysisInput) (domain.AnalysisOutput, error)
 }
 
+type progressReporterKey struct{}
+
+// WithProgressReporter attaches a progress callback to the context.
+// Callers can use ProgressReporter to retrieve it; if none is attached the
+// returned function is nil. This lets analyzers report granular progress
+// without changing the Analyzer interface.
+func WithProgressReporter(ctx context.Context, reporter func(progress int, stage string)) context.Context {
+	return context.WithValue(ctx, progressReporterKey{}, reporter)
+}
+
+// ProgressReporter returns the progress callback attached to ctx, or nil.
+func ProgressReporter(ctx context.Context) func(progress int, stage string) {
+	if r, ok := ctx.Value(progressReporterKey{}).(func(progress int, stage string)); ok {
+		return r
+	}
+	return nil
+}
+
 type AnalysisImage struct {
 	ID       string
 	Kind     string

@@ -688,7 +688,9 @@ const (
 func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 	jobCtx, cancel := context.WithTimeout(ctx, analysisJobTimeout)
 	defer cancel()
-	_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, 32, "正在检查照片并读取面部特征")
+	jobCtx = provider.WithProgressReporter(jobCtx, func(progress int, stage string) {
+		_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, progress, stage)
+	})
 	output, err := s.analyzer.Analyze(jobCtx, job.Input)
 	if err != nil {
 		var rejected *provider.PhotoRejectedError
@@ -701,6 +703,7 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 		_ = s.repo.FailAnalysis(jobCtx, job, err)
 		return
 	}
+	_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, 82, "正在组合发型、妆容与穿搭方案")
 	currentImageURL, err := s.analysisPreviewURL(jobCtx, job.UserID, job.Input.MediaIDs)
 	if err != nil {
 		_ = s.repo.FailAnalysis(jobCtx, job, err)
@@ -710,7 +713,7 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 	// stock reference. This keeps every provider and fallback on the same
 	// user-photo contract.
 	output.CurrentImageURL = currentImageURL
-	_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, 86, "组合发型、妆容与穿搭方案")
+	_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, 95, "正在保存形象档案")
 	if _, err := s.repo.CompleteAnalysis(jobCtx, job, output); err != nil {
 		if errors.Is(err, repository.ErrAnalysisRemoved) {
 			s.logger.Info("analysis removed while processing; discarding result", "analysis_id", job.AnalysisID)
