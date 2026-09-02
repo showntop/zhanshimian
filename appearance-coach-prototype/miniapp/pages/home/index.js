@@ -98,13 +98,22 @@ Page({
       requests.push(api.getPlans(planReportID, activePlan.scene || '').then((plans) => {
         const completed = plans.filter((item) => item.generation_status === 'completed').length
         const working = plans.some((item) => item.generation_status === 'queued' || item.generation_status === 'processing')
-        const failed = plans.length > 0 && plans.every((item) => item.generation_status === 'failed')
-        return {
-          kind: 'plans', reportId: planReportID, scene: activePlan.scene || '', state: working ? 'processing' : (failed ? 'failed' : 'completed'),
-          title: working ? '3 套本人方案正在生成' : (failed ? '本人方案生成未完成' : '3 套本人方案已经完成'),
-          note: working ? `${completed} / ${plans.length} 套完成 · 可退出后继续生成` : (failed ? '可以重新尝试，分析报告不会丢失' : '脸部、发型与全身穿搭都已准备好'),
-          action: working ? '查看进度' : (failed ? '重新生成' : '查看方案')
+        const failedCount = plans.filter((item) => item.generation_status === 'failed').length
+        // plans 从未生成时全是 idle，不能兜底显示“已完成”
+        const idle = plans.length > 0 && completed === 0 && failedCount === 0
+        let task
+        if (working) {
+          task = { state: 'processing', title: '3 套本人方案正在生成', note: `${completed} / ${plans.length} 套完成 · 可退出后继续生成`, action: '查看进度' }
+        } else if (plans.length > 0 && failedCount === plans.length) {
+          task = { state: 'failed', title: '本人方案生成未完成', note: '可以重新尝试，分析报告不会丢失', action: '重新生成' }
+        } else if (idle) {
+          task = { state: 'idle', title: '尚未生成本人方案', note: '分析报告已就绪，随时可以生成', action: '去生成' }
+        } else if (failedCount > 0) {
+          task = { state: 'partial', title: `${completed} / ${plans.length} 套本人方案已完成`, note: `${failedCount} 套可重试`, action: '查看方案' }
+        } else {
+          task = { state: 'completed', title: '3 套本人方案已经完成', note: '脸部、发型与全身穿搭都已准备好', action: '查看方案' }
         }
+        return { kind: 'plans', reportId: planReportID, scene: activePlan.scene || '', ...task }
       }).catch(() => null))
     }
     const activeHairID = wx.getStorageSync('jianwo_active_hair_preview') || ''

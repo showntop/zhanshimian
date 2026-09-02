@@ -1,6 +1,9 @@
 const api = require('../../services/api')
 const { userImage } = require('../../utils/media')
 
+// 删除档案后需要一并清掉的本地缓存 key
+const CLEAR_KEYS = ['jianwo_report_id', 'jianwo_plan_id', 'jianwo_saved_plan_id', 'jianwo_active_analysis_id', 'jianwo_active_plan_generation', 'jianwo_active_hair_preview', 'jianwo_plans_scene', 'jianwo_scene_brief', 'jianwo_advisor_conversation_id', 'jianwo_saved_hair', 'jianwo_saved_product']
+
 Page({
   data: { hasReport: false, hasPlan: false, deleting: false, profileImage: '' },
   onShow() {
@@ -51,7 +54,9 @@ Page({
       if (!confirm) return
       this.setData({ deleting: true })
       api.deleteData().then(() => {
-        wx.removeStorageSync('jianwo_report_id'); wx.removeStorageSync('jianwo_plan_id'); wx.removeStorageSync('jianwo_saved_plan_id'); wx.removeStorageSync('jianwo_active_analysis_id'); wx.removeStorageSync('jianwo_active_plan_generation'); wx.removeStorageSync('jianwo_active_hair_preview')
+        CLEAR_KEYS.forEach((key) => wx.removeStorageSync(key))
+        const app = getApp()
+        if (app && app.globalData) { app.globalData.reportID = ''; app.globalData.planID = '' }
         this.setData({ hasReport: false, hasPlan: false, profileImage: '' })
         wx.showToast({ title: '档案已删除', icon: 'success' })
       }).catch((error) => wx.showToast({ title: error.message, icon: 'none' })).finally(() => this.setData({ deleting: false }))

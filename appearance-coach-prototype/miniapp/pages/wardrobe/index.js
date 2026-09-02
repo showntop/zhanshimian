@@ -5,9 +5,9 @@ const categories = [
 ]
 
 Page({
-  data: { items: [], filtered: [], categories, active: 'all', adding: false, saving: false, outfit: null, form: { media_id: '', path: '', name: '', category: 'top', color: '黑色' } },
+  data: { items: [], filtered: [], categories, active: 'all', adding: false, saving: false, outfit: null, loadError: false, form: { media_id: '', path: '', name: '', category: 'top', color: '黑色' } },
   onShow() { api.trackEvent('page_view', { page: 'wardrobe' }).catch(() => {}); this.load() },
-  load() { api.getWardrobeItems().then((items) => this.setItems(items)).catch((error) => wx.showToast({ title: error.message, icon: 'none' })) },
+  load() { this.setData({ loadError: false }); api.getWardrobeItems().then((items) => this.setItems(items)).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loadError: true }) }) },
   setItems(items) { this.setData({ items, filtered: this.data.active === 'all' ? items : items.filter((item) => item.category === this.data.active) }) },
   filter(event) { const active = event.currentTarget.dataset.value; this.setData({ active, filtered: active === 'all' ? this.data.items : this.data.items.filter((item) => item.category === active) }) },
   openAdd() { this.setData({ adding: true, form: { media_id: '', path: '', name: '', category: 'top', color: '黑色' } }) },

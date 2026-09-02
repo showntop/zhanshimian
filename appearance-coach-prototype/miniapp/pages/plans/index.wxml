@@ -34,7 +34,19 @@
     <view class="generation-fail-action"><primary-button text="重新生成" bind:tap="generate" /></view>
   </view>
   <view wx:elif="{{loading}}" class="skeleton plan-placeholder" />
-  <view wx:elif="{{!savedHair.length}}" class="plans-empty"><text class="serif">暂时没有生成方案</text><text>你的档案还在，稍后可以重新尝试。</text><button bindtap="retry">重新加载</button></view>
+  <view wx:elif="{{!savedHair.length}}" class="plans-empty">
+    <block wx:if="{{!hasReport}}">
+      <text class="serif">还没有形象方案</text>
+      <text>完成形象分析后，这里会出现 3 套适合你的方案。</text>
+      <primary-button text="开始形象分析" bind:tap="startAnalysis" />
+    </block>
+    <block wx:else>
+      <text class="serif">暂时没有生成方案</text>
+      <text>你的档案还在，随时可以生成本人方案。</text>
+      <primary-button text="生成 3 套本人方案" bind:tap="generate" />
+      <button class="plans-empty-secondary" bindtap="retry">重新加载</button>
+    </block>
+  </view>
   <view wx:if="{{!loading && savedHair.length}}" class="saved-section fade-up">
 	<view class="saved-head"><view><text class="saved-title serif">已保存的发型预览</text><text class="saved-note">你的本人效果图</text></view><text>{{savedHair.length}} 个</text></view>
 	<scroll-view class="saved-scroll" scroll-x enhanced show-scrollbar="{{false}}"><view class="saved-row"><view wx:for="{{savedHair}}" wx:key="id" class="saved-card"><image src="{{item.result_image_url}}" mode="aspectFill" /><view><text>{{item.style_name}}</text><text>{{item.preview_label}}</text></view></view></view></scroll-view>

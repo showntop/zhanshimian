@@ -43,3 +43,7 @@
 .detail-copy { display: block; margin-top: 12rpx; color: #737772; font-size: 23rpx; line-height: 1.65; }
 
 .report-action { margin-top: 34rpx; }.reanalyze-action { width: 100%; margin: 12rpx 0 0; padding: 18rpx; background: transparent; color: #587344; font-size: 22rpx; text-decoration: underline; }
+.report-error { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16rpx; color: #7a8178; text-align: center; font-size: 24rpx; line-height: 1.6; }
+.report-error .serif { color: #303630; font-size: 34rpx; font-weight: 700; }
+.report-error image { width: 62rpx; height: 62rpx; opacity: .62; }
+.report-error button { min-width: 260rpx; margin-top: 12rpx; border-radius: 18rpx; background: #587344; color: #fff; }

@@ -4,7 +4,8 @@
   <view class="progress"><view style="width: {{items.length >= 8 ? 100 : items.length * 12.5}}%" /></view>
   <scroll-view class="category-rail" scroll-x show-scrollbar="{{false}}"><view class="category-row"><button class="{{active === 'all' ? 'active' : ''}}" data-value="all" bindtap="filter">全部</button><button wx:for="{{categories}}" wx:key="value" class="{{active === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="filter">{{item.label}}</button></view></scroll-view>
 
-  <view wx:if="{{filtered.length}}" class="item-grid fade-up delay-1">
+  <view wx:if="{{loadError}}" class="empty surface"><text>加载失败</text><text>请检查网络后重新加载</text><button bindtap="load">重新加载</button></view>
+  <view wx:elif="{{filtered.length}}" class="item-grid fade-up delay-1">
     <view wx:for="{{filtered}}" wx:key="id" class="item-card">
       <image src="{{item.image_url}}" mode="aspectFill" /><button class="delete" data-id="{{item.id}}" bindtap="remove">×</button>
       <text class="item-name">{{item.name}}</text><text class="item-meta">{{item.color}} · {{item.wear_count ? '穿过 ' + item.wear_count + ' 次' : '新加入'}}</text>

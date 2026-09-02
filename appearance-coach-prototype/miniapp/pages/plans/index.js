@@ -5,7 +5,7 @@ Page({
   data: {
     reportId: '', scene: '', plans: [], savedHair: [], selected: 0, showCurrent: false, loading: true,
     sceneLabel: '', asTab: true, generating: false, allIdle: false, allFailed: false, allReady: false,
-    generationCount: 0, currentFaceUrl: '', currentBodyUrl: ''
+    hasReport: false, generationCount: 0, currentFaceUrl: '', currentBodyUrl: ''
   },
   onLoad() {
     this.applyIntent(true)
@@ -22,7 +22,7 @@ Page({
     if (scene) wx.removeStorageSync('jianwo_plans_scene')
     const changed = scene !== this.data.scene || reportId !== this.data.reportId
     if (force || changed) {
-      this.setData({ reportId, scene, sceneLabel: labels[scene] || '', loading: true })
+      this.setData({ reportId, scene, sceneLabel: labels[scene] || '', hasReport: Boolean(reportId), loading: true })
       this.load()
     }
   },
@@ -90,10 +90,11 @@ Page({
       return
     }
     this.setData({ generating: true })
-    wx.setStorageSync('jianwo_active_plan_generation', { reportId: this.data.reportId, scene: this.data.scene })
     const refresh = this.data.plans.some((item) => item.generation_status === 'completed' && !item.generated)
     api.generatePlanLooks(this.data.reportId, this.data.scene, refresh)
       .then((plans) => {
+        // 入队成功后再记录进行中的生成，避免失败后 key 残留误导首页
+        wx.setStorageSync('jianwo_active_plan_generation', { reportId: this.data.reportId, scene: this.data.scene })
         const mapped = this.mapPlans(plans)
         this.setData({ plans: mapped, allIdle: false, allFailed: false })
         this.schedulePoll(mapped)
@@ -125,5 +126,6 @@ Page({
     }
     wx.navigateTo({ url: `/pages/plan/index?id=${plan.id}` })
   },
+  startAnalysis() { wx.navigateTo({ url: '/pages/capture/index?scene=general' }) },
   onShareAppMessage() { return { title: '同一个我，三种更适合的表达｜怎么打扮', path: '/pages/home/index' } }
 })

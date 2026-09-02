@@ -26,5 +26,6 @@
     <view class="execute-card"><view><text>想按这套开始调整？</text><text>把发型、妆容和穿搭拆成可勾选的执行步骤。</text></view><primary-button text="{{plan.isDemo ? '查看执行清单（流程预览）' : '选择这套并查看执行清单'}}" loading="{{selecting}}" bind:tap="createChecklist" /></view>
     <view class="plan-utilities"><button bindtap="toggleSaved">{{saved ? '✓ 已保存' : '保存方案'}}</button><button bindtap="feedback">试过后反馈</button><button bindtap="sharePlan">分享方案</button></view>
   </view>
-  <view wx:else class="skeleton loading-card" />
+  <view wx:elif="{{loading}}" class="skeleton loading-card" />
+  <view wx:else class="load-error"><text>加载失败，请稍后重试</text><button bindtap="load">重新加载</button></view>
 </view>

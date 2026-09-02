@@ -128,7 +128,7 @@ function ensureSession() {
     })
 }
 
-function uploadMedia(kind, filePath) {
+function uploadMedia(kind, filePath, retried = false) {
   const data = appData()
   return ensureSession().then(() => new Promise((resolve, reject) => {
     wx.uploadFile({
@@ -141,8 +141,15 @@ function uploadMedia(kind, filePath) {
       success(response) {
         try {
           const body = JSON.parse(response.data)
-          if (response.statusCode >= 200 && response.statusCode < 300) resolve(body.data)
-          else reject(new Error(body.error ? body.error.message : '上传失败'))
+          if (response.statusCode >= 200 && response.statusCode < 300) { resolve(body.data); return }
+          if (response.statusCode === 401 && !retried) {
+            // token 过期：仿 request() 的 401 分支，重新登录后只重试一次
+            data.token = ''
+            wx.removeStorageSync(TOKEN_KEY)
+            ensureSession().then(() => uploadMedia(kind, filePath, true)).then(resolve).catch(reject)
+            return
+          }
+          reject(new Error(body.error ? body.error.message : '上传失败'))
         } catch (error) { reject(error) }
       },
       fail(error) { reject(new Error(error.errMsg || '上传失败')) }

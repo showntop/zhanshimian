@@ -71,7 +71,14 @@ Page({
       this.setData({ loading: true })
       api.getAnalysis(activeID).then((analysis) => {
         if (analysis.status === 'queued' || analysis.status === 'processing') {
-          wx.navigateTo({ url: `/pages/analysis/index?id=${analysis.id}&scene=${this.data.scene}` })
+          // 服务端只允许单一活跃分析，新上传的照片无法并行处理，先诚实告知用户
+          wx.showModal({
+            title: '已有一份分析正在进行',
+            content: '继续使用之前上传的照片完成分析；完成后可以重新上传新照片。',
+            showCancel: false,
+            confirmText: '查看进度',
+            success: () => wx.navigateTo({ url: `/pages/analysis/index?id=${analysis.id}&scene=${this.data.scene}` })
+          })
           return
         }
         wx.removeStorageSync('jianwo_active_analysis_id')

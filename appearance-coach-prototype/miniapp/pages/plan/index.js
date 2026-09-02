@@ -2,9 +2,10 @@ const api = require('../../services/api')
 const { lookImage, userImage } = require('../../utils/media')
 
 Page({
-  data: { id: '', plan: null, active: 0, loading: true, selecting: false, showCurrent: false, saved: false, categories: ['发型', '妆容', '穿搭'] },
+  data: { id: '', plan: null, active: 0, loading: true, loadError: false, selecting: false, showCurrent: false, saved: false, categories: ['发型', '妆容', '穿搭'] },
   onLoad(options) { this.setData({ id: options.id }); this.load() },
   load() {
+    this.setData({ loading: true, loadError: false })
     api.getPlan(this.data.id).then((plan) => {
       const mediaRequest = api.getReport(plan.report_id).then((report) => api.getAnalysis(report.analysis_id)).catch(() => null)
       return Promise.all([Promise.resolve(plan), mediaRequest])
@@ -26,7 +27,7 @@ Page({
       plan.steps = (plan.steps || []).map((step) => ({ ...step, details: Array.isArray(step.details) ? step.details : [] }))
       const savedID = wx.getStorageSync('jianwo_saved_plan_id') || wx.getStorageSync('jianwo_plan_id')
       this.setData({ plan, loading: false, saved: savedID === plan.id })
-    }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false }) })
+    }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false, loadError: true }) })
   },
   changeTab(event) { this.setData({ active: Number(event.currentTarget.dataset.index) }); wx.vibrateShort({ type: 'light' }) },
   compare() {

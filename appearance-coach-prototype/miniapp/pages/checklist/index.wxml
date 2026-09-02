@@ -12,5 +12,6 @@
     <view class="finish-note surface"><text class="serif">照着步骤完成，不需要一次买齐</text><text>勾选已经做过的调整；实际尝试后可以反馈，下一次推荐会更贴合你。</text></view>
     <primary-button text="提交实际体验反馈" bind:tap="feedback" />
   </block>
-  <view wx:else class="skeleton checklist-loading" />
+  <view wx:elif="{{loading}}" class="skeleton checklist-loading" />
+  <view wx:else class="load-error"><text>加载失败，请稍后重试</text><button bindtap="load">重新加载</button></view>
 </view>

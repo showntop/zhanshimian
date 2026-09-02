@@ -14,6 +14,7 @@
     <button bindtap="savePoster" loading="{{saving}}">保存分享卡</button>
     <button wx:if="{{owner}}" class="revoke" bindtap="revoke">撤销这张分享卡</button>
   </view>
-  <view wx:else class="loading skeleton" />
+  <view wx:elif="{{loading}}" class="loading skeleton" />
+  <view wx:else class="load-error"><text>加载失败，请稍后重试</text><button bindtap="load">重新加载</button></view>
 </view>
 <canvas type="2d" id="shareCanvas" class="export-canvas" />

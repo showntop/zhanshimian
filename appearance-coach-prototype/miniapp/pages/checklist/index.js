@@ -2,15 +2,16 @@ const api = require('../../services/api')
 const { lookImage } = require('../../utils/media')
 
 Page({
-  data: { id: '', plan: null, items: [], completed: 0, loading: true },
+  data: { id: '', plan: null, items: [], completed: 0, loading: true, loadError: false },
   onLoad(options) { this.setData({ id: options.id || wx.getStorageSync('jianwo_plan_id') }); this.load() },
   load() {
+    this.setData({ loading: true, loadError: false })
     Promise.all([api.getPlan(this.data.id), api.getChecklist(this.data.id)]).then((results) => {
       const plan = results[0]
       const items = results[1]
       plan.image_url = lookImage(plan.image_url, plan.slug)
       this.setData({ plan, items, completed: items.filter((item) => item.completed).length, loading: false })
-    }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false }) })
+    }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false, loadError: true }) })
   },
   toggle(event) {
     const index = Number(event.currentTarget.dataset.index)

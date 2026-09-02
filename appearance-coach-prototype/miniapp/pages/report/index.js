@@ -6,7 +6,7 @@ const SEVERITY_LABEL = { low: '轻微', medium: '适中', high: '明显' }
 const CATEGORY_ICON = { hair: '/assets/icons/sparkles.svg', makeup: '/assets/icons/user.svg', outfit: '/assets/icons/briefcase.svg' }
 
 Page({
-  data: { id: '', scene: '', loading: true, report: null, annotations: [], image: '', findingItems: [], suggestions: [], looksReady: false, ctaText: '生成 3 套本人方案', generating: false },
+  data: { id: '', scene: '', loading: true, loadError: false, report: null, annotations: [], image: '', findingItems: [], suggestions: [], looksReady: false, ctaText: '生成 3 套本人方案', generating: false },
   onLoad(options) {
     const id = options.id || getApp().globalData.reportID || wx.getStorageSync('jianwo_report_id')
     this.setData({ id, scene: options.scene || '' })
@@ -14,6 +14,7 @@ Page({
   },
   load() {
     if (!this.data.id) { this.setData({ loading: false }); wx.showToast({ title: '请先完成形象分析', icon: 'none' }); return }
+    this.setData({ loading: true, loadError: false })
     api.getReport(this.data.id).then((report) => {
       wx.setStorageSync('jianwo_report_id', this.data.id)
       const findings = report.findings || []
@@ -43,7 +44,7 @@ Page({
       })
       this.loadSuggestions()
     }).catch((error) => {
-      wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false })
+      wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false, loadError: true })
     })
   },
   loadSuggestions() {
@@ -81,10 +82,17 @@ Page({
     }
     if (this.data.looksReady || this.data.generating) { go(); return }
     this.setData({ generating: true, ctaText: '正在加入生成队列…' })
-    wx.setStorageSync('jianwo_active_plan_generation', { reportId: this.data.id, scene: this.data.scene })
     api.generatePlanLooks(this.data.id, this.data.scene)
-      .catch((error) => wx.showToast({ title: error.message || '生成暂时不可用', icon: 'none' }))
-      .finally(() => { this.setData({ generating: false, ctaText: '生成 3 套本人方案' }); go() })
+      .then(() => {
+        // 入队成功后再记录进行中的生成，避免失败后 key 残留误导首页
+        wx.setStorageSync('jianwo_active_plan_generation', { reportId: this.data.id, scene: this.data.scene })
+        this.setData({ generating: false, ctaText: '生成 3 套本人方案' })
+        go()
+      })
+      .catch((error) => {
+        wx.showToast({ title: error.message || '生成暂时不可用', icon: 'none' })
+        this.setData({ generating: false, ctaText: '生成 3 套本人方案' })
+      })
   },
   reanalyze() { wx.navigateTo({ url: '/pages/capture/index?scene=general&replace=1' }) },
   onShareAppMessage() { return { title: '我的形象分析报告｜怎么打扮', path: '/pages/home/index' } }

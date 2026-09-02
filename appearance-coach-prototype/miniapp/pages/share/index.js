@@ -2,14 +2,17 @@ const api = require('../../services/api')
 const { lookImage } = require('../../utils/media')
 
 Page({
-  data: { card: null, snapshot: null, loading: true, owner: false, saving: false },
-  onLoad(options) {
+  data: { card: null, snapshot: null, loading: true, loadError: false, owner: false, saving: false },
+  onLoad(options) { this.options = options; this.load() },
+  load() {
+    this.setData({ loading: true, loadError: false })
+    const options = this.options || {}
     if (options.token) {
-      api.getShareCard(options.token).then((card) => this.setCard(card, false)).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false }) })
+      api.getShareCard(options.token).then((card) => this.setCard(card, false)).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false, loadError: true }) })
       return
     }
-    if (!options.type || !options.id) { this.setData({ loading: false }); return }
-    api.createShareCard({ source_type: options.type, source_id: options.id, include_photo: false }).then((card) => { this.setCard(card, true); api.trackEvent('share_card_create', { source_type: options.type, source_id: options.id }).catch(() => {}) }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false }) })
+    if (!options.type || !options.id) { this.setData({ loading: false, loadError: true }); return }
+    api.createShareCard({ source_type: options.type, source_id: options.id, include_photo: false }).then((card) => { this.setCard(card, true); api.trackEvent('share_card_create', { source_type: options.type, source_id: options.id }).catch(() => {}) }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false, loadError: true }) })
   },
   setCard(card, owner) {
     const snapshot = card.snapshot ? { ...card.snapshot, image_url: card.snapshot.image_url ? lookImage(card.snapshot.image_url, 'natural', 'plan') : '' } : null
