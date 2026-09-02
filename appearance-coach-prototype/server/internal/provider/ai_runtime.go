@@ -172,6 +172,7 @@ func (r *AIRuntime) Structured(ctx context.Context, capability string, input Str
 			causes = append(causes, modelID+": incompatible structured protocol")
 			continue
 		}
+		started := time.Now()
 		var result StructuredResult
 		var err error
 		if model.Protocol == "openai_chat_completions" {
@@ -196,6 +197,9 @@ func (r *AIRuntime) Structured(ctx context.Context, capability string, input Str
 		failedMeta := result.Meta
 		if failedMeta.ModelID == "" {
 			failedMeta = InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model}
+		}
+		if failedMeta.LatencyMS == 0 {
+			failedMeta.LatencyMS = time.Since(started).Milliseconds()
 		}
 		r.logInvocation(failedMeta, err)
 	}
@@ -239,6 +243,7 @@ func (r *AIRuntime) EditImage(ctx context.Context, capability string, input Imag
 			causes = append(causes, fmt.Sprintf("%s: estimated cost %.4f exceeds route limit %.4f", modelID, estimatedCost, route.MaxCostCNY))
 			continue
 		}
+		started := time.Now()
 		var result ImageEditResult
 		var err error
 		switch model.Protocol {
@@ -261,7 +266,14 @@ func (r *AIRuntime) EditImage(ctx context.Context, capability string, input Imag
 			return result, nil
 		}
 		causes = append(causes, modelID+": "+err.Error())
-		r.logInvocation(InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model}, err)
+		failedMeta := result.Meta
+		if failedMeta.ModelID == "" {
+			failedMeta = InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model}
+		}
+		if failedMeta.LatencyMS == 0 {
+			failedMeta.LatencyMS = time.Since(started).Milliseconds()
+		}
+		r.logInvocation(failedMeta, err)
 	}
 	return ImageEditResult{}, fmt.Errorf("all AI models failed for %s: %s", capability, strings.Join(causes, "; "))
 }
@@ -629,6 +641,9 @@ func (r *AIRuntime) doJSON(ctx context.Context, model AIModel, method, endpoint 
 }
 
 func (r *AIRuntime) doRequest(model AIModel, request *http.Request, output any, limit int64) error {
+	if err := request.Context().Err(); err != nil {
+		return fmt.Errorf("%s request context already done: %w", model.Vendor, err)
+	}
 	ctx, cancel := context.WithTimeout(request.Context(), model.Timeout)
 	defer cancel()
 	response, err := r.client.Do(request.WithContext(ctx))

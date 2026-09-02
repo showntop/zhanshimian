@@ -613,99 +613,111 @@ func (s *Service) runPlanLookWorker(ctx context.Context, poll time.Duration) {
 }
 
 func (s *Service) processPlanLook(ctx context.Context, job domain.PlanLookJob) {
+	jobCtx, cancel := context.WithTimeout(ctx, planLookJobTimeout)
+	defer cancel()
 	if s.lookGenerator == nil {
-		_ = s.repo.FailPlanLook(ctx, job, errors.New("plan look generator is not configured"))
+		_ = s.repo.FailPlanLook(jobCtx, job, errors.New("plan look generator is not configured"))
 		return
 	}
-	output, err := s.lookGenerator.Generate(ctx, provider.LookInput{Name: job.Name, Slug: job.Slug, Why: job.Why, Steps: job.Steps, MediaIDs: job.MediaIDs})
+	output, err := s.lookGenerator.Generate(jobCtx, provider.LookInput{Name: job.Name, Slug: job.Slug, Why: job.Why, Steps: job.Steps, MediaIDs: job.MediaIDs})
 	if err != nil {
-		_ = s.repo.FailPlanLook(ctx, job, err)
+		_ = s.repo.FailPlanLook(jobCtx, job, err)
 		return
 	}
 	extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
 	if extension == "" {
-		_ = s.repo.FailPlanLook(ctx, job, errors.New("look provider returned an unsupported image format"))
+		_ = s.repo.FailPlanLook(jobCtx, job, errors.New("look provider returned an unsupported image format"))
 		return
 	}
 	storageKey := fmt.Sprintf("%s/generated/looks/%s%s", job.UserID, uuid.NewString(), extension)
-	storedKey, saveErr := s.storage.Save(ctx, storageKey, bytes.NewReader(output.ImageData))
+	storedKey, saveErr := s.storage.Save(jobCtx, storageKey, bytes.NewReader(output.ImageData))
 	if saveErr != nil {
-		_ = s.repo.FailPlanLook(ctx, job, saveErr)
+		_ = s.repo.FailPlanLook(jobCtx, job, saveErr)
 		return
 	}
-	if err := s.repo.CompletePlanLook(ctx, job, "/uploads/"+storedKey, storedKey, output.ProviderVersion); err != nil {
-		_ = s.storage.Delete(ctx, storedKey)
+	if err := s.repo.CompletePlanLook(jobCtx, job, "/uploads/"+storedKey, storedKey, output.ProviderVersion); err != nil {
+		_ = s.storage.Delete(jobCtx, storedKey)
 		s.logger.Error("complete plan look", "plan_id", job.PlanID, "error", err)
-		_ = s.repo.FailPlanLook(ctx, job, err)
+		_ = s.repo.FailPlanLook(jobCtx, job, err)
 	}
 }
 
 func (s *Service) processHairPreview(ctx context.Context, job domain.HairPreviewJob) {
-	output, err := s.hairGenerator.Generate(ctx, job.Input)
+	jobCtx, cancel := context.WithTimeout(ctx, hairPreviewJobTimeout)
+	defer cancel()
+	output, err := s.hairGenerator.Generate(jobCtx, job.Input)
 	if err != nil {
-		_ = s.repo.FailHairPreview(ctx, job, err)
+		_ = s.repo.FailHairPreview(jobCtx, job, err)
 		return
 	}
 	resultURL, storageKey := output.ImageURL, ""
 	if len(output.ImageData) > 0 {
 		extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
 		if extension == "" {
-			_ = s.repo.FailHairPreview(ctx, job, errors.New("hair preview provider returned an unsupported image format"))
+			_ = s.repo.FailHairPreview(jobCtx, job, errors.New("hair preview provider returned an unsupported image format"))
 			return
 		}
 		storageKey = fmt.Sprintf("%s/generated/hair/%s%s", job.UserID, uuid.NewString(), extension)
-		storedKey, saveErr := s.storage.Save(ctx, storageKey, bytes.NewReader(output.ImageData))
+		storedKey, saveErr := s.storage.Save(jobCtx, storageKey, bytes.NewReader(output.ImageData))
 		if saveErr != nil {
-			_ = s.repo.FailHairPreview(ctx, job, saveErr)
+			_ = s.repo.FailHairPreview(jobCtx, job, saveErr)
 			return
 		}
 		storageKey = storedKey
 		resultURL = "/uploads/" + storedKey
 	}
 	if resultURL == "" {
-		_ = s.repo.FailHairPreview(ctx, job, errors.New("hair preview provider returned no image"))
+		_ = s.repo.FailHairPreview(jobCtx, job, errors.New("hair preview provider returned no image"))
 		return
 	}
-	if err := s.repo.CompleteHairPreview(ctx, job, resultURL, storageKey, output.ProviderVersion); err != nil {
+	if err := s.repo.CompleteHairPreview(jobCtx, job, resultURL, storageKey, output.ProviderVersion); err != nil {
 		if storageKey != "" {
-			_ = s.storage.Delete(ctx, storageKey)
+			_ = s.storage.Delete(jobCtx, storageKey)
 		}
 		s.logger.Error("complete hair preview", "preview_id", job.PreviewID, "error", err)
-		_ = s.repo.FailHairPreview(ctx, job, err)
+		_ = s.repo.FailHairPreview(jobCtx, job, err)
 	}
 }
 
+const (
+	analysisJobTimeout   = 5 * time.Minute
+	hairPreviewJobTimeout = 5 * time.Minute
+	planLookJobTimeout   = 5 * time.Minute
+)
+
 func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
-	_ = s.repo.UpdateAnalysisProgress(ctx, job.AnalysisID, 32, "正在检查照片并读取面部特征")
-	output, err := s.analyzer.Analyze(ctx, job.Input)
+	jobCtx, cancel := context.WithTimeout(ctx, analysisJobTimeout)
+	defer cancel()
+	_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, 32, "正在检查照片并读取面部特征")
+	output, err := s.analyzer.Analyze(jobCtx, job.Input)
 	if err != nil {
 		var rejected *provider.PhotoRejectedError
 		if errors.As(err, &rejected) {
-			if failErr := s.repo.RejectAnalysis(ctx, job, rejected.UserMessage()); failErr != nil {
+			if failErr := s.repo.RejectAnalysis(jobCtx, job, rejected.UserMessage()); failErr != nil {
 				s.logger.Error("reject analysis", "analysis_id", job.AnalysisID, "error", failErr)
 			}
 			return
 		}
-		_ = s.repo.FailAnalysis(ctx, job, err)
+		_ = s.repo.FailAnalysis(jobCtx, job, err)
 		return
 	}
-	currentImageURL, err := s.analysisPreviewURL(ctx, job.UserID, job.Input.MediaIDs)
+	currentImageURL, err := s.analysisPreviewURL(jobCtx, job.UserID, job.Input.MediaIDs)
 	if err != nil {
-		_ = s.repo.FailAnalysis(ctx, job, err)
+		_ = s.repo.FailAnalysis(jobCtx, job, err)
 		return
 	}
 	// The "current" image is source evidence, never a provider-generated or
 	// stock reference. This keeps every provider and fallback on the same
 	// user-photo contract.
 	output.CurrentImageURL = currentImageURL
-	_ = s.repo.UpdateAnalysisProgress(ctx, job.AnalysisID, 86, "组合发型、妆容与穿搭方案")
-	if _, err := s.repo.CompleteAnalysis(ctx, job, output); err != nil {
+	_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, 86, "组合发型、妆容与穿搭方案")
+	if _, err := s.repo.CompleteAnalysis(jobCtx, job, output); err != nil {
 		if errors.Is(err, repository.ErrAnalysisRemoved) {
 			s.logger.Info("analysis removed while processing; discarding result", "analysis_id", job.AnalysisID)
 			return
 		}
 		s.logger.Error("complete analysis", "analysis_id", job.AnalysisID, "error", err)
-		_ = s.repo.FailAnalysis(ctx, job, err)
+		_ = s.repo.FailAnalysis(jobCtx, job, err)
 	}
 }
 
