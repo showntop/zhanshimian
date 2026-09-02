@@ -8,7 +8,7 @@
     <swiper class="plan-swiper" current="{{selected}}" previous-margin="42rpx" next-margin="42rpx" bindchange="swiperChange" duration="380">
       <swiper-item wx:for="{{plans}}" wx:key="id">
         <view class="plan-card {{selected === index ? 'active' : ''}}">
-          <smart-image wx:if="{{!item.generateFailed}}" className="{{!showCurrent && item.generated ? 'generated-look' : ''}}" src="{{showCurrent && selected === index && item.current_image_url ? item.current_image_url : item.display_url}}" placeholder="/assets/placeholders/figure.png" mode="{{showCurrent && selected === index ? item.current_image_mode : item.display_mode}}" />
+          <image wx:if="{{!item.generateFailed}}" class="{{!showCurrent && item.generated ? 'generated-look' : ''}}" src="{{showCurrent && selected === index && item.current_image_url ? item.current_image_url : item.display_url}}" mode="{{showCurrent && selected === index ? item.current_image_mode : item.display_mode}}" fade-show="{{false}}" />
           <view wx:if="{{!item.generateFailed}}" class="photo-shade" />
           <text wx:if="{{item.recommended && !item.generateFailed}}" class="recommend">首选推荐</text>
           <view class="compare" wx:if="{{selected === index && !item.generating && !item.generateFailed}}"><button class="{{showCurrent ? 'active' : ''}}" data-mode="current" bindtap="toggleCompare">我的当前</button><button class="{{!showCurrent ? 'active' : ''}}" data-mode="plan" bindtap="toggleCompare">{{item.compare_label}}</button></view>
@@ -19,7 +19,7 @@
       </swiper-item>
     </swiper>
     <view class="thumbs fade-up delay-1">
-      <button wx:for="{{plans}}" wx:key="id" class="thumb {{selected === index ? 'active' : ''}}" data-index="{{index}}" bindtap="selectThumb"><smart-image className="thumb-image {{item.generated ? 'generated-thumb' : ''}}" src="{{item.thumbnail_url}}" placeholder="/assets/placeholders/detail.png" mode="{{item.thumbnail_mode}}" /><text>{{item.name}}</text></button>
+      <button wx:for="{{plans}}" wx:key="id" class="thumb {{selected === index ? 'active' : ''}}" data-index="{{index}}" bindtap="selectThumb"><image class="{{item.generated ? 'generated-thumb' : ''}}" src="{{item.thumbnail_url}}" mode="{{item.thumbnail_mode}}" /><text>{{item.name}}</text></button>
     </view>
     <view class="why surface fade-up delay-2">
       <text class="why-title serif">为什么更适合你</text><text class="why-copy">{{plans[selected].why}}</text>
@@ -38,7 +38,7 @@
   <view wx:elif="{{!savedHair.length}}" class="plans-empty"><text class="serif">暂时没有生成方案</text><text>你的档案还在，稍后可以重新尝试。</text><button bindtap="retry">重新加载</button></view>
   <view wx:if="{{!loading && savedHair.length}}" class="saved-section fade-up">
 	<view class="saved-head"><view><text class="saved-title serif">已保存的发型预览</text><text class="saved-note">你的本人效果图</text></view><text>{{savedHair.length}} 个</text></view>
-	<scroll-view class="saved-scroll" scroll-x enhanced show-scrollbar="{{false}}"><view class="saved-row"><view wx:for="{{savedHair}}" wx:key="id" class="saved-card"><smart-image className="saved-image" src="{{item.result_image_url}}" placeholder="/assets/placeholders/portrait.png" mode="aspectFill" /><view><text>{{item.style_name}}</text><text>{{item.preview_label}}</text></view></view></view></scroll-view>
+	<scroll-view class="saved-scroll" scroll-x enhanced show-scrollbar="{{false}}"><view class="saved-row"><view wx:for="{{savedHair}}" wx:key="id" class="saved-card"><image src="{{item.result_image_url}}" mode="aspectFill" /><view><text>{{item.style_name}}</text><text>{{item.preview_label}}</text></view></view></view></scroll-view>
   </view>
 </view>
 <bottom-nav wx:if="{{asTab}}" active="plans" />

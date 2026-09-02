@@ -17,9 +17,9 @@ Page({
     ],
     hasProfile: false,
     reportID: '',
-    todayLookUrl: '/assets/placeholders/figure.png',
+    todayLookUrl: '/assets/plans/sharp.jpg',
     currentLookUrl: '',
-    referenceLookUrl: '/assets/placeholders/figure.png',
+    referenceLookUrl: '/assets/reports/sharp.jpg',
     referenceGenerated: false,
     referenceDemo: false,
     comparisonTitle: '清晰利落',
@@ -31,9 +31,7 @@ Page({
   onShow() {
 	api.trackEvent('page_view', { page: 'home' }).catch(() => {})
     const reportID = wx.getStorageSync('jianwo_report_id') || ''
-    // Keep previous image URLs while refreshing so the screen doesn't flash
-    // from empty/placeholder back to real images when returning from another tab.
-    this.setData({ hasProfile: Boolean(reportID), reportID, todayOpening: false, tasks: [] })
+    this.setData({ hasProfile: Boolean(reportID), reportID, currentLookUrl: '', todayOpening: false, tasks: [] })
     this.refreshTasks(reportID)
     if (reportID) {
       api.getTodayPlan().then((todayPlan) => {
@@ -46,7 +44,7 @@ Page({
         const generatedURL = featured && userImage(featured.generated_image_url)
         this.setData({
           currentLookUrl: userImage(report.current_image_url),
-          referenceLookUrl: featured ? (generatedURL || lookImage(featured.image_url, featured.slug, 'report')) : '/assets/placeholders/figure.png',
+          referenceLookUrl: featured ? (generatedURL || lookImage(featured.image_url, featured.slug, 'report')) : '/assets/reports/sharp.jpg',
           referenceGenerated: Boolean(generatedURL),
           referenceDemo: Boolean(featured && (/^demo\//.test(featured.look_provider || '') || /^demo-/.test(featured.look_provider || ''))),
           comparisonTitle: featured ? featured.name : '清晰利落'

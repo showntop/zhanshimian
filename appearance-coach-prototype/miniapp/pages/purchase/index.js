@@ -21,7 +21,7 @@ Page({
     if (this.data.loading) return
     this.setData({ loading: true, error: '' })
     api.createDemoMedia('product').then((asset) => this.setData({
-      photo: '/assets/placeholders/figure.png', mediaID: asset.id, result: null, loading: false
+      photo: '/assets/looks/warm.jpg', mediaID: asset.id, result: null, loading: false
     })).catch((error) => this.setData({ error: error.message, loading: false }))
   },
   selectContext(event) {

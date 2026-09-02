@@ -1,4 +1,0 @@
-.smart-image { position: relative; width: 100%; height: 100%; overflow: hidden; }
-.smart-image image { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity .35s ease; }
-.smart-placeholder { z-index: 1; opacity: 1; }
-.smart-real { z-index: 2; }
