@@ -31,7 +31,7 @@
     <view class="generation-fail-badge"><image src="/assets/icons/sparkles.svg" mode="aspectFit" /></view>
     <text class="generation-fail-title serif">本人方案暂时生成失败</text>
     <text class="generation-fail-copy">你的分析报告已保存，方案图片生成服务暂时不可用。稍后可以重新尝试。</text>
-    <button class="generation-fail-retry" bindtap="generate">重新生成</button>
+    <view class="generation-fail-action"><primary-button text="重新生成" bind:tap="generate" /></view>
   </view>
   <view wx:elif="{{loading}}" class="skeleton plan-placeholder" />
   <view wx:elif="{{!savedHair.length}}" class="plans-empty"><text class="serif">暂时没有生成方案</text><text>你的档案还在，稍后可以重新尝试。</text><button bindtap="retry">重新加载</button></view>
