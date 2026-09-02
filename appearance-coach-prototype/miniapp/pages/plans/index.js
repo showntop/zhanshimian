@@ -4,13 +4,27 @@ const { lookImage, userImage } = require('../../utils/media')
 Page({
   data: {
     reportId: '', scene: '', plans: [], savedHair: [], selected: 0, showCurrent: false, loading: true,
-    sceneLabel: '', asTab: false, generating: false, allIdle: false, allFailed: false, allReady: false,
+    sceneLabel: '', asTab: true, generating: false, allIdle: false, allFailed: false, allReady: false,
     generationCount: 0, currentFaceUrl: '', currentBodyUrl: '', generationFailureMessage: ''
   },
-  onLoad(options) {
+  onLoad() {
+    this.applyIntent(true)
+  },
+  onShow() {
+    // Tab pages only fire onShow (not onLoad) when revisited via the tab bar.
+    // Re-apply any pending scene intent stored by the caller before switchTab.
+    this.applyIntent()
+  },
+  applyIntent(force = false) {
     const labels = { interview: '面试', wedding: '婚礼', date: '约会', daily: '日常' }
-    this.setData({ reportId: options.reportId || wx.getStorageSync('jianwo_report_id'), scene: options.scene || '', sceneLabel: labels[options.scene] || '', asTab: options.tab === '1' })
-    this.load()
+    const scene = wx.getStorageSync('jianwo_plans_scene') || ''
+    const reportId = wx.getStorageSync('jianwo_report_id') || ''
+    if (scene) wx.removeStorageSync('jianwo_plans_scene')
+    const changed = scene !== this.data.scene || reportId !== this.data.reportId
+    if (force || changed) {
+      this.setData({ reportId, scene, sceneLabel: labels[scene] || '', loading: true })
+      this.load()
+    }
   },
   onUnload() { if (this.timer) clearTimeout(this.timer) },
   retry() { this.setData({ loading: true }); this.load() },
@@ -73,7 +87,8 @@ Page({
     const active = wx.getStorageSync('jianwo_active_plan_generation')
     if (active && (active.reportId !== this.data.reportId || (active.scene || '') !== (this.data.scene || ''))) {
       wx.showToast({ title: '已有一组方案正在生成', icon: 'none' })
-      wx.navigateTo({ url: `/pages/plans/index?reportId=${active.reportId}${active.scene ? `&scene=${active.scene}` : ''}` })
+      if (active.scene) wx.setStorageSync('jianwo_plans_scene', active.scene)
+      wx.switchTab({ url: '/pages/plans/index' })
       return
     }
     this.setData({ generating: true })

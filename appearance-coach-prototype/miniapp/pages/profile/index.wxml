@@ -1,5 +1,5 @@
-<app-header title="我的档案" back="{{true}}" />
-<view class="page page-with-nav profile-page">
+<app-header title="我的档案" />
+<view class="page profile-page">
   <view class="profile-hero fade-up">
     <view class="avatar-wrap">
       <image wx:if="{{profileImage}}" src="{{profileImage}}" mode="aspectFill" />
@@ -79,4 +79,3 @@
     <button class="delete" loading="{{deleting}}" bindtap="deleteData">删除我的数据</button>
   </view>
 </view>
-<bottom-nav active="mine" />

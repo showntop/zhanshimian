@@ -1,6 +1,6 @@
 <app-header transparent="{{true}}" />
 <scroll-view class="home-scroll" scroll-y enhanced show-scrollbar="{{false}}">
-  <view class="home page-with-nav">
+  <view class="home">
     <view class="advisor-head {{initialized ? 'fade-up' : ''}}">
       <view>
         <text class="advisor-kicker">私人形象顾问</text>
@@ -92,7 +92,6 @@
 
   </view>
 </scroll-view>
-<bottom-nav active="home" />
 <view wx:if="{{previewOpen}}" class="look-lightbox" catchtap="closeTodayLook">
   <view class="look-lightbox-inner" catchtap="noop">
     <image src="{{todayLookUrl}}" mode="aspectFit" />

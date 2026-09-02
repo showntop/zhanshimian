@@ -1,5 +1,5 @@
-<app-header title="我的形象方案" back="{{!asTab}}" />
-<view class="page plans-page {{asTab ? 'page-with-nav' : ''}}">
+<app-header title="我的形象方案" />
+<view class="page plans-page">
   <view class="intro fade-up"><text wx:if="{{sceneLabel}}" class="scene-context">{{sceneLabel}} · 针对性方案</text><text class="plans-title serif">同一个你，三种更适合的表达</text><text class="lede">发型、妆容与穿搭已为你组合好</text></view>
   <block wx:if="{{!loading && plans.length && !allFailed}}">
     <view wx:if="{{allIdle}}" class="gen-cta fade-up"><primary-button text="生成 3 套本人方案" bind:tap="generate" /></view>
@@ -41,4 +41,3 @@
 	<scroll-view class="saved-scroll" scroll-x enhanced show-scrollbar="{{false}}"><view class="saved-row"><view wx:for="{{savedHair}}" wx:key="id" class="saved-card"><image src="{{item.result_image_url}}" mode="aspectFill" /><view><text>{{item.style_name}}</text><text>{{item.preview_label}}</text></view></view></view></scroll-view>
   </view>
 </view>
-<bottom-nav wx:if="{{asTab}}" active="plans" />

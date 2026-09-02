@@ -90,7 +90,10 @@ Page({
     }
     this.setData({ creating: true })
     api.createScenePlans(reportID, brief)
-      .then(() => wx.navigateTo({ url: `/pages/plans/index?reportId=${reportID}&scene=${this.data.scene.id}` }))
+      .then(() => {
+        wx.setStorageSync('jianwo_plans_scene', this.data.scene.id)
+        wx.switchTab({ url: '/pages/plans/index' })
+      })
       .catch((error) => wx.showToast({ title: error.message || '方案生成失败，请重试', icon: 'none' }))
       .finally(() => this.setData({ creating: false }))
   }

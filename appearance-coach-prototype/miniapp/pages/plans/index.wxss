@@ -1,4 +1,4 @@
-.plans-page { padding-left: 0; padding-right: 0; padding-bottom: calc(env(safe-area-inset-bottom) + 50rpx); }
+.plans-page { padding-left: 0; padding-right: 0; padding-bottom: calc(env(safe-area-inset-bottom) + 90rpx); }
 .intro { padding: 0 40rpx; text-align: center; }.scene-context { display: block; margin-bottom: 12rpx; color: var(--moss); font-size: 22rpx; letter-spacing: 2rpx; }.plans-title { display: block; font-size: 43rpx; line-height: 1.28; font-weight: 700; }.intro .lede { display: block; margin-top: 12rpx; }
 .counter { display: block; margin: 24rpx 0 14rpx; color: var(--moss); text-align: center; font-size: 24rpx; }
 .plan-swiper { height: 584rpx; }

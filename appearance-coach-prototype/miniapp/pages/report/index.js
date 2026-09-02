@@ -69,13 +69,14 @@ Page({
   viewPlans() {
     if (this.data.generating) return
     const go = () => {
-      const scene = this.data.scene ? `&scene=${this.data.scene}` : ''
-      wx.navigateTo({ url: `/pages/plans/index?reportId=${this.data.id}${scene}` })
+      if (this.data.scene) wx.setStorageSync('jianwo_plans_scene', this.data.scene)
+      wx.switchTab({ url: '/pages/plans/index' })
     }
     const active = wx.getStorageSync('jianwo_active_plan_generation')
     if (active && (active.reportId !== this.data.id || (active.scene || '') !== (this.data.scene || ''))) {
       wx.showToast({ title: '已有一组方案正在生成', icon: 'none' })
-      wx.navigateTo({ url: `/pages/plans/index?reportId=${active.reportId}${active.scene ? `&scene=${active.scene}` : ''}` })
+      if (active.scene) wx.setStorageSync('jianwo_plans_scene', active.scene)
+      wx.switchTab({ url: '/pages/plans/index' })
       return
     }
     if (this.data.looksReady || this.data.generating) { go(); return }

@@ -33,5 +33,5 @@ Page({
     this.setData({ loading: true })
     api.addFeedback({ plan_id: this.data.planId, tags: this.data.selected, comment: this.data.comment }).then(() => this.setData({ done: true })).catch((error) => wx.showToast({ title: error.message, icon: 'none' })).finally(() => this.setData({ loading: false }))
   },
-  home() { wx.reLaunch({ url: '/pages/home/index' }) }
+  home() { wx.switchTab({ url: '/pages/home/index' }) }
 })

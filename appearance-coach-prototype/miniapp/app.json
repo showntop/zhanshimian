@@ -24,6 +24,32 @@
     "backgroundColor": "#f8f5f0",
     "backgroundTextStyle": "dark"
   },
+  "tabBar": {
+    "color": "#555a55",
+    "selectedColor": "#587344",
+    "backgroundColor": "#f8f7f3",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "assets/tabbar/home.png",
+        "selectedIconPath": "assets/tabbar/home-active.png"
+      },
+      {
+        "pagePath": "pages/plans/index",
+        "text": "方案",
+        "iconPath": "assets/tabbar/plans.png",
+        "selectedIconPath": "assets/tabbar/plans-active.png"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的",
+        "iconPath": "assets/tabbar/user.png",
+        "selectedIconPath": "assets/tabbar/user-active.png"
+      }
+    ]
+  },
   "sitemapLocation": "sitemap.json",
   "lazyCodeLoading": "requiredComponents"
 }

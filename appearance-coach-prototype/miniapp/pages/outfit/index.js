@@ -56,8 +56,12 @@ Page({
     const continueFlow = () => {
       const reportID = wx.getStorageSync('jianwo_report_id')
       const scene = sceneCodes[this.data.context] || 'daily'
-      if (reportID) wx.navigateTo({ url: `/pages/plans/index?reportId=${reportID}&scene=${scene}` })
-      else wx.navigateTo({ url: `/pages/capture/index?scene=${scene}` })
+      if (reportID) {
+        wx.setStorageSync('jianwo_plans_scene', scene)
+        wx.switchTab({ url: '/pages/plans/index' })
+      } else {
+        wx.navigateTo({ url: `/pages/capture/index?scene=${scene}` })
+      }
     }
     if (!this.data.result || !this.data.result.id) {
       continueFlow()

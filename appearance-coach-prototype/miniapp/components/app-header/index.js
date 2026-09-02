@@ -11,9 +11,9 @@ Component({
   methods: {
     goBack() {
       if (getCurrentPages().length > 1) wx.navigateBack()
-      else wx.reLaunch({ url: '/pages/home/index' })
+      else wx.switchTab({ url: '/pages/home/index' })
     },
-    openProfile() { wx.navigateTo({ url: '/pages/profile/index' }) },
+    openProfile() { wx.switchTab({ url: '/pages/profile/index' }) },
     emitHelp() { this.triggerEvent('help') },
     emitBookmark() { this.triggerEvent('bookmark') }
   }

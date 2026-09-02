@@ -115,7 +115,8 @@ Page({
       wx.navigateTo({ url: `/pages/analysis/index?id=${task.id}&scene=general` }); return
     }
     if (task.kind === 'plans') {
-      wx.navigateTo({ url: `/pages/plans/index?reportId=${task.reportId}${task.scene ? `&scene=${task.scene}` : ''}` }); return
+      if (task.scene) wx.setStorageSync('jianwo_plans_scene', task.scene)
+      wx.switchTab({ url: '/pages/plans/index' }); return
     }
     if (task.kind === 'hair') wx.navigateTo({ url: '/pages/hair/index' })
   },
@@ -139,7 +140,7 @@ Page({
     if (this.data.reportID) wx.navigateTo({ url: `/pages/report/index?id=${this.data.reportID}` })
   },
   openExample() {
-    if (this.data.reportID) wx.navigateTo({ url: `/pages/plans/index?reportId=${this.data.reportID}` })
+    if (this.data.reportID) wx.switchTab({ url: '/pages/plans/index' })
     else wx.navigateTo({ url: '/pages/capture/index?scene=general&demo=1' })
   },
   openLab() { wx.navigateTo({ url: '/pages/lab/index' }) },
