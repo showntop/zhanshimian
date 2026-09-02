@@ -4,13 +4,32 @@ const { userImage } = require('../../utils/media')
 Page({
   data: { hasReport: false, hasPlan: false, deleting: false, profileImage: '' },
   onShow() {
-    const reportID = wx.getStorageSync('jianwo_report_id') || ''
     const savedPlanID = wx.getStorageSync('jianwo_saved_plan_id') || wx.getStorageSync('jianwo_plan_id') || ''
+    const reportID = wx.getStorageSync('jianwo_report_id') || ''
     this.setData({ hasReport: Boolean(reportID), hasPlan: Boolean(savedPlanID) })
-    if (!reportID) { this.setData({ profileImage: '' }); return }
+    if (!reportID) {
+      this.setData({ profileImage: '' })
+      // A reinstalled mini-program wipes local cache but the report still
+      // lives on the server; recover the latest one once per session.
+      if (this.reportRecovered) return
+      this.reportRecovered = true
+      api.getCurrentReport()
+        .then((report) => {
+          wx.setStorageSync('jianwo_report_id', report.id)
+          this.setData({ hasReport: true })
+          this.loadProfileImage()
+        })
+        .catch(() => {})
+      return
+    }
     // Keep the previously loaded avatar instead of clearing it on every show,
     // so switching back to this tab doesn't flash placeholder -> photo.
     if (this.data.profileImage) return
+    this.loadProfileImage()
+  },
+  loadProfileImage() {
+    const reportID = wx.getStorageSync('jianwo_report_id') || ''
+    if (!reportID) return
     api.getReport(reportID)
       .then((report) => api.getAnalysis(report.analysis_id))
       .then((analysis) => {

@@ -157,6 +157,7 @@ module.exports = {
   createAnalysis: (data) => request('/v1/analyses', { method: 'POST', data }),
   getAnalysis: (id) => request(`/v1/analyses/${id}`),
   getReport: (id) => request(`/v1/reports/${id}`),
+  getCurrentReport: () => ensureSession().then(() => request('/v1/reports/current')),
   getPlans: (id, scene = '') => request(`/v1/reports/${id}/plans${scene ? `?scene=${encodeURIComponent(scene)}` : ''}`),
   generatePlanLooks: (id, scene = '', refresh = false) => {
     const query = []

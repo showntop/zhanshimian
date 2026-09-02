@@ -52,6 +52,7 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("POST /v1/media/demo", api.auth(http.HandlerFunc(api.createDemoMedia)))
 	mux.Handle("POST /v1/analyses", api.auth(http.HandlerFunc(api.createAnalysis)))
 	mux.Handle("GET /v1/analyses/{id}", api.auth(http.HandlerFunc(api.getAnalysis)))
+	mux.Handle("GET /v1/reports/current", api.auth(http.HandlerFunc(api.getCurrentReport)))
 	mux.Handle("GET /v1/reports/{id}", api.auth(http.HandlerFunc(api.getReport)))
 	mux.Handle("GET /v1/reports/{id}/plans", api.auth(http.HandlerFunc(api.listPlans)))
 	mux.Handle("POST /v1/reports/{id}/plan-looks", api.auth(http.HandlerFunc(api.generatePlanLooks)))
@@ -247,6 +248,14 @@ func (a *API) getAnalysis(w http.ResponseWriter, r *http.Request) {
 }
 func (a *API) getReport(w http.ResponseWriter, r *http.Request) {
 	item, err := a.service.GetReport(r.Context(), currentUser(r).ID, r.PathValue("id"))
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, item)
+}
+func (a *API) getCurrentReport(w http.ResponseWriter, r *http.Request) {
+	item, err := a.service.GetCurrentReport(r.Context(), currentUser(r).ID)
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return

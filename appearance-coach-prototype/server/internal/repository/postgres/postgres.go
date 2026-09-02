@@ -353,6 +353,15 @@ func (s *Store) GetReport(ctx context.Context, userID, reportID string) (domain.
 	return report, rows.Err()
 }
 
+func (s *Store) LatestReport(ctx context.Context, userID string) (domain.Report, error) {
+	var reportID string
+	err := s.pool.QueryRow(ctx, `SELECT id::text FROM reports WHERE user_id=$1 ORDER BY generated_at DESC LIMIT 1`, userID).Scan(&reportID)
+	if err != nil {
+		return domain.Report{}, mapNotFound(err)
+	}
+	return s.GetReport(ctx, userID, reportID)
+}
+
 func scanPlan(row pgx.Row) (domain.Plan, error) {
 	var item domain.Plan
 	err := row.Scan(&item.ID, &item.ReportID, &item.Scene, &item.Name, &item.Slug, &item.ImageURL, &item.Recommended, &item.Descriptor, &item.Why, &item.OutcomeTags, &item.DifferenceTags, &item.Sort, &item.Selected, &item.CurrentImageURL, &item.GeneratedImageURL, &item.GenerationStatus, &item.GenerationError, &item.LookProvider)

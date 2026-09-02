@@ -37,6 +37,9 @@ type Repository interface {
 	// FailAnalysis it never requeues.
 	RejectAnalysis(context.Context, domain.AnalysisJob, string) error
 	GetReport(context.Context, string, string) (domain.Report, error)
+	// LatestReport returns the user's most recent report, so clients whose
+	// local cache was wiped (e.g. reinstalled mini-program) can recover it.
+	LatestReport(context.Context, string) (domain.Report, error)
 	ListPlans(context.Context, string, string, string) ([]domain.Plan, error)
 	CreateScenePlans(context.Context, string, string, domain.ScenePlanInput, []domain.Plan) ([]domain.Plan, error)
 	GetPlan(context.Context, string, string) (domain.Plan, error)

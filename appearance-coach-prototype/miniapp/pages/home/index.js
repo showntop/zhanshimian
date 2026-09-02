@@ -36,6 +36,18 @@ Page({
   onShow() {
     api.trackEvent('page_view', { page: 'home' }).catch(() => {})
     const reportID = wx.getStorageSync('jianwo_report_id') || ''
+    if (!reportID && !this.reportRecovered) {
+      // A reinstalled mini-program wipes local cache but the report still
+      // lives on the server; recover the latest one once per session.
+      this.reportRecovered = true
+      api.getCurrentReport()
+        .then((report) => {
+          wx.setStorageSync('jianwo_report_id', report.id)
+          this.onShow()
+        })
+        .catch(() => {})
+      return
+    }
     const hadProfile = this.data.hasProfile
     const hasProfile = Boolean(reportID)
     // Avoid wiping image URLs while refreshing so the screen doesn't flash

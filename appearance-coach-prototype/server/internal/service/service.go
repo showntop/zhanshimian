@@ -299,6 +299,17 @@ func (s *Service) GetReport(ctx context.Context, userID, id string) (domain.Repo
 	}
 	return report, err
 }
+
+// GetCurrentReport returns the user's most recent report. Clients key their
+// local cache by report ID, so a wiped cache (reinstalled mini-program) needs
+// this to rediscover the profile that still lives on the server.
+func (s *Service) GetCurrentReport(ctx context.Context, userID string) (domain.Report, error) {
+	report, err := s.repo.LatestReport(ctx, userID)
+	if err == nil {
+		report.CurrentImageURL = s.resolveAssetURL(report.CurrentImageURL)
+	}
+	return report, err
+}
 func (s *Service) ListPlans(ctx context.Context, userID, reportID, scene string) ([]domain.Plan, error) {
 	plans, err := s.repo.ListPlans(ctx, userID, reportID, scene)
 	for i := range plans {
