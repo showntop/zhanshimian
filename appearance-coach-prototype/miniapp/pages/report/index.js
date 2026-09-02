@@ -67,6 +67,7 @@ Page({
     }).catch(() => {})
   },
   viewPlans() {
+    if (this.data.generating) return
     const go = () => {
       const scene = this.data.scene ? `&scene=${this.data.scene}` : ''
       wx.navigateTo({ url: `/pages/plans/index?reportId=${this.data.id}${scene}` })

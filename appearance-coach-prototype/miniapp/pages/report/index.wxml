@@ -36,6 +36,6 @@
         <image src="{{item.icon}}" /><text class="suggestion-type">{{item.type}}</text><text class="suggestion-copy">{{item.title}}，{{item.summary}}</text><text class="chevron">〉</text>
       </view>
     </view>
-    <view class="report-action"><primary-button text="{{ctaText}}" bind:tap="viewPlans" /><button class="reanalyze-action" bindtap="reanalyze">重新上传 3 张照片并更新分析</button></view>
+    <view class="report-action"><primary-button text="{{ctaText}}" loading="{{generating}}" disabled="{{generating}}" bind:tap="viewPlans" /><button class="reanalyze-action" bindtap="reanalyze">重新上传 3 张照片并更新分析</button></view>
   </block>
 </view>
