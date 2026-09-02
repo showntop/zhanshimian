@@ -5,7 +5,9 @@ Page({
   data: { id: '', plan: null, items: [], completed: 0, loading: true },
   onLoad(options) { this.setData({ id: options.id || wx.getStorageSync('jianwo_plan_id') }); this.load() },
   load() {
-    Promise.all([api.getPlan(this.data.id), api.getChecklist(this.data.id)]).then(([plan, items]) => {
+    Promise.all([api.getPlan(this.data.id), api.getChecklist(this.data.id)]).then((results) => {
+      const plan = results[0]
+      const items = results[1]
       plan.image_url = lookImage(plan.image_url, plan.slug)
       this.setData({ plan, items, completed: items.filter((item) => item.completed).length, loading: false })
     }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false }) })

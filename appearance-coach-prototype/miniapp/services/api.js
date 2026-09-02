@@ -5,23 +5,36 @@ function appData() {
   return app.globalData
 }
 
-// WeChat 3.17+ refuses to render http:// URLs in <image>, which breaks user
-// photos served by the local dev API (http://localhost:58000/...). Download
-// such images once and swap in the temp file path; https URLs (trial/release)
-// are returned untouched, so production behavior never hits downloadFile.
+// WeChat 3.17+ refuses to render any http:// URL in <image>. API requests to
+// the local development server still work, so fetch image bytes with
+// wx.request, persist them inside USER_DATA_PATH, and render that local file.
+// Production HTTPS URLs bypass this path completely.
 const IMAGE_URL_PATTERN = /^http:\/\/\S+\.(png|jpe?g|webp)(\?\S*)?$/i
 const imageDownloads = new Map()
 
 function downloadImage(url) {
   if (!imageDownloads.has(url)) {
     imageDownloads.set(url, new Promise((resolve) => {
-      wx.downloadFile({
-        url,
-        success(response) {
-          const ok = response.statusCode >= 200 && response.statusCode < 300 && response.tempFilePath
-          resolve(ok ? response.tempFilePath : '')
-        },
-        fail() { resolve('') }
+      const extension = (url.match(/\.(png|jpe?g|webp)(?:\?|$)/i) || [])[1] || 'jpg'
+      let hash = 5381
+      for (let index = 0; index < url.length; index += 1) hash = ((hash << 5) + hash) ^ url.charCodeAt(index)
+      const filePath = `${wx.env.USER_DATA_PATH}/jianwo-${Math.abs(hash >>> 0)}.${extension}`
+      const fileSystem = wx.getFileSystemManager()
+      fileSystem.access({
+        path: filePath,
+        success() { resolve(filePath) },
+        fail() {
+          wx.request({
+            url,
+            responseType: 'arraybuffer',
+            timeout: 15000,
+            success(response) {
+              if (response.statusCode < 200 || response.statusCode >= 300 || !response.data) { resolve(''); return }
+              fileSystem.writeFile({ filePath, data: response.data, success: () => resolve(filePath), fail: () => resolve('') })
+            },
+            fail() { resolve('') }
+          })
+        }
       })
     }))
   }
@@ -46,10 +59,14 @@ function swapImageURLs(value, resolved) {
 }
 
 function localizeDevImages(data) {
-  const urls = [...collectImageURLs(data)]
+  const urls = Array.from(collectImageURLs(data))
   if (!urls.length) return Promise.resolve(data)
-  return Promise.all(urls.map((url) => downloadImage(url).then((local) => [url, local]))).then((entries) => {
-    const resolved = new Map(entries.filter(([, local]) => Boolean(local)))
+  return Promise.all(urls.map((url) => downloadImage(url).then((local) => ({ url, local })))).then((entries) => {
+    // Replace an unreachable old upload with an empty value as well. Page-level
+    // media helpers can then show the bundled reference or an explicit empty
+    // state instead of feeding a broken HTTP URL into <image>.
+    const resolved = new Map()
+    entries.forEach((entry) => resolved.set(entry.url, entry.local))
     return swapImageURLs(data, resolved)
   })
 }
@@ -141,6 +158,12 @@ module.exports = {
   getAnalysis: (id) => request(`/v1/analyses/${id}`),
   getReport: (id) => request(`/v1/reports/${id}`),
   getPlans: (id, scene = '') => request(`/v1/reports/${id}/plans${scene ? `?scene=${encodeURIComponent(scene)}` : ''}`),
+  generatePlanLooks: (id, scene = '', refresh = false) => {
+    const query = []
+    if (scene) query.push(`scene=${encodeURIComponent(scene)}`)
+    if (refresh) query.push('refresh=1')
+    return ensureSession().then(() => request(`/v1/reports/${id}/plan-looks${query.length ? `?${query.join('&')}` : ''}`, { method: 'POST' }))
+  },
   createScenePlans: (id, data) => request(`/v1/reports/${id}/scene-plans`, { method: 'POST', data }),
   getPlan: (id) => request(`/v1/plans/${id}`),
   selectPlan: (id) => request(`/v1/plans/${id}/select`, { method: 'POST' }),

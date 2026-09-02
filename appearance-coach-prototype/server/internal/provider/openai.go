@@ -94,6 +94,7 @@ type analysisFinding struct {
 	Label    string  `json:"label"`
 	Category string  `json:"category"`
 	Severity string  `json:"severity"`
+	Detail   string  `json:"detail"`
 	AnchorX  float64 `json:"anchor_x"`
 	AnchorY  float64 `json:"anchor_y"`
 }
@@ -199,7 +200,7 @@ func analysisPrompt(input domain.CreateAnalysisInput) string {
 场景：%s；职业：%s；身高：%d cm；预算：%s。
 	只描述能从照片直接观察到的发型重心、眉眼对比、头肩比例、服装轮廓和配色。不要给出颜值或身材评分，不推断敏感属性。
 	输出 3 个当前印象标签、4 个可提升点、一个最优先建议，以及严格 3 套方案。每套方案必须包含 hair、makeup、outfit 三个步骤和可执行细节。顶层必须输出一个 JSON 对象，不要输出数组、Markdown 或额外解释。
-	每个可提升点必须包含 label、category（只能填 hair、makeup、outfit、color 之一）、severity（只能填 low、medium、high）、anchor_x 和 anchor_y（0 到 1 之间的小数，表示在照片上的相对位置，不要用百分比或像素）。3 套方案的 slug 必须分别是 sharp、warm、natural，且恰好一套 recommended 为 true。`, input.Scene, input.Profile.Role, input.Profile.HeightCM, input.Profile.Budget)
+	每个可提升点必须包含 label、category（只能填 hair、makeup、outfit、color 之一）、severity（只能填 low、medium、high）、anchor_x 和 anchor_y（0 到 1 之间的小数，表示在照片上的相对位置，不要用百分比或像素）、detail（一两句话，说明在照片里看到的依据和值得调整的方向，语气温和具体，不超过 60 字）。3 套方案的 slug 必须分别是 sharp、warm、natural，且恰好一套 recommended 为 true。`, input.Scene, input.Profile.Role, input.Profile.HeightCM, input.Profile.Budget)
 }
 
 func photoKindName(kind string) string {
@@ -234,7 +235,7 @@ func (payload analysisPayload) toDomain(images []AnalysisImage, providerVersion 
 	}
 	for _, finding := range payload.Findings {
 		output.Findings = append(output.Findings, domain.Finding{
-			Label: finding.Label, Category: finding.Category, Severity: finding.Severity,
+			Label: finding.Label, Category: finding.Category, Severity: finding.Severity, Detail: finding.Detail,
 			AnchorX: finding.AnchorX, AnchorY: finding.AnchorY,
 		})
 	}
@@ -278,8 +279,8 @@ func validateAnalysisPayload(payload analysisPayload) error {
 	allowedCategories := map[string]bool{"hair": true, "makeup": true, "outfit": true, "color": true}
 	allowedSeverity := map[string]bool{"low": true, "medium": true, "high": true}
 	for index, finding := range payload.Findings {
-		if !safeText(finding.Label) || !allowedCategories[finding.Category] || !allowedSeverity[finding.Severity] || finding.AnchorX < 0 || finding.AnchorX > 1 || finding.AnchorY < 0 || finding.AnchorY > 1 {
-			return fmt.Errorf("provider output contains invalid finding %d: category=%q severity=%q anchor=(%.2f,%.2f) label=%q", index+1, finding.Category, finding.Severity, finding.AnchorX, finding.AnchorY, preview(finding.Label))
+		if !safeText(finding.Label) || !allowedCategories[finding.Category] || !allowedSeverity[finding.Severity] || !safeText(finding.Detail) || finding.AnchorX < 0 || finding.AnchorX > 1 || finding.AnchorY < 0 || finding.AnchorY > 1 {
+			return fmt.Errorf("provider output contains invalid finding %d: category=%q severity=%q anchor=(%.2f,%.2f) label=%q detail=%q", index+1, finding.Category, finding.Severity, finding.AnchorX, finding.AnchorY, preview(finding.Label), preview(finding.Detail))
 		}
 	}
 	allowedSlugs := map[string]bool{"sharp": true, "warm": true, "natural": true}
@@ -351,9 +352,10 @@ func analysisSchema() map[string]any {
 		"label":    stringSchema,
 		"category": map[string]any{"type": "string", "enum": []string{"hair", "makeup", "outfit", "color"}},
 		"severity": map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}},
+		"detail":   stringSchema,
 		"anchor_x": map[string]any{"type": "number", "minimum": 0, "maximum": 1},
 		"anchor_y": map[string]any{"type": "number", "minimum": 0, "maximum": 1},
-	}, "label", "category", "severity", "anchor_x", "anchor_y")
+	}, "label", "category", "severity", "detail", "anchor_x", "anchor_y")
 	return objectSchema(map[string]any{
 		"impression_tags": stringArray3,
 		"priority_title":  stringSchema,

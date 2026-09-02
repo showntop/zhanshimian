@@ -40,6 +40,10 @@ type Repository interface {
 	ListPlans(context.Context, string, string, string) ([]domain.Plan, error)
 	CreateScenePlans(context.Context, string, string, domain.ScenePlanInput, []domain.Plan) ([]domain.Plan, error)
 	GetPlan(context.Context, string, string) (domain.Plan, error)
+	QueuePlanLooks(context.Context, string, string, string, bool) error
+	ClaimPlanLook(context.Context) (domain.PlanLookJob, bool, error)
+	CompletePlanLook(context.Context, domain.PlanLookJob, string, string, string) error
+	FailPlanLook(context.Context, domain.PlanLookJob, error) error
 	SelectPlan(context.Context, string, string) error
 	GetChecklist(context.Context, string, string) ([]domain.ChecklistItem, error)
 	SetChecklistItem(context.Context, string, string, bool) (domain.ChecklistItem, error)

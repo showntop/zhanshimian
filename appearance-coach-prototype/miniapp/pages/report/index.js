@@ -1,8 +1,12 @@
 const api = require('../../services/api')
 const { userImage } = require('../../utils/media')
 
+const CATEGORY_LABEL = { hair: '发型', makeup: '妆容', outfit: '穿搭', color: '色彩' }
+const SEVERITY_LABEL = { low: '轻微', medium: '适中', high: '明显' }
+const CATEGORY_ICON = { hair: '/assets/icons/sparkles.svg', makeup: '/assets/icons/user.svg', outfit: '/assets/icons/briefcase.svg' }
+
 Page({
-  data: { id: '', scene: '', loading: true, report: null, annotations: [], image: '' },
+  data: { id: '', scene: '', loading: true, report: null, annotations: [], image: '', findingItems: [], suggestions: [], looksReady: false, ctaText: '生成 3 套本人方案', generating: false },
   onLoad(options) {
     const id = options.id || getApp().globalData.reportID || wx.getStorageSync('jianwo_report_id')
     this.setData({ id, scene: options.scene || '' })
@@ -13,14 +17,61 @@ Page({
     api.getReport(this.data.id).then((report) => {
       wx.setStorageSync('jianwo_report_id', this.data.id)
       const findings = report.findings || []
-      this.setData({ report: { ...report, findings }, annotations: findings.slice(0, 2), image: userImage(report.current_image_url), loading: false })
+      this.setData({
+        report: { ...report, findings },
+        annotations: findings.slice(0, 2),
+        findingItems: findings.map((item, index) => ({
+          ...item,
+          index: index + 1,
+          categoryLabel: CATEGORY_LABEL[item.category] || '形象',
+          severityLabel: SEVERITY_LABEL[item.severity] || ''
+        })),
+        image: userImage(report.current_image_url),
+        loading: false
+      })
+      this.loadSuggestions()
     }).catch((error) => {
       wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false })
     })
   },
-  viewPlans() {
-    const scene = this.data.scene ? `&scene=${this.data.scene}` : ''
-    wx.navigateTo({ url: `/pages/plans/index?reportId=${this.data.id}${scene}` })
+  loadSuggestions() {
+    api.getPlans(this.data.id, this.data.scene).then((plans) => {
+      const list = plans || []
+      const looksReady = list.length > 0 && list.every((item) => item.generation_status === 'completed')
+      this.setData({ looksReady, ctaText: looksReady ? '查看 3 套本人方案' : '生成 3 套本人方案' })
+      const plan = list.find((item) => item.recommended) || list[0]
+      if (!plan) return
+      return api.getPlan(plan.id)
+    }).then((detail) => {
+      if (!detail) return
+      const suggestions = (detail.steps || []).map((step) => ({
+        category: step.category,
+        icon: CATEGORY_ICON[step.category] || CATEGORY_ICON.hair,
+        type: CATEGORY_LABEL[step.category] || '建议',
+        title: step.title,
+        summary: step.summary
+      }))
+      this.setData({ suggestions })
+    }).catch(() => {})
   },
+  viewPlans() {
+    const go = () => {
+      const scene = this.data.scene ? `&scene=${this.data.scene}` : ''
+      wx.navigateTo({ url: `/pages/plans/index?reportId=${this.data.id}${scene}` })
+    }
+    const active = wx.getStorageSync('jianwo_active_plan_generation')
+    if (active && (active.reportId !== this.data.id || (active.scene || '') !== (this.data.scene || ''))) {
+      wx.showToast({ title: '已有一组方案正在生成', icon: 'none' })
+      wx.navigateTo({ url: `/pages/plans/index?reportId=${active.reportId}${active.scene ? `&scene=${active.scene}` : ''}` })
+      return
+    }
+    if (this.data.looksReady || this.data.generating) { go(); return }
+    this.setData({ generating: true, ctaText: '正在加入生成队列…' })
+    wx.setStorageSync('jianwo_active_plan_generation', { reportId: this.data.id, scene: this.data.scene })
+    api.generatePlanLooks(this.data.id, this.data.scene)
+      .catch((error) => wx.showToast({ title: error.message || '生成暂时不可用', icon: 'none' }))
+      .finally(() => { this.setData({ generating: false, ctaText: '生成 3 套本人方案' }); go() })
+  },
+  reanalyze() { wx.navigateTo({ url: '/pages/capture/index?scene=general&replace=1' }) },
   onShareAppMessage() { return { title: '我的形象分析报告｜怎么打扮', path: '/pages/home/index' } }
 })

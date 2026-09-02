@@ -3,8 +3,7 @@
   <view wx:if="{{loading}}" class="loading-view"><view class="skeleton skeleton-title" /><view class="skeleton skeleton-photo" /></view>
   <block wx:else-if="{{report}}">
     <view class="status fade-up"><icon type="success" size="18" color="#587344" /><text>分析完成 · 已保存至形象档案</text></view>
-    <text class="report-title serif fade-up">你的形象特点，
-已经看清楚了</text>
+    <text class="report-title serif fade-up">你的形象特点，已经看清楚了</text>
     <view class="current-card fade-up delay-1">
       <image wx:if="{{image}}" src="{{image}}" mode="aspectFill" />
       <view wx:else class="image-unavailable"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>当前照片加载中</text></view>
@@ -19,12 +18,24 @@
       <view class="priority-star"><image src="/assets/icons/sparkles.svg" /></view>
       <view class="priority-content"><text class="priority-label">最值得先改的一处</text><text class="priority-title serif">{{report.priority_title}}</text><text class="priority-copy">{{report.priority_copy}}</text></view>
     </view>
-    <view class="suggestions fade-up delay-3">
-      <text class="section-title">给你的 3 个建议</text>
-      <view class="suggestion-row"><image src="/assets/icons/sparkles.svg" /><text class="suggestion-type">发型</text><text>增加颅顶蓬松度，露出下颌线</text><text class="chevron">〉</text></view>
-      <view class="suggestion-row"><image src="/assets/icons/user.svg" /><text class="suggestion-type">妆容</text><text>强化眉形与眼部对比</text><text class="chevron">〉</text></view>
-      <view class="suggestion-row"><image src="/assets/icons/briefcase.svg" /><text class="suggestion-type">穿搭</text><text>选择清晰肩线和更明亮的上身配色</text><text class="chevron">〉</text></view>
+    <view wx:if="{{findingItems.length}}" class="details fade-up delay-2">
+      <text class="section-title">细致解读</text>
+      <view wx:for="{{findingItems}}" wx:key="id" class="detail-row">
+        <view class="detail-head">
+          <text class="detail-number">{{item.index}}</text>
+          <text class="detail-label">{{item.label}}</text>
+          <text class="detail-chip">{{item.categoryLabel}}</text>
+          <text wx:if="{{item.severityLabel}}" class="detail-severity severity-{{item.severity}}">{{item.severityLabel}}</text>
+        </view>
+        <text wx:if="{{item.detail}}" class="detail-copy">{{item.detail}}</text>
+      </view>
     </view>
-    <view class="report-action"><primary-button text="查看 3 套本人方案" bind:tap="viewPlans" /></view>
+    <view wx:if="{{suggestions.length}}" class="suggestions fade-up delay-3">
+      <text class="section-title">给你的 3 个建议</text>
+      <view wx:for="{{suggestions}}" wx:key="category" class="suggestion-row" bindtap="viewPlans">
+        <image src="{{item.icon}}" /><text class="suggestion-type">{{item.type}}</text><text class="suggestion-copy">{{item.title}}，{{item.summary}}</text><text class="chevron">〉</text>
+      </view>
+    </view>
+    <view class="report-action"><primary-button text="{{ctaText}}" bind:tap="viewPlans" /><button class="reanalyze-action" bindtap="reanalyze">重新上传 3 张照片并更新分析</button></view>
   </block>
 </view>

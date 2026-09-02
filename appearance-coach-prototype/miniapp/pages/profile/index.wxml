@@ -28,6 +28,11 @@
       <view><text class="archive-title">已保存的方案</text><text>{{hasPlan ? '继续查看或打开执行清单' : '尚未保存方案'}}</text></view>
       <image class="row-chevron" src="/assets/icons/arrow-left.svg" />
     </button>
+    <button class="archive-row {{!hasReport ? 'disabled' : ''}}" bindtap="reanalyze" disabled="{{!hasReport}}">
+      <image class="row-icon" src="/assets/icons/user.svg" />
+      <view><text class="archive-title">重新拍摄并更新分析</text><text>{{hasReport ? '重新上传正脸、侧脸和全身照' : '建立档案后可重新分析'}}</text></view>
+      <image class="row-chevron" src="/assets/icons/arrow-left.svg" />
+    </button>
   </view>
 
   <view class="section-head fade-up delay-2"><text class="section-title">个人资料</text><text>让推荐更贴合你</text></view>

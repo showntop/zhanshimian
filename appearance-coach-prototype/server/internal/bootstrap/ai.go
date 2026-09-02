@@ -15,6 +15,7 @@ import (
 type AIBundle struct {
 	Analyzer provider.Analyzer
 	Hair     provider.HairPreviewGenerator
+	Look     provider.LookGenerator
 	Outfit   provider.OutfitAdvisor
 	Purchase provider.OutfitAdvisor
 	Advisor  provider.AdvisorChat
@@ -70,6 +71,13 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 		return AIBundle{}, err
 	}
 	bundle := AIBundle{Analyzer: analyzer, Hair: hair, Outfit: outfit, Routes: runtime.RouteSummary()}
+	if runtime.HasRoute(provider.CapabilityFullLookEdit) {
+		look, err := provider.NewRoutedLookGenerator(runtime, loader)
+		if err != nil {
+			return AIBundle{}, err
+		}
+		bundle.Look = look
+	}
 	if runtime.HasRoute(provider.CapabilityPurchaseDiagnosis) {
 		bundle.Purchase, err = provider.NewRoutedPurchaseAdvisor(runtime, loader)
 		if err != nil {
@@ -123,9 +131,10 @@ func buildLegacyAI(cfg config.Config, repo *postgres.Store, objects storage.Obje
 			outfit = provider.NewFallbackOutfitAdvisor(real, demoOutfit)
 		}
 	}
-	return AIBundle{Analyzer: analyzer, Hair: hair, Outfit: outfit, Routes: map[string]string{
+	return AIBundle{Analyzer: analyzer, Hair: hair, Look: provider.NewDemoLookGenerator(loader), Outfit: outfit, Routes: map[string]string{
 		provider.CapabilityAppearanceAnalysis: cfg.AIProvider + "/" + cfg.OpenAIVisionModel,
 		provider.CapabilityHairEdit:           cfg.HairPreviewProvider + "/" + cfg.OpenAIImageModel,
+		provider.CapabilityFullLookEdit:       "demo/free-pass-through",
 		provider.CapabilityOutfitDiagnosis:    cfg.OutfitDiagnosisProvider + "/" + cfg.OpenAIOutfitModel,
 	}}, nil
 }

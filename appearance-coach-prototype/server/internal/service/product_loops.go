@@ -61,9 +61,9 @@ func (s *Service) GenerateTodayPlan(ctx context.Context, userID string, input do
 	styles := []struct {
 		title, summary, image, hair, makeup, outfit string
 	}{
-		{"轻薄利落，清爽不单薄", "保持自然亲和，用清晰肩线和明亮内搭提升精神感。", "/assets/plans/sharp.webp", "轻盈侧分 · 发根蓬松", "轻透底妆 · 眉眼更清晰", "米白外套 · 明亮内搭 · 垂感长裤"},
-		{"柔和明亮，今天更有气色", "减少沉重配色，用柔和弧度与一处明亮颜色保持亲近感。", "/assets/plans/warm.webp", "空气微卷 · 发尾有弧度", "提亮眼下 · 柔和唇色", "浅色针织 · 高腰下装 · 小体积包"},
-		{"舒服自然，也保持完整", "以现有衣橱为主，只整理比例、发根与鞋包三个重点。", "/assets/plans/natural.webp", "自然偏分 · 整理耳侧", "均匀肤色 · 保留原生感", "舒展上装 · 清楚腰线 · 轻便鞋履"},
+		{"轻薄利落，清爽不单薄", "保持自然亲和，用清晰肩线和明亮内搭提升精神感。", "/assets/plans/sharp.jpg", "轻盈侧分 · 发根蓬松", "轻透底妆 · 眉眼更清晰", "米白外套 · 明亮内搭 · 垂感长裤"},
+		{"柔和明亮，今天更有气色", "减少沉重配色，用柔和弧度与一处明亮颜色保持亲近感。", "/assets/plans/warm.jpg", "空气微卷 · 发尾有弧度", "提亮眼下 · 柔和唇色", "浅色针织 · 高腰下装 · 小体积包"},
+		{"舒服自然，也保持完整", "以现有衣橱为主，只整理比例、发根与鞋包三个重点。", "/assets/plans/natural.jpg", "自然偏分 · 整理耳侧", "均匀肤色 · 保留原生感", "舒展上装 · 清楚腰线 · 轻便鞋履"},
 	}
 	style := styles[variant]
 	plan := domain.TodayPlan{
@@ -118,7 +118,11 @@ func (s *Service) CreateShareCard(ctx context.Context, userID string, input doma
 		if err != nil {
 			return domain.ShareCard{}, err
 		}
-		snapshot = map[string]any{"title": item.Name, "summary": item.Descriptor, "image_url": item.ImageURL, "tags": item.OutcomeTags, "label": "我的形象方案"}
+		imageURL := item.GeneratedImageURL
+		if imageURL == "" {
+			imageURL = item.ImageURL
+		}
+		snapshot = map[string]any{"title": item.Name, "summary": item.Descriptor, "image_url": s.absoluteURL(imageURL), "tags": item.OutcomeTags, "label": "我的形象方案"}
 	default:
 		return domain.ShareCard{}, fmt.Errorf("%w: 不支持的分享来源", ErrValidation)
 	}

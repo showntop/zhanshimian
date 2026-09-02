@@ -29,6 +29,7 @@ type Service struct {
 	storage         storage.ObjectStorage
 	analyzer        provider.Analyzer
 	hairGenerator   provider.HairPreviewGenerator
+	lookGenerator   provider.LookGenerator
 	outfitAdvisor   provider.OutfitAdvisor
 	purchaseAdvisor provider.OutfitAdvisor
 	advisorChat     provider.AdvisorChat
@@ -43,6 +44,7 @@ type Service struct {
 
 type ProviderOptions struct {
 	Hair        provider.HairPreviewGenerator
+	Look        provider.LookGenerator
 	Outfit      provider.OutfitAdvisor
 	Purchase    provider.OutfitAdvisor
 	Advisor     provider.AdvisorChat
@@ -58,6 +60,7 @@ func New(repo repository.Repository, storage storage.ObjectStorage, analyzer pro
 	var advisorChat provider.AdvisorChat
 	weather := provider.WeatherProvider(provider.NewDemoWeatherProvider())
 	var wechat provider.WeChatAuthenticator
+	var lookGenerator provider.LookGenerator
 	assetURLTTL := 15 * time.Minute
 	if len(options) > 0 {
 		if options[0].Hair != nil {
@@ -72,11 +75,12 @@ func New(repo repository.Repository, storage storage.ObjectStorage, analyzer pro
 			weather = options[0].Weather
 		}
 		wechat = options[0].WeChat
+		lookGenerator = options[0].Look
 		if options[0].AssetURLTTL > 0 {
 			assetURLTTL = options[0].AssetURLTTL
 		}
 	}
-	return &Service{repo: repo, storage: storage, analyzer: analyzer, hairGenerator: hairGenerator, outfitAdvisor: outfitAdvisor, purchaseAdvisor: purchaseAdvisor, advisorChat: advisorChat, weather: weather, wechat: wechat, publicBaseURL: strings.TrimSuffix(publicBaseURL, "/"), assetURLTTL: assetURLTTL, sessionTTL: sessionTTL, maxUpload: maxUpload, logger: logger}
+	return &Service{repo: repo, storage: storage, analyzer: analyzer, hairGenerator: hairGenerator, lookGenerator: lookGenerator, outfitAdvisor: outfitAdvisor, purchaseAdvisor: purchaseAdvisor, advisorChat: advisorChat, weather: weather, wechat: wechat, publicBaseURL: strings.TrimSuffix(publicBaseURL, "/"), assetURLTTL: assetURLTTL, sessionTTL: sessionTTL, maxUpload: maxUpload, logger: logger}
 }
 
 func (s *Service) DevLogin(ctx context.Context, nickname string) (domain.Session, error) {
@@ -271,6 +275,34 @@ func (s *Service) ListPlans(ctx context.Context, userID, reportID, scene string)
 	for i := range plans {
 		plans[i].ImageURL = s.absoluteURL(plans[i].ImageURL)
 		plans[i].CurrentImageURL = s.absoluteURL(plans[i].CurrentImageURL)
+		if plans[i].GeneratedImageURL != "" {
+			plans[i].GeneratedImageURL = s.absoluteURL(plans[i].GeneratedImageURL)
+		}
+	}
+	return plans, err
+}
+
+// GeneratePlanLooks queues full-look image generation for every plan of the
+// report+scene and returns the plans with their current generation state.
+func (s *Service) GeneratePlanLooks(ctx context.Context, userID, reportID, scene string, refresh bool) ([]domain.Plan, error) {
+	if s.lookGenerator == nil {
+		return nil, fmt.Errorf("%w: 当前环境暂未开启本人方案生成", ErrValidation)
+	}
+	if _, err := uuid.Parse(reportID); err != nil {
+		return nil, fmt.Errorf("%w: 无效的形象报告", ErrValidation)
+	}
+	if scene == "" {
+		scene = "general"
+	}
+	if !map[string]bool{"general": true, "daily": true, "interview": true, "wedding": true, "date": true}[scene] {
+		return nil, fmt.Errorf("%w: 不支持的使用场景", ErrValidation)
+	}
+	if err := s.repo.QueuePlanLooks(ctx, userID, reportID, scene, refresh); err != nil {
+		return nil, err
+	}
+	plans, err := s.ListPlans(ctx, userID, reportID, scene)
+	if err == nil && len(plans) == 0 {
+		return nil, repository.ErrNotFound
 	}
 	return plans, err
 }
@@ -279,6 +311,9 @@ func (s *Service) GetPlan(ctx context.Context, userID, planID string) (domain.Pl
 	if err == nil {
 		plan.ImageURL = s.absoluteURL(plan.ImageURL)
 		plan.CurrentImageURL = s.absoluteURL(plan.CurrentImageURL)
+		if plan.GeneratedImageURL != "" {
+			plan.GeneratedImageURL = s.absoluteURL(plan.GeneratedImageURL)
+		}
 	}
 	return plan, err
 }
@@ -513,6 +548,7 @@ func (s *Service) DeleteUserData(ctx context.Context, userID string) error {
 
 func (s *Service) RunWorker(ctx context.Context, poll time.Duration) {
 	go s.runHairPreviewWorker(ctx, poll)
+	go s.runPlanLookWorker(ctx, poll)
 	ticker := time.NewTicker(poll)
 	defer ticker.Stop()
 	s.logger.Info("analysis worker started", "poll", poll)
@@ -552,6 +588,55 @@ func (s *Service) runHairPreviewWorker(ctx context.Context, poll time.Duration) 
 				s.processHairPreview(ctx, job)
 			}
 		}
+	}
+}
+
+func (s *Service) runPlanLookWorker(ctx context.Context, poll time.Duration) {
+	ticker := time.NewTicker(poll)
+	defer ticker.Stop()
+	s.logger.Info("plan look worker started", "poll", poll)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			job, ok, err := s.repo.ClaimPlanLook(ctx)
+			if err != nil {
+				s.logger.Error("claim plan look", "error", err)
+				continue
+			}
+			if ok {
+				s.processPlanLook(ctx, job)
+			}
+		}
+	}
+}
+
+func (s *Service) processPlanLook(ctx context.Context, job domain.PlanLookJob) {
+	if s.lookGenerator == nil {
+		_ = s.repo.FailPlanLook(ctx, job, errors.New("plan look generator is not configured"))
+		return
+	}
+	output, err := s.lookGenerator.Generate(ctx, provider.LookInput{Name: job.Name, Slug: job.Slug, Why: job.Why, Steps: job.Steps, MediaIDs: job.MediaIDs})
+	if err != nil {
+		_ = s.repo.FailPlanLook(ctx, job, err)
+		return
+	}
+	extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
+	if extension == "" {
+		_ = s.repo.FailPlanLook(ctx, job, errors.New("look provider returned an unsupported image format"))
+		return
+	}
+	storageKey := fmt.Sprintf("%s/generated/looks/%s%s", job.UserID, uuid.NewString(), extension)
+	storedKey, saveErr := s.storage.Save(ctx, storageKey, bytes.NewReader(output.ImageData))
+	if saveErr != nil {
+		_ = s.repo.FailPlanLook(ctx, job, saveErr)
+		return
+	}
+	if err := s.repo.CompletePlanLook(ctx, job, "/uploads/"+storedKey, storedKey, output.ProviderVersion); err != nil {
+		_ = s.storage.Delete(ctx, storedKey)
+		s.logger.Error("complete plan look", "plan_id", job.PlanID, "error", err)
+		_ = s.repo.FailPlanLook(ctx, job, err)
 	}
 }
 

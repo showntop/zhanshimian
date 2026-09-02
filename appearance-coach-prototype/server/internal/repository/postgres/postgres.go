@@ -148,6 +148,25 @@ func (s *Store) CreateAnalysis(ctx context.Context, userID string, input domain.
 		return domain.Analysis{}, err
 	}
 	defer tx.Rollback(ctx)
+	// Only one analysis may be active for a user at a time. The advisory lock
+	// closes the small race between two create requests, while returning the
+	// existing job makes retries and returning from a backgrounded client safe.
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "analysis:"+userID); err != nil {
+		return domain.Analysis{}, err
+	}
+	var active domain.Analysis
+	err = tx.QueryRow(ctx, `
+		SELECT id::text,status,progress,stage,media_ids::text[],created_at,updated_at
+		FROM analyses
+		WHERE user_id=$1 AND status IN ('queued','processing')
+		ORDER BY created_at DESC LIMIT 1`, userID).
+		Scan(&active.ID, &active.Status, &active.Progress, &active.Stage, &active.MediaIDs, &active.CreatedAt, &active.UpdatedAt)
+	if err == nil {
+		return active, tx.Commit(ctx)
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return domain.Analysis{}, err
+	}
 	var count int
 	err = tx.QueryRow(ctx, `SELECT count(*) FROM media_assets WHERE user_id=$1 AND id=ANY($2::uuid[]) AND deleted_at IS NULL`, userID, input.MediaIDs).Scan(&count)
 	if err != nil {
@@ -246,7 +265,7 @@ func (s *Store) CompleteAnalysis(ctx context.Context, job domain.AnalysisJob, ou
 		return "", err
 	}
 	for index, finding := range output.Findings {
-		_, err = tx.Exec(ctx, `INSERT INTO report_findings(report_id,label,category,severity,anchor_x,anchor_y,sort_order) VALUES($1,$2,$3,$4,$5,$6,$7)`, reportID, finding.Label, finding.Category, finding.Severity, finding.AnchorX, finding.AnchorY, index+1)
+		_, err = tx.Exec(ctx, `INSERT INTO report_findings(report_id,label,category,severity,detail,anchor_x,anchor_y,sort_order) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, reportID, finding.Label, finding.Category, finding.Severity, finding.Detail, finding.AnchorX, finding.AnchorY, index+1)
 		if err != nil {
 			return "", err
 		}
@@ -319,14 +338,14 @@ func (s *Store) GetReport(ctx context.Context, userID, reportID string) (domain.
 	if err != nil {
 		return report, mapNotFound(err)
 	}
-	rows, err := s.pool.Query(ctx, `SELECT id::text,label,category,severity,anchor_x,anchor_y FROM report_findings WHERE report_id=$1 ORDER BY sort_order`, reportID)
+	rows, err := s.pool.Query(ctx, `SELECT id::text,label,category,severity,detail,anchor_x,anchor_y FROM report_findings WHERE report_id=$1 ORDER BY sort_order`, reportID)
 	if err != nil {
 		return report, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var finding domain.Finding
-		if err := rows.Scan(&finding.ID, &finding.Label, &finding.Category, &finding.Severity, &finding.AnchorX, &finding.AnchorY); err != nil {
+		if err := rows.Scan(&finding.ID, &finding.Label, &finding.Category, &finding.Severity, &finding.Detail, &finding.AnchorX, &finding.AnchorY); err != nil {
 			return report, err
 		}
 		report.Findings = append(report.Findings, finding)
@@ -336,11 +355,11 @@ func (s *Store) GetReport(ctx context.Context, userID, reportID string) (domain.
 
 func scanPlan(row pgx.Row) (domain.Plan, error) {
 	var item domain.Plan
-	err := row.Scan(&item.ID, &item.ReportID, &item.Scene, &item.Name, &item.Slug, &item.ImageURL, &item.Recommended, &item.Descriptor, &item.Why, &item.OutcomeTags, &item.DifferenceTags, &item.Sort, &item.Selected, &item.CurrentImageURL)
+	err := row.Scan(&item.ID, &item.ReportID, &item.Scene, &item.Name, &item.Slug, &item.ImageURL, &item.Recommended, &item.Descriptor, &item.Why, &item.OutcomeTags, &item.DifferenceTags, &item.Sort, &item.Selected, &item.CurrentImageURL, &item.GeneratedImageURL, &item.GenerationStatus, &item.GenerationError, &item.LookProvider)
 	return item, err
 }
 
-const planSelect = `SELECT p.id::text,p.report_id::text,p.scene,p.name,p.slug,p.image_url,p.recommended,p.descriptor,p.why,p.outcome_tags,p.difference_tags,p.sort_order,(p.selected_at IS NOT NULL),r.current_image_url FROM plans p JOIN reports r ON r.id=p.report_id`
+const planSelect = `SELECT p.id::text,p.report_id::text,p.scene,p.name,p.slug,p.image_url,p.recommended,p.descriptor,p.why,p.outcome_tags,p.difference_tags,p.sort_order,(p.selected_at IS NOT NULL),r.current_image_url,p.generated_image_url,p.generation_status,p.generation_error,p.look_provider FROM plans p JOIN reports r ON r.id=p.report_id`
 
 func (s *Store) ListPlans(ctx context.Context, userID, reportID, scene string) ([]domain.Plan, error) {
 	if scene == "" {
@@ -425,6 +444,97 @@ func (s *Store) GetPlan(ctx context.Context, userID, planID string) (domain.Plan
 		item.Steps = append(item.Steps, step)
 	}
 	return item, rows.Err()
+}
+
+// QueuePlanLooks marks every idle or failed plan of one report+scene for
+// full-look image generation. Plans already queued, processing, or completed
+// are left untouched, which makes the operation idempotent.
+func (s *Store) QueuePlanLooks(ctx context.Context, userID, reportID, scene string, refresh bool) error {
+	statuses := []string{"idle", "failed"}
+	if refresh {
+		statuses = append(statuses, "completed")
+	}
+	_, err := s.pool.Exec(ctx, `UPDATE plans SET generation_status='queued',generated_image_url='',generated_storage_key='',generation_error='',generation_next_run_at=now() WHERE report_id=$1 AND user_id=$2 AND scene=$3 AND generation_status=ANY($4)`, reportID, userID, scene, statuses)
+	return err
+}
+
+func (s *Store) ClaimPlanLook(ctx context.Context) (domain.PlanLookJob, bool, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return domain.PlanLookJob{}, false, err
+	}
+	defer tx.Rollback(ctx)
+	var job domain.PlanLookJob
+	err = tx.QueryRow(ctx, `
+		SELECT p.id::text,p.report_id::text,p.user_id::text,p.name,p.slug,p.why,p.generation_attempts,a.media_ids::text[]
+		FROM plans p
+		JOIN reports r ON r.id=p.report_id
+		JOIN analyses a ON a.id=r.analysis_id
+		WHERE p.generation_status='queued' AND p.generation_next_run_at<=now()
+		ORDER BY p.generation_next_run_at,p.id FOR UPDATE OF p SKIP LOCKED LIMIT 1`).
+		Scan(&job.PlanID, &job.ReportID, &job.UserID, &job.Name, &job.Slug, &job.Why, &job.Attempt, &job.MediaIDs)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.PlanLookJob{}, false, nil
+	}
+	if err != nil {
+		return domain.PlanLookJob{}, false, err
+	}
+	rows, err := tx.Query(ctx, `SELECT category,title,summary FROM plan_steps WHERE plan_id=$1 ORDER BY sort_order`, job.PlanID)
+	if err != nil {
+		return domain.PlanLookJob{}, false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var step domain.PlanStep
+		if err := rows.Scan(&step.Category, &step.Title, &step.Summary); err != nil {
+			return domain.PlanLookJob{}, false, err
+		}
+		job.Steps = append(job.Steps, step)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.PlanLookJob{}, false, err
+	}
+	job.Attempt++
+	_, err = tx.Exec(ctx, `UPDATE plans SET generation_status='processing',generation_attempts=$2,generation_locked_at=now() WHERE id=$1`, job.PlanID, job.Attempt)
+	if err != nil {
+		return domain.PlanLookJob{}, false, err
+	}
+	return job, true, tx.Commit(ctx)
+}
+
+func (s *Store) CompletePlanLook(ctx context.Context, job domain.PlanLookJob, resultURL, storageKey, providerVersion string) error {
+	_, err := s.pool.Exec(ctx, `UPDATE plans SET generation_status='completed',generated_image_url=$2,generated_storage_key=$3,look_provider=$4,generation_error='' WHERE id=$1`, job.PlanID, resultURL, storageKey, providerVersion)
+	return err
+}
+
+func (s *Store) FailPlanLook(ctx context.Context, job domain.PlanLookJob, cause error) error {
+	// Authentication, entitlement and response-contract errors will not change
+	// on a second identical request. Mark those jobs failed immediately instead
+	// of repeatedly calling the provider (which used to leave the UI looking
+	// like a still-progressing generation for several polling cycles).
+	if job.Attempt >= 2 || !retryPlanLookError(cause) {
+		_, err := s.pool.Exec(ctx, `UPDATE plans SET generation_status='failed',generation_error=$2 WHERE id=$1`, job.PlanID, cause.Error())
+		return err
+	}
+	_, err := s.pool.Exec(ctx, `UPDATE plans SET generation_status='queued',generation_error=$2,generation_next_run_at=$3 WHERE id=$1`, job.PlanID, cause.Error(), time.Now().Add(time.Duration(job.Attempt*5)*time.Second))
+	return err
+}
+
+func retryPlanLookError(cause error) bool {
+	if cause == nil {
+		return false
+	}
+	message := strings.ToLower(cause.Error())
+	for _, permanent := range []string{
+		" returned status 401", " returned status 403", "accessdenied", "unauthorized",
+		"authentication", "insufficient_quota", "quota", "unpurchased", "api key",
+		"unsupported image format", "unsupported format", "no usable image", "no output",
+	} {
+		if strings.Contains(message, permanent) {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Store) SelectPlan(ctx context.Context, userID, planID string) error {
@@ -569,6 +679,19 @@ func (s *Store) CreateHairPreview(ctx context.Context, userID string, input doma
 		return domain.HairPreview{}, err
 	}
 	defer tx.Rollback(ctx)
+	// A hair preview is a user-level asynchronous capability. Serialize its
+	// creation and return the current active job so repeated taps, page reloads,
+	// or a second device cannot create concurrent previews of the same type.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "hair-preview:"+userID); err != nil {
+		return domain.HairPreview{}, err
+	}
+	existing, existingErr := scanHairPreview(tx.QueryRow(ctx, hairPreviewSelect+` WHERE user_id=$1 AND status IN ('queued','processing') ORDER BY created_at DESC LIMIT 1`, userID))
+	if existingErr == nil {
+		return existing, tx.Commit(ctx)
+	}
+	if !errors.Is(existingErr, pgx.ErrNoRows) {
+		return domain.HairPreview{}, existingErr
+	}
 	var storageKey string
 	if err := tx.QueryRow(ctx, `SELECT storage_key FROM media_assets WHERE id=$1 AND user_id=$2 AND kind='face' AND deleted_at IS NULL`, input.MediaID, userID).Scan(&storageKey); err != nil {
 		return domain.HairPreview{}, mapNotFound(err)
@@ -687,7 +810,7 @@ func (s *Store) DeleteUserData(ctx context.Context, userID string) ([]string, er
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
-	rows, err := tx.Query(ctx, `SELECT storage_key FROM media_assets WHERE user_id=$1 AND deleted_at IS NULL UNION ALL SELECT result_storage_key FROM hair_previews WHERE user_id=$1 AND result_storage_key<>''`, userID)
+	rows, err := tx.Query(ctx, `SELECT storage_key FROM media_assets WHERE user_id=$1 AND deleted_at IS NULL UNION ALL SELECT result_storage_key FROM hair_previews WHERE user_id=$1 AND result_storage_key<>'' UNION ALL SELECT generated_storage_key FROM plans WHERE user_id=$1 AND generated_storage_key<>''`, userID)
 	if err != nil {
 		return nil, err
 	}

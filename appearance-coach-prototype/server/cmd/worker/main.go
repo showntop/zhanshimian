@@ -46,7 +46,7 @@ func main() {
 	}
 	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
 	svc := service.New(repo, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
-		Hair: ai.Hair, Outfit: ai.Outfit, Purchase: ai.Purchase, Advisor: ai.Advisor, AssetURLTTL: cfg.AssetURLTTL,
+		Hair: ai.Hair, Look: ai.Look, Outfit: ai.Outfit, Purchase: ai.Purchase, Advisor: ai.Advisor, AssetURLTTL: cfg.AssetURLTTL,
 	})
 	svc.RunWorker(ctx, cfg.AnalysisPollTime)
 }

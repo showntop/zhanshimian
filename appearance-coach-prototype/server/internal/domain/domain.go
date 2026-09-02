@@ -64,6 +64,7 @@ type Finding struct {
 	Label    string  `json:"label"`
 	Category string  `json:"category"`
 	Severity string  `json:"severity"`
+	Detail   string  `json:"detail"`
 	AnchorX  float64 `json:"anchor_x"`
 	AnchorY  float64 `json:"anchor_y"`
 }
@@ -90,21 +91,25 @@ type PlanStep struct {
 }
 
 type Plan struct {
-	ID              string     `json:"id"`
-	ReportID        string     `json:"report_id"`
-	Scene           string     `json:"scene,omitempty"`
-	Name            string     `json:"name"`
-	Slug            string     `json:"slug"`
-	ImageURL        string     `json:"image_url"`
-	CurrentImageURL string     `json:"current_image_url,omitempty"`
-	Recommended     bool       `json:"recommended"`
-	Descriptor      string     `json:"descriptor"`
-	Why             string     `json:"why"`
-	OutcomeTags     []string   `json:"outcome_tags"`
-	DifferenceTags  []string   `json:"difference_tags"`
-	Sort            int        `json:"sort"`
-	Selected        bool       `json:"selected"`
-	Steps           []PlanStep `json:"steps,omitempty"`
+	ID                string     `json:"id"`
+	ReportID          string     `json:"report_id"`
+	Scene             string     `json:"scene,omitempty"`
+	Name              string     `json:"name"`
+	Slug              string     `json:"slug"`
+	ImageURL          string     `json:"image_url"`
+	CurrentImageURL   string     `json:"current_image_url,omitempty"`
+	GeneratedImageURL string     `json:"generated_image_url,omitempty"`
+	GenerationStatus  string     `json:"generation_status,omitempty"`
+	GenerationError   string     `json:"generation_error,omitempty"`
+	LookProvider      string     `json:"look_provider,omitempty"`
+	Recommended       bool       `json:"recommended"`
+	Descriptor        string     `json:"descriptor"`
+	Why               string     `json:"why"`
+	OutcomeTags       []string   `json:"outcome_tags"`
+	DifferenceTags    []string   `json:"difference_tags"`
+	Sort              int        `json:"sort"`
+	Selected          bool       `json:"selected"`
+	Steps             []PlanStep `json:"steps,omitempty"`
 }
 
 // ScenePlanInput is the lightweight brief used to tailor a saved image
@@ -354,6 +359,21 @@ type HairPreviewJob struct {
 	UserID    string
 	Attempt   int
 	Input     HairPreviewInput
+}
+
+// PlanLookJob carries everything the worker needs to render one plan's
+// full-look image: the plan's direction (name/descriptor/steps) and the
+// source photos from the originating analysis.
+type PlanLookJob struct {
+	PlanID   string
+	ReportID string
+	UserID   string
+	Name     string
+	Slug     string
+	Why      string
+	Steps    []PlanStep
+	MediaIDs []string
+	Attempt  int
 }
 
 type AnalysisOutput struct {

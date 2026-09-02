@@ -20,27 +20,93 @@ Page({
     todayLookUrl: '/assets/plans/sharp.jpg',
     currentLookUrl: '',
     referenceLookUrl: '/assets/reports/sharp.jpg',
+    referenceGenerated: false,
+    referenceDemo: false,
     comparisonTitle: '清晰利落',
     todayPlan: null,
-    previewOpen: false
+    previewOpen: false,
+    todayOpening: false,
+    tasks: []
   },
   onShow() {
 	api.trackEvent('page_view', { page: 'home' }).catch(() => {})
     const reportID = wx.getStorageSync('jianwo_report_id') || ''
-    this.setData({ hasProfile: Boolean(reportID), reportID, currentLookUrl: '' })
+    this.setData({ hasProfile: Boolean(reportID), reportID, currentLookUrl: '', todayOpening: false, tasks: [] })
+    this.refreshTasks(reportID)
     if (reportID) {
       api.getTodayPlan().then((todayPlan) => {
-        if (todayPlan) this.setData({ todayPlan, todayLookUrl: todayPlan.image_url })
+        if (todayPlan) this.setData({ todayPlan, todayLookUrl: lookImage(todayPlan.image_url, 'sharp', 'full') })
       }).catch(() => {})
-      Promise.all([api.getReport(reportID), api.getPlans(reportID)]).then(([report, plans]) => {
+      Promise.all([api.getReport(reportID), api.getPlans(reportID)]).then((results) => {
+        const report = results[0]
+        const plans = results[1]
         const featured = plans.find((item) => item.recommended) || plans[0]
+        const generatedURL = featured && userImage(featured.generated_image_url)
         this.setData({
           currentLookUrl: userImage(report.current_image_url),
-          referenceLookUrl: featured ? lookImage(featured.image_url, featured.slug, 'report') : '/assets/reports/sharp.jpg',
+          referenceLookUrl: featured ? (generatedURL || lookImage(featured.image_url, featured.slug, 'report')) : '/assets/reports/sharp.jpg',
+          referenceGenerated: Boolean(generatedURL),
+          referenceDemo: Boolean(featured && (/^demo\//.test(featured.look_provider || '') || /^demo-/.test(featured.look_provider || ''))),
           comparisonTitle: featured ? featured.name : '清晰利落'
         })
       }).catch(() => {})
     }
+  },
+  refreshTasks(reportID) {
+    const requests = []
+    const activeAnalysisID = wx.getStorageSync('jianwo_active_analysis_id') || ''
+    if (activeAnalysisID) {
+      requests.push(api.getAnalysis(activeAnalysisID).then((analysis) => {
+        if (analysis.status === 'completed' && analysis.report_id) {
+          wx.setStorageSync('jianwo_report_id', analysis.report_id)
+          this.setData({ hasProfile: true, reportID: analysis.report_id })
+        }
+        return {
+          kind: 'analysis', id: analysis.id, reportId: analysis.report_id || '', state: analysis.status,
+          title: analysis.status === 'completed' ? '形象分析已经完成' : (analysis.status === 'failed' ? '形象分析未完成' : '正在分析 3 张形象照片'),
+          note: analysis.status === 'completed' ? '查看报告与三套方向' : (analysis.status === 'failed' ? '查看原因并重新提交' : `${analysis.progress || 0}% · ${analysis.stage || '正在处理'}`),
+          action: analysis.status === 'completed' ? '查看报告' : (analysis.status === 'failed' ? '重新分析' : '查看进度')
+        }
+      }).catch(() => null))
+    }
+    const activePlan = wx.getStorageSync('jianwo_active_plan_generation')
+    const planReportID = activePlan && activePlan.reportId || reportID
+    if (activePlan && planReportID) {
+      requests.push(api.getPlans(planReportID, activePlan.scene || '').then((plans) => {
+        const completed = plans.filter((item) => item.generation_status === 'completed').length
+        const working = plans.some((item) => item.generation_status === 'queued' || item.generation_status === 'processing')
+        const failed = plans.length > 0 && plans.every((item) => item.generation_status === 'failed')
+        return {
+          kind: 'plans', reportId: planReportID, scene: activePlan.scene || '', state: working ? 'processing' : (failed ? 'failed' : 'completed'),
+          title: working ? '3 套本人方案正在生成' : (failed ? '本人方案生成未完成' : '3 套本人方案已经完成'),
+          note: working ? `${completed} / ${plans.length} 套完成 · 可退出后继续生成` : (failed ? '可以重新尝试，分析报告不会丢失' : '脸部、发型与全身穿搭都已准备好'),
+          action: working ? '查看进度' : (failed ? '重新生成' : '查看方案')
+        }
+      }).catch(() => null))
+    }
+    const activeHairID = wx.getStorageSync('jianwo_active_hair_preview') || ''
+    if (activeHairID) {
+      requests.push(api.getHairPreview(activeHairID).then((preview) => ({
+        kind: 'hair', id: preview.id, state: preview.status,
+        title: preview.status === 'completed' ? '发型预览已经完成' : (preview.status === 'failed' ? '发型预览未完成' : '发型预览正在生成'),
+        note: preview.status === 'completed' ? `${preview.style_name} · 查看并决定是否保存` : (preview.status === 'failed' ? '可以更换照片或重新生成' : `${preview.progress || 0}% · ${preview.stage || '正在处理'}`),
+        action: preview.status === 'completed' ? '查看结果' : (preview.status === 'failed' ? '重新尝试' : '查看进度')
+      })).catch(() => null))
+    }
+    Promise.all(requests).then((tasks) => this.setData({ tasks: tasks.filter(Boolean) }))
+  },
+  openTask(event) {
+    const task = this.data.tasks[Number(event.currentTarget.dataset.index)]
+    if (!task) return
+    if (task.kind === 'analysis') {
+      if (task.state === 'completed' && task.reportId) { wx.removeStorageSync('jianwo_active_analysis_id'); wx.navigateTo({ url: `/pages/report/index?id=${task.reportId}` }); return }
+      if (task.state === 'failed') { wx.removeStorageSync('jianwo_active_analysis_id'); wx.navigateTo({ url: '/pages/capture/index?scene=general&replace=1' }); return }
+      wx.navigateTo({ url: `/pages/analysis/index?id=${task.id}&scene=general` }); return
+    }
+    if (task.kind === 'plans') {
+      wx.navigateTo({ url: `/pages/plans/index?reportId=${task.reportId}${task.scene ? `&scene=${task.scene}` : ''}` }); return
+    }
+    if (task.kind === 'hair') wx.navigateTo({ url: '/pages/hair/index' })
   },
   chooseScene(event) {
     const scene = event.currentTarget.dataset.scene
@@ -51,7 +117,7 @@ Page({
     const routes = { hair: '/pages/hair/index', outfit: '/pages/outfit/index', purchase: '/pages/purchase/index', advisor: '/pages/advisor/index' }
     wx.navigateTo({ url: routes[tool] })
   },
-  openToday() { wx.navigateTo({ url: '/pages/today/index' }) },
+  openToday() { if (this.data.todayOpening) return; this.setData({ todayOpening: true }); wx.navigateTo({ url: '/pages/today/index', fail: () => this.setData({ todayOpening: false }) }) },
   previewTodayLook() {
     this.setData({ previewOpen: true })
   },

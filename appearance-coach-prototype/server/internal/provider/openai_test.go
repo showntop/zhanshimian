@@ -114,10 +114,10 @@ func validAnalysisPayload() analysisPayload {
 		ImpressionTags: []string{"自然亲和", "稳重克制", "线条柔和"},
 		PriorityTitle:  "先提升头肩区域的利落感", PriorityCopy: "抬高发型重心并露出肩颈，整体会更精神。",
 		Findings: []analysisFinding{
-			{Label: "发型重心偏低", Category: "hair", Severity: "medium", AnchorX: .6, AnchorY: .14},
-			{Label: "眉眼对比稍弱", Category: "makeup", Severity: "low", AnchorX: .42, AnchorY: .28},
-			{Label: "肩颈线条可更利落", Category: "outfit", Severity: "medium", AnchorX: .66, AnchorY: .49},
-			{Label: "上身配色偏沉", Category: "color", Severity: "low", AnchorX: .31, AnchorY: .68},
+			{Label: "发型重心偏低", Category: "hair", Severity: "medium", Detail: "颅顶贴头皮，抬高蓬松度会更利落。", AnchorX: .6, AnchorY: .14},
+			{Label: "眉眼对比稍弱", Category: "makeup", Severity: "low", Detail: "眉形偏淡，清晰眉峰可增强聚焦。", AnchorX: .42, AnchorY: .28},
+			{Label: "肩颈线条可更利落", Category: "outfit", Severity: "medium", Detail: "落肩版型下移肩线，合肩剪裁更精神。", AnchorX: .66, AnchorY: .49},
+			{Label: "上身配色偏沉", Category: "color", Severity: "low", Detail: "深色压低明度，浅色内搭可提亮。", AnchorX: .31, AnchorY: .68},
 		},
 		Plans: []analysisPlan{
 			{Name: "清晰利落", Slug: "sharp", Recommended: true, Descriptor: "精神可信", Why: "强化头肩区域", OutcomeTags: []string{"精神", "可信", "利落"}, DifferenceTags: []string{"发型", "眉眼", "肩线"}, Steps: steps},

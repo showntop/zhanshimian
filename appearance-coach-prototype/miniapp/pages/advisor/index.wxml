@@ -10,11 +10,18 @@
     <view wx:if="{{!messages.length}}" class="starter-card surface"><text>你可以直接这样问</text><view><button wx:for="{{suggestions}}" wx:key="*this" data-value="{{item}}" bindtap="chooseSuggestion">{{item}} <text>›</text></button></view></view>
 
     <view class="message-list">
-      <view wx:for="{{messages}}" wx:key="id" class="message {{item.role}}"><text>{{item.content}}</text><view wx:if="{{item.actions.length}}" class="message-actions"><button wx:for="{{item.actions}}" wx:for-item="action" wx:key="id" data-id="{{action.id}}" disabled="{{action.applied}}" bindtap="applyAction">{{action.applied ? '已应用' : action.label}}</button></view></view>
-      <view wx:if="{{sending}}" class="message assistant typing"><text>正在结合你的档案与今日安排…</text></view>
+      <view wx:for="{{messages}}" wx:key="id" class="msg {{item.role}}">
+        <view class="msg-bubble"><text user-select="{{true}}">{{item.content}}</text></view>
+        <view wx:if="{{item.role === 'assistant' && item.actions.length}}" class="msg-actions">
+          <button wx:for="{{item.actions}}" wx:for-item="action" wx:key="id" class="action-chip {{action.applied ? 'applied' : ''}}" data-id="{{action.id}}" disabled="{{action.applied}}" bindtap="applyAction">{{action.applied ? '✓ 已应用' : '＋ ' + action.label}}</button>
+        </view>
+      </view>
+      <view wx:if="{{sending}}" class="msg assistant">
+        <view class="typing"><text class="dot"></text><text class="dot"></text><text class="dot"></text><text class="typing-copy">正在结合你的档案与今日安排</text></view>
+      </view>
     </view>
     <view id="chat-end" class="chat-end" />
   </scroll-view>
 
-  <view class="composer"><input value="{{input}}" placeholder="问这件怎么穿、明天怎么搭…" maxlength="500" confirm-type="send" bindinput="inputChange" bindconfirm="send" /><button class="{{input ? 'active' : ''}}" bindtap="send" loading="{{sending}}">发送</button></view>
+  <view class="composer"><input value="{{input}}" placeholder="问这件怎么穿、明天怎么搭…" placeholder-class="composer-ph" maxlength="500" confirm-type="send" bindinput="inputChange" bindconfirm="send" /><button class="{{input ? 'active' : ''}}" bindtap="send" loading="{{sending}}">发送</button></view>
 </view>

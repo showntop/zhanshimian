@@ -33,6 +33,15 @@
       "timeout_seconds": 180,
       "output_image_cost": 0.5
     },
+    "aliyun/wanx2.1-imageedit": {
+      "vendor": "aliyun",
+      "protocol": "dashscope_wanx_imageedit",
+      "model": "wanx2.1-imageedit",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/image2image/image-synthesis",
+      "api_key_env": "ALIYUN_API_KEY",
+      "timeout_seconds": 180,
+      "output_image_cost": 0.14
+    },
     "volcengine/seedream-4.5": {
       "vendor": "volcengine",
       "protocol": "ark_image",
@@ -85,8 +94,8 @@
     },
     "full_look_edit": {
       "policy": "quality_first",
-      "primary": "aliyun/wan2.7-image-pro",
-      "fallbacks": ["volcengine/seedream-4.5"],
+      "primary": "aliyun/wanx2.1-imageedit",
+      "fallbacks": ["aliyun/wan2.7-image-pro", "volcengine/seedream-4.5"],
       "max_cost_cny": 0.6
     }
   }

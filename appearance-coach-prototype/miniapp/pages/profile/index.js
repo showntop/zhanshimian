@@ -5,7 +5,8 @@ Page({
   data: { hasReport: false, hasPlan: false, deleting: false, profileImage: '' },
   onShow() {
     const reportID = wx.getStorageSync('jianwo_report_id') || ''
-    this.setData({ hasReport: Boolean(reportID), hasPlan: Boolean(wx.getStorageSync('jianwo_plan_id')), profileImage: '' })
+    const savedPlanID = wx.getStorageSync('jianwo_saved_plan_id') || wx.getStorageSync('jianwo_plan_id') || ''
+    this.setData({ hasReport: Boolean(reportID), hasPlan: Boolean(savedPlanID), profileImage: '' })
     if (!reportID) return
     api.getReport(reportID)
       .then((report) => api.getAnalysis(report.analysis_id))
@@ -16,7 +17,8 @@ Page({
       .catch(() => {})
   },
   openReport() { const id = wx.getStorageSync('jianwo_report_id'); if (id) wx.navigateTo({ url: `/pages/report/index?id=${id}` }) },
-  openPlan() { const id = wx.getStorageSync('jianwo_plan_id'); if (id) wx.navigateTo({ url: `/pages/plan/index?id=${id}` }) },
+  openPlan() { const id = wx.getStorageSync('jianwo_saved_plan_id') || wx.getStorageSync('jianwo_plan_id'); if (id) wx.navigateTo({ url: `/pages/plan/index?id=${id}` }) },
+  reanalyze() { wx.navigateTo({ url: '/pages/capture/index?scene=general&replace=1' }) },
   editBasic() { wx.showToast({ title: '基础资料编辑将在下一版开放', icon: 'none' }) },
   editBody() { wx.showModal({ title: '身体数据为选填', content: '体重和三围只在需要提升穿搭准确度或体验 3D/试衣时填写，不影响基础形象分析。', showCancel: false, confirmText: '知道了' }) },
   openLab() { wx.navigateTo({ url: '/pages/lab/index' }) },
@@ -27,7 +29,7 @@ Page({
       if (!confirm) return
       this.setData({ deleting: true })
       api.deleteData().then(() => {
-        wx.removeStorageSync('jianwo_report_id'); wx.removeStorageSync('jianwo_plan_id'); wx.removeStorageSync('jianwo_saved_plan_id')
+        wx.removeStorageSync('jianwo_report_id'); wx.removeStorageSync('jianwo_plan_id'); wx.removeStorageSync('jianwo_saved_plan_id'); wx.removeStorageSync('jianwo_active_analysis_id'); wx.removeStorageSync('jianwo_active_plan_generation'); wx.removeStorageSync('jianwo_active_hair_preview')
         this.setData({ hasReport: false, hasPlan: false, profileImage: '' })
         wx.showToast({ title: '档案已删除', icon: 'success' })
       }).catch((error) => wx.showToast({ title: error.message, icon: 'none' })).finally(() => this.setData({ deleting: false }))

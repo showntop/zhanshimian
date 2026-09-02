@@ -1,19 +1,41 @@
-<app-header title="正在分析" back="{{true}}" />
+<app-header title="{{failed ? '分析未完成' : '正在分析'}}" back="{{true}}" />
 <view class="page analysis-page">
-  <view class="scan-wrap fade-up">
-    <image wx:if="{{previewImage}}" class="scan-image" src="{{previewImage}}" mode="{{previewMode}}" />
-    <view wx:else class="scan-empty"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>正在准备照片</text></view>
-    <view class="scan-mask" />
-    <view class="scan-line" />
-    <view class="focus-point p1" /><view class="focus-point p2" /><view class="focus-point p3" />
-    <text class="scan-photo-kind">{{previewLabel}}</text>
+  <block wx:if="{{!failed}}">
+    <view class="scan-wrap fade-up">
+      <image wx:if="{{previewImage}}" class="scan-image scan-image-{{previewKind}}" src="{{previewImage}}" mode="{{previewMode}}" />
+      <view wx:else class="scan-empty"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>正在准备照片</text></view>
+      <view class="scan-mask" />
+      <view class="scan-line" />
+      <view wx:for="{{scanPoints}}" wx:key="id" class="focus-point" style="left: {{item.x}}%; top: {{item.y}}%; animation-delay: {{item.delay}}ms;" />
+      <text class="scan-count">正在分析 {{currentPhotoIndex}} / 3</text>
+      <view class="scan-photo-kind"><text>{{previewLabel}}</text><text class="scan-photo-focus">{{analysisSummary}}</text></view>
+    </view>
+    <view class="photo-track fade-up delay-1">
+      <view wx:for="{{photoSteps}}" wx:key="kind" class="photo-step photo-step-{{item.state}}">
+        <view class="photo-step-number">{{item.state === 'done' ? '✓' : item.index}}</view>
+        <view class="photo-step-copy"><text>{{item.label}}</text><text>{{item.shortFocus}}</text></view>
+      </view>
+    </view>
+    <view class="analysis-copy fade-up delay-1">
+      <text class="eyebrow">第 {{currentPhotoIndex}} / 3 张 · {{previewLabel}}</text>
+      <text class="analysis-title serif">正在分析{{analysisFocus}}</text>
+      <text class="analysis-detail">{{stage}}</text>
+      <view class="progress-head"><text>整体分析进度</text><text>{{progress}}%</text></view>
+      <view class="progress"><view class="progress-value" style="width: {{progress}}%" /></view>
+      <view class="stage-row"><text class="{{progress >= 24 ? 'done' : ''}}">读取轮廓</text><text class="{{progress >= 56 ? 'done' : ''}}">匹配方向</text><text class="{{progress >= 86 ? 'done' : ''}}">生成方案</text></view>
+    </view>
+  </block>
+  <view wx:else class="fail-wrap fade-up">
+    <view class="fail-badge"><image src="/assets/capture/face-line.png" mode="aspectFit" /></view>
+    <text class="fail-title serif">{{failTitle}}</text>
+    <view wx:if="{{failureItems.length}}" class="fail-list">
+      <view wx:for="{{failureItems}}" wx:key="label" class="fail-item">
+        <text class="fail-kind">{{item.label}}</text>
+        <text class="fail-reason">{{item.reason}}</text>
+      </view>
+      <text class="fail-tip">{{failTip}}</text>
+    </view>
+    <text wx:else class="fail-lede">{{failMessage}}</text>
+    <button class="retry" bindtap="retry">{{failAction}}</button>
   </view>
-  <view wx:if="{{!failed}}" class="analysis-copy fade-up delay-1">
-    <text class="eyebrow">正在组合你的专属方案</text>
-    <text class="analysis-title serif">{{stage}}</text>
-    <view class="progress"><view class="progress-value" style="width: {{progress}}%" /></view>
-    <text class="progress-number">{{progress}}%</text>
-    <view class="stage-row"><text class="{{progress >= 24 ? 'done' : ''}}">读取轮廓</text><text class="{{progress >= 56 ? 'done' : ''}}">匹配方向</text><text class="{{progress >= 86 ? 'done' : ''}}">生成方案</text></view>
-  </view>
-  <view wx:else class="analysis-copy"><text class="analysis-title serif">这次没有分析完成</text><text class="lede">{{errorMessage || '照片不会丢失，你可以返回后重新提交。'}}</text><button class="retry" bindtap="retry">返回重试</button></view>
 </view>

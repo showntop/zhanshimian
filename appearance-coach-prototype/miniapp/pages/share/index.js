@@ -1,4 +1,5 @@
 const api = require('../../services/api')
+const { lookImage } = require('../../utils/media')
 
 Page({
   data: { card: null, snapshot: null, loading: true, owner: false, saving: false },
@@ -11,7 +12,8 @@ Page({
     api.createShareCard({ source_type: options.type, source_id: options.id, include_photo: false }).then((card) => { this.setCard(card, true); api.trackEvent('share_card_create', { source_type: options.type, source_id: options.id }).catch(() => {}) }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false }) })
   },
   setCard(card, owner) {
-    this.setData({ card, snapshot: card.snapshot, owner, loading: false })
+    const snapshot = card.snapshot ? { ...card.snapshot, image_url: card.snapshot.image_url ? lookImage(card.snapshot.image_url, 'natural', 'plan') : '' } : null
+    this.setData({ card, snapshot, owner, loading: false })
   },
   savePoster() {
     if (!this.data.snapshot) return

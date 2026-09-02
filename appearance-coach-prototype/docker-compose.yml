@@ -22,7 +22,9 @@ services:
       APP_ENV: ${APP_ENV:-development}
       ADDR: ${ADDR:-:8080}
       DATABASE_URL: ${DATABASE_URL:-postgres://jianwo:jianwo@postgres:5432/jianwo?sslmode=disable}
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:58000}
+      # WeChat DevTools treats the loopback IP as a secure local origin, while
+      # newer runtimes reject http://localhost image URLs inside <image>.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:58000}
       UPLOAD_DIR: ${UPLOAD_DIR:-data/uploads}
       ASSET_DIR: ${ASSET_DIR:-assets}
       DEV_LOGIN_ENABLED: ${DEV_LOGIN_ENABLED:-true}

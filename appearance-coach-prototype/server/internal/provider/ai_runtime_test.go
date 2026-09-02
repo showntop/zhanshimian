@@ -97,6 +97,39 @@ func TestAIRuntimeDashScopeImageEditPersistsDownloadedBytes(t *testing.T) {
 	}
 }
 
+func TestAIRuntimeWanxImageEditSubmitsAndPollsTask(t *testing.T) {
+	t.Setenv("AI_TEST_WANX_KEY", "wanx-key")
+	png := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00}
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/services/aigc/image2image/image-synthesis":
+			if r.Header.Get("X-DashScope-Async") != "enable" || r.Header.Get("Authorization") != "Bearer wanx-key" {
+				t.Fatal("missing Wanx async/auth headers")
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"request_id": "submit-1", "output": map[string]any{"task_id": "task-1", "task_status": "PENDING"}})
+		case "/api/v1/tasks/task-1":
+			_ = json.NewEncoder(w).Encode(map[string]any{"request_id": "poll-1", "output": map[string]any{"task_status": "SUCCEEDED", "results": []map[string]string{{"url": server.URL + "/result.png"}}}})
+		case "/result.png":
+			_, _ = w.Write(png)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	runtime, err := NewAIRuntime([]AIModel{{ID: "wanx", Vendor: "aliyun", Protocol: "dashscope_wanx_imageedit", Model: "wanx2.1-imageedit", BaseURL: server.URL + "/api/v1/services/aigc/image2image/image-synthesis", APIKeyEnv: "AI_TEST_WANX_KEY", Timeout: 2 * time.Second, OutputImageCost: .14}}, []AIRoute{{Capability: CapabilityFullLookEdit, Primary: "wanx"}}, server.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := runtime.EditImage(context.Background(), CapabilityFullLookEdit, ImageEditRequest{Prompt: "完整造型", Images: []AnalysisImage{{MIMEType: "image/jpeg", Data: []byte("source")}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(result.Data) != string(png) || result.MIMEType != "image/png" || result.Meta.ProviderVersion() != "aliyun:dashscope_wanx_imageedit:wanx2.1-imageedit" {
+		t.Fatalf("unexpected Wanx result: %#v", result)
+	}
+}
+
 func TestAIRuntimeFallsBackWhenDomainValidationRejectsOutput(t *testing.T) {
 	t.Setenv("AI_TEST_VALIDATE_KEY", "key")
 	primaryCalls, fallbackCalls := 0, 0

@@ -10,9 +10,10 @@ Page({
     ],
     loading: false,
     completed: 0,
-    demo: false
+    demo: false,
+    replace: false
   },
-  onLoad(options) { this.setData({ scene: options.scene || 'general', demo: options.demo === '1' }) },
+  onLoad(options) { this.setData({ scene: options.scene || 'general', demo: options.demo === '1', replace: options.replace === '1' }) },
   chooseOne(event) {
     const index = Number(event.currentTarget.dataset.index)
     wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'], sizeType: ['compressed'], success: ({ tempFiles }) => this.upload(index, tempFiles[0].tempFilePath) })
@@ -42,7 +43,7 @@ Page({
   primaryAction() { this.data.completed === 3 ? this.startAnalysis() : this.choosePhotos('camera') },
   chooseFromAlbum() { this.choosePhotos('album') },
   showHelp() {
-    wx.showModal({ title: '这样拍更准确', content: '站在窗边自然光下，关闭美颜与滤镜。正脸平视镜头；侧脸转向 90°；全身照完整露出肩颈、腰线与鞋子。', showCancel: false, confirmText: '知道了', confirmColor: '#587344' })
+    wx.showModal({ title: '这样拍更准确', content: '站在窗边自然光下，关闭美颜与滤镜。正脸平视镜头；侧脸转向 90°；全身照露出肩颈与腰线即可，脚部可以不完整入镜。', showCancel: false, confirmText: '知道了', confirmColor: '#587344' })
   },
   upload(index, path) {
     const kind = this.data.shots[index].kind
@@ -65,6 +66,25 @@ Page({
   },
   startAnalysis() {
     if (this.data.completed !== 3) return
+    const activeID = wx.getStorageSync('jianwo_active_analysis_id') || ''
+    if (activeID) {
+      this.setData({ loading: true })
+      api.getAnalysis(activeID).then((analysis) => {
+        if (analysis.status === 'queued' || analysis.status === 'processing') {
+          wx.navigateTo({ url: `/pages/analysis/index?id=${analysis.id}&scene=${this.data.scene}` })
+          return
+        }
+        wx.removeStorageSync('jianwo_active_analysis_id')
+        this.createAnalysis()
+      }).catch(() => {
+        wx.removeStorageSync('jianwo_active_analysis_id')
+        this.createAnalysis()
+      })
+      return
+    }
+    this.createAnalysis()
+  },
+  createAnalysis() {
     this.setData({ loading: true })
     const mediaIDs = this.data.shots.map((item) => item.asset.id)
     api.createAnalysis({ scene: this.data.scene, media_ids: mediaIDs, profile: { height_cm: 165, role: '', budget: '' } }).then((analysis) => {
@@ -72,6 +92,7 @@ Page({
       const app = getApp()
       app.globalData.analysisID = analysis.id
       app.globalData.analysisMedia = analysis.media && analysis.media.length ? analysis.media : localMedia
+      wx.setStorageSync('jianwo_active_analysis_id', analysis.id)
       wx.navigateTo({ url: `/pages/analysis/index?id=${analysis.id}&scene=${this.data.scene}` })
     }).catch((error) => wx.showToast({ title: error.message, icon: 'none' })).finally(() => this.setData({ loading: false }))
   }

@@ -1,10 +1,9 @@
-<app-header title="建立形象档案" back="{{true}}" help="{{true}}" bind:help="showHelp" />
+<app-header title="{{replace ? '更新形象档案' : '建立形象档案'}}" back="{{true}}" help="{{true}}" bind:help="showHelp" />
 <scroll-view class="capture-scroll" scroll-y enhanced show-scrollbar="{{false}}">
   <view class="page capture-page">
     <view class="capture-intro fade-up">
       <text class="photo-count">{{completed ? ('已完成 ' + completed + ' / 3 张') : '需要 3 张照片'}}</text>
-      <text class="capture-title serif">拍 3 张照片，
-先看见更适合你的自己</text>
+      <text class="capture-title serif">{{replace ? '重新拍 3 张照片，\n更新你的形象分析' : '拍 3 张照片，\n先看见更适合你的自己'}}</text>
       <text class="capture-lede">不用专业拍摄，按引导一次完成</text>
     </view>
     <view class="shots-panel fade-up delay-1">

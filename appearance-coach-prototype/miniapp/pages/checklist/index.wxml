@@ -1,4 +1,4 @@
-<app-header title="我的改造清单" back="{{true}}" />
+<app-header title="方案执行清单" back="{{true}}" />
 <view class="page checklist-page">
   <block wx:if="{{plan}}">
     <view class="check-hero fade-up"><image src="{{plan.image_url}}" mode="aspectFill" /><view><text class="eyebrow">你选择了</text><text class="check-title serif">{{plan.name}}</text><text class="muted">{{plan.descriptor}}</text></view></view>
@@ -9,8 +9,8 @@
         <view class="task-copy"><text class="task-category">{{item.category === 'hair' ? '发型' : item.category === 'makeup' ? '妆容' : '穿搭'}}</text><text class="task-title">{{item.title}}</text><text class="task-description">{{item.description}}</text><text class="task-meta">{{item.meta}}</text></view>
       </button>
     </view>
-    <view class="finish-note surface"><text class="serif">真正的变化，来自一次次小行动</text><text>完成后上传实拍，你的下一次建议会更准确。</text></view>
-    <primary-button text="完成后回来反馈" bind:tap="feedback" />
+    <view class="finish-note surface"><text class="serif">照着步骤完成，不需要一次买齐</text><text>勾选已经做过的调整；实际尝试后可以反馈，下一次推荐会更贴合你。</text></view>
+    <primary-button text="提交实际体验反馈" bind:tap="feedback" />
   </block>
   <view wx:else class="skeleton checklist-loading" />
 </view>

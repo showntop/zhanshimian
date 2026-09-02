@@ -246,6 +246,8 @@ func (r *AIRuntime) EditImage(ctx context.Context, capability string, input Imag
 			result, err = r.openAIImageEdit(ctx, capability, model, input)
 		case "dashscope_wan":
 			result, err = r.dashScopeImageEdit(ctx, capability, model, input)
+		case "dashscope_wanx_imageedit":
+			result, err = r.dashScopeWanxImageEdit(ctx, capability, model, input)
 		case "ark_image":
 			result, err = r.arkImageEdit(ctx, capability, model, input)
 		default:
@@ -262,6 +264,123 @@ func (r *AIRuntime) EditImage(ctx context.Context, capability string, input Imag
 		r.logInvocation(InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model}, err)
 	}
 	return ImageEditResult{}, fmt.Errorf("all AI models failed for %s: %s", capability, strings.Join(causes, "; "))
+}
+
+// dashScopeWanxImageEdit adapts the low-cost Wan 2.1 general image editor.
+// Unlike wan2.7, this endpoint is asynchronous: submit a task, poll it, then
+// download the short-lived result URL into our own storage.
+func (r *AIRuntime) dashScopeWanxImageEdit(ctx context.Context, capability string, model AIModel, input ImageEditRequest) (ImageEditResult, error) {
+	if len(input.Images) == 0 {
+		return ImageEditResult{}, errors.New("image edit requires at least one source image")
+	}
+	if model.Timeout <= 0 {
+		model.Timeout = 180 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, model.Timeout)
+	defer cancel()
+	base := input.Images[0]
+	body := map[string]any{
+		"model": model.Model,
+		"input": map[string]any{
+			"function":       "description_edit",
+			"prompt":         input.Prompt,
+			"base_image_url": dataURL(base.MIMEType, base.Data),
+		},
+		"parameters": map[string]any{"n": 1, "watermark": false},
+	}
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return ImageEditResult{}, err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, model.BaseURL, bytes.NewReader(encoded))
+	if err != nil {
+		return ImageEditResult{}, err
+	}
+	request.Header.Set("Authorization", "Bearer "+os.Getenv(model.APIKeyEnv))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-DashScope-Async", "enable")
+	var submitted struct {
+		RequestID string `json:"request_id"`
+		Output    struct {
+			TaskID     string `json:"task_id"`
+			TaskStatus string `json:"task_status"`
+			Code       string `json:"code"`
+			Message    string `json:"message"`
+		} `json:"output"`
+	}
+	started := time.Now()
+	if err := r.doRequest(model, request, &submitted, 2<<20); err != nil {
+		return ImageEditResult{}, err
+	}
+	if submitted.Output.TaskID == "" {
+		return ImageEditResult{}, fmt.Errorf("wanx image edit returned no task: %s", strings.TrimSpace(submitted.Output.Message))
+	}
+
+	taskURL, err := wanxTaskURL(model.BaseURL, submitted.Output.TaskID)
+	if err != nil {
+		return ImageEditResult{}, err
+	}
+	var completed struct {
+		RequestID string `json:"request_id"`
+		Output    struct {
+			TaskStatus string `json:"task_status"`
+			Code       string `json:"code"`
+			Message    string `json:"message"`
+			Results    []struct {
+				URL     string `json:"url"`
+				Code    string `json:"code"`
+				Message string `json:"message"`
+			} `json:"results"`
+		} `json:"output"`
+	}
+	pollEvery := time.NewTicker(2 * time.Second)
+	defer pollEvery.Stop()
+	for {
+		poll, pollErr := http.NewRequestWithContext(ctx, http.MethodGet, taskURL, nil)
+		if pollErr != nil {
+			return ImageEditResult{}, pollErr
+		}
+		poll.Header.Set("Authorization", "Bearer "+os.Getenv(model.APIKeyEnv))
+		if pollErr = r.doRequest(model, poll, &completed, 2<<20); pollErr != nil {
+			return ImageEditResult{}, pollErr
+		}
+		switch completed.Output.TaskStatus {
+		case "SUCCEEDED":
+			if len(completed.Output.Results) == 0 || completed.Output.Results[0].URL == "" {
+				return ImageEditResult{}, errors.New("wanx image edit succeeded without an image URL")
+			}
+			data, mimeType, resolveErr := r.resolveImage(ctx, model, "", completed.Output.Results[0].URL)
+			if resolveErr != nil {
+				return ImageEditResult{}, resolveErr
+			}
+			meta := invocationMeta(capability, model, started)
+			meta.RequestID, meta.InputImages, meta.OutputImages = submitted.RequestID, 1, 1
+			meta.EstimatedCostCNY = model.OutputImageCost
+			return ImageEditResult{Data: data, MIMEType: mimeType, Meta: meta}, nil
+		case "FAILED", "CANCELED", "UNKNOWN":
+			return ImageEditResult{}, fmt.Errorf("wanx image edit task %s: %s", completed.Output.TaskStatus, strings.TrimSpace(completed.Output.Message))
+		}
+		select {
+		case <-ctx.Done():
+			return ImageEditResult{}, ctx.Err()
+		case <-pollEvery.C:
+		}
+	}
+}
+
+func wanxTaskURL(baseURL, taskID string) (string, error) {
+	parsed, err := url.Parse(baseURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", errors.New("wanx image edit base URL is invalid")
+	}
+	marker := strings.Index(parsed.Path, "/services/")
+	if marker < 0 {
+		return "", errors.New("wanx image edit base URL must include /services/")
+	}
+	parsed.Path = strings.TrimRight(parsed.Path[:marker], "/") + "/tasks/" + url.PathEscape(taskID)
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String(), nil
 }
 
 func (r *AIRuntime) openAIResponses(ctx context.Context, capability string, model AIModel, input StructuredRequest) (StructuredResult, error) {
@@ -518,8 +637,12 @@ func (r *AIRuntime) doRequest(model AIModel, request *http.Request, output any, 
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 8<<10))
-		return fmt.Errorf("%s returned status %d", model.Vendor, response.StatusCode)
+		snippet, _ := io.ReadAll(io.LimitReader(response.Body, 512))
+		message := strings.TrimSpace(string(snippet))
+		if message == "" {
+			return fmt.Errorf("%s returned status %d", model.Vendor, response.StatusCode)
+		}
+		return fmt.Errorf("%s returned status %d: %s", model.Vendor, response.StatusCode, message)
 	}
 	if err := json.NewDecoder(io.LimitReader(response.Body, limit)).Decode(output); err != nil {
 		return fmt.Errorf("decode %s response: %w", model.Vendor, err)

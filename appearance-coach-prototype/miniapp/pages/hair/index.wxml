@@ -8,7 +8,7 @@
     <view wx:else class="preview-card fade-up delay-1">
       <image src="{{showCurrent || !resultImage ? currentImage : resultImage}}" mode="aspectFit" />
       <view wx:if="{{resultImage}}" class="view-toggle"><button class="{{showCurrent ? 'active' : ''}}" data-current="1" bindtap="toggleCurrent">原图</button><button class="{{!showCurrent ? 'active' : ''}}" data-current="0" bindtap="toggleCurrent">效果</button></view>
-      <view wx:if="{{generating}}" class="generating-mask"><view class="scan-line" /><text class="generation-value">{{progress}}%</text><text class="generation-stage">{{stage}}</text><text class="generation-note">通常需要 20–60 秒，请保持页面打开</text></view>
+      <view wx:if="{{generating}}" class="generating-mask"><view class="scan-line" /><text class="generation-value">{{progress}}%</text><text class="generation-stage">{{stage}}</text><text class="generation-note">通常需要 20–60 秒，可以退出，完成后首页会提醒</text></view>
       <view wx:if="{{!generating}}" class="preview-caption"><text>{{resultImage && !showCurrent ? activeStyle.name : '我的当前发型'}}</text><text>{{resultImage && !showCurrent ? (isDemo ? '效果示例' : 'AI 生成 · 仅供参考') : (usingProfilePhoto ? '形象档案正脸照' : '原图')}}</text></view>
     </view>
     <view wx:if="{{error}}" class="inline-error"><text>{{error}}</text><button wx:if="{{sourceMediaID}}" bindtap="generatePreview">重新生成</button></view>

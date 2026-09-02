@@ -86,11 +86,12 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		return fmt.Errorf("AI routing config requires models and routes")
 	}
 	protocols := map[string]bool{
-		"openai_responses":        true,
-		"openai_chat_completions": true,
-		"openai_image_edit":       true,
-		"dashscope_wan":           true,
-		"ark_image":               true,
+		"openai_responses":         true,
+		"openai_chat_completions":  true,
+		"openai_image_edit":        true,
+		"dashscope_wan":            true,
+		"dashscope_wanx_imageedit": true,
+		"ark_image":                true,
 	}
 	structuredCapabilities := map[string]bool{"appearance_analysis": true, "photo_check": true, "outfit_diagnosis": true, "purchase_diagnosis": true, "advisor_chat": true}
 	imageCapabilities := map[string]bool{"hair_edit": true, "makeup_edit": true, "full_look_edit": true}
@@ -145,7 +146,7 @@ func validateAIRouting(routing AIRoutingConfig) error {
 			if structuredCapabilities[capability] && protocol != "openai_responses" && protocol != "openai_chat_completions" {
 				return fmt.Errorf("AI route %q uses image protocol %q", capability, protocol)
 			}
-			if imageCapabilities[capability] && protocol != "openai_image_edit" && protocol != "dashscope_wan" && protocol != "ark_image" {
+			if imageCapabilities[capability] && protocol != "openai_image_edit" && protocol != "dashscope_wan" && protocol != "dashscope_wanx_imageedit" && protocol != "ark_image" {
 				return fmt.Errorf("AI route %q uses structured protocol %q", capability, protocol)
 			}
 		}

@@ -54,6 +54,7 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("GET /v1/analyses/{id}", api.auth(http.HandlerFunc(api.getAnalysis)))
 	mux.Handle("GET /v1/reports/{id}", api.auth(http.HandlerFunc(api.getReport)))
 	mux.Handle("GET /v1/reports/{id}/plans", api.auth(http.HandlerFunc(api.listPlans)))
+	mux.Handle("POST /v1/reports/{id}/plan-looks", api.auth(http.HandlerFunc(api.generatePlanLooks)))
 	mux.Handle("POST /v1/reports/{id}/scene-plans", api.auth(http.HandlerFunc(api.createScenePlans)))
 	mux.Handle("GET /v1/plans/{id}", api.auth(http.HandlerFunc(api.getPlan)))
 	mux.Handle("POST /v1/plans/{id}/select", api.auth(http.HandlerFunc(api.selectPlan)))
@@ -259,6 +260,15 @@ func (a *API) listPlans(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, http.StatusOK, items)
+}
+
+func (a *API) generatePlanLooks(w http.ResponseWriter, r *http.Request) {
+	items, err := a.service.GeneratePlanLooks(r.Context(), currentUser(r).ID, r.PathValue("id"), r.URL.Query().Get("scene"), r.URL.Query().Get("refresh") == "1")
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusAccepted, items)
 }
 func (a *API) createScenePlans(w http.ResponseWriter, r *http.Request) {
 	var input domain.ScenePlanInput
