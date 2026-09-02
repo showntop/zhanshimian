@@ -252,7 +252,10 @@ func (s *Service) analysisPreviewURL(ctx context.Context, userID string, mediaID
 		return "", err
 	}
 	for index := range assets {
-		assets[index].URL = s.mediaAssetURL(assets[index])
+		// This value is persisted on the report row, so it must stay in
+		// canonical relative form: GetReport re-expands and re-signs it on
+		// every read, and a stored signed URL would expire with its TTL.
+		assets[index].URL = relativeAssetURL(assets[index])
 	}
 	if url := s.pickReportPreviewImage(assets); url != "" {
 		return url, nil
@@ -267,27 +270,42 @@ func (s *Service) mediaAssetURL(asset domain.MediaAsset) string {
 	return s.absoluteURL("/uploads/" + strings.TrimPrefix(asset.StorageKey, "/"))
 }
 
+// relativeAssetURL is the storable form of an asset reference: a bundled
+// /assets path or an /uploads path without host or signature. Read paths
+// expand it through absoluteURL, which signs a fresh URL on private object
+// stores, so persisted URLs never expire with their signature.
+func relativeAssetURL(asset domain.MediaAsset) string {
+	if strings.HasPrefix(asset.StorageKey, "demo/") {
+		return demoMediaAssetPath(asset.Kind)
+	}
+	return "/uploads/" + strings.TrimPrefix(asset.StorageKey, "/")
+}
+
 func (s *Service) demoMediaURL(kind string) string {
+	return s.absoluteURL(demoMediaAssetPath(kind))
+}
+
+func demoMediaAssetPath(kind string) string {
 	assetName := "natural.png"
 	if kind == "product" {
 		assetName = "warm.png"
 	}
-	return s.absoluteURL("/assets/looks/" + assetName)
+	return "/assets/looks/" + assetName
 }
 func (s *Service) GetReport(ctx context.Context, userID, id string) (domain.Report, error) {
 	report, err := s.repo.GetReport(ctx, userID, id)
 	if err == nil {
-		report.CurrentImageURL = s.absoluteURL(report.CurrentImageURL)
+		report.CurrentImageURL = s.resolveAssetURL(report.CurrentImageURL)
 	}
 	return report, err
 }
 func (s *Service) ListPlans(ctx context.Context, userID, reportID, scene string) ([]domain.Plan, error) {
 	plans, err := s.repo.ListPlans(ctx, userID, reportID, scene)
 	for i := range plans {
-		plans[i].ImageURL = s.absoluteURL(plans[i].ImageURL)
-		plans[i].CurrentImageURL = s.absoluteURL(plans[i].CurrentImageURL)
+		plans[i].ImageURL = s.resolveAssetURL(plans[i].ImageURL)
+		plans[i].CurrentImageURL = s.resolveAssetURL(plans[i].CurrentImageURL)
 		if plans[i].GeneratedImageURL != "" {
-			plans[i].GeneratedImageURL = s.absoluteURL(plans[i].GeneratedImageURL)
+			plans[i].GeneratedImageURL = s.resolveAssetURL(plans[i].GeneratedImageURL)
 		}
 	}
 	return plans, err
@@ -320,10 +338,10 @@ func (s *Service) GeneratePlanLooks(ctx context.Context, userID, reportID, scene
 func (s *Service) GetPlan(ctx context.Context, userID, planID string) (domain.Plan, error) {
 	plan, err := s.repo.GetPlan(ctx, userID, planID)
 	if err == nil {
-		plan.ImageURL = s.absoluteURL(plan.ImageURL)
-		plan.CurrentImageURL = s.absoluteURL(plan.CurrentImageURL)
+		plan.ImageURL = s.resolveAssetURL(plan.ImageURL)
+		plan.CurrentImageURL = s.resolveAssetURL(plan.CurrentImageURL)
 		if plan.GeneratedImageURL != "" {
-			plan.GeneratedImageURL = s.absoluteURL(plan.GeneratedImageURL)
+			plan.GeneratedImageURL = s.resolveAssetURL(plan.GeneratedImageURL)
 		}
 	}
 	return plan, err
@@ -733,6 +751,23 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 		s.logger.Error("complete analysis", "analysis_id", job.AnalysisID, "error", err)
 		_ = s.repo.FailAnalysis(jobCtx, job, err)
 	}
+}
+
+// resolveAssetURL expands a stored asset reference to a currently loadable
+// URL. Reports written before previews were persisted in relative form still
+// carry the store's own signed URL, whose TTL may already have expired; when
+// the store recognizes the URL as one of its own, re-sign it instead of
+// returning the stale value verbatim.
+func (s *Service) resolveAssetURL(value string) string {
+	if strings.Contains(value, "://") {
+		if refresher, ok := s.storage.(storage.StoredURLRefresher); ok {
+			if refreshed, hit := refresher.RefreshURL(value, s.assetURLTTL); hit {
+				return refreshed
+			}
+		}
+		return value
+	}
+	return s.absoluteURL(value)
 }
 
 func (s *Service) absoluteURL(value string) string {

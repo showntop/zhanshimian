@@ -22,6 +22,13 @@ type SignedURLStorage interface {
 	SignedURL(context.Context, string, time.Duration) (string, error)
 }
 
+// StoredURLRefresher is implemented by object stores whose persisted URLs can
+// expire (signed URLs). RefreshURL returns a fresh URL when value is one of
+// the store's own object URLs and reports whether the value was recognized.
+type StoredURLRefresher interface {
+	RefreshURL(value string, ttl time.Duration) (string, bool)
+}
+
 type Local struct{ Root string }
 
 func NewLocal(root string) (*Local, error) {

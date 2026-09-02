@@ -23,6 +23,7 @@ type COSConfig struct {
 
 type COS struct {
 	client    *cos.Client
+	bucket    *url.URL
 	secretID  string
 	secretKey string
 	prefix    string
@@ -44,6 +45,7 @@ func NewCOS(cfg COSConfig) (*COS, error) {
 	}
 	return &COS{
 		client:   cos.NewClient(&cos.BaseURL{BucketURL: bucketURL}, httpClient),
+		bucket:   bucketURL,
 		secretID: strings.TrimSpace(cfg.SecretID), secretKey: strings.TrimSpace(cfg.SecretKey),
 		prefix: strings.Trim(strings.TrimSpace(cfg.KeyPrefix), "/"),
 	}, nil
@@ -104,6 +106,26 @@ func (c *COS) SignedURL(ctx context.Context, key string, ttl time.Duration) (str
 		return "", fmt.Errorf("sign COS object URL: %w", err)
 	}
 	return value.String(), nil
+}
+
+// RefreshURL re-signs one of the store's own object URLs (signed or plain)
+// so rows written before relative paths were persisted keep working after
+// the original signature expires. Unrecognized hosts return ok == false.
+func (c *COS) RefreshURL(value string, ttl time.Duration) (string, bool) {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" || parsed.Host != c.bucket.Host {
+		return "", false
+	}
+	basePath := strings.TrimSuffix(c.bucket.Path, "/")
+	key := strings.TrimPrefix(parsed.Path, basePath+"/")
+	if key == "" || key == parsed.Path {
+		return "", false
+	}
+	signed, err := c.SignedURL(context.Background(), key, ttl)
+	if err != nil {
+		return "", false
+	}
+	return signed, true
 }
 
 func (c *COS) objectKey(value string) (string, error) {
