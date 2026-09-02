@@ -200,7 +200,11 @@ func (s *Service) CreateAnalysis(ctx context.Context, userID string, input domai
 	if err != nil {
 		return domain.Analysis{}, err
 	}
-	analysis.MediaIDs = input.MediaIDs
+	// 幂等返回的旧分析已经带原始照片；只有真正新建的分析才回填本次照片，
+	// 避免响应里挂上和实际分析输入不符的 media ids。
+	if len(analysis.MediaIDs) == 0 {
+		analysis.MediaIDs = input.MediaIDs
+	}
 	return s.hydrateAnalysisMedia(ctx, userID, analysis)
 }
 
@@ -655,59 +659,63 @@ func (s *Service) runPlanLookWorker(ctx context.Context, poll time.Duration) {
 func (s *Service) processPlanLook(ctx context.Context, job domain.PlanLookJob) {
 	jobCtx, cancel := context.WithTimeout(ctx, planLookJobTimeout)
 	defer cancel()
+	failCtx, failCancel := failContext()
+	defer failCancel()
 	if s.lookGenerator == nil {
-		_ = s.repo.FailPlanLook(jobCtx, job, errors.New("plan look generator is not configured"))
+		_ = s.repo.FailPlanLook(failCtx, job, errors.New("plan look generator is not configured"))
 		return
 	}
 	output, err := s.lookGenerator.Generate(jobCtx, provider.LookInput{Name: job.Name, Slug: job.Slug, Why: job.Why, Steps: job.Steps, MediaIDs: job.MediaIDs})
 	if err != nil {
-		_ = s.repo.FailPlanLook(jobCtx, job, err)
+		_ = s.repo.FailPlanLook(failCtx, job, err)
 		return
 	}
 	extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
 	if extension == "" {
-		_ = s.repo.FailPlanLook(jobCtx, job, errors.New("look provider returned an unsupported image format"))
+		_ = s.repo.FailPlanLook(failCtx, job, errors.New("look provider returned an unsupported image format"))
 		return
 	}
 	storageKey := fmt.Sprintf("%s/generated/looks/%s%s", job.UserID, uuid.NewString(), extension)
 	storedKey, saveErr := s.storage.Save(jobCtx, storageKey, bytes.NewReader(output.ImageData))
 	if saveErr != nil {
-		_ = s.repo.FailPlanLook(jobCtx, job, saveErr)
+		_ = s.repo.FailPlanLook(failCtx, job, saveErr)
 		return
 	}
 	if err := s.repo.CompletePlanLook(jobCtx, job, "/uploads/"+storedKey, storedKey, output.ProviderVersion); err != nil {
 		_ = s.storage.Delete(jobCtx, storedKey)
 		s.logger.Error("complete plan look", "plan_id", job.PlanID, "error", err)
-		_ = s.repo.FailPlanLook(jobCtx, job, err)
+		_ = s.repo.FailPlanLook(failCtx, job, err)
 	}
 }
 
 func (s *Service) processHairPreview(ctx context.Context, job domain.HairPreviewJob) {
 	jobCtx, cancel := context.WithTimeout(ctx, hairPreviewJobTimeout)
 	defer cancel()
+	failCtx, failCancel := failContext()
+	defer failCancel()
 	output, err := s.hairGenerator.Generate(jobCtx, job.Input)
 	if err != nil {
-		_ = s.repo.FailHairPreview(jobCtx, job, err)
+		_ = s.repo.FailHairPreview(failCtx, job, err)
 		return
 	}
 	resultURL, storageKey := output.ImageURL, ""
 	if len(output.ImageData) > 0 {
 		extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
 		if extension == "" {
-			_ = s.repo.FailHairPreview(jobCtx, job, errors.New("hair preview provider returned an unsupported image format"))
+			_ = s.repo.FailHairPreview(failCtx, job, errors.New("hair preview provider returned an unsupported image format"))
 			return
 		}
 		storageKey = fmt.Sprintf("%s/generated/hair/%s%s", job.UserID, uuid.NewString(), extension)
 		storedKey, saveErr := s.storage.Save(jobCtx, storageKey, bytes.NewReader(output.ImageData))
 		if saveErr != nil {
-			_ = s.repo.FailHairPreview(jobCtx, job, saveErr)
+			_ = s.repo.FailHairPreview(failCtx, job, saveErr)
 			return
 		}
 		storageKey = storedKey
 		resultURL = "/uploads/" + storedKey
 	}
 	if resultURL == "" {
-		_ = s.repo.FailHairPreview(jobCtx, job, errors.New("hair preview provider returned no image"))
+		_ = s.repo.FailHairPreview(failCtx, job, errors.New("hair preview provider returned no image"))
 		return
 	}
 	if err := s.repo.CompleteHairPreview(jobCtx, job, resultURL, storageKey, output.ProviderVersion); err != nil {
@@ -715,19 +723,29 @@ func (s *Service) processHairPreview(ctx context.Context, job domain.HairPreview
 			_ = s.storage.Delete(jobCtx, storageKey)
 		}
 		s.logger.Error("complete hair preview", "preview_id", job.PreviewID, "error", err)
-		_ = s.repo.FailHairPreview(jobCtx, job, err)
+		_ = s.repo.FailHairPreview(failCtx, job, err)
 	}
 }
 
 const (
-	analysisJobTimeout   = 5 * time.Minute
+	analysisJobTimeout    = 5 * time.Minute
 	hairPreviewJobTimeout = 5 * time.Minute
-	planLookJobTimeout   = 5 * time.Minute
+	planLookJobTimeout    = 5 * time.Minute
 )
+
+// failContext 返回一个从 context.Background() 派生的 10 秒超时上下文，
+// 专供任务失败后的状态回写使用。worker 的 jobCtx 在 provider 调用因 5 分钟
+// 超时取消后已经过期，继续用它调 FailAnalysis/RejectAnalysis 等回写会让
+// SQL 全部因 DeadlineExceeded 失败，任务永远停在 running/processing。
+func failContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 10*time.Second)
+}
 
 func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 	jobCtx, cancel := context.WithTimeout(ctx, analysisJobTimeout)
 	defer cancel()
+	failCtx, failCancel := failContext()
+	defer failCancel()
 	jobCtx = provider.WithProgressReporter(jobCtx, func(progress int, stage string) {
 		_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, progress, stage)
 	})
@@ -735,18 +753,18 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 	if err != nil {
 		var rejected *provider.PhotoRejectedError
 		if errors.As(err, &rejected) {
-			if failErr := s.repo.RejectAnalysis(jobCtx, job, rejected.UserMessage()); failErr != nil {
+			if failErr := s.repo.RejectAnalysis(failCtx, job, rejected.UserMessage()); failErr != nil {
 				s.logger.Error("reject analysis", "analysis_id", job.AnalysisID, "error", failErr)
 			}
 			return
 		}
-		_ = s.repo.FailAnalysis(jobCtx, job, err)
+		_ = s.repo.FailAnalysis(failCtx, job, err)
 		return
 	}
 	_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, 82, "正在组合发型、妆容与穿搭方案")
 	currentImageURL, err := s.analysisPreviewURL(jobCtx, job.UserID, job.Input.MediaIDs)
 	if err != nil {
-		_ = s.repo.FailAnalysis(jobCtx, job, err)
+		_ = s.repo.FailAnalysis(failCtx, job, err)
 		return
 	}
 	// The "current" image is source evidence, never a provider-generated or
@@ -760,7 +778,7 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 			return
 		}
 		s.logger.Error("complete analysis", "analysis_id", job.AnalysisID, "error", err)
-		_ = s.repo.FailAnalysis(jobCtx, job, err)
+		_ = s.repo.FailAnalysis(failCtx, job, err)
 	}
 }
 

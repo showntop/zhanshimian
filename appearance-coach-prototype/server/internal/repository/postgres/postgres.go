@@ -215,6 +215,22 @@ func (s *Store) ClaimAnalysisJob(ctx context.Context) (domain.AnalysisJob, bool,
 		return domain.AnalysisJob{}, false, err
 	}
 	defer tx.Rollback(ctx)
+	// 回收 worker 崩溃滞留的任务：locked_at 超过 10 分钟仍停留在 running，
+	// 说明执行它的 worker 已被杀（发布/OOM）。attempts 未满（上限 3，与
+	// FailAnalysis 一致）的任务重新排队并把 analyses 状态重置回 queued，
+	// 让前端轮询继续；attempts 用尽的任务直接置为 failed 终态，避免无限重试。
+	if _, err = tx.Exec(ctx, `UPDATE analyses SET status='failed',error_message='分析暂时没有完成，请稍后重试',stage='分析未完成',updated_at=now() WHERE id IN (SELECT analysis_id FROM analysis_jobs WHERE status='running' AND locked_at < now() - interval '10 minutes' AND attempts>=3)`); err != nil {
+		return domain.AnalysisJob{}, false, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE analysis_jobs SET status='failed',last_error='worker 处理超时，任务已终止',updated_at=now() WHERE status='running' AND locked_at < now() - interval '10 minutes' AND attempts>=3`); err != nil {
+		return domain.AnalysisJob{}, false, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE analyses SET status='queued',updated_at=now() WHERE id IN (SELECT analysis_id FROM analysis_jobs WHERE status='running' AND locked_at < now() - interval '10 minutes' AND attempts<3)`); err != nil {
+		return domain.AnalysisJob{}, false, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE analysis_jobs SET status='queued',next_run_at=now(),updated_at=now() WHERE status='running' AND locked_at < now() - interval '10 minutes' AND attempts<3`); err != nil {
+		return domain.AnalysisJob{}, false, err
+	}
 	var job domain.AnalysisJob
 	var payload []byte
 	err = tx.QueryRow(ctx, `
@@ -473,6 +489,15 @@ func (s *Store) ClaimPlanLook(ctx context.Context) (domain.PlanLookJob, bool, er
 		return domain.PlanLookJob{}, false, err
 	}
 	defer tx.Rollback(ctx)
+	// 回收 worker 崩溃滞留的生成任务：generation_locked_at 超过 10 分钟仍
+	// 停留在 processing 说明 worker 已被杀。attempts 上限与 FailPlanLook
+	// 一致（2 次）：用尽的任务置为 failed 终态，其余重新排队等待重领。
+	if _, err = tx.Exec(ctx, `UPDATE plans SET generation_status='failed',generation_error='形象生成超时，请稍后重试' WHERE generation_status='processing' AND generation_locked_at < now() - interval '10 minutes' AND generation_attempts>=2`); err != nil {
+		return domain.PlanLookJob{}, false, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE plans SET generation_status='queued',generation_next_run_at=now() WHERE generation_status='processing' AND generation_locked_at < now() - interval '10 minutes' AND generation_attempts<2`); err != nil {
+		return domain.PlanLookJob{}, false, err
+	}
 	var job domain.PlanLookJob
 	err = tx.QueryRow(ctx, `
 		SELECT p.id::text,p.report_id::text,p.user_id::text,p.name,p.slug,p.why,p.generation_attempts,a.media_ids::text[]
@@ -769,6 +794,15 @@ func (s *Store) ClaimHairPreview(ctx context.Context) (domain.HairPreviewJob, bo
 		return domain.HairPreviewJob{}, false, err
 	}
 	defer tx.Rollback(ctx)
+	// 回收 worker 崩溃滞留的预览任务：locked_at 超过 10 分钟仍停留在
+	// processing 说明 worker 已被杀。attempts 上限与 FailHairPreview 一致
+	// （2 次）：用尽的任务置为 failed 终态，其余重新排队等待重领。
+	if _, err = tx.Exec(ctx, `UPDATE hair_previews SET status='failed',stage='生成未完成',error_message='预览暂时没有生成，请稍后重试' WHERE status='processing' AND locked_at < now() - interval '10 minutes' AND attempts>=2`); err != nil {
+		return domain.HairPreviewJob{}, false, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE hair_previews SET status='queued',progress=12,stage='正在重新尝试',next_run_at=now() WHERE status='processing' AND locked_at < now() - interval '10 minutes' AND attempts<2`); err != nil {
+		return domain.HairPreviewJob{}, false, err
+	}
 	var job domain.HairPreviewJob
 	err = tx.QueryRow(ctx, `
 		SELECT id::text,user_id::text,attempts,media_id::text,coalesce(report_id::text,''),style_id,scene
@@ -813,6 +847,25 @@ func (s *Store) SaveHairPreview(ctx context.Context, userID, previewID string) (
 	return item, err
 }
 
+// deleteUserDataQueries 按依赖顺序列出注销账号时需要清理的用户数据。
+// users 必须放在最后：user_sessions 删除后旧 token 立即失效，而迁移里的
+// ON DELETE CASCADE 只在 users 行被删除时才会触发。
+var deleteUserDataQueries = []string{
+	`DELETE FROM share_cards WHERE user_id=$1`,
+	`DELETE FROM today_plans WHERE user_id=$1`,
+	`DELETE FROM wardrobe_outfits WHERE user_id=$1`,
+	`DELETE FROM wardrobe_items WHERE user_id=$1`,
+	`DELETE FROM advisor_conversations WHERE user_id=$1`,
+	`DELETE FROM product_events WHERE user_id=$1`,
+	`DELETE FROM tool_results WHERE user_id=$1`,
+	`DELETE FROM analyses WHERE user_id=$1`,
+	`DELETE FROM hair_previews WHERE user_id=$1`,
+	`DELETE FROM media_assets WHERE user_id=$1`,
+	`DELETE FROM feedback WHERE user_id=$1`,
+	`DELETE FROM user_sessions WHERE user_id=$1`,
+	`DELETE FROM users WHERE id=$1`,
+}
+
 func (s *Store) DeleteUserData(ctx context.Context, userID string) ([]string, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -833,32 +886,10 @@ func (s *Store) DeleteUserData(ctx context.Context, userID string) ([]string, er
 		keys = append(keys, key)
 	}
 	rows.Close()
-	if _, err = tx.Exec(ctx, `DELETE FROM share_cards WHERE user_id=$1`, userID); err != nil {
-		return nil, err
-	}
-	if _, err = tx.Exec(ctx, `DELETE FROM today_plans WHERE user_id=$1`, userID); err != nil {
-		return nil, err
-	}
-	if _, err = tx.Exec(ctx, `DELETE FROM wardrobe_outfits WHERE user_id=$1`, userID); err != nil {
-		return nil, err
-	}
-	if _, err = tx.Exec(ctx, `DELETE FROM wardrobe_items WHERE user_id=$1`, userID); err != nil {
-		return nil, err
-	}
-	if _, err = tx.Exec(ctx, `DELETE FROM advisor_conversations WHERE user_id=$1`, userID); err != nil {
-		return nil, err
-	}
-	if _, err = tx.Exec(ctx, `DELETE FROM product_events WHERE user_id=$1`, userID); err != nil {
-		return nil, err
-	}
-	if _, err = tx.Exec(ctx, `DELETE FROM tool_results WHERE user_id=$1`, userID); err != nil {
-		return nil, err
-	}
-	if _, err = tx.Exec(ctx, `DELETE FROM analyses WHERE user_id=$1`, userID); err != nil {
-		return nil, err
-	}
-	if _, err = tx.Exec(ctx, `DELETE FROM media_assets WHERE user_id=$1`, userID); err != nil {
-		return nil, err
+	for _, query := range deleteUserDataQueries {
+		if _, err = tx.Exec(ctx, query, userID); err != nil {
+			return nil, err
+		}
 	}
 	return keys, tx.Commit(ctx)
 }
