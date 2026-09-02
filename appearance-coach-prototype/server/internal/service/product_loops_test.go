@@ -48,3 +48,28 @@ func TestAbsoluteURLKeepsBundledAssetsAndExpandsUploads(t *testing.T) {
 		t.Fatalf("upload URL was not expanded: %q", got)
 	}
 }
+
+func TestHydrateShareSnapshotResolvesStoredImageURL(t *testing.T) {
+	service := &Service{publicBaseURL: "https://api.example.test"}
+	snapshot := service.hydrateShareSnapshot([]byte(`{"title":"方案","image_url":"/uploads/user/plan.jpg"}`))
+	if !strings.Contains(string(snapshot), `"image_url":"https://api.example.test/uploads/user/plan.jpg"`) {
+		t.Fatalf("relative snapshot URL was not expanded: %s", snapshot)
+	}
+	// Bundled assets must stay relative for the mini-program renderer.
+	snapshot = service.hydrateShareSnapshot([]byte(`{"title":"今日","image_url":"/assets/plans/sharp.jpg"}`))
+	if !strings.Contains(string(snapshot), `"image_url":"/assets/plans/sharp.jpg"`) {
+		t.Fatalf("bundled snapshot URL must stay relative: %s", snapshot)
+	}
+}
+
+func TestHydrateShareSnapshotRefreshesStaleSignedURL(t *testing.T) {
+	stale := "https://bucket.cos.ap-guangzhou.myqcloud.com/user/plan.jpg?sign=expired"
+	service := &Service{
+		publicBaseURL: "https://api.example.test",
+		storage:       refreshStorageStub{refreshed: map[string]string{stale: "https://bucket.cos.ap-guangzhou.myqcloud.com/user/plan.jpg?sign=fresh"}},
+	}
+	snapshot := service.hydrateShareSnapshot([]byte(`{"title":"方案","image_url":"` + stale + `"}`))
+	if !strings.Contains(string(snapshot), "sign=fresh") {
+		t.Fatalf("stale signed snapshot URL was not refreshed: %s", snapshot)
+	}
+}

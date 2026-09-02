@@ -122,7 +122,9 @@ func (s *Service) CreateShareCard(ctx context.Context, userID string, input doma
 		if imageURL == "" {
 			imageURL = item.ImageURL
 		}
-		snapshot = map[string]any{"title": item.Name, "summary": item.Descriptor, "image_url": s.absoluteURL(imageURL), "tags": item.OutcomeTags, "label": "我的形象方案"}
+		// Keep the snapshot URL relative: GetShareCard expands and re-signs it
+		// on every view, so a stored signed URL cannot expire on the viewer.
+		snapshot = map[string]any{"title": item.Name, "summary": item.Descriptor, "image_url": imageURL, "tags": item.OutcomeTags, "label": "我的形象方案"}
 	default:
 		return domain.ShareCard{}, fmt.Errorf("%w: 不支持的分享来源", ErrValidation)
 	}
@@ -137,7 +139,32 @@ func (s *Service) GetShareCard(ctx context.Context, token string) (domain.ShareC
 	if len(token) < 20 {
 		return domain.ShareCard{}, repository.ErrNotFound
 	}
-	return s.repo.GetShareCard(ctx, token)
+	card, err := s.repo.GetShareCard(ctx, token)
+	if err != nil {
+		return card, err
+	}
+	card.Snapshot = s.hydrateShareSnapshot(card.Snapshot)
+	return card, nil
+}
+
+// hydrateShareSnapshot expands the snapshot image URL at view time. Cards
+// created before snapshots were persisted relative may still carry an expired
+// signed URL; resolveAssetURL refreshes those and expands relative paths.
+func (s *Service) hydrateShareSnapshot(snapshot json.RawMessage) json.RawMessage {
+	var object map[string]any
+	if json.Unmarshal(snapshot, &object) != nil {
+		return snapshot
+	}
+	imageURL, ok := object["image_url"].(string)
+	if !ok || imageURL == "" {
+		return snapshot
+	}
+	object["image_url"] = s.resolveAssetURL(imageURL)
+	data, err := json.Marshal(object)
+	if err != nil {
+		return snapshot
+	}
+	return data
 }
 
 func (s *Service) RevokeShareCard(ctx context.Context, userID, cardID string) error {
