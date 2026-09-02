@@ -1,14 +1,14 @@
 <app-header transparent="{{true}}" />
 <scroll-view class="home-scroll" scroll-y enhanced show-scrollbar="{{false}}">
   <view class="home page-with-nav">
-    <view class="advisor-head fade-up">
+    <view class="advisor-head {{initialized ? 'fade-up' : ''}}">
       <view>
         <text class="advisor-kicker">私人形象顾问</text>
         <text class="advisor-greeting">{{hasProfile ? '上午好，今日造型穿搭建议' : '你好，我是你的私人形象顾问'}}</text>
       </view>
     </view>
 
-    <view wx:if="{{!hasProfile}}" class="profile-card first-card fade-up delay-1">
+    <view class="profile-card first-card {{initialized ? 'fade-up delay-1' : ''}}" hidden="{{hasProfile}}">
       <view class="card-topline"><text>形象档案</text><text>约 3 分钟</text></view>
       <text class="profile-title">先让我认识真实的你</text>
       <text class="profile-subtitle">上传 3 张照片，获得当前形象分析和 3 套本人方案</text>
@@ -23,7 +23,7 @@
       <view class="privacy-line"><image src="/assets/icons/shield-check.svg" /><text>照片可随时删除，仅用于生成分析</text></view>
     </view>
 
-    <view wx:else class="today-card fade-up delay-1">
+    <view class="today-card {{initialized ? 'fade-up delay-1' : ''}}" hidden="{{!hasProfile}}">
       <view class="today-card-head">
         <view class="weather-line"><image src="/assets/icons/sun.svg" /><text>{{todayPlan ? todayPlan.context.city + ' · ' + todayPlan.context.condition + ' · ' + todayPlan.context.temperature + '°C' : '上海 · 多云 · 26°C'}}</text></view>
         <text class="day-kind">{{todayPlan ? todayPlan.context.day_type + ' · ' + todayPlan.context.schedule : '工作日 · 通勤'}}</text>
@@ -43,14 +43,14 @@
       <button class="today-action pressable" loading="{{todayOpening}}" disabled="{{todayOpening}}" bindtap="openToday">{{todayOpening ? '正在打开今日方案…' : (todayPlan ? '查看今日完整方案' : '生成我的今日方案')}} <text wx:if="{{!todayOpening}}">›</text></button>
     </view>
 
-    <view wx:if="{{tasks.length}}" class="task-stack fade-up delay-1">
+    <view class="task-stack {{initialized ? 'fade-up delay-1' : ''}}" hidden="{{!tasks.length}}">
       <button wx:for="{{tasks}}" wx:key="kind" class="task-banner pressable" data-index="{{index}}" bindtap="openTask">
         <view class="task-state {{item.state}}"><view wx:if="{{item.state === 'queued' || item.state === 'processing'}}" class="task-spinner" /><icon wx:elif="{{item.state === 'completed'}}" type="success_no_circle" size="18" color="#ffffff" /><text wx:else>!</text></view>
         <view class="task-copy"><text>{{item.title}}</text><text>{{item.note}}</text></view><text class="task-action">{{item.action}} ›</text>
       </button>
     </view>
 
-    <view wx:if="{{hasProfile}}" class="product-section scene-section fade-up delay-2">
+    <view class="product-section scene-section {{initialized ? 'fade-up delay-2' : ''}}" hidden="{{!hasProfile}}">
       <view class="section-head"><view><text class="section-heading">你准备去哪里？</text><text class="section-note">选一个场合，我来组合适合你的方案</text></view></view>
       <view class="scene-grid">
         <button wx:for="{{scenes}}" wx:key="id" class="scene-item pressable" data-scene="{{item.id}}" bindtap="chooseScene">
@@ -61,14 +61,13 @@
       </view>
     </view>
 
-    <view class="product-section result-section fade-up delay-2">
+    <view class="product-section result-section {{initialized ? 'fade-up delay-2' : ''}}">
       <view class="section-head"><view><text class="section-heading">{{hasProfile ? '最近方案' : '你会得到什么'}}</text><text class="section-note">当前与方案一眼对比</text></view><button wx:if="{{hasProfile}}" class="text-action" bindtap="openExample">全部方案</button></view>
       <button class="comparison-card pressable" bindtap="openExample">
         <view class="comparison-images">
           <view class="comparison-half">
-            <image wx:if="{{hasProfile && currentLookUrl}}" src="{{currentLookUrl}}" mode="aspectFill" />
-            <image wx:elif="{{!hasProfile}}" src="/assets/reports/natural.jpg" mode="aspectFill" />
-            <view wx:else class="comparison-image-empty"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>当前照片</text></view>
+            <image class="comparison-image" src="{{hasProfile ? (currentLookUrl || '') : '/assets/reports/natural.jpg'}}" mode="aspectFill" hidden="{{hasProfile && !currentLookUrl}}" />
+            <view class="comparison-image-empty" hidden="{{!(hasProfile && !currentLookUrl)}}"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>当前照片</text></view>
             <text class="image-chip">{{hasProfile ? '当前' : '示例'}}</text>
           </view>
           <view class="comparison-half plan-half"><image class="{{referenceGenerated ? 'generated-reference' : ''}}" src="{{referenceLookUrl}}" mode="{{referenceGenerated ? 'widthFix' : 'aspectFill'}}" /><text class="image-chip plan-chip">{{referenceDemo ? '流程预览' : (referenceGenerated ? '本人方案' : '风格参考')}}</text></view>
@@ -78,7 +77,7 @@
       </button>
     </view>
 
-    <view wx:if="{{hasProfile}}" class="product-section tool-section fade-up delay-3">
+    <view class="product-section tool-section {{initialized ? 'fade-up delay-3' : ''}}" hidden="{{!hasProfile}}">
       <view class="section-head"><view><text class="section-heading">快捷工具</text><text class="section-note">处理今天眼前的一件事</text></view></view>
       <scroll-view class="tool-rail" scroll-x enhanced show-scrollbar="{{false}}">
         <view class="tool-row">

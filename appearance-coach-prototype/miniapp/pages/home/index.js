@@ -26,12 +26,23 @@ Page({
     todayPlan: null,
     previewOpen: false,
     todayOpening: false,
-    tasks: []
+    tasks: [],
+    initialized: false
+  },
+  onLoad() {
+    // Trigger entrance animations only on first page load, not on tab switch.
+    this.setData({ initialized: true })
   },
   onShow() {
-	api.trackEvent('page_view', { page: 'home' }).catch(() => {})
+    api.trackEvent('page_view', { page: 'home' }).catch(() => {})
     const reportID = wx.getStorageSync('jianwo_report_id') || ''
-    this.setData({ hasProfile: Boolean(reportID), reportID, currentLookUrl: '', todayOpening: false, tasks: [] })
+    const hadProfile = this.data.hasProfile
+    const hasProfile = Boolean(reportID)
+    // Avoid wiping image URLs while refreshing so the screen doesn't flash
+    // from placeholder/empty back to real images when returning from another tab.
+    const update = { reportID, todayOpening: false }
+    if (hadProfile !== hasProfile) update.hasProfile = hasProfile
+    this.setData(update)
     this.refreshTasks(reportID)
     if (reportID) {
       api.getTodayPlan().then((todayPlan) => {
