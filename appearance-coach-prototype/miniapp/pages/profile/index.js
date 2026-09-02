@@ -6,8 +6,11 @@ Page({
   onShow() {
     const reportID = wx.getStorageSync('jianwo_report_id') || ''
     const savedPlanID = wx.getStorageSync('jianwo_saved_plan_id') || wx.getStorageSync('jianwo_plan_id') || ''
-    this.setData({ hasReport: Boolean(reportID), hasPlan: Boolean(savedPlanID), profileImage: '' })
-    if (!reportID) return
+    this.setData({ hasReport: Boolean(reportID), hasPlan: Boolean(savedPlanID) })
+    if (!reportID) { this.setData({ profileImage: '' }); return }
+    // Keep the previously loaded avatar instead of clearing it on every show,
+    // so switching back to this tab doesn't flash placeholder -> photo.
+    if (this.data.profileImage) return
     api.getReport(reportID)
       .then((report) => api.getAnalysis(report.analysis_id))
       .then((analysis) => {
@@ -18,7 +21,7 @@ Page({
   },
   openReport() { const id = wx.getStorageSync('jianwo_report_id'); if (id) wx.navigateTo({ url: `/pages/report/index?id=${id}` }) },
   openPlan() { const id = wx.getStorageSync('jianwo_saved_plan_id') || wx.getStorageSync('jianwo_plan_id'); if (id) wx.navigateTo({ url: `/pages/plan/index?id=${id}` }) },
-  reanalyze() { wx.navigateTo({ url: '/pages/capture/index?scene=general&replace=1' }) },
+  reanalyze() { this.setData({ profileImage: '' }); wx.navigateTo({ url: '/pages/capture/index?scene=general&replace=1' }) },
   editBasic() { wx.showToast({ title: '基础资料编辑将在下一版开放', icon: 'none' }) },
   editBody() { wx.showModal({ title: '身体数据为选填', content: '体重和三围只在需要提升穿搭准确度或体验 3D/试衣时填写，不影响基础形象分析。', showCancel: false, confirmText: '知道了' }) },
   openLab() { wx.navigateTo({ url: '/pages/lab/index' }) },
