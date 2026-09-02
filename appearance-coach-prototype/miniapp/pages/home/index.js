@@ -17,9 +17,9 @@ Page({
     ],
     hasProfile: false,
     reportID: '',
-    todayLookUrl: '/assets/plans/sharp.jpg',
+    todayLookUrl: '/assets/placeholders/figure.png',
     currentLookUrl: '',
-    referenceLookUrl: '/assets/reports/sharp.jpg',
+    referenceLookUrl: '/assets/placeholders/figure.png',
     referenceGenerated: false,
     referenceDemo: false,
     comparisonTitle: '清晰利落',
@@ -44,7 +44,7 @@ Page({
         const generatedURL = featured && userImage(featured.generated_image_url)
         this.setData({
           currentLookUrl: userImage(report.current_image_url),
-          referenceLookUrl: featured ? (generatedURL || lookImage(featured.image_url, featured.slug, 'report')) : '/assets/reports/sharp.jpg',
+          referenceLookUrl: featured ? (generatedURL || lookImage(featured.image_url, featured.slug, 'report')) : '/assets/placeholders/figure.png',
           referenceGenerated: Boolean(generatedURL),
           referenceDemo: Boolean(featured && (/^demo\//.test(featured.look_provider || '') || /^demo-/.test(featured.look_provider || ''))),
           comparisonTitle: featured ? featured.name : '清晰利落'

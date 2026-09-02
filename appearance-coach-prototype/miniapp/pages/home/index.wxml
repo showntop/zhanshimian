@@ -36,7 +36,7 @@
           <view class="style-detail"><text class="detail-label">穿搭</text><text>{{todayPlan ? todayPlan.steps[2].title : '米白薄西装 · 垂感长裤'}}</text></view>
         </view>
         <button class="today-thumb-wrap pressable" bindtap="previewTodayLook" aria-label="查看今日穿搭大图">
-          <image class="today-thumb" src="{{todayLookUrl}}" mode="aspectFill" />
+          <smart-image className="today-thumb" src="{{todayLookUrl}}" placeholder="/assets/placeholders/figure.png" mode="aspectFill" />
           <text class="today-thumb-hint">点开看大图</text>
         </button>
       </view>
@@ -66,12 +66,12 @@
       <button class="comparison-card pressable" bindtap="openExample">
         <view class="comparison-images">
           <view class="comparison-half">
-            <image wx:if="{{hasProfile && currentLookUrl}}" src="{{currentLookUrl}}" mode="aspectFill" />
-            <image wx:elif="{{!hasProfile}}" src="/assets/reports/natural.jpg" mode="aspectFill" />
+            <smart-image wx:if="{{hasProfile && currentLookUrl}}" className="comparison-image" src="{{currentLookUrl}}" placeholder="/assets/placeholders/figure.png" mode="aspectFill" />
+            <smart-image wx:elif="{{!hasProfile}}" className="comparison-image" src="/assets/placeholders/figure.png" placeholder="/assets/placeholders/figure.png" mode="aspectFill" />
             <view wx:else class="comparison-image-empty"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>当前照片</text></view>
             <text class="image-chip">{{hasProfile ? '当前' : '示例'}}</text>
           </view>
-          <view class="comparison-half plan-half"><image class="{{referenceGenerated ? 'generated-reference' : ''}}" src="{{referenceLookUrl}}" mode="{{referenceGenerated ? 'widthFix' : 'aspectFill'}}" /><text class="image-chip plan-chip">{{referenceDemo ? '流程预览' : (referenceGenerated ? '本人方案' : '风格参考')}}</text></view>
+          <view class="comparison-half plan-half"><smart-image className="comparison-image {{referenceGenerated ? 'generated-reference' : ''}}" src="{{referenceLookUrl}}" placeholder="/assets/placeholders/figure.png" mode="{{referenceGenerated ? 'widthFix' : 'aspectFill'}}" /><text class="image-chip plan-chip">{{referenceDemo ? '流程预览' : (referenceGenerated ? '本人方案' : '风格参考')}}</text></view>
           <view class="comparison-arrow">→</view>
         </view>
         <view class="comparison-footer"><view class="comparison-copy"><text class="comparison-title">{{comparisonTitle}}</text><text class="comparison-sub">发型 · 妆容 · 穿搭已组合</text></view><text class="example-link">查看 ›</text></view>
@@ -96,7 +96,7 @@
 <bottom-nav active="home" />
 <view wx:if="{{previewOpen}}" class="look-lightbox" catchtap="closeTodayLook">
   <view class="look-lightbox-inner" catchtap="noop">
-    <image src="{{todayLookUrl}}" mode="aspectFit" />
+    <smart-image className="lightbox-image" src="{{todayLookUrl}}" placeholder="/assets/placeholders/figure.png" mode="aspectFit" />
     <text>点击任意处关闭</text>
   </view>
 </view>

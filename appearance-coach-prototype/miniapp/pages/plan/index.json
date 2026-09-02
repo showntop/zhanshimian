@@ -1,6 +1,7 @@
 {
   "usingComponents": {
     "app-header": "/components/app-header/index",
-    "primary-button": "/components/primary-button/index"
+    "primary-button": "/components/primary-button/index",
+    "smart-image": "/components/smart-image/index"
   }
 }

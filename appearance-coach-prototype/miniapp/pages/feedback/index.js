@@ -8,7 +8,7 @@ Page({
     selected: [],
     comment: '',
     feedbackImage: '',
-    referenceImage: '/assets/looks/sharp.jpg',
+    referenceImage: '/assets/placeholders/figure.png',
     loading: false,
     done: false
   },

@@ -5,7 +5,7 @@
     <view class="status fade-up"><icon type="success" size="18" color="#587344" /><text>分析完成 · 已保存至形象档案</text></view>
     <text class="report-title serif fade-up">你的形象特点，已经看清楚了</text>
     <view class="current-card fade-up delay-1">
-      <image wx:if="{{image}}" src="{{image}}" mode="aspectFill" fade-show="{{false}}" />
+      <smart-image wx:if="{{image}}" className="current-photo" src="{{image}}" placeholder="/assets/placeholders/figure.png" mode="aspectFill" />
       <view wx:else class="image-unavailable"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>当前照片加载中</text></view>
       <text class="current-label">当前形象</text>
       <view wx:for="{{annotations}}" wx:key="id" class="finding {{item.alignClass}}" style="left: {{item.styleLeft}}; top: {{item.styleTop}};"><text class="number">{{index + 1}}</text><text>{{item.label}}</text><view class="connector" /></view>

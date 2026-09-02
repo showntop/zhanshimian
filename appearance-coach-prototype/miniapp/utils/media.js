@@ -1,24 +1,24 @@
 const LOCAL_LOOKS = {
   natural: {
-    full: '/assets/looks/natural.jpg',
-    portrait: '/assets/portraits/natural.jpg',
-    report: '/assets/reports/natural.jpg',
-    hair: '/assets/hair/natural.jpg',
-    plan: '/assets/plans/natural.jpg'
+    full: '/assets/placeholders/figure.png',
+    portrait: '/assets/placeholders/portrait.png',
+    report: '/assets/placeholders/figure.png',
+    hair: '/assets/placeholders/detail.png',
+    plan: '/assets/placeholders/figure.png'
   },
   sharp: {
-    full: '/assets/looks/sharp.jpg',
-    portrait: '/assets/portraits/sharp.jpg',
-    report: '/assets/reports/sharp.jpg',
-    hair: '/assets/hair/sharp.jpg',
-    plan: '/assets/plans/sharp.jpg'
+    full: '/assets/placeholders/figure.png',
+    portrait: '/assets/placeholders/portrait.png',
+    report: '/assets/placeholders/figure.png',
+    hair: '/assets/placeholders/detail.png',
+    plan: '/assets/placeholders/figure.png'
   },
   warm: {
-    full: '/assets/looks/warm.jpg',
-    portrait: '/assets/portraits/warm.jpg',
-    report: '/assets/reports/warm.jpg',
-    hair: '/assets/hair/warm.jpg',
-    plan: '/assets/plans/warm.jpg'
+    full: '/assets/placeholders/figure.png',
+    portrait: '/assets/placeholders/portrait.png',
+    report: '/assets/placeholders/figure.png',
+    hair: '/assets/placeholders/detail.png',
+    plan: '/assets/placeholders/figure.png'
   }
 }
 

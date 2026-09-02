@@ -2,6 +2,7 @@
   "usingComponents": {
     "app-header": "/components/app-header/index",
     "primary-button": "/components/primary-button/index",
-    "bottom-nav": "/components/bottom-nav/index"
+    "bottom-nav": "/components/bottom-nav/index",
+    "smart-image": "/components/smart-image/index"
   }
 }

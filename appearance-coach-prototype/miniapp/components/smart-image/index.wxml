@@ -1,0 +1,4 @@
+<view class="smart-image {{className}}">
+  <image wx:if="{{placeholder && !loaded}}" class="smart-placeholder" src="{{placeholder}}" mode="{{placeholderMode}}" />
+  <image wx:if="{{src}}" class="smart-real" src="{{src}}" mode="{{mode}}" bindload="onLoad" binderror="onError" style="opacity: {{loaded ? 1 : 0}};" />
+</view>
