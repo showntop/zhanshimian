@@ -57,7 +57,7 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 	if err != nil {
 		return AIBundle{}, err
 	}
-	loader := service.NewAnalysisMediaLoader(repo, objects, cfg.PublicBaseURL, cfg.MaxUploadBytes)
+	loader := service.NewAnalysisMediaLoader(repo, objects, cfg.PublicBaseURL, cfg.MaxUploadBytes, cfg.AssetDir)
 	analyzer, err := provider.NewRoutedAnalyzer(runtime, loader)
 	if err != nil {
 		return AIBundle{}, err
@@ -94,7 +94,7 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 }
 
 func buildLegacyAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStorage) (AIBundle, error) {
-	loader := service.NewAnalysisMediaLoader(repo, objects, cfg.PublicBaseURL, cfg.MaxUploadBytes)
+	loader := service.NewAnalysisMediaLoader(repo, objects, cfg.PublicBaseURL, cfg.MaxUploadBytes, cfg.AssetDir)
 	demoAnalyzer := provider.Analyzer(provider.NewDemoAnalyzer())
 	analyzer := demoAnalyzer
 	if cfg.AIProvider == "openai" {

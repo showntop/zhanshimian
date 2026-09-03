@@ -29,7 +29,6 @@ Page({
   },
   preview() { this.setData({ previewOpen: true }) },
   closePreview() { this.setData({ previewOpen: false }) },
-  noop() {},
   sharePlan() { wx.navigateTo({ url: `/pages/share/index?type=today&id=${this.data.plan.id}` }) },
   openAdvisor() { wx.navigateTo({ url: `/pages/advisor/index?todayPlanId=${this.data.plan.id}` }) }
 })

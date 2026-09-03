@@ -66,14 +66,20 @@
       <button class="comparison-card pressable" bindtap="openExample">
         <view class="comparison-images">
           <view class="comparison-half">
-            <image class="comparison-image" src="{{hasProfile ? (currentLookUrl || '') : '/assets/reports/natural.jpg'}}" mode="aspectFill" hidden="{{hasProfile && !currentLookUrl}}" />
+            <image class="comparison-fill" src="{{hasProfile ? (currentLookUrl || '') : '/assets/reports/natural.jpg'}}" mode="widthFix" hidden="{{hasProfile && !currentLookUrl}}" />
             <view class="comparison-image-empty" hidden="{{!(hasProfile && !currentLookUrl)}}"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>当前照片</text></view>
             <text class="image-chip">{{hasProfile ? '当前' : '示例'}}</text>
           </view>
-          <view class="comparison-half plan-half"><image class="{{referenceGenerated ? 'generated-reference' : ''}}" src="{{referenceLookUrl}}" mode="{{referenceGenerated ? 'widthFix' : 'aspectFill'}}" /><text class="image-chip plan-chip">{{referenceDemo ? '流程预览' : (referenceGenerated ? '本人方案' : '风格参考')}}</text></view>
+          <view class="comparison-half plan-half">
+            <view wx:if="{{hasProfile && !referenceGenerated && !referenceDemo}}" class="comparison-image-empty"><image src="/assets/capture/body-line.png" mode="aspectFit" /><text>生成本人方案后可对比</text></view>
+            <block wx:else>
+              <image class="comparison-fill" src="{{referenceLookUrl}}" mode="widthFix" />
+              <text class="image-chip plan-chip">{{hasProfile ? (referenceDemo ? '流程预览' : '本人方案') : '风格参考'}}</text>
+            </block>
+          </view>
           <view class="comparison-arrow">→</view>
         </view>
-        <view class="comparison-footer"><view class="comparison-copy"><text class="comparison-title">{{comparisonTitle}}</text><text class="comparison-sub">发型 · 妆容 · 穿搭已组合</text></view><text class="example-link">查看 ›</text></view>
+        <view class="comparison-footer"><view class="comparison-copy"><text class="comparison-title">{{comparisonTitle}}</text><text class="comparison-sub">{{hasProfile && !referenceGenerated && !referenceDemo ? '生成后可在这里一眼对比' : '发型 · 妆容 · 穿搭已组合'}}</text></view><text class="example-link">查看 ›</text></view>
       </button>
     </view>
 
@@ -93,7 +99,7 @@
   </view>
 </scroll-view>
 <view wx:if="{{previewOpen}}" class="look-lightbox" catchtap="closeTodayLook">
-  <view class="look-lightbox-inner" catchtap="noop">
+  <view class="look-lightbox-inner">
     <image src="{{todayLookUrl}}" mode="aspectFit" />
     <text>点击任意处关闭</text>
   </view>

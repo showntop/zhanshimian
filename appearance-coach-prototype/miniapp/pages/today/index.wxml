@@ -30,4 +30,4 @@
   <view wx:elif="{{loading}}" class="today-generating"><view class="today-spinner" /><text class="serif">正在生成你的今日方案</text><text>结合天气、日程和形象档案，整理今天可直接执行的发型、妆容与穿搭。</text></view>
   <view wx:else class="today-error"><image src="/assets/icons/sun.svg" /><text class="serif">今日方案暂时没有生成</text><text>{{error || '网络恢复后可以继续尝试。'}}</text><button bindtap="load">重新生成</button></view>
 </view>
-<view wx:if="{{previewOpen}}" class="preview-overlay" catchtap="closePreview"><view catchtap="noop"><image src="{{plan.image_url}}" mode="aspectFit" /><text>搭配示意 · 点击关闭</text></view></view>
+<view wx:if="{{previewOpen}}" class="preview-overlay" catchtap="closePreview"><view><image src="{{plan.image_url}}" mode="aspectFit" /><text>搭配示意 · 点击关闭</text></view></view>

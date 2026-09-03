@@ -412,12 +412,16 @@ func (s *Store) CreateScenePlans(ctx context.Context, userID, reportID string, i
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
-	var exists bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM reports WHERE id=$1 AND user_id=$2)`, reportID, userID).Scan(&exists); err != nil {
-		return nil, err
-	}
-	if !exists {
+	// 用 reports 行锁把同一报告的场景方案重建串行化：并发双击/重复提交时，
+	// 后一个事务等待前一个提交后再 DELETE+INSERT，避免撞上
+	// plans_report_scene_slug_key 唯一约束返回 500。
+	var lockedReport string
+	err = tx.QueryRow(ctx, `SELECT id::text FROM reports WHERE id=$1 AND user_id=$2 FOR UPDATE`, reportID, userID).Scan(&lockedReport)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, repository.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM plans WHERE report_id=$1 AND user_id=$2 AND scene=$3`, reportID, userID, input.Scene); err != nil {
 		return nil, err

@@ -70,7 +70,7 @@ Page({
           referenceLookUrl: featured ? (generatedURL || lookImage(featured.image_url, featured.slug, 'report')) : '/assets/reports/sharp.jpg',
           referenceGenerated: Boolean(generatedURL),
           referenceDemo: Boolean(featured && (/^demo\//.test(featured.look_provider || '') || /^demo-/.test(featured.look_provider || ''))),
-          comparisonTitle: featured ? featured.name : '清晰利落'
+          comparisonTitle: featured ? featured.name : '本人方案待生成'
         })
       }).catch(() => {})
     }
@@ -155,7 +155,6 @@ Page({
     this.setData({ previewOpen: true })
   },
   closeTodayLook() { this.setData({ previewOpen: false }) },
-  noop() {},
   start() { wx.navigateTo({ url: '/pages/capture/index?scene=general' }) },
   openReport() {
     if (this.data.reportID) wx.navigateTo({ url: `/pages/report/index?id=${this.data.reportID}` })

@@ -205,7 +205,7 @@ func buildScenePlans(input domain.ScenePlanInput) []domain.Plan {
 			Name:           sceneLabels[input.Scene] + " · " + styleNames[slug],
 			Slug:           slug,
 			Scene:          input.Scene,
-			ImageURL:       "/assets/plans/" + slug + ".webp",
+			ImageURL:       "/assets/plans/" + slug + ".jpg",
 			Descriptor:     sceneImpressions[impression] + " · " + sceneTone(input),
 			Why:            styleNotes[slug] + " 这次是" + sceneContext(input) + "，优先" + preparationDescriptor(input) + "。",
 			OutcomeTags:    []string{sceneImpressions[impression], sceneTone(input), preparationDescriptor(input)},

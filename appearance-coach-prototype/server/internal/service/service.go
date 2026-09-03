@@ -609,7 +609,13 @@ func (s *Service) RunWorker(ctx context.Context, poll time.Duration) {
 			if !ok {
 				continue
 			}
-			s.processJob(ctx, job)
+			s.guardWorkerJob("analysis", job.AnalysisID, func(cause error) {
+				failCtx, failCancel := failContext()
+				defer failCancel()
+				if err := s.repo.FailAnalysis(failCtx, job, cause); err != nil {
+					s.logger.Error("fail analysis after panic", "analysis_id", job.AnalysisID, "error", err)
+				}
+			}, func() { s.processJob(ctx, job) })
 		}
 	}
 }
@@ -629,7 +635,13 @@ func (s *Service) runHairPreviewWorker(ctx context.Context, poll time.Duration) 
 				continue
 			}
 			if ok {
-				s.processHairPreview(ctx, job)
+				s.guardWorkerJob("hair_preview", job.PreviewID, func(cause error) {
+					failCtx, failCancel := failContext()
+					defer failCancel()
+					if err := s.repo.FailHairPreview(failCtx, job, cause); err != nil {
+						s.logger.Error("fail hair preview after panic", "preview_id", job.PreviewID, "error", err)
+					}
+				}, func() { s.processHairPreview(ctx, job) })
 			}
 		}
 	}
@@ -650,7 +662,13 @@ func (s *Service) runPlanLookWorker(ctx context.Context, poll time.Duration) {
 				continue
 			}
 			if ok {
-				s.processPlanLook(ctx, job)
+				s.guardWorkerJob("plan_look", job.PlanID, func(cause error) {
+					failCtx, failCancel := failContext()
+					defer failCancel()
+					if err := s.repo.FailPlanLook(failCtx, job, cause); err != nil {
+						s.logger.Error("fail plan look after panic", "plan_id", job.PlanID, "error", err)
+					}
+				}, func() { s.processPlanLook(ctx, job) })
 			}
 		}
 	}
@@ -675,14 +693,17 @@ func (s *Service) processPlanLook(ctx context.Context, job domain.PlanLookJob) {
 		_ = s.repo.FailPlanLook(failCtx, job, errors.New("look provider returned an unsupported image format"))
 		return
 	}
+	// 生成可能已经用满 jobCtx，存储与回写改用独立上下文，避免成果被丢弃重排。
+	writeCtx, writeCancel := writeContext()
+	defer writeCancel()
 	storageKey := fmt.Sprintf("%s/generated/looks/%s%s", job.UserID, uuid.NewString(), extension)
-	storedKey, saveErr := s.storage.Save(jobCtx, storageKey, bytes.NewReader(output.ImageData))
+	storedKey, saveErr := s.storage.Save(writeCtx, storageKey, bytes.NewReader(output.ImageData))
 	if saveErr != nil {
 		_ = s.repo.FailPlanLook(failCtx, job, saveErr)
 		return
 	}
-	if err := s.repo.CompletePlanLook(jobCtx, job, "/uploads/"+storedKey, storedKey, output.ProviderVersion); err != nil {
-		_ = s.storage.Delete(jobCtx, storedKey)
+	if err := s.repo.CompletePlanLook(writeCtx, job, "/uploads/"+storedKey, storedKey, output.ProviderVersion); err != nil {
+		_ = s.storage.Delete(writeCtx, storedKey)
 		s.logger.Error("complete plan look", "plan_id", job.PlanID, "error", err)
 		_ = s.repo.FailPlanLook(failCtx, job, err)
 	}
@@ -699,6 +720,8 @@ func (s *Service) processHairPreview(ctx context.Context, job domain.HairPreview
 		return
 	}
 	resultURL, storageKey := output.ImageURL, ""
+	writeCtx, writeCancel := writeContext()
+	defer writeCancel()
 	if len(output.ImageData) > 0 {
 		extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
 		if extension == "" {
@@ -706,7 +729,7 @@ func (s *Service) processHairPreview(ctx context.Context, job domain.HairPreview
 			return
 		}
 		storageKey = fmt.Sprintf("%s/generated/hair/%s%s", job.UserID, uuid.NewString(), extension)
-		storedKey, saveErr := s.storage.Save(jobCtx, storageKey, bytes.NewReader(output.ImageData))
+		storedKey, saveErr := s.storage.Save(writeCtx, storageKey, bytes.NewReader(output.ImageData))
 		if saveErr != nil {
 			_ = s.repo.FailHairPreview(failCtx, job, saveErr)
 			return
@@ -718,9 +741,9 @@ func (s *Service) processHairPreview(ctx context.Context, job domain.HairPreview
 		_ = s.repo.FailHairPreview(failCtx, job, errors.New("hair preview provider returned no image"))
 		return
 	}
-	if err := s.repo.CompleteHairPreview(jobCtx, job, resultURL, storageKey, output.ProviderVersion); err != nil {
+	if err := s.repo.CompleteHairPreview(writeCtx, job, resultURL, storageKey, output.ProviderVersion); err != nil {
 		if storageKey != "" {
-			_ = s.storage.Delete(jobCtx, storageKey)
+			_ = s.storage.Delete(writeCtx, storageKey)
 		}
 		s.logger.Error("complete hair preview", "preview_id", job.PreviewID, "error", err)
 		_ = s.repo.FailHairPreview(failCtx, job, err)
@@ -739,6 +762,28 @@ const (
 // SQL 全部因 DeadlineExceeded 失败，任务永远停在 running/processing。
 func failContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 10*time.Second)
+}
+
+// writeContext 返回一个独立的 1 分钟超时上下文，供生成完成后的对象存储写入
+// 与状态回写使用。provider 调用可能几乎用满 jobCtx 的 5 分钟，继续用 jobCtx
+// 会把已经生成完的图丢弃并把任务重新排队，用户看到的是方案一直"生成中"。
+func writeContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), time.Minute)
+}
+
+// guardWorkerJob 把单个任务的 panic 转成普通失败回写，避免一个"毒任务"直接
+// 崩掉 worker 进程（RUN_WORKER 内嵌时会连 API 一起崩），导致所有已领取的
+// 任务永远停在 running/processing。
+func (s *Service) guardWorkerJob(kind, id string, fail func(error), run func()) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			s.logger.Error("worker job panicked", "kind", kind, "id", id, "panic", recovered)
+			if fail != nil {
+				fail(fmt.Errorf("worker %s job panicked: %v", kind, recovered))
+			}
+		}
+	}()
+	run()
 }
 
 func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
@@ -762,7 +807,9 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 		return
 	}
 	_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, 82, "正在组合发型、妆容与穿搭方案")
-	currentImageURL, err := s.analysisPreviewURL(jobCtx, job.UserID, job.Input.MediaIDs)
+	writeCtx, writeCancel := writeContext()
+	defer writeCancel()
+	currentImageURL, err := s.analysisPreviewURL(writeCtx, job.UserID, job.Input.MediaIDs)
 	if err != nil {
 		_ = s.repo.FailAnalysis(failCtx, job, err)
 		return
@@ -772,7 +819,7 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 	// user-photo contract.
 	output.CurrentImageURL = currentImageURL
 	_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, 95, "正在保存形象档案")
-	if _, err := s.repo.CompleteAnalysis(jobCtx, job, output); err != nil {
+	if _, err := s.repo.CompleteAnalysis(writeCtx, job, output); err != nil {
 		if errors.Is(err, repository.ErrAnalysisRemoved) {
 			s.logger.Info("analysis removed while processing; discarding result", "analysis_id", job.AnalysisID)
 			return

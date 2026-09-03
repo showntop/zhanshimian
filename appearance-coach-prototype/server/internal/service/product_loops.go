@@ -185,7 +185,7 @@ func (s *Service) CreateWardrobeItem(ctx context.Context, userID string, input d
 	if len(input.Scenes) == 0 {
 		input.Scenes = []string{"daily"}
 	}
-	imageURL := map[string]string{"top": "/assets/plans/warm.webp", "bottom": "/assets/plans/sharp.webp", "outer": "/assets/plans/natural.webp", "shoes": "/assets/reports/sharp.webp", "bag": "/assets/reports/warm.webp"}[input.Category]
+	imageURL := map[string]string{"top": "/assets/plans/warm.jpg", "bottom": "/assets/plans/sharp.jpg", "outer": "/assets/plans/natural.jpg", "shoes": "/assets/reports/sharp.jpg", "bag": "/assets/reports/warm.jpg"}[input.Category]
 	if input.MediaID != "" {
 		assets, err := s.repo.GetMediaAssetsForUser(ctx, userID, []string{input.MediaID})
 		if err != nil || len(assets) != 1 || assets[0].Kind != "wardrobe" {
