@@ -192,7 +192,7 @@ module.exports = {
 	getHairPreview: (id) => ensureSession().then(() => request(`/v1/hair-previews/${id}`)),
 	getSavedHairPreviews: () => ensureSession().then(() => request('/v1/hair-previews')),
 	saveHairPreview: (id) => ensureSession().then(() => request(`/v1/hair-previews/${id}/save`, { method: 'POST' })),
-  getTodayContext: () => ensureSession().then(() => request('/v1/today/context')),
+  getTodayContext: (city) => ensureSession().then(() => request('/v1/today/context' + (city ? '?city=' + encodeURIComponent(city) : ''))),
   getTodayPlan: () => ensureSession().then(() => request('/v1/today/plans/current')),
   createTodayPlan: (data) => ensureSession().then(() => request('/v1/today/plans', { method: 'POST', data })),
   activateTodayPlan: (id) => request(`/v1/today/plans/${id}/activate`, { method: 'POST' }),

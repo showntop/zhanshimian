@@ -15,9 +15,6 @@ import (
 
 func (s *Service) buildTodayContext(ctx context.Context, city, schedule string) (domain.TodayContext, error) {
 	now := time.Now()
-	if strings.TrimSpace(schedule) == "" {
-		schedule = "通勤"
-	}
 	weather, err := s.weather.Current(ctx, city)
 	if err != nil {
 		return domain.TodayContext{}, fmt.Errorf("load weather: %w", err)
@@ -25,6 +22,13 @@ func (s *Service) buildTodayContext(ctx context.Context, city, schedule string) 
 	dayType := "工作日"
 	if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
 		dayType = "休息日"
+	}
+	// 日程未指定时按工作日/休息日给出合理默认，不再对所有用户硬编码"通勤"
+	if strings.TrimSpace(schedule) == "" {
+		schedule = "通勤"
+		if dayType == "休息日" {
+			schedule = "休息"
+		}
 	}
 	return domain.TodayContext{Date: now.Format("2006-01-02"), City: weather.City, Condition: weather.Condition, Temperature: weather.Temperature, DayType: dayType, Schedule: schedule}, nil
 }

@@ -65,7 +65,7 @@ Page({
     }).catch((error) => wx.showToast({ title: error.message, icon: 'none' })).finally(() => this.setData({ loading: false }))
   },
   startAnalysis() {
-    if (this.data.completed !== 3) return
+    if (this.data.completed !== 3 || this.data.loading) return
     const activeID = wx.getStorageSync('jianwo_active_analysis_id') || ''
     if (activeID) {
       this.setData({ loading: true })
@@ -77,7 +77,7 @@ Page({
             content: '继续使用之前上传的照片完成分析；完成后可以重新上传新照片。',
             showCancel: false,
             confirmText: '查看进度',
-            success: () => wx.navigateTo({ url: `/pages/analysis/index?id=${analysis.id}&scene=${this.data.scene}` })
+            success: () => wx.navigateTo({ url: `/pages/analysis/index?id=${analysis.id}&scene=${analysis.scene || this.data.scene}` })
           })
           return
         }
@@ -94,7 +94,7 @@ Page({
   createAnalysis() {
     this.setData({ loading: true })
     const mediaIDs = this.data.shots.map((item) => item.asset.id)
-    api.createAnalysis({ scene: this.data.scene, media_ids: mediaIDs, profile: { height_cm: 165, role: '', budget: '' } }).then((analysis) => {
+    api.createAnalysis({ scene: this.data.scene, media_ids: mediaIDs, profile: {} }).then((analysis) => {
       const localMedia = this.data.shots.map((item) => ({ id: item.asset.id, kind: item.kind, url: item.path || item.asset.url || '' }))
       const app = getApp()
       app.globalData.analysisID = analysis.id

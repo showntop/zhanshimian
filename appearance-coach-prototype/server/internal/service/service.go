@@ -377,6 +377,12 @@ func (s *Service) AddFeedback(ctx context.Context, userID string, input domain.F
 	if len(input.Comment) > 500 {
 		return fmt.Errorf("%w: comment is too long", ErrValidation)
 	}
+	if input.MediaID != "" {
+		assets, err := s.repo.GetMediaAssetsForUser(ctx, userID, []string{input.MediaID})
+		if err != nil || len(assets) != 1 || assets[0].Kind != "feedback" {
+			return repository.ErrNotFound
+		}
+	}
 	return s.repo.AddFeedback(ctx, userID, input)
 }
 

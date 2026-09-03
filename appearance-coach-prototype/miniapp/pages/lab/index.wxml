@@ -17,5 +17,5 @@
     <view class="feature-copy"><view><text class="feature-name">上半身试衣</text><text class="status">排队中</text></view><text>先支持外套和上衣，重点判断色彩、领型和肩线，不做完整商城。</text><button data-feature="try-on" bindtap="joinWaitlist">加入候补</button></view>
   </view>
 
-  <view class="lab-principle"><image src="/assets/icons/shield-check.svg" /><view><text>体验原则</text><text>不改变真实身体，不把生成图包装成确定效果，也不要求先填写大量身体数据。</text></view></view>
+  <view class="lab-principle"><image src="/assets/icons/shield-check.png" /><view><text>体验原则</text><text>不改变真实身体，不把生成图包装成确定效果，也不要求先填写大量身体数据。</text></view></view>
 </view>

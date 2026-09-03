@@ -1,7 +1,7 @@
 <app-header title="今日造型" back="{{true}}" />
 <view class="page today-page">
   <view wx:if="{{plan}}">
-    <view class="context-line fade-up"><image src="/assets/icons/sun.svg" /><text>{{plan.context.city}} · {{plan.context.condition}} · {{plan.context.temperature}}°C</text><text>{{plan.context.day_type}} · {{plan.context.schedule}}</text></view>
+    <view class="context-line fade-up"><image src="/assets/icons/sun.png" /><button class="context-city" bindtap="editCity" hover-class="action-hover">{{plan.context.city}} · {{plan.context.condition}} · {{plan.context.temperature}}°C ›</button><text>{{plan.context.day_type}} · {{plan.context.schedule}}</text></view>
     <text class="today-kicker fade-up">今日私人方案</text>
     <text class="today-heading serif fade-up">{{plan.title}}</text>
     <text class="today-summary fade-up">{{plan.summary}}</text>
@@ -18,8 +18,8 @@
       </view>
     </view>
 
-    <view class="time-line"><image src="/assets/icons/shield-check.svg" /><text>预计 15 分钟完成 · 优先使用现有衣橱</text></view>
-    <primary-button text="{{plan.active ? '已加入今日清单' : '加入今日清单'}}" disabled="{{plan.active}}" bind:tap="activate" />
+    <view class="time-line"><image src="/assets/icons/shield-check.png" /><text>预计 15 分钟完成 · 优先使用现有衣橱</text></view>
+    <primary-button text="{{plan.active ? '已加入今日清单' : '加入今日清单'}}" disabled="{{plan.active || activating}}" loading="{{activating}}" bind:tap="activate" />
     <view class="secondary-actions"><button bindtap="regenerate" loading="{{refreshing}}">换一种表达</button><button bindtap="sharePlan">生成分享卡</button><button bindtap="openAdvisor">问顾问调整</button></view>
 
     <view class="feedback-card surface">
@@ -28,6 +28,6 @@
     </view>
   </view>
   <view wx:elif="{{loading}}" class="today-generating"><view class="today-spinner" /><text class="serif">正在生成你的今日方案</text><text>结合天气、日程和形象档案，整理今天可直接执行的发型、妆容与穿搭。</text></view>
-  <view wx:else class="today-error"><image src="/assets/icons/sun.svg" /><text class="serif">今日方案暂时没有生成</text><text>{{error || '网络恢复后可以继续尝试。'}}</text><button bindtap="load">重新生成</button></view>
+  <view wx:else class="today-error"><image src="/assets/icons/sun.png" /><text class="serif">今日方案暂时没有生成</text><text>{{error || '网络恢复后可以继续尝试。'}}</text><button bindtap="load">重新生成</button></view>
 </view>
 <view wx:if="{{previewOpen}}" class="preview-overlay" catchtap="closePreview"><view><image src="{{plan.image_url}}" mode="aspectFit" /><text>搭配示意 · 点击关闭</text></view></view>

@@ -17,13 +17,13 @@
       </button>
     </view>
     <view class="light-tip fade-up delay-2">
-      <image src="/assets/icons/sun.svg" /><view><text>站在自然光下，关闭滤镜</text><text>穿合身衣服，露出肩颈与身体轮廓</text></view>
+      <image src="/assets/icons/sun.png" /><view><text>站在自然光下，关闭滤镜</text><text>穿合身衣服，露出肩颈与身体轮廓</text></view>
     </view>
     <view class="capture-actions fade-up delay-3">
       <primary-button text="{{completed === 3 ? '开始形象分析' : '开始连续拍摄'}}" loading="{{loading}}" bind:tap="primaryAction" />
       <button class="album-button" disabled="{{loading}}" bindtap="chooseFromAlbum">从相册选择</button>
       <button wx:if="{{demo}}" class="demo-link" disabled="{{loading}}" bindtap="useDemo">使用示例照片快速体验</button>
-      <view class="privacy-bottom"><image src="/assets/icons/shield-check.svg" /><text>照片仅用于生成分析，可随时删除</text></view>
+      <view class="privacy-bottom"><image src="/assets/icons/shield-check.png" /><text>照片仅用于生成分析，可随时删除</text></view>
     </view>
   </view>
 </scroll-view>

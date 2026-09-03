@@ -53,7 +53,8 @@ func (s *Store) SaveTodayPlan(ctx context.Context, userID string, input domain.T
 		VALUES($1,$2,$3::date,$4,$5,$6,$7,$8,$9)
 		ON CONFLICT(user_id,plan_date) DO UPDATE SET
 			report_id=EXCLUDED.report_id,context=EXCLUDED.context,title=EXCLUDED.title,summary=EXCLUDED.summary,
-			image_url=EXCLUDED.image_url,steps=EXCLUDED.steps,regenerate_count=EXCLUDED.regenerate_count,updated_at=now()
+			image_url=EXCLUDED.image_url,steps=EXCLUDED.steps,regenerate_count=EXCLUDED.regenerate_count,updated_at=now(),
+			active=false,feedback=''
 		RETURNING id::text,coalesce(report_id::text,''),context,title,summary,image_url,steps,active,feedback,regenerate_count,created_at,updated_at`,
 		userID, reportID, input.Context.Date, contextData, input.Title, input.Summary, input.ImageURL, stepsData, input.RegenerateCount))
 	return item, err

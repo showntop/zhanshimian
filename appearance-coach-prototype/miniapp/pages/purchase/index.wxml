@@ -4,7 +4,7 @@
   <view class="purchase-layout fade-up delay-1">
     <button class="product-shot" bindtap="chooseProduct">
       <image wx:if="{{photo}}" src="{{photo}}" mode="aspectFill" />
-      <view wx:else><view class="upload-icon"><image src="/assets/icons/bookmark.svg" /></view><text>上传商品截图</text><text>支持衣服、鞋包和配饰</text></view>
+      <view wx:else><view class="upload-icon"><image src="/assets/icons/bookmark.png" /></view><text>上传商品截图</text><text>支持衣服、鞋包和配饰</text></view>
       <text wx:if="{{photo}}" class="replace-chip">更换</text>
     </button>
     <view class="product-context">

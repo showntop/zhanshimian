@@ -4,7 +4,7 @@
     <view class="advisor-head {{initialized ? 'fade-up' : ''}}">
       <view>
         <text class="advisor-kicker">私人形象顾问</text>
-        <text class="advisor-greeting">{{hasProfile ? '上午好，今日造型穿搭建议' : '你好，我是你的私人形象顾问'}}</text>
+        <text class="advisor-greeting">{{hasProfile ? greeting + '，今日造型穿搭建议' : '你好，我是你的私人形象顾问'}}</text>
       </view>
     </view>
 
@@ -20,20 +20,23 @@
         <view class="photo-type"><view class="photo-icon"><image src="/assets/capture/body-line.png" mode="aspectFill" /></view><text>全身</text></view>
       </view>
       <primary-button text="开始形象分析" bind:tap="start" />
-      <view class="privacy-line"><image src="/assets/icons/shield-check.svg" /><text>照片可随时删除，仅用于生成分析</text></view>
+      <view class="privacy-line"><image src="/assets/icons/shield-check.png" /><text>照片可随时删除，仅用于生成分析</text></view>
     </view>
 
     <view class="today-card {{initialized ? 'fade-up delay-1' : ''}}" hidden="{{!hasProfile}}">
       <view class="today-card-head">
-        <view class="weather-line"><image src="/assets/icons/sun.svg" /><text>{{todayPlan ? todayPlan.context.city + ' · ' + todayPlan.context.condition + ' · ' + todayPlan.context.temperature + '°C' : '上海 · 多云 · 26°C'}}</text></view>
-        <text class="day-kind">{{todayPlan ? todayPlan.context.day_type + ' · ' + todayPlan.context.schedule : '工作日 · 通勤'}}</text>
+        <view class="weather-line" wx:if="{{todayContext}}"><image src="/assets/icons/sun.png" /><text>{{todayContext.city}} · {{todayContext.condition}} · {{todayContext.temperature}}°C</text></view>
+        <text class="day-kind" wx:if="{{todayContext}}">{{todayContext.day_type}} · {{todayContext.schedule}}</text>
       </view>
       <view class="today-body">
         <view class="today-details">
-          <text class="today-title">{{todayPlan ? todayPlan.title : '轻薄利落，清爽不单薄'}}</text>
-          <view class="style-detail"><text class="detail-label">发型</text><text>{{todayPlan ? todayPlan.steps[0].title : '轻盈侧分 · 发根蓬松'}}</text></view>
-          <view class="style-detail"><text class="detail-label">妆造</text><text>{{todayPlan ? todayPlan.steps[1].title : '轻透底妆 · 柔和眉眼'}}</text></view>
-          <view class="style-detail"><text class="detail-label">穿搭</text><text>{{todayPlan ? todayPlan.steps[2].title : '米白薄西装 · 垂感长裤'}}</text></view>
+          <text class="today-title">{{todayPlan ? todayPlan.title : '今天的造型建议还没生成'}}</text>
+          <block wx:if="{{todayPlan}}">
+            <view class="style-detail"><text class="detail-label">发型</text><text>{{todayPlan.steps[0].title}}</text></view>
+            <view class="style-detail"><text class="detail-label">妆造</text><text>{{todayPlan.steps[1].title}}</text></view>
+            <view class="style-detail"><text class="detail-label">穿搭</text><text>{{todayPlan.steps[2].title}}</text></view>
+          </block>
+          <text wx:else class="today-pending-copy">结合今天的天气和你的形象档案，生成可直接执行的发型、妆容与穿搭。</text>
         </view>
         <button class="today-thumb-wrap pressable" bindtap="previewTodayLook" aria-label="查看今日穿搭大图">
           <image class="today-thumb" src="{{todayLookUrl}}" mode="aspectFill" />

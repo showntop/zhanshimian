@@ -15,6 +15,6 @@
     </view>
   </view>
 
-  <view class="reuse-note fade-up delay-2"><image src="/assets/icons/shield-check.svg" /><text>{{hasProfile ? '不会重复索要照片和身体数据' : '完成选择后只需建立一次形象档案'}}</text></view>
+  <view class="reuse-note fade-up delay-2"><image src="/assets/icons/shield-check.png" /><text>{{hasProfile ? '不会重复索要照片和身体数据' : '完成选择后只需建立一次形象档案'}}</text></view>
   <view class="scene-action fade-up delay-2"><primary-button text="{{hasProfile ? '生成' + scene.label + '方案' : '下一步：建立形象档案'}}" loading="{{creating}}" bind:tap="continueFlow" /></view>
 </view>

@@ -86,10 +86,10 @@ func NewAMapWeatherProvider(cfg AMapWeatherConfig, client *http.Client) (*AMapWe
 func (a *AMapWeatherProvider) Current(ctx context.Context, city string) (Weather, error) {
 	requestedCity := strings.TrimSpace(city)
 	cityCode := a.defaultCode
-	if len(requestedCity) == 6 {
-		if _, err := strconv.Atoi(requestedCity); err == nil {
-			cityCode = requestedCity
-		}
+	// 高德 city 参数同时接受 adcode 和中文城市名，用户指定的城市直接透传；
+	// 只限制长度避免异常输入。
+	if requestedCity != "" && len([]rune(requestedCity)) <= 20 {
+		cityCode = requestedCity
 	}
 	endpoint, err := url.Parse(a.baseURL)
 	if err != nil {

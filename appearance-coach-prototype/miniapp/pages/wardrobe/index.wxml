@@ -11,7 +11,7 @@
       <text class="item-name">{{item.name}}</text><text class="item-meta">{{item.color}} · {{item.wear_count ? '穿过 ' + item.wear_count + ' 次' : '新加入'}}</text>
     </view>
   </view>
-  <view wx:else class="empty surface"><image src="/assets/icons/bookmark.svg" /><text>衣橱还是空的</text><text>先加入一件最常穿的上装</text><button bindtap="openAdd">添加第一件</button></view>
+  <view wx:else class="empty surface"><image src="/assets/icons/bookmark.png" /><text>衣橱还是空的</text><text>先加入一件最常穿的上装</text><button bindtap="openAdd">添加第一件</button></view>
 
   <view class="outfit-action"><primary-button text="用我的衣橱生成今日搭配" disabled="{{items.length < 2}}" bind:tap="createOutfit" /><text>{{items.length < 2 ? '至少添加 2 件后可体验' : '优先组合不同类别，不引导购买'}}</text></view>
 </view>

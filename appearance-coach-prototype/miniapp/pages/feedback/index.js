@@ -26,12 +26,22 @@ Page({
   },
   input(event) { this.setData({ comment: event.detail.value }) },
   choosePhoto() {
-    wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'], sizeType: ['compressed'], success: ({ tempFiles }) => this.setData({ feedbackImage: tempFiles[0].tempFilePath }) })
+    wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'], sizeType: ['compressed'], success: ({ tempFiles }) => { this.feedbackMediaID = ''; this.setData({ feedbackImage: tempFiles[0].tempFilePath }) } })
   },
   submit() {
-    if (!this.data.selected.length) return
+    if (!this.data.selected.length || this.data.loading) return
     this.setData({ loading: true })
-    api.addFeedback({ plan_id: this.data.planId, tags: this.data.selected, comment: this.data.comment }).then(() => this.setData({ done: true })).catch((error) => wx.showToast({ title: error.message, icon: 'none' })).finally(() => this.setData({ loading: false }))
+    const send = () => api.addFeedback({ plan_id: this.data.planId, tags: this.data.selected, comment: this.data.comment, media_id: this.feedbackMediaID || '' })
+      .then(() => this.setData({ done: true }))
+      .catch((error) => wx.showToast({ title: error.message, icon: 'none' }))
+      .finally(() => this.setData({ loading: false }))
+    // 用户选了实拍就必须真的上传，不再静默丢弃
+    if (!this.data.feedbackImage || this.feedbackMediaID) { send(); return }
+    wx.showLoading({ title: '上传实拍中' })
+    api.uploadMedia('feedback', this.data.feedbackImage)
+      .then((asset) => { this.feedbackMediaID = asset.id; send() })
+      .catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false }) })
+      .finally(() => wx.hideLoading())
   },
   home() { wx.switchTab({ url: '/pages/home/index' }) }
 })

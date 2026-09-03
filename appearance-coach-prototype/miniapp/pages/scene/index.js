@@ -1,8 +1,8 @@
 const scenes = {
-  interview: { id: 'interview', label: '面试', icon: '/assets/icons/briefcase.svg' },
-  wedding: { id: 'wedding', label: '婚礼', icon: '/assets/icons/sparkles.svg' },
-  date: { id: 'date', label: '约会', icon: '/assets/icons/heart.svg' },
-  daily: { id: 'daily', label: '日常', icon: '/assets/icons/sun.svg' }
+  interview: { id: 'interview', label: '面试', icon: '/assets/icons/briefcase.png' },
+  wedding: { id: 'wedding', label: '婚礼', icon: '/assets/icons/sparkles.png' },
+  date: { id: 'date', label: '约会', icon: '/assets/icons/heart.png' },
+  daily: { id: 'daily', label: '日常', icon: '/assets/icons/sun.png' }
 }
 
 const impressionOptions = [

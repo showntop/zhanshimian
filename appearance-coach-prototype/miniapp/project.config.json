@@ -6,7 +6,8 @@
       { "type": "glob", "value": "assets/reports/**/*.png" },
       { "type": "glob", "value": "assets/portraits/**/*.png" },
       { "type": "glob", "value": "assets/plans/**/*.png" },
-      { "type": "glob", "value": "assets/hair/**/*.png" }
+      { "type": "glob", "value": "assets/hair/**/*.png" },
+      { "type": "glob", "value": "assets/icons/**/*.svg" }
     ],
     "include": []
   },

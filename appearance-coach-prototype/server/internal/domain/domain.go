@@ -50,6 +50,7 @@ type Analysis struct {
 	Status          string       `json:"status"`
 	Progress        int          `json:"progress"`
 	Stage           string       `json:"stage"`
+	Scene           string       `json:"scene,omitempty"`
 	PreviewImageURL string       `json:"preview_image_url,omitempty"`
 	Media           []MediaAsset `json:"media,omitempty"`
 	MediaIDs        []string     `json:"-"`
@@ -272,6 +273,7 @@ type FeedbackInput struct {
 	PlanID  string   `json:"plan_id"`
 	Tags    []string `json:"tags"`
 	Comment string   `json:"comment"`
+	MediaID string   `json:"media_id"`
 }
 
 type ToolInput struct {

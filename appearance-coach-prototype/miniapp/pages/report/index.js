@@ -3,7 +3,7 @@ const { userImage } = require('../../utils/media')
 
 const CATEGORY_LABEL = { hair: '发型', makeup: '妆容', outfit: '穿搭', color: '色彩' }
 const SEVERITY_LABEL = { low: '轻微', medium: '适中', high: '明显' }
-const CATEGORY_ICON = { hair: '/assets/icons/sparkles.svg', makeup: '/assets/icons/user.svg', outfit: '/assets/icons/briefcase.svg' }
+const CATEGORY_ICON = { hair: '/assets/icons/sparkles.png', makeup: '/assets/icons/user.png', outfit: '/assets/icons/briefcase.png' }
 
 Page({
   data: { id: '', scene: '', loading: true, loadError: false, report: null, annotations: [], image: '', findingItems: [], suggestions: [], looksReady: false, ctaText: '生成 3 套本人方案', generating: false },

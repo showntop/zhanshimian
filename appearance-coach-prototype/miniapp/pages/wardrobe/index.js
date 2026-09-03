@@ -38,7 +38,7 @@ Page({
     wx.showModal({ title: '移除这件单品？', content: '不会删除你手机相册中的照片。', success: ({ confirm }) => { if (confirm) api.deleteWardrobeItem(id).then(() => this.setItems(this.data.items.filter((item) => item.id !== id))).catch((error) => wx.showToast({ title: error.message, icon: 'none' })) } })
   },
   createOutfit() {
-    api.getTodayContext().then((context) => api.createWardrobeOutfit(context)).then((outfit) => { this.setData({ outfit: this.mapOutfit(outfit) }); api.trackEvent('wardrobe_outfit_generate', { outfit_id: outfit.id, item_count: outfit.items.length }).catch(() => {}) }).catch((error) => wx.showToast({ title: error.message, icon: 'none' }))
+    api.getTodayContext(wx.getStorageSync('jianwo_city') || '').then((context) => api.createWardrobeOutfit(context)).then((outfit) => { this.setData({ outfit: this.mapOutfit(outfit) }); api.trackEvent('wardrobe_outfit_generate', { outfit_id: outfit.id, item_count: outfit.items.length }).catch(() => {}) }).catch((error) => wx.showToast({ title: error.message, icon: 'none' }))
   },
   closeOutfit() { this.setData({ outfit: null }) },
   wearOutfit() { api.wearWardrobeOutfit(this.data.outfit.id).then((outfit) => { this.setData({ outfit: this.mapOutfit(outfit) }); api.trackEvent('wardrobe_outfit_wear', { outfit_id: outfit.id }).catch(() => {}); wx.showToast({ title: '已记录今天穿了', icon: 'success' }) }).catch((error) => wx.showToast({ title: error.message, icon: 'none' })) }

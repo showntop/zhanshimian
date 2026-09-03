@@ -15,7 +15,7 @@
       <view class="pill-row"><text wx:for="{{report.impression_tags}}" wx:key="*this" class="pill">{{item}}</text></view>
     </view>
     <view class="priority surface fade-up delay-2">
-      <view class="priority-star"><image src="/assets/icons/sparkles.svg" /></view>
+      <view class="priority-star"><image src="/assets/icons/sparkles.png" /></view>
       <view class="priority-content"><text class="priority-label">最值得先改的一处</text><text class="priority-title serif">{{report.priority_title}}</text><text class="priority-copy">{{report.priority_copy}}</text></view>
     </view>
     <view wx:if="{{findingItems.length}}" class="details fade-up delay-2">
@@ -39,7 +39,7 @@
     <view class="report-action"><primary-button text="{{ctaText}}" loading="{{generating}}" disabled="{{generating}}" bind:tap="viewPlans" /><button class="reanalyze-action" bindtap="reanalyze">重新上传 3 张照片并更新分析</button></view>
   </block>
   <view wx:else-if="{{loadError}}" class="report-error fade-up">
-    <image src="/assets/icons/sparkles.svg" mode="aspectFit" />
+    <image src="/assets/icons/sparkles.png" mode="aspectFit" />
     <text class="serif">报告加载失败</text>
     <text>请检查网络后重试。</text>
     <button bindtap="load">重新加载</button>

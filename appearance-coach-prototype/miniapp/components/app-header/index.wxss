@@ -1,7 +1,7 @@
-.header { position: fixed; z-index: 50; left: 0; right: 0; top: 0; height: 192rpx; padding: 88rpx 32rpx 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; background: rgba(248,247,243,.96); border-bottom: 1rpx solid var(--line); backdrop-filter: blur(20rpx); }
+.header { position: fixed; z-index: 50; left: 0; right: 0; top: 0; height: 192rpx; padding: 0 32rpx; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; background: rgba(248,247,243,.96); border-bottom: 1rpx solid var(--line); backdrop-filter: blur(20rpx); }
 .header.transparent { background: rgba(248,247,243,.86); border-bottom-color: transparent; }
 .side { min-width: 100rpx; display: flex; align-items: center; }
-.side.right { padding-right: 118rpx; justify-content: flex-end; }
+.side.right { justify-content: flex-end; }
 .wordmark { display: flex; white-space: nowrap; font-size: 34rpx; font-weight: 700; letter-spacing: -2rpx; }
 .wordmark-accent { color: var(--moss); }
 .header-title { font-size: 31rpx; font-weight: 700; letter-spacing: 1rpx; }

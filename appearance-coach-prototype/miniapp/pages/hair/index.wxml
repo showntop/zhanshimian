@@ -1,7 +1,7 @@
 <app-header title="发型预览" back="{{true}}" bookmark="{{true}}" bind:bookmark="savePreview" />
 <view class="page hair-page">
   <view wx:if="{{loading}}" class="tool-loading"><view class="skeleton loading-image" /><view class="skeleton loading-line" /><view class="skeleton loading-line short" /></view>
-  <view wx:elif="{{error && !styles.length}}" class="tool-error"><image src="/assets/icons/document.svg" /><text>暂时没有加载成功</text><text>{{error}}</text><button bindtap="loadRecommendations">重新加载</button></view>
+  <view wx:elif="{{error && !styles.length}}" class="tool-error"><image src="/assets/icons/document.png" /><text>暂时没有加载成功</text><text>{{error}}</text><button bindtap="loadRecommendations">重新加载</button></view>
   <block wx:else>
     <view class="page-intro fade-up"><view><text class="intro-title">换发型前，先看看自己</text><text class="intro-note">{{usingProfilePhoto ? '已带入形象档案的正脸照，可随时更换' : '上传一张正脸照，生成本人效果预览'}}</text></view><text class="ai-chip">AI 本人预览</text></view>
     <button wx:if="{{!sourceMediaID}}" class="upload-card fade-up delay-1" bindtap="choosePhoto"><view class="upload-icon"><image src="/assets/capture/face-line.png" /></view><text class="upload-title">上传清晰正脸照</text><text class="upload-note">自然光 · 不开滤镜 · 头发完整入镜</text><text class="upload-action">拍照或从相册选择</text></button>
@@ -15,7 +15,7 @@
     <view wx:if="{{!sourceMediaID}}" class="demo-row"><text>暂时不想上传？</text><button bindtap="useDemoPhoto">使用示例体验</button></view>
     <view class="style-head"><text>选择想尝试的方向</text><text>{{activeIndex + 1}} / {{styles.length}}</text></view>
     <scroll-view class="style-scroll" scroll-x enhanced show-scrollbar="{{false}}"><view class="style-row"><button wx:for="{{styles}}" wx:key="id" class="style-card {{activeIndex === index ? 'active' : ''}}" data-index="{{index}}" bindtap="selectStyle"><image src="{{item.image}}" mode="aspectFill" /><text>{{item.name}}</text><text>{{item.note}}</text></button></view></scroll-view>
-    <view class="reason-card fade-up delay-2"><view class="reason-title"><image src="/assets/icons/sparkles.svg" /><text>为什么适合你</text></view><text>{{activeStyle.reason}}</text><view class="reason-tags"><text wx:for="{{activeStyle.tags}}" wx:key="*this">{{item}}</text></view></view>
+    <view class="reason-card fade-up delay-2"><view class="reason-title"><image src="/assets/icons/sparkles.png" /><text>为什么适合你</text></view><text>{{activeStyle.reason}}</text><view class="reason-tags"><text wx:for="{{activeStyle.tags}}" wx:key="*this">{{item}}</text></view></view>
     <view class="privacy-note"><text>仅改变发型，保留五官、表情与背景</text><text>照片和生成图可在「我的」中删除</text></view>
     <view class="hair-action"><primary-button text="{{generating ? stage : (resultImage ? (saving ? '正在保存…' : (saved ? '已保存到方案' : '保存这个发型')) : (sourceMediaID ? '生成' + activeStyle.name + '预览' : '上传照片开始'))}}" disabled="{{generating || saving || saved}}" bind:tap="primaryAction" /><button wx:if="{{sourceMediaID && !generating}}" class="secondary-action" bindtap="changePhoto">更换照片</button></view>
   </block>

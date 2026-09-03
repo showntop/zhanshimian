@@ -1,30 +1,50 @@
 const api = require('../../services/api')
 const { lookImage, userImage } = require('../../utils/media')
 
+const SCENE_LABELS = { interview: '面试', wedding: '婚礼', date: '约会', daily: '日常' }
+
 Page({
   data: {
     reportId: '', scene: '', plans: [], savedHair: [], selected: 0, showCurrent: false, loading: true,
     sceneLabel: '', asTab: true, generating: false, allIdle: false, allFailed: false, allReady: false,
-    hasReport: false, generationCount: 0, currentFaceUrl: '', currentBodyUrl: ''
+    hasReport: false, generationCount: 0, currentFaceUrl: '', currentBodyUrl: '',
+    sceneTabs: [{ id: '', label: '形象方案' }, { id: 'interview', label: '面试' }, { id: 'wedding', label: '婚礼' }, { id: 'date', label: '约会' }, { id: 'daily', label: '日常' }]
   },
   onLoad() {
+    // onLoad 后紧跟的首次 onShow 不再重复加载
+    this.skipNextShow = true
     this.applyIntent(true)
   },
   onShow() {
     // Tab pages only fire onShow (not onLoad) when revisited via the tab bar.
     // Re-apply any pending scene intent stored by the caller before switchTab.
+    if (this.skipNextShow) { this.skipNextShow = false; return }
     this.applyIntent()
   },
   applyIntent(force = false) {
-    const labels = { interview: '面试', wedding: '婚礼', date: '约会', daily: '日常' }
-    const scene = wx.getStorageSync('jianwo_plans_scene') || ''
+    const intent = wx.getStorageSync('jianwo_plans_scene') || ''
+    if (intent) wx.removeStorageSync('jianwo_plans_scene')
     const reportId = wx.getStorageSync('jianwo_report_id') || ''
-    if (scene) wx.removeStorageSync('jianwo_plans_scene')
+    // 有待进入的场景意图才切换场景；否则保持当前场景，场景方案不会"只能看一次"
+    const scene = intent || (force ? '' : this.data.scene)
     const changed = scene !== this.data.scene || reportId !== this.data.reportId
     if (force || changed) {
-      this.setData({ reportId, scene, sceneLabel: labels[scene] || '', hasReport: Boolean(reportId), loading: true })
+      this.setData({ reportId, scene, sceneLabel: SCENE_LABELS[scene] || '', hasReport: Boolean(reportId), loading: true })
       this.load()
+      return
     }
+    // 场景未变时也刷新：生成进度、新方案图和跨页改动需要及时反映
+    this.load()
+  },
+  switchScene(event) {
+    const scene = event.currentTarget.dataset.id
+    if (scene === this.data.scene || !this.data.reportId) return
+    if (this.timer) clearTimeout(this.timer)
+    this.setData({ scene, sceneLabel: SCENE_LABELS[scene] || '', plans: [], loading: true, allIdle: false, allFailed: false, allReady: false })
+    this.load()
+  },
+  openSceneBrief() {
+    if (this.data.scene) wx.navigateTo({ url: `/pages/scene/index?scene=${this.data.scene}` })
   },
   onUnload() { if (this.timer) clearTimeout(this.timer) },
   retry() { this.setData({ loading: true }); this.load() },

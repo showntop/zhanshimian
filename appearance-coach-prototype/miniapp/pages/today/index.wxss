@@ -1,6 +1,8 @@
 .today-page { padding-left: 32rpx; padding-right: 32rpx; }
 .context-line { display: flex; align-items: center; gap: 8rpx; color: #5c7350; font-size: 20rpx; }
 .context-line image { width: 30rpx; height: 30rpx; }.context-line text:last-child { margin-left: auto; color: #7b817a; }
+.context-city { margin: 0; padding: 0; background: transparent; color: #5c7350; font-size: 20rpx; line-height: 1.4; text-align: left; }
+.context-city::after { border: none; }
 .today-kicker { display: block; margin-top: 34rpx; color: #587344; font-size: 22rpx; letter-spacing: 3rpx; }
 .today-heading { display: block; margin-top: 13rpx; font-size: 48rpx; line-height: 1.25; font-weight: 700; }
 .today-summary { display: block; margin-top: 13rpx; color: #727871; font-size: 24rpx; line-height: 1.65; }

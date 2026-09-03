@@ -156,11 +156,11 @@ func (s *Store) CreateAnalysis(ctx context.Context, userID string, input domain.
 	}
 	var active domain.Analysis
 	err = tx.QueryRow(ctx, `
-		SELECT id::text,status,progress,stage,media_ids::text[],created_at,updated_at
+		SELECT id::text,status,progress,stage,scene,media_ids::text[],created_at,updated_at
 		FROM analyses
 		WHERE user_id=$1 AND status IN ('queued','processing')
 		ORDER BY created_at DESC LIMIT 1`, userID).
-		Scan(&active.ID, &active.Status, &active.Progress, &active.Stage, &active.MediaIDs, &active.CreatedAt, &active.UpdatedAt)
+		Scan(&active.ID, &active.Status, &active.Progress, &active.Stage, &active.Scene, &active.MediaIDs, &active.CreatedAt, &active.UpdatedAt)
 	if err == nil {
 		return active, tx.Commit(ctx)
 	}
@@ -187,8 +187,8 @@ func (s *Store) CreateAnalysis(ctx context.Context, userID string, input domain.
 	err = tx.QueryRow(ctx, `
 		INSERT INTO analyses(user_id,scene,media_ids,profile,status,progress,stage)
 		VALUES($1,$2,$3,$4,'queued',5,'正在安全上传照片')
-		RETURNING id::text,status,progress,stage,created_at,updated_at`, userID, input.Scene, input.MediaIDs, profile).
-		Scan(&analysis.ID, &analysis.Status, &analysis.Progress, &analysis.Stage, &analysis.CreatedAt, &analysis.UpdatedAt)
+		RETURNING id::text,status,progress,stage,scene,created_at,updated_at`, userID, input.Scene, input.MediaIDs, profile).
+		Scan(&analysis.ID, &analysis.Status, &analysis.Progress, &analysis.Stage, &analysis.Scene, &analysis.CreatedAt, &analysis.UpdatedAt)
 	if err != nil {
 		return domain.Analysis{}, err
 	}
@@ -202,10 +202,10 @@ func (s *Store) CreateAnalysis(ctx context.Context, userID string, input domain.
 func (s *Store) GetAnalysis(ctx context.Context, userID, analysisID string) (domain.Analysis, error) {
 	var item domain.Analysis
 	err := s.pool.QueryRow(ctx, `
-		SELECT a.id::text,a.status,a.progress,a.stage,a.media_ids::text[],a.error_message,coalesce(r.id::text,''),a.created_at,a.updated_at
+		SELECT a.id::text,a.status,a.progress,a.stage,a.scene,a.media_ids::text[],a.error_message,coalesce(r.id::text,''),a.created_at,a.updated_at
 		FROM analyses a LEFT JOIN reports r ON r.analysis_id=a.id
 		WHERE a.id=$1 AND a.user_id=$2`, analysisID, userID).
-		Scan(&item.ID, &item.Status, &item.Progress, &item.Stage, &item.MediaIDs, &item.ErrorMessage, &item.ReportID, &item.CreatedAt, &item.UpdatedAt)
+		Scan(&item.ID, &item.Status, &item.Progress, &item.Stage, &item.Scene, &item.MediaIDs, &item.ErrorMessage, &item.ReportID, &item.CreatedAt, &item.UpdatedAt)
 	return item, mapNotFound(err)
 }
 
@@ -633,7 +633,14 @@ func (s *Store) AddFeedback(ctx context.Context, userID string, input domain.Fee
 	if _, err := uuid.Parse(input.PlanID); err != nil {
 		return repository.ErrNotFound
 	}
-	tag, err := s.pool.Exec(ctx, `INSERT INTO feedback(user_id,plan_id,tags,comment) SELECT $1,p.id,$3,$4 FROM plans p WHERE p.id=$2 AND p.user_id=$1`, userID, input.PlanID, input.Tags, input.Comment)
+	var mediaID any
+	if input.MediaID != "" {
+		if _, err := uuid.Parse(input.MediaID); err != nil {
+			return repository.ErrNotFound
+		}
+		mediaID = input.MediaID
+	}
+	tag, err := s.pool.Exec(ctx, `INSERT INTO feedback(user_id,plan_id,tags,comment,media_id) SELECT $1,p.id,$3,$4,$5 FROM plans p WHERE p.id=$2 AND p.user_id=$1`, userID, input.PlanID, input.Tags, input.Comment, mediaID)
 	if err != nil {
 		return err
 	}

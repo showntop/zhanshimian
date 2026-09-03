@@ -1,6 +1,6 @@
 .advisor-page { min-height: 100vh; background: var(--app-bg); }
 .chat-scroll { height: 100vh; }
-.chat-scroll > view { padding: 200rpx 32rpx calc(env(safe-area-inset-bottom) + 170rpx); }
+.chat-body { padding: 200rpx 32rpx calc(env(safe-area-inset-bottom) + 170rpx); }
 
 /* Context card */
 .advisor-context { padding: 26rpx; display: grid; grid-template-columns: 72rpx 1fr; gap: 18rpx; border-radius: 28rpx; background: #eef2e9; border: 1rpx solid rgba(86,114,67,.14); }

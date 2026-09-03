@@ -1,5 +1,5 @@
 <view class="nav">
-  <button class="nav-item {{active === 'home' ? 'active' : ''}}" data-target="home" bindtap="navigate"><image class="nav-icon {{active === 'home' ? 'active-icon' : ''}}" src="/assets/icons/home.svg" /><text>首页</text></button>
-  <button class="nav-item {{active === 'plans' ? 'active' : ''}}" data-target="plans" bindtap="navigate"><image class="nav-icon {{active === 'plans' ? 'active-icon' : ''}}" src="/assets/icons/document.svg" /><text>方案</text></button>
-  <button class="nav-item {{active === 'mine' ? 'active' : ''}}" data-target="mine" bindtap="navigate"><image class="nav-icon {{active === 'mine' ? 'active-icon' : ''}}" src="/assets/icons/user.svg" /><text>我的</text></button>
+  <button class="nav-item {{active === 'home' ? 'active' : ''}}" data-target="home" bindtap="navigate"><image class="nav-icon {{active === 'home' ? 'active-icon' : ''}}" src="/assets/icons/home.png" /><text>首页</text></button>
+  <button class="nav-item {{active === 'plans' ? 'active' : ''}}" data-target="plans" bindtap="navigate"><image class="nav-icon {{active === 'plans' ? 'active-icon' : ''}}" src="/assets/icons/document.png" /><text>方案</text></button>
+  <button class="nav-item {{active === 'mine' ? 'active' : ''}}" data-target="mine" bindtap="navigate"><image class="nav-icon {{active === 'mine' ? 'active-icon' : ''}}" src="/assets/icons/user.png" /><text>我的</text></button>
 </view>
