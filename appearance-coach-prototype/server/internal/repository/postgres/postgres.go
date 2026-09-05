@@ -281,7 +281,7 @@ func (s *Store) CompleteAnalysis(ctx context.Context, job domain.AnalysisJob, ou
 		return "", err
 	}
 	for index, finding := range output.Findings {
-		_, err = tx.Exec(ctx, `INSERT INTO report_findings(report_id,label,category,severity,detail,anchor_x,anchor_y,sort_order) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, reportID, finding.Label, finding.Category, finding.Severity, finding.Detail, finding.AnchorX, finding.AnchorY, index+1)
+		_, err = tx.Exec(ctx, `INSERT INTO report_findings(report_id,label,category,severity,detail,photo,anchor_x,anchor_y,sort_order) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, reportID, finding.Label, finding.Category, finding.Severity, finding.Detail, finding.Photo, finding.AnchorX, finding.AnchorY, index+1)
 		if err != nil {
 			return "", err
 		}
@@ -354,14 +354,14 @@ func (s *Store) GetReport(ctx context.Context, userID, reportID string) (domain.
 	if err != nil {
 		return report, mapNotFound(err)
 	}
-	rows, err := s.pool.Query(ctx, `SELECT id::text,label,category,severity,detail,anchor_x,anchor_y FROM report_findings WHERE report_id=$1 ORDER BY sort_order`, reportID)
+	rows, err := s.pool.Query(ctx, `SELECT id::text,label,category,severity,detail,photo,anchor_x,anchor_y FROM report_findings WHERE report_id=$1 ORDER BY sort_order`, reportID)
 	if err != nil {
 		return report, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var finding domain.Finding
-		if err := rows.Scan(&finding.ID, &finding.Label, &finding.Category, &finding.Severity, &finding.Detail, &finding.AnchorX, &finding.AnchorY); err != nil {
+		if err := rows.Scan(&finding.ID, &finding.Label, &finding.Category, &finding.Severity, &finding.Detail, &finding.Photo, &finding.AnchorX, &finding.AnchorY); err != nil {
 			return report, err
 		}
 		report.Findings = append(report.Findings, finding)

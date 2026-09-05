@@ -70,10 +70,10 @@ func (d *DemoAnalyzer) Analyze(_ context.Context, input domain.CreateAnalysisInp
 		PriorityCopy:    "抬高发型重心、露出肩颈、加强眉眼轮廓，整体会更精神。",
 		ProviderVersion: "demo-v1.0.0",
 		Findings: []domain.Finding{
-			{Label: "发型重心偏低", Category: "hair", Severity: "medium", Detail: "颅顶头发贴头皮，视觉重心压在颧骨附近，显得不够精神；抬高 2–3 cm 蓬松度会利落很多。", AnchorX: .60, AnchorY: .14},
-			{Label: "眉眼对比度稍弱", Category: "makeup", Severity: "low", Detail: "眉形偏淡、眼妆接近素颜，眼神聚焦力弱；清晰眉峰加贴根部内眼线即可改善。", AnchorX: .42, AnchorY: .28},
-			{Label: "肩颈线条可更利落", Category: "outfit", Severity: "medium", Detail: "落肩版型让肩线下移、上半身影量变大；换成合肩剪裁能立即收紧轮廓。", AnchorX: .66, AnchorY: .49},
-			{Label: "上身配色偏沉", Category: "color", Severity: "low", Detail: "上身大面积深色压低明度，脸色被压住；内搭换成象牙白等浅色可提亮。", AnchorX: .31, AnchorY: .68},
+			{Label: "肩颈线条可更利落", Category: "outfit", Severity: "medium", Photo: "body", Detail: "落肩版型让肩线下移、上半身影量变大；换成合肩剪裁能立即收紧轮廓。", AnchorX: .66, AnchorY: .49},
+			{Label: "上身配色偏沉", Category: "color", Severity: "low", Photo: "body", Detail: "上身大面积深色压低明度，脸色被压住；内搭换成象牙白等浅色可提亮。", AnchorX: .31, AnchorY: .68},
+			{Label: "发型重心偏低", Category: "hair", Severity: "medium", Photo: "face", Detail: "颅顶头发贴头皮，视觉重心压在颧骨附近，显得不够精神；抬高 2–3 cm 蓬松度会利落很多。", AnchorX: .60, AnchorY: .14},
+			{Label: "眉眼对比度稍弱", Category: "makeup", Severity: "low", Photo: "face", Detail: "眉形偏淡、眼妆接近素颜，眼神聚焦力弱；清晰眉峰加贴根部内眼线即可改善。", AnchorX: .42, AnchorY: .28},
 		},
 		Plans: []domain.Plan{
 			{Name: "清晰利落", Slug: "sharp", ImageURL: "/assets/looks/sharp.png", Recommended: true, Descriptor: "更精神 · 更可信 · 更有边界感", Why: "抬高发型重心，强化眉眼轮廓，用清晰肩线改善头肩比例。", OutcomeTags: []string{"精神感提升", "专业感更强", "保留亲和力"}, DifferenceTags: []string{"发型更蓬松", "眉眼更清晰", "肩线更利落"}, Sort: 1, Steps: baseSteps},

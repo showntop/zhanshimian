@@ -19,6 +19,7 @@ type AIBundle struct {
 	Outfit   provider.OutfitAdvisor
 	Purchase provider.OutfitAdvisor
 	Advisor  provider.AdvisorChat
+	Today    provider.TodayPlanner
 	Routes   map[string]string
 }
 
@@ -86,6 +87,12 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 	}
 	if runtime.HasRoute(provider.CapabilityAdvisorChat) {
 		bundle.Advisor, err = provider.NewRoutedAdvisorChat(runtime)
+		if err != nil {
+			return AIBundle{}, err
+		}
+	}
+	if runtime.HasRoute(provider.CapabilityTodayPlan) {
+		bundle.Today, err = provider.NewRoutedTodayPlanner(runtime)
 		if err != nil {
 			return AIBundle{}, err
 		}

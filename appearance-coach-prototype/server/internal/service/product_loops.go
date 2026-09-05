@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/example/jianwo/server/internal/domain"
+	"github.com/example/jianwo/server/internal/provider"
 	"github.com/example/jianwo/server/internal/repository"
 	"github.com/google/uuid"
 )
@@ -17,7 +18,12 @@ func (s *Service) buildTodayContext(ctx context.Context, city, schedule string) 
 	now := time.Now()
 	weather, err := s.weather.Current(ctx, city)
 	if err != nil {
-		return domain.TodayContext{}, fmt.Errorf("load weather: %w", err)
+		// 天气失败时降级为城市+日期类型+日程的上下文：今日方案仍然可用，
+		// 也不把天气故障传播成 GET /v1/today/context 的 500。
+		if s.logger != nil {
+			s.logger.Warn("weather lookup failed; building degraded today context", "city", city, "error", err)
+		}
+		weather = provider.Weather{City: strings.TrimSpace(city)}
 	}
 	dayType := "工作日"
 	if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
@@ -45,6 +51,9 @@ func (s *Service) GetTodayPlan(ctx context.Context, userID string) (domain.Today
 	return item, err
 }
 
+// todayPlanImages 是今日方案的示意图，客户端会把 /assets/ 路径标注为「风格参考」。
+var todayPlanImages = []string{"/assets/plans/sharp.jpg", "/assets/plans/warm.jpg", "/assets/plans/natural.jpg"}
+
 func (s *Service) GenerateTodayPlan(ctx context.Context, userID string, input domain.TodayPlanInput) (domain.TodayPlan, error) {
 	existing, err := s.repo.GetTodayPlan(ctx, userID)
 	if err == nil && !input.Refresh {
@@ -62,22 +71,31 @@ func (s *Service) GenerateTodayPlan(ctx context.Context, userID string, input do
 	if err != nil {
 		return domain.TodayPlan{}, err
 	}
-	styles := []struct {
-		title, summary, image, hair, makeup, outfit string
-	}{
-		{"轻薄利落，清爽不单薄", "保持自然亲和，用清晰肩线和明亮内搭提升精神感。", "/assets/plans/sharp.jpg", "轻盈侧分 · 发根蓬松", "轻透底妆 · 眉眼更清晰", "米白外套 · 明亮内搭 · 垂感长裤"},
-		{"柔和明亮，今天更有气色", "减少沉重配色，用柔和弧度与一处明亮颜色保持亲近感。", "/assets/plans/warm.jpg", "空气微卷 · 发尾有弧度", "提亮眼下 · 柔和唇色", "浅色针织 · 高腰下装 · 小体积包"},
-		{"舒服自然，也保持完整", "以现有衣橱为主，只整理比例、发根与鞋包三个重点。", "/assets/plans/natural.jpg", "自然偏分 · 整理耳侧", "均匀肤色 · 保留原生感", "舒展上装 · 清楚腰线 · 轻便鞋履"},
+	grounding := provider.TodayPlanGrounding{Context: contexts, Variant: variant}
+	if err == nil {
+		grounding.PreviousTitle = existing.Title
 	}
-	style := styles[variant]
+	if input.ReportID != "" {
+		if _, parseErr := uuid.Parse(input.ReportID); parseErr != nil {
+			return domain.TodayPlan{}, fmt.Errorf("%w: 无效的形象档案", ErrValidation)
+		}
+		report, reportErr := s.repo.GetReport(ctx, userID, input.ReportID)
+		if reportErr == nil {
+			grounding.Report = &report
+		} else if !errors.Is(reportErr, repository.ErrNotFound) {
+			return domain.TodayPlan{}, reportErr
+		}
+	}
+	// 真实 provider 失败时直接报错，绝不回退到模板假数据；模板内容只由
+	// demo provider 在本地开发环境输出。
+	output, err := s.todayPlanner.Generate(ctx, grounding)
+	if err != nil {
+		return domain.TodayPlan{}, fmt.Errorf("generate today plan: %w", err)
+	}
 	plan := domain.TodayPlan{
-		ReportID: input.ReportID, Context: contexts, Title: style.title, Summary: style.summary,
-		ImageURL: style.image, RegenerateCount: variant,
-		Steps: []domain.TodayPlanStep{
-			{Category: "hair", Label: "发型", Title: style.hair, Copy: "先抬高发根，再整理耳侧轮廓，约 3 分钟。"},
-			{Category: "makeup", Label: "妆造", Title: style.makeup, Copy: "控制妆感，把重点放在气色与眉眼对比。"},
-			{Category: "outfit", Label: "穿搭", Title: style.outfit, Copy: "优先使用已有衣物，先处理配色和腰线。"},
-		},
+		ReportID: input.ReportID, Context: contexts, Title: output.Title, Summary: output.Summary,
+		ImageURL: todayPlanImages[variant], RegenerateCount: variant,
+		Steps: output.Steps,
 	}
 	item, err := s.repo.SaveTodayPlan(ctx, userID, plan)
 	if err == nil {

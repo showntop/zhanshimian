@@ -33,6 +33,7 @@ type Service struct {
 	outfitAdvisor   provider.OutfitAdvisor
 	purchaseAdvisor provider.OutfitAdvisor
 	advisorChat     provider.AdvisorChat
+	todayPlanner    provider.TodayPlanner
 	weather         provider.WeatherProvider
 	wechat          provider.WeChatAuthenticator
 	publicBaseURL   string
@@ -48,6 +49,7 @@ type ProviderOptions struct {
 	Outfit      provider.OutfitAdvisor
 	Purchase    provider.OutfitAdvisor
 	Advisor     provider.AdvisorChat
+	Today       provider.TodayPlanner
 	Weather     provider.WeatherProvider
 	WeChat      provider.WeChatAuthenticator
 	AssetURLTTL time.Duration
@@ -58,6 +60,7 @@ func New(repo repository.Repository, storage storage.ObjectStorage, analyzer pro
 	outfitAdvisor := provider.OutfitAdvisor(provider.NewDemoOutfitAdvisor())
 	var purchaseAdvisor provider.OutfitAdvisor
 	var advisorChat provider.AdvisorChat
+	todayPlanner := provider.TodayPlanner(provider.NewDemoTodayPlanner())
 	weather := provider.WeatherProvider(provider.NewDemoWeatherProvider())
 	var wechat provider.WeChatAuthenticator
 	var lookGenerator provider.LookGenerator
@@ -71,6 +74,9 @@ func New(repo repository.Repository, storage storage.ObjectStorage, analyzer pro
 		}
 		purchaseAdvisor = options[0].Purchase
 		advisorChat = options[0].Advisor
+		if options[0].Today != nil {
+			todayPlanner = options[0].Today
+		}
 		if options[0].Weather != nil {
 			weather = options[0].Weather
 		}
@@ -80,7 +86,7 @@ func New(repo repository.Repository, storage storage.ObjectStorage, analyzer pro
 			assetURLTTL = options[0].AssetURLTTL
 		}
 	}
-	return &Service{repo: repo, storage: storage, analyzer: analyzer, hairGenerator: hairGenerator, lookGenerator: lookGenerator, outfitAdvisor: outfitAdvisor, purchaseAdvisor: purchaseAdvisor, advisorChat: advisorChat, weather: weather, wechat: wechat, publicBaseURL: strings.TrimSuffix(publicBaseURL, "/"), assetURLTTL: assetURLTTL, sessionTTL: sessionTTL, maxUpload: maxUpload, logger: logger}
+	return &Service{repo: repo, storage: storage, analyzer: analyzer, hairGenerator: hairGenerator, lookGenerator: lookGenerator, outfitAdvisor: outfitAdvisor, purchaseAdvisor: purchaseAdvisor, advisorChat: advisorChat, todayPlanner: todayPlanner, weather: weather, wechat: wechat, publicBaseURL: strings.TrimSuffix(publicBaseURL, "/"), assetURLTTL: assetURLTTL, sessionTTL: sessionTTL, maxUpload: maxUpload, logger: logger}
 }
 
 func (s *Service) DevLogin(ctx context.Context, nickname string) (domain.Session, error) {

@@ -143,6 +143,7 @@ func TestLoadAcceptsProductionReleaseProviders(t *testing.T) {
 			"outfit_diagnosis":{"primary":"qwen"},
 			"purchase_diagnosis":{"primary":"qwen"},
 			"advisor_chat":{"primary":"qwen"},
+			"today_plan":{"primary":"qwen"},
 			"hair_edit":{"primary":"image"}
 		}
 	}`)

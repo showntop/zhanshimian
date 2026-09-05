@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -95,6 +96,7 @@ type analysisFinding struct {
 	Category string  `json:"category"`
 	Severity string  `json:"severity"`
 	Detail   string  `json:"detail"`
+	Photo    string  `json:"photo"`
 	AnchorX  float64 `json:"anchor_x"`
 	AnchorY  float64 `json:"anchor_y"`
 }
@@ -175,6 +177,7 @@ func (a *OpenAIAnalyzer) Analyze(ctx context.Context, input domain.CreateAnalysi
 	if err := validateAnalysisPayload(payload); err != nil {
 		return domain.AnalysisOutput{}, err
 	}
+	separateAnchors(payload.Findings)
 	return payload.toDomain(images, "openai-responses:"+a.config.Model)
 }
 
@@ -200,7 +203,7 @@ func analysisPrompt(input domain.CreateAnalysisInput) string {
 场景：%s；职业：%s；身高：%d cm；预算：%s。
 	只描述能从照片直接观察到的发型重心、眉眼对比、头肩比例、服装轮廓和配色。不要给出颜值或身材评分，不推断敏感属性。
 	输出 3 个当前印象标签、4 个可提升点、一个最优先建议，以及严格 3 套方案。每套方案必须包含 hair、makeup、outfit 三个步骤和可执行细节。顶层必须输出一个 JSON 对象，不要输出数组、Markdown 或额外解释。
-	每个可提升点必须包含 label、category（只能填 hair、makeup、outfit、color 之一）、severity（只能填 low、medium、high）、anchor_x 和 anchor_y（0 到 1 之间的小数，表示在照片上的相对位置，不要用百分比或像素）、detail（一两句话，说明在照片里看到的依据和值得调整的方向，语气温和具体，不超过 60 字）。3 套方案的 slug 必须分别是 sharp、warm、natural，且恰好一套 recommended 为 true。`, input.Scene, input.Profile.Role, input.Profile.HeightCM, input.Profile.Budget)
+	每个可提升点必须包含 label、category（只能填 hair、makeup、outfit、color 之一）、severity（只能填 low、medium、high）、photo（只能填 face、side、body 之一，表示该结论来自哪张照片）、anchor_x 和 anchor_y（0 到 1 之间的小数，表示该部位在 photo 指向那张照片上的相对位置，x 向右、y 向下，不要用百分比或像素；发型发顶大约在头部 y 0.02–0.2，正脸的眉眼在 y 0.3–0.5，全身照的肩线在 y 0.2–0.35、服装主体在 y 0.3–0.7，按实际构图微调）、detail（一两句话，说明在照片里看到的依据和值得调整的方向，语气温和具体，不超过 60 字）。不同可提升点的锚点必须落在各自部位的真实位置上，任意两点之间在 x 或 y 方向至少相距 0.1，绝不允许全部集中在画面中心。3 套方案的 slug 必须分别是 sharp、warm、natural，且恰好一套 recommended 为 true。`, input.Scene, input.Profile.Role, input.Profile.HeightCM, input.Profile.Budget)
 }
 
 func photoKindName(kind string) string {
@@ -236,7 +239,7 @@ func (payload analysisPayload) toDomain(images []AnalysisImage, providerVersion 
 	for _, finding := range payload.Findings {
 		output.Findings = append(output.Findings, domain.Finding{
 			Label: finding.Label, Category: finding.Category, Severity: finding.Severity, Detail: finding.Detail,
-			AnchorX: finding.AnchorX, AnchorY: finding.AnchorY,
+			Photo: finding.Photo, AnchorX: finding.AnchorX, AnchorY: finding.AnchorY,
 		})
 	}
 	imageURLs := map[string]string{"sharp": "/assets/looks/sharp.png", "warm": "/assets/looks/warm.png", "natural": "/assets/looks/natural.png"}
@@ -278,9 +281,10 @@ func validateAnalysisPayload(payload analysisPayload) error {
 	}
 	allowedCategories := map[string]bool{"hair": true, "makeup": true, "outfit": true, "color": true}
 	allowedSeverity := map[string]bool{"low": true, "medium": true, "high": true}
+	allowedPhotos := map[string]bool{"face": true, "side": true, "body": true}
 	for index, finding := range payload.Findings {
-		if !safeText(finding.Label) || !allowedCategories[finding.Category] || !allowedSeverity[finding.Severity] || !safeText(finding.Detail) || finding.AnchorX < 0 || finding.AnchorX > 1 || finding.AnchorY < 0 || finding.AnchorY > 1 {
-			return fmt.Errorf("provider output contains invalid finding %d: category=%q severity=%q anchor=(%.2f,%.2f) label=%q detail=%q", index+1, finding.Category, finding.Severity, finding.AnchorX, finding.AnchorY, preview(finding.Label), preview(finding.Detail))
+		if !safeText(finding.Label) || !allowedCategories[finding.Category] || !allowedSeverity[finding.Severity] || !safeText(finding.Detail) || !allowedPhotos[finding.Photo] || finding.AnchorX < 0 || finding.AnchorX > 1 || finding.AnchorY < 0 || finding.AnchorY > 1 {
+			return fmt.Errorf("provider output contains invalid finding %d: category=%q severity=%q photo=%q anchor=(%.2f,%.2f) label=%q detail=%q", index+1, finding.Category, finding.Severity, finding.Photo, finding.AnchorX, finding.AnchorY, preview(finding.Label), preview(finding.Detail))
 		}
 	}
 	allowedSlugs := map[string]bool{"sharp": true, "warm": true, "natural": true}
@@ -318,6 +322,61 @@ func validateAnalysisPayload(payload analysisPayload) error {
 	return nil
 }
 
+// minAnchorGap is the smallest normalized distance wanted between two anchors
+// on the same photo: below it the report hero card renders dots and chips on
+// top of each other. Models tend to cluster coordinates near the frame center,
+// so near-duplicates are nudged apart deterministically instead of failing the
+// whole analysis over a cosmetic issue.
+const minAnchorGap = 0.12
+
+// separateAnchors pushes same-photo anchors that sit closer than minAnchorGap
+// downward (wrapping to the top and shifting right when running out of room)
+// until every placed anchor is sufficiently far away. The pass is bounded and
+// keeps values inside [0.03, 0.97].
+func separateAnchors(findings []analysisFinding) {
+	placed := map[string][][2]float64{}
+	for index := range findings {
+		finding := &findings[index]
+		x, y := clampAnchor(finding.AnchorX), clampAnchor(finding.AnchorY)
+		for attempt := 0; attempt < 24; attempt++ {
+			crowded := false
+			for _, other := range placed[finding.Photo] {
+				if anchorDistance(x, y, other[0], other[1]) < minAnchorGap {
+					crowded = true
+					break
+				}
+			}
+			if !crowded {
+				break
+			}
+			y += 0.08
+			if y > 0.97 {
+				y = 0.03
+				x += 0.18
+				if x > 0.97 {
+					x = 0.03
+				}
+			}
+		}
+		finding.AnchorX, finding.AnchorY = x, y
+		placed[finding.Photo] = append(placed[finding.Photo], [2]float64{x, y})
+	}
+}
+
+func clampAnchor(value float64) float64 {
+	if value < 0.03 {
+		return 0.03
+	}
+	if value > 0.97 {
+		return 0.97
+	}
+	return value
+}
+
+func anchorDistance(x1, y1, x2, y2 float64) float64 {
+	return math.Hypot(x1-x2, y1-y2)
+}
+
 func safeText(value string) bool {
 	value = strings.TrimSpace(value)
 	if value == "" || len([]rune(value)) > 160 {
@@ -353,9 +412,10 @@ func analysisSchema() map[string]any {
 		"category": map[string]any{"type": "string", "enum": []string{"hair", "makeup", "outfit", "color"}},
 		"severity": map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}},
 		"detail":   stringSchema,
+		"photo":    map[string]any{"type": "string", "enum": []string{"face", "side", "body"}},
 		"anchor_x": map[string]any{"type": "number", "minimum": 0, "maximum": 1},
 		"anchor_y": map[string]any{"type": "number", "minimum": 0, "maximum": 1},
-	}, "label", "category", "severity", "detail", "anchor_x", "anchor_y")
+	}, "label", "category", "severity", "detail", "photo", "anchor_x", "anchor_y")
 	return objectSchema(map[string]any{
 		"impression_tags": stringArray3,
 		"priority_title":  stringSchema,

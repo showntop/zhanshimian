@@ -1,10 +1,14 @@
 package service
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/example/jianwo/server/internal/domain"
+	"github.com/example/jianwo/server/internal/provider"
+	"github.com/example/jianwo/server/internal/repository"
 )
 
 func TestAdvisorReplyUsesWardrobeAndTodayContext(t *testing.T) {
@@ -36,6 +40,92 @@ func TestValidEventName(t *testing.T) {
 		if validEventName(name) {
 			t.Fatalf("invalid event accepted: %q", name)
 		}
+	}
+}
+
+type todayPlanRepoStub struct {
+	repository.Repository
+	existing    domain.TodayPlan
+	existingErr error
+	saved       domain.TodayPlan
+}
+
+func (r *todayPlanRepoStub) GetTodayPlan(context.Context, string) (domain.TodayPlan, error) {
+	return r.existing, r.existingErr
+}
+
+func (r *todayPlanRepoStub) SaveTodayPlan(_ context.Context, _ string, plan domain.TodayPlan) (domain.TodayPlan, error) {
+	plan.ID = "today-1"
+	r.saved = plan
+	return plan, nil
+}
+
+type failingWeatherStub struct{}
+
+func (failingWeatherStub) Current(context.Context, string) (provider.Weather, error) {
+	return provider.Weather{}, provider.ErrWeatherUnavailable
+}
+
+type failingTodayPlanner struct{ err error }
+
+func (p failingTodayPlanner) Generate(context.Context, provider.TodayPlanGrounding) (provider.TodayPlanOutput, error) {
+	return provider.TodayPlanOutput{}, p.err
+}
+
+func TestGenerateTodayPlanWithDemoPlannerReturnsTemplatePlan(t *testing.T) {
+	repo := &todayPlanRepoStub{existingErr: repository.ErrNotFound}
+	service := &Service{repo: repo, weather: provider.NewDemoWeatherProvider(), todayPlanner: provider.NewDemoTodayPlanner()}
+	plan, err := service.GenerateTodayPlan(context.Background(), "user-1", domain.TodayPlanInput{City: "杭州"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Title == "" || plan.Summary == "" || plan.ImageURL != "/assets/plans/sharp.jpg" || plan.RegenerateCount != 0 {
+		t.Fatalf("unexpected demo plan: %#v", plan)
+	}
+	if plan.Context.City != "杭州" {
+		t.Fatalf("context lost the requested city: %#v", plan.Context)
+	}
+	if len(plan.Steps) != 3 || plan.Steps[0].Category != "hair" || plan.Steps[1].Category != "makeup" || plan.Steps[2].Category != "outfit" {
+		t.Fatalf("demo plan steps are incomplete: %#v", plan.Steps)
+	}
+}
+
+func TestGenerateTodayPlanRotatesVariantOnRefresh(t *testing.T) {
+	repo := &todayPlanRepoStub{existing: domain.TodayPlan{Title: "旧方案", RegenerateCount: 0}}
+	service := &Service{repo: repo, weather: provider.NewDemoWeatherProvider(), todayPlanner: provider.NewDemoTodayPlanner()}
+	plan, err := service.GenerateTodayPlan(context.Background(), "user-1", domain.TodayPlanInput{City: "杭州", Refresh: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.RegenerateCount != 1 || plan.ImageURL != "/assets/plans/warm.jpg" {
+		t.Fatalf("refresh did not rotate the variant: %#v", plan)
+	}
+}
+
+// 数据真实性：真实 provider 失败时必须返回 error，不能回退成模板假数据。
+func TestGenerateTodayPlanReturnsErrorWhenPlannerFails(t *testing.T) {
+	repo := &todayPlanRepoStub{existingErr: repository.ErrNotFound}
+	service := &Service{repo: repo, weather: provider.NewDemoWeatherProvider(), todayPlanner: failingTodayPlanner{err: errors.New("model unavailable")}}
+	if _, err := service.GenerateTodayPlan(context.Background(), "user-1", domain.TodayPlanInput{City: "杭州"}); err == nil {
+		t.Fatal("planner failure must surface as an error, not a template plan")
+	}
+	if repo.saved.Title != "" {
+		t.Fatalf("failed generation must not be persisted: %#v", repo.saved)
+	}
+}
+
+// 天气失败时降级为城市+日期类型+日程的上下文，不再返回 error。
+func TestBuildTodayContextDegradesWhenWeatherFails(t *testing.T) {
+	service := &Service{weather: failingWeatherStub{}}
+	contexts, err := service.buildTodayContext(context.Background(), "杭州", "")
+	if err != nil {
+		t.Fatalf("weather failure must not break today context: %v", err)
+	}
+	if contexts.City != "杭州" || contexts.Condition != "" {
+		t.Fatalf("degraded context should keep only the requested city: %#v", contexts)
+	}
+	if contexts.DayType == "" || contexts.Schedule == "" || contexts.Date == "" {
+		t.Fatalf("degraded context lost date type or schedule: %#v", contexts)
 	}
 }
 

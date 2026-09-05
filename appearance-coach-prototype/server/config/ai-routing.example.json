@@ -80,6 +80,11 @@
       "primary": "aliyun/qwen3.7-flash",
       "fallbacks": ["aliyun/qwen3.7-plus"]
     },
+    "today_plan": {
+      "policy": "value_first",
+      "primary": "aliyun/qwen3.7-flash",
+      "fallbacks": ["aliyun/qwen3.7-plus"]
+    },
     "hair_edit": {
       "policy": "quality_first",
       "primary": "aliyun/wan2.7-image-pro",

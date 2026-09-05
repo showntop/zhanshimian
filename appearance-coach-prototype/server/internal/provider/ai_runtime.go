@@ -24,6 +24,7 @@ const (
 	CapabilityOutfitDiagnosis    = "outfit_diagnosis"
 	CapabilityPurchaseDiagnosis  = "purchase_diagnosis"
 	CapabilityAdvisorChat        = "advisor_chat"
+	CapabilityTodayPlan          = "today_plan"
 	CapabilityHairEdit           = "hair_edit"
 	CapabilityMakeupEdit         = "makeup_edit"
 	CapabilityFullLookEdit       = "full_look_edit"

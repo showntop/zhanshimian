@@ -66,8 +66,12 @@ type Finding struct {
 	Category string  `json:"category"`
 	Severity string  `json:"severity"`
 	Detail   string  `json:"detail"`
-	AnchorX  float64 `json:"anchor_x"`
-	AnchorY  float64 `json:"anchor_y"`
+	// Photo marks which analysis photo the observation came from
+	// (face/side/body); anchors are relative to that photo. Empty means a
+	// legacy row that was only ever rendered on the body hero.
+	Photo   string  `json:"photo,omitempty"`
+	AnchorX float64 `json:"anchor_x"`
+	AnchorY float64 `json:"anchor_y"`
 }
 
 type Report struct {
