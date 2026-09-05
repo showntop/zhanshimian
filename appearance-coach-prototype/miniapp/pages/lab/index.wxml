@@ -1,19 +1,19 @@
 <app-header title="体验实验室" back="{{true}}" />
 <view class="page lab-page">
-  <view class="lab-head fade-up"><text class="lab-title">这里放“哇塞”，不打断核心流程</text><text class="lab-note">实验能力可能不稳定，所有预览都会明确标注 AI 生成</text></view>
+  <view class="lab-head fade-up"><text class="lab-title">这里放“哇塞”，不打断核心流程</text><text class="lab-note">实验能力可能不稳定，所有预览都会明确标注为效果预览</text></view>
 
   <view class="feature-card live fade-up delay-1">
-    <view class="feature-media"><image src="/assets/looks/sharp.jpg" mode="aspectFill" /><text class="media-chip">可体验</text><text class="media-action">打开相机预览</text></view>
+    <view class="feature-media"><image src="/assets/looks/sharp.jpg" mode="aspectFill" /><text class="media-chip">可体验</text><text class="example-badge badge-left">示例</text><text class="media-action">打开相机预览</text></view>
     <view class="feature-copy"><view><text class="feature-name">发型与妆容 AR</text><text class="status live-status">内测</text></view><text>实时切换发型轮廓、发色与眉眼重点，适合先验证视觉方向。</text><button data-feature="hair-ar" bindtap="tryFeature">立即体验</button></view>
   </view>
 
   <view class="feature-card fade-up delay-2">
-    <view class="feature-media"><image src="/assets/looks/natural.jpg" mode="aspectFill" /><text class="media-chip">预览版</text><text class="rotate-hint">拖动查看 360°</text></view>
+    <view class="feature-media"><image src="/assets/looks/natural.jpg" mode="aspectFill" /><text class="media-chip">预览版</text><text class="example-badge badge-left">示例</text><text class="rotate-hint">拖动查看 360°</text></view>
     <view class="feature-copy"><view><text class="feature-name">3D 形象 Lite</text><text class="status">开发中</text></view><text>用照片生成可旋转形象，只表达比例和穿搭轮廓，不承诺精确测量。</text><button data-feature="3d" bindtap="joinWaitlist">预约体验</button></view>
   </view>
 
   <view class="feature-card fade-up delay-3">
-    <view class="feature-media"><image src="/assets/looks/warm.jpg" mode="aspectFill" /><text class="media-chip">概念验证</text></view>
+    <view class="feature-media"><image src="/assets/looks/warm.jpg" mode="aspectFill" /><text class="media-chip">概念验证</text><text class="example-badge badge-left">示例</text></view>
     <view class="feature-copy"><view><text class="feature-name">上半身试衣</text><text class="status">排队中</text></view><text>先支持外套和上衣，重点判断色彩、领型和肩线，不做完整商城。</text><button data-feature="try-on" bindtap="joinWaitlist">加入候补</button></view>
   </view>
 

@@ -1,6 +1,6 @@
 .profile-page { padding-top: 214rpx; padding-bottom: calc(env(safe-area-inset-bottom) + 60rpx); }
 .profile-hero { display: flex; align-items: center; gap: 24rpx; padding: 12rpx 8rpx 30rpx; }
-.avatar-wrap { position: relative; width: 128rpx; height: 128rpx; padding: 4rpx; overflow: visible; border: 1rpx solid rgba(86,114,67,.2); border-radius: 50%; background: #edf1e9; }
+.avatar-wrap { position: relative; width: 128rpx; height: 128rpx; padding: 4rpx; overflow: visible; border: 1rpx solid var(--line); border-radius: 50%; background: #f1f0ea; }
 .avatar-wrap image { width: 100%; height: 100%; border-radius: 50%; }
 .avatar-status { position: absolute; right: 3rpx; bottom: 3rpx; width: 20rpx; height: 20rpx; border: 4rpx solid var(--app-bg); border-radius: 50%; background: var(--moss); }
 .profile-copy { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 7rpx; }
@@ -11,7 +11,7 @@
 .archive { overflow: hidden; box-shadow: 0 10rpx 28rpx rgba(48,56,44,.04); }
 .archive-intro { min-height: 94rpx; padding: 20rpx 24rpx 17rpx; display: flex; align-items: flex-start; justify-content: space-between; gap: 16rpx; border-bottom: 1rpx solid var(--line); }
 .archive-intro > view { min-width: 0; display: flex; flex-direction: column; gap: 6rpx; }
-.archive-eyebrow { color: var(--moss); font-size: 21rpx; font-weight: 650; }
+.archive-eyebrow { color: var(--ink-tertiary); font-size: 21rpx; font-weight: 650; }
 .archive-summary { color: var(--ink-secondary); font-size: 21rpx; }
 .archive-state { flex: 0 0 auto; margin-top: 3rpx; padding: 7rpx 12rpx; border-radius: 999rpx; background: var(--moss-soft); color: var(--moss); font-size: 18rpx; }
 .archive-row, .data-row, .explore-row { width: 100%; margin: 0; padding: 22rpx 24rpx; display: grid; grid-template-columns: 46rpx minmax(0, 1fr) 26rpx; align-items: center; gap: 17rpx; background: transparent; color: var(--ink-secondary); text-align: left; font-size: 21rpx; line-height: 1.35; }
@@ -19,9 +19,11 @@
 .archive-row:last-child { border-bottom: 0; }
 .archive-row > view, .data-row > view, .explore-row > view { min-width: 0; display: flex; flex-direction: column; gap: 7rpx; }
 .archive-title { display: block; color: var(--ink); font-size: 27rpx; font-weight: 650; }
-.row-icon { width: 46rpx; height: 46rpx; padding: 10rpx; border-radius: 15rpx; background: var(--moss-soft); }
+.row-icon { width: 46rpx; height: 46rpx; padding: 10rpx; border-radius: var(--radius-sm); background: #f1f0ea; }
 .row-chevron { width: 26rpx; height: 26rpx; opacity: .72; transform: rotate(180deg); }
 .archive-row.disabled { opacity: .48; }
+/* 无语义匹配图标的次级行走纯文字,只占标题与箭头两列 */
+.data-row.no-icon, .explore-row.no-icon, .archive-row.no-icon { grid-template-columns: minmax(0, 1fr) 26rpx; }
 
 .section-head { margin: 42rpx 5rpx 18rpx; display: flex; align-items: baseline; justify-content: space-between; gap: 14rpx; }
 .section-head .section-title { margin: 0; font-size: 31rpx; }
@@ -29,9 +31,8 @@
 .data-list, .explore { overflow: hidden; }
 .data-row { min-height: 126rpx; border-bottom: 1rpx solid var(--line); }
 .data-row:last-child { border-bottom: 0; }
-.optional-tag { display: inline-flex; margin-left: 8rpx; padding: 3rpx 9rpx 4rpx; border-radius: 999rpx; background: var(--moss-soft); color: var(--moss); font-size: 17rpx; font-weight: 600; vertical-align: 3rpx; }
+.optional-tag { display: inline-flex; margin-left: 8rpx; padding: 3rpx 9rpx 4rpx; border-radius: 999rpx; background: #efeee9; color: var(--ink-tertiary); font-size: 17rpx; font-weight: 600; vertical-align: 3rpx; }
 .explore-row { min-height: 128rpx; }
-.explore-icon { width: 46rpx; height: 46rpx; padding: 10rpx; border-radius: 15rpx; background: #f1f0ea; }
 
 .privacy { overflow: hidden; padding: 3rpx 24rpx; }
 .privacy > view { padding: 22rpx 0; display: flex; flex-direction: column; gap: 7rpx; border-bottom: 1rpx solid var(--line); color: var(--ink-secondary); font-size: 22rpx; line-height: 1.55; }

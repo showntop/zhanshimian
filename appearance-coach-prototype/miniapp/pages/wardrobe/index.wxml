@@ -7,7 +7,7 @@
   <view wx:if="{{loadError}}" class="empty surface"><text>加载失败</text><text>请检查网络后重新加载</text><button bindtap="load">重新加载</button></view>
   <view wx:elif="{{filtered.length}}" class="item-grid fade-up delay-1">
     <view wx:for="{{filtered}}" wx:key="id" class="item-card">
-      <image src="{{item.image_url}}" mode="aspectFill" /><button class="delete" data-id="{{item.id}}" bindtap="remove">×</button>
+      <image wx:if="{{item.image_url}}" src="{{item.image_url}}" mode="aspectFill" /><view wx:else class="item-image-empty"><image src="/assets/icons/bookmark.png" mode="aspectFit" /><text>暂无照片</text></view><button class="delete" data-id="{{item.id}}" bindtap="remove">×</button>
       <text class="item-name">{{item.name}}</text><text class="item-meta">{{item.color}} · {{item.wear_count ? '穿过 ' + item.wear_count + ' 次' : '新加入'}}</text>
     </view>
   </view>
@@ -18,4 +18,4 @@
 
 <view wx:if="{{adding}}" class="sheet-mask" catchtap="closeAdd"><view class="add-sheet" catchtap="stop"><view class="sheet-head"><text>添加常穿单品</text><button bindtap="closeAdd">完成后关闭</button></view><button class="photo-picker" bindtap="choosePhoto"><image wx:if="{{form.path}}" src="{{form.path}}" mode="aspectFill" /><text wx:else>＋ 拍照或从相册选择</text></button><input placeholder="单品名称，如：米白针织衫" value="{{form.name}}" bindinput="inputName" /><input placeholder="主颜色，如：米白" value="{{form.color}}" bindinput="inputColor" /><view class="form-categories"><button wx:for="{{categories}}" wx:key="value" class="{{form.category === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="chooseCategory">{{item.label}}</button></view><primary-button text="加入我的衣橱" loading="{{saving}}" bind:tap="saveItem" /></view></view>
 
-<view wx:if="{{outfit}}" class="sheet-mask" catchtap="closeOutfit"><view class="outfit-sheet" catchtap="stop"><text class="outfit-kicker">现有衣橱组合</text><text class="outfit-title serif">{{outfit.title}}</text><text class="outfit-note">{{outfit.note}}</text><view class="outfit-items"><view wx:for="{{outfit.items}}" wx:key="id"><image src="{{item.image_url}}" mode="aspectFill" /><text>{{item.name}}</text></view></view><primary-button text="{{outfit.worn ? '今天已经穿了' : '记录：今天穿这套'}}" disabled="{{outfit.worn}}" bind:tap="wearOutfit" /></view></view>
+<view wx:if="{{outfit}}" class="sheet-mask" catchtap="closeOutfit"><view class="outfit-sheet" catchtap="stop"><text class="outfit-kicker">现有衣橱组合</text><text class="outfit-title serif">{{outfit.title}}</text><text class="outfit-note">{{outfit.note}}</text><view class="outfit-items"><view wx:for="{{outfit.items}}" wx:key="id"><image wx:if="{{item.image_url}}" src="{{item.image_url}}" mode="aspectFill" /><view wx:else class="item-image-empty outfit-image-empty"><image src="/assets/icons/bookmark.png" mode="aspectFit" /></view><text>{{item.name}}</text></view></view><primary-button text="{{outfit.worn ? '今天已经穿了' : '记录：今天穿这套'}}" disabled="{{outfit.worn}}" bind:tap="wearOutfit" /></view></view>

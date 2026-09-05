@@ -1,5 +1,5 @@
 const api = require('../../services/api')
-const { lookImage, userImage } = require('../../utils/media')
+const { lookImage, exampleImage, userImage } = require('../../utils/media')
 
 Page({
   data: { id: '', plan: null, active: 0, loading: true, loadError: false, selecting: false, showCurrent: false, saved: false, categories: ['发型', '妆容', '穿搭'] },
@@ -18,7 +18,10 @@ Page({
       const face = media.find((item) => item.kind === 'face')
       plan.generated = Boolean(plan.generated_image_url)
       plan.isDemo = /^demo\//.test(plan.look_provider || '') || /^demo-/.test(plan.look_provider || '')
-      plan.image_url = plan.generated ? userImage(plan.generated_image_url) : lookImage(plan.image_url, slug, 'plan')
+      // 无本人生成图时显式使用内置示例图,页面上叠加「风格参考」角标
+      const generatedURL = plan.generated ? userImage(plan.generated_image_url) : ''
+      plan.image_url = generatedURL || lookImage(plan.image_url) || exampleImage(slug, 'plan')
+      plan.imageExample = !generatedURL
       plan.current_image_url = userImage(plan.current_image_url)
       plan.current_body_url = userImage(body && body.url)
       plan.current_face_url = userImage(face && face.url) || plan.current_image_url

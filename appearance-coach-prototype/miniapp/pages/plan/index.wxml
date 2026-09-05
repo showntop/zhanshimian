@@ -5,20 +5,21 @@
     <text class="plan-title serif fade-up">{{plan.name}}</text>
     <text class="plan-subtitle fade-up">{{plan.descriptor}}</text>
     <view class="hero fade-up delay-1">
-      <image class="hero-image" src="{{showCurrent && plan.current_compare_url ? plan.current_compare_url : plan.image_url}}" mode="{{showCurrent ? plan.current_compare_mode : (plan.generated ? 'aspectFit' : 'aspectFill')}}" fade-show="{{false}}" />
-      <image wx:if="{{showCurrent || !plan.current_compare_url}}" class="current-thumb" src="{{plan.image_url}}" mode="{{plan.generated ? 'aspectFit' : 'aspectFill'}}" fade-show="{{false}}" />
+      <image class="hero-image {{plan.imageExample && !showCurrent ? 'example-soft' : ''}}" src="{{showCurrent && plan.current_compare_url ? plan.current_compare_url : plan.image_url}}" mode="{{showCurrent ? plan.current_compare_mode : (plan.generated ? 'aspectFit' : 'aspectFill')}}" fade-show="{{false}}" />
+      <text wx:if="{{plan.imageExample && !showCurrent}}" class="example-badge">风格参考</text>
+      <image wx:if="{{showCurrent || !plan.current_compare_url}}" class="current-thumb {{!plan.generated ? 'example-soft' : ''}}" src="{{plan.image_url}}" mode="{{plan.generated ? 'aspectFit' : 'aspectFill'}}" fade-show="{{false}}" />
       <image wx:else class="current-thumb" src="{{plan.current_compare_url}}" mode="{{plan.current_compare_mode}}" fade-show="{{false}}" />
-      <text class="current-label">{{showCurrent ? (plan.isDemo ? '流程预览' : '本人方案') : '全身当前'}}</text>
-      <text class="scheme-label">{{showCurrent ? '全身当前' : (plan.isDemo ? '流程预览' : '本人方案')}}</text>
+      <text class="current-label">{{(showCurrent || !plan.current_compare_url) ? (plan.generated ? '本人方案' : '风格参考') : '全身当前'}}</text>
+      <text class="scheme-label">{{showCurrent ? '全身当前' : (plan.generated ? '本人方案' : '风格参考')}}</text>
       <button class="compare-button" bindtap="compare">{{showCurrent ? '方案' : '当前'}}</button>
       <text class="compare-note">{{plan.isDemo ? '免费流程模式 · 使用全身原照验证任务与页面链路' : (plan.generated ? '同一人物 · 对比整体造型变化' : '当前为风格方向示例')}}</text>
     </view>
-    <view class="outcomes fade-up delay-2"><view wx:for="{{plan.outcome_tags}}" wx:key="*this"><icon type="success_no_circle" size="18" color="#587344" /><text>{{item}}</text></view></view>
+    <view class="outcomes fade-up delay-2"><view wx:for="{{plan.outcome_tags}}" wx:key="*this"><icon type="success_no_circle" size="18" color="#567243" /><text>{{item}}</text></view></view>
     <text class="section-title">这套方案，具体怎么改</text>
     <view class="tabs"><button wx:for="{{categories}}" wx:key="*this" class="{{active === index ? 'active' : ''}}" data-index="{{index}}" bindtap="changeTab">{{item}}</button></view>
     <view class="step surface fade-up" wx:if="{{plan.steps[active]}}">
       <view class="step-copy"><text class="step-kicker">{{categories[active]}}建议</text><text class="step-title serif">{{plan.steps[active].title}}</text><text class="step-summary">{{plan.steps[active].summary}}</text></view>
-      <view class="detail-visual {{active === 2 ? 'outfit-visual' : 'face-visual'}}"><image src="{{plan.image_url}}" mode="{{active === 2 ? 'aspectFit' : 'widthFix'}}" fade-show="{{false}}" /><text class="visual-label">{{active === 2 ? '整体穿搭效果' : (active === 0 ? '本人方案 · 发型细节' : '本人方案 · 妆容细节')}}</text><view class="mark m1" /><view class="mark m2" /><view class="mark m3" /></view>
+      <view class="detail-visual {{active === 2 ? 'outfit-visual' : 'face-visual'}}"><image src="{{plan.image_url}}" mode="{{active === 2 ? 'aspectFit' : 'widthFix'}}" fade-show="{{false}}" class="{{plan.imageExample ? 'example-soft' : ''}}" /><text wx:if="{{plan.imageExample}}" class="example-badge">风格参考</text><text class="visual-label">{{active === 2 ? '整体穿搭效果' : (active === 0 ? '本人方案 · 发型细节' : '本人方案 · 妆容细节')}}</text><view class="mark m1" /><view class="mark m2" /><view class="mark m3" /></view>
       <view class="detail-list"><view class="detail-row" wx:for="{{plan.steps[active].details}}" wx:key="label"><text>{{item.label}}</text><text>{{item.value}}</text></view></view>
     </view>
     <view class="collapsed"><view wx:for="{{plan.steps}}" wx:if="{{index !== active}}" wx:key="id" class="collapsed-row" data-index="{{index}}" bindtap="changeTab"><text class="collapsed-type">{{categories[index]}}</text><text>{{item.title}}</text><text class="more">查看</text></view></view>
@@ -27,5 +28,5 @@
     <view class="plan-utilities"><button bindtap="toggleSaved">{{saved ? '✓ 已保存' : '保存方案'}}</button><button bindtap="feedback">试过后反馈</button><button bindtap="sharePlan">分享方案</button></view>
   </view>
   <view wx:elif="{{loading}}" class="skeleton loading-card" />
-  <view wx:else class="load-error"><text>加载失败，请稍后重试</text><button bindtap="load">重新加载</button></view>
+  <view wx:else class="load-error"><text>方案暂时没有加载成功</text><text>请检查网络后重新加载</text><view class="load-error-action"><primary-button text="重新加载" bind:tap="load" /></view></view>
 </view>

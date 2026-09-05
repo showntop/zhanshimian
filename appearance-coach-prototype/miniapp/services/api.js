@@ -91,7 +91,7 @@ function request(path, options = {}) {
         if (response.statusCode >= 200 && response.statusCode < 300) {
           localizeDevImages(response.data && response.data.data)
             .then(resolve)
-            .catch(() => resolve(response.data && response.data.data))
+            .catch((error) => { console.warn('[api] 开发环境图片本地化失败,使用原始数据', error); resolve(response.data && response.data.data) })
           return
         }
         if (response.statusCode === 401 && !path.startsWith('/v1/auth/') && !options.retried) {

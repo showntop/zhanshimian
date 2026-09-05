@@ -1,5 +1,5 @@
 const api = require('../../services/api')
-const { lookImage, userImage } = require('../../utils/media')
+const { lookImage, exampleImage, userImage, isBundledAsset } = require('../../utils/media')
 
 function greetingByHour() {
   const hour = new Date().getHours()
@@ -15,26 +15,27 @@ Page({
   data: {
     scenes: [
       { id: 'interview', label: '面试', note: '精神可信', icon: '/assets/icons/briefcase.png' },
-      { id: 'wedding', label: '婚礼', note: '得体上镜', icon: '/assets/icons/sparkles.png' },
-      { id: 'date', label: '约会', note: '自然有记忆点', icon: '/assets/icons/heart.png' },
+      { id: 'wedding', label: '婚礼', note: '得体上镜', icon: '/assets/icons/heart.png' },
+      { id: 'date', label: '约会', note: '自然有记忆点', icon: '/assets/icons/bookmark.png' },
       { id: 'daily', label: '日常', note: '省心耐看', icon: '/assets/icons/sun.png' }
     ],
     tools: [
       { id: 'hair', label: '发型预览', note: '先看再决定', icon: '/assets/capture/face-line.png', badge: '推荐' },
       { id: 'outfit', label: '穿搭诊断', note: '今天怎么改', icon: '/assets/icons/document.png' },
-      { id: 'purchase', label: '购买判断', note: '这件适合吗', icon: '/assets/icons/bookmark.png' },
-      { id: 'advisor', label: '问顾问', note: '继续调整方案', icon: '/assets/icons/sparkles.png' }
+      { id: 'purchase', label: '购买判断', note: '这件适合吗', icon: '/assets/icons/shield-check.png' },
+      { id: 'advisor', label: '问顾问', note: '继续调整方案', icon: '/assets/icons/user.png' }
     ],
     hasProfile: false,
     reportID: '',
     greeting: greetingByHour(),
     todayContext: null,
-    todayLookUrl: '/assets/plans/sharp.jpg',
+    todayLookUrl: '',
+    todayLookExample: false,
     currentLookUrl: '',
-    referenceLookUrl: '/assets/reports/sharp.jpg',
+    referenceLookUrl: '',
     referenceGenerated: false,
     referenceDemo: false,
-    comparisonTitle: '清晰利落',
+    comparisonTitle: '',
     todayPlan: null,
     previewOpen: false,
     todayOpening: false,
@@ -46,7 +47,7 @@ Page({
     this.setData({ initialized: true })
   },
   onShow() {
-    api.trackEvent('page_view', { page: 'home' }).catch(() => {})
+    api.trackEvent('page_view', { page: 'home' }).catch((error) => console.warn('[home] 埋点上报失败', error))
     const reportID = wx.getStorageSync('jianwo_report_id') || ''
     if (!reportID && !this.reportRecovered) {
       // A reinstalled mini-program wipes local cache but the report still
@@ -57,7 +58,7 @@ Page({
           wx.setStorageSync('jianwo_report_id', report.id)
           this.onShow()
         })
-        .catch(() => {})
+        .catch((error) => console.warn('[home] 历史报告恢复失败', error))
       return
     }
     const hadProfile = this.data.hasProfile
@@ -71,31 +72,44 @@ Page({
     if (reportID) {
       api.getTodayPlan().then((todayPlan) => {
         if (todayPlan) {
-          this.setData({ todayPlan, todayContext: todayPlan.context, todayLookUrl: lookImage(todayPlan.image_url, 'sharp', 'full') })
+          // 方案图 URL 无效时显式回退到内置示例图,wxml 用 todayLookExample 叠加「风格参考」角标
+          const lookURL = lookImage(todayPlan.image_url)
+          this.setData({ todayPlan, todayContext: todayPlan.context, todayLookUrl: lookURL || exampleImage('sharp', 'full'), todayLookExample: !lookURL || isBundledAsset(lookURL) })
         } else {
+          this.setData({ todayPlan: null, todayLookUrl: '', todayLookExample: false })
           this.loadTodayContext()
         }
-      }).catch(() => this.loadTodayContext())
+      }).catch((error) => {
+        console.warn('[home] 今日方案加载失败', error)
+        // 今日卡进入空态:wxml 显示「今天的造型建议还没生成」与占位缩略图
+        this.setData({ todayPlan: null, todayLookUrl: '', todayLookExample: false })
+        this.loadTodayContext()
+      })
       Promise.all([api.getReport(reportID), api.getPlans(reportID)]).then((results) => {
         const report = results[0]
         const plans = results[1]
         const featured = plans.find((item) => item.recommended) || plans[0]
         const generatedURL = featured && userImage(featured.generated_image_url)
+        const referenceURL = featured ? (generatedURL || lookImage(featured.image_url)) : ''
         this.setData({
           currentLookUrl: userImage(report.current_image_url),
-          referenceLookUrl: featured ? (generatedURL || lookImage(featured.image_url, featured.slug, 'report')) : '/assets/reports/sharp.jpg',
+          referenceLookUrl: referenceURL || (featured ? exampleImage(featured.slug, 'report') : ''),
           referenceGenerated: Boolean(generatedURL),
           referenceDemo: Boolean(featured && (/^demo\//.test(featured.look_provider || '') || /^demo-/.test(featured.look_provider || ''))),
-          comparisonTitle: featured ? featured.name : '本人方案待生成'
+          comparisonTitle: featured ? featured.name : ''
         })
-      }).catch(() => {})
+      }).catch((error) => {
+        console.warn('[home] 方案对比卡加载失败', error)
+        // 对比卡进入空态:wxml 的 referenceGenerated/referenceDemo 守卫会显示「生成本人方案后可对比」
+        this.setData({ currentLookUrl: '', referenceLookUrl: '', referenceGenerated: false, referenceDemo: false, comparisonTitle: '' })
+      })
     }
   },
   loadTodayContext() {
     // 今日方案还没生成时也展示真实天气，不再用写死的"上海 · 多云 · 26°C"
     api.getTodayContext(wx.getStorageSync('jianwo_city') || '').then((context) => {
       if (context) this.setData({ todayContext: context })
-    }).catch(() => {})
+    }).catch((error) => console.warn('[home] 今日天气加载失败', error))
   },
   refreshTasks(reportID) {
     const requests = []
@@ -112,7 +126,7 @@ Page({
           note: analysis.status === 'completed' ? '查看报告与三套方向' : (analysis.status === 'failed' ? '查看原因并重新提交' : `${analysis.progress || 0}% · ${analysis.stage || '正在处理'}`),
           action: analysis.status === 'completed' ? '查看报告' : (analysis.status === 'failed' ? '重新分析' : '查看进度')
         }
-      }).catch(() => null))
+      }).catch((error) => { console.warn('[home] 分析任务状态加载失败', error); return null }))
     }
     const activePlan = wx.getStorageSync('jianwo_active_plan_generation')
     const planReportID = activePlan && activePlan.reportId || reportID
@@ -136,7 +150,7 @@ Page({
           task = { state: 'completed', title: '3 套本人方案已经完成', note: '脸部、发型与全身穿搭都已准备好', action: '查看方案' }
         }
         return { kind: 'plans', reportId: planReportID, scene: activePlan.scene || '', ...task }
-      }).catch(() => null))
+      }).catch((error) => { console.warn('[home] 方案任务状态加载失败', error); return null }))
     }
     const activeHairID = wx.getStorageSync('jianwo_active_hair_preview') || ''
     if (activeHairID) {
@@ -145,7 +159,7 @@ Page({
         title: preview.status === 'completed' ? '发型预览已经完成' : (preview.status === 'failed' ? '发型预览未完成' : '发型预览正在生成'),
         note: preview.status === 'completed' ? `${preview.style_name} · 查看并决定是否保存` : (preview.status === 'failed' ? '可以更换照片或重新生成' : `${preview.progress || 0}% · ${preview.stage || '正在处理'}`),
         action: preview.status === 'completed' ? '查看结果' : (preview.status === 'failed' ? '重新尝试' : '查看进度')
-      })).catch(() => null))
+      })).catch((error) => { console.warn('[home] 发型预览任务状态加载失败', error); return null }))
     }
     Promise.all(requests).then((tasks) => this.setData({ tasks: tasks.filter(Boolean) }))
   },
@@ -159,7 +173,7 @@ Page({
         // 用户中途退出导致场景方案没来得及创建时，在这里补上，场景流程不再断链
         const brief = wx.getStorageSync('jianwo_scene_brief')
         if (scene !== 'general' && brief && brief.scene === scene) {
-          api.createScenePlans(task.reportId, brief).catch(() => {}).finally(() => wx.navigateTo({ url: `/pages/report/index?id=${task.reportId}&scene=${scene}` }))
+          api.createScenePlans(task.reportId, brief).catch((error) => console.warn('[home] 场景方案补建失败', error)).finally(() => wx.navigateTo({ url: `/pages/report/index?id=${task.reportId}&scene=${scene}` }))
           return
         }
         wx.navigateTo({ url: `/pages/report/index?id=${task.reportId}` }); return
@@ -184,17 +198,19 @@ Page({
   },
   openToday() { if (this.data.todayOpening) return; this.setData({ todayOpening: true }); wx.navigateTo({ url: '/pages/today/index', fail: () => this.setData({ todayOpening: false }) }) },
   previewTodayLook() {
+    if (!this.data.todayLookUrl) return
     this.setData({ previewOpen: true })
   },
   closeTodayLook() { this.setData({ previewOpen: false }) },
   start() { wx.navigateTo({ url: '/pages/capture/index?scene=general' }) },
   openReport() {
-    if (this.data.reportID) wx.navigateTo({ url: `/pages/report/index?id=${this.data.reportID}` })
+    if (this.data.reportID) { wx.navigateTo({ url: `/pages/report/index?id=${this.data.reportID}` }); return }
+    this.openExample()
   },
   openExample() {
     if (this.data.reportID) wx.switchTab({ url: '/pages/plans/index' })
     else wx.navigateTo({ url: '/pages/capture/index?scene=general&demo=1' })
   },
   openLab() { wx.navigateTo({ url: '/pages/lab/index' }) },
-  onShareAppMessage() { return { title: '怎么打扮｜你的 AI 形象顾问', path: '/pages/home/index' } }
+  onShareAppMessage() { return { title: '怎么打扮｜你的私人形象顾问', path: '/pages/home/index' } }
 })

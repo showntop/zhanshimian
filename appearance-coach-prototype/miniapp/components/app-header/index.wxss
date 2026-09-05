@@ -9,6 +9,6 @@
 .header-icon { width: 40rpx; height: 40rpx; }
 .profile-button { padding: 12rpx; border: 2rpx solid var(--moss); border-radius: 50%; }
 .profile-icon { width: 42rpx; height: 42rpx; }
-.header-help { margin: 0; padding: 18rpx 0; background: transparent; color: var(--moss); font-size: 24rpx; line-height: 1; }
+.header-help { margin: 0; padding: 18rpx 0; background: transparent; color: var(--ink-secondary); font-size: 24rpx; line-height: 1; white-space: nowrap; }
 .right { gap: 4rpx; }
 .action-hover { opacity: .5; }

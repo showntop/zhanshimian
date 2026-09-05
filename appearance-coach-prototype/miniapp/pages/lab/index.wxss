@@ -1,23 +1,23 @@
 .lab-page { padding-left: 28rpx; padding-right: 28rpx; }
 .lab-head { padding: 12rpx 6rpx 27rpx; display: flex; flex-direction: column; gap: 9rpx; }
 .lab-title { font-size: 31rpx; line-height: 1.4; font-weight: 700; }
-.lab-note { color: #7d827c; font-size: 21rpx; line-height: 1.55; }
-.feature-card { margin-bottom: 20rpx; overflow: hidden; border: 1rpx solid rgba(80,93,73,.14); border-radius: 28rpx; background: rgba(255,255,255,.76); }
-.feature-card.live { border-color: rgba(88,115,68,.3); box-shadow: 0 12rpx 34rpx rgba(60,74,51,.07); }
+.lab-note { color: var(--ink-secondary); font-size: 21rpx; line-height: 1.55; }
+.feature-card { margin-bottom: 20rpx; overflow: hidden; border: 1rpx solid var(--line); border-radius: var(--radius-xl); background: var(--surface); }
+.feature-card.live { border-color: var(--moss); }
 .feature-media { position: relative; height: 330rpx; overflow: hidden; background: #ecece8; }
 .feature-media image { width: 100%; height: 100%; }
-.media-chip { position: absolute; left: 16rpx; top: 16rpx; padding: 8rpx 12rpx; border-radius: 999rpx; background: rgba(255,255,255,.9); color: #587344; font-size: 18rpx; }
+.media-chip { position: absolute; left: 16rpx; top: 16rpx; padding: 8rpx 12rpx; border-radius: 999rpx; background: rgba(255,255,255,.9); color: var(--ink); font-size: 18rpx; }
 .media-action, .rotate-hint { position: absolute; right: 16rpx; bottom: 16rpx; padding: 9rpx 13rpx; border-radius: 999rpx; background: rgba(39,44,37,.68); color: #fff; font-size: 18rpx; }
 .feature-copy { padding: 23rpx; }
 .feature-copy > view { display: flex; align-items: center; justify-content: space-between; }
 .feature-name { font-size: 27rpx; font-weight: 700; }
-.status { padding: 7rpx 11rpx; border-radius: 999rpx; background: #f0efea; color: #7a7f79; font-size: 17rpx; }
-.live-status { background: #eaf0e5; color: #587344; }
-.feature-copy > text { display: block; margin-top: 11rpx; color: #747974; font-size: 21rpx; line-height: 1.6; }
-.feature-copy button { width: 100%; min-height: 72rpx; margin-top: 18rpx; border-radius: 18rpx; background: #eef2e9; color: #587344; font-size: 22rpx; }
-.feature-card.live .feature-copy button { background: #587344; color: #fff; }
-.lab-principle { margin-top: 8rpx; padding: 22rpx; display: grid; grid-template-columns: 36rpx 1fr; gap: 13rpx; border-radius: 23rpx; background: #f0f1ec; }
+.status { padding: 7rpx 11rpx; border-radius: 999rpx; background: #f0efea; color: var(--ink-tertiary); font-size: 17rpx; }
+.live-status { background: var(--moss-soft); color: var(--moss); }
+.feature-copy > text { display: block; margin-top: 11rpx; color: var(--ink-secondary); font-size: 21rpx; line-height: 1.6; }
+.feature-copy button { width: 100%; min-height: 72rpx; margin-top: 18rpx; border-radius: var(--radius-md); background: #efeee9; color: var(--ink); font-size: 22rpx; }
+.feature-card.live .feature-copy button { background: var(--moss); color: #fff; }
+.lab-principle { margin-top: 8rpx; padding: 22rpx; display: grid; grid-template-columns: 36rpx 1fr; gap: 13rpx; border-radius: var(--radius-lg); background: #f0f1ec; }
 .lab-principle image { width: 34rpx; height: 34rpx; }
 .lab-principle > view { display: flex; flex-direction: column; gap: 7rpx; }
 .lab-principle text:first-child { font-size: 23rpx; font-weight: 650; }
-.lab-principle text:last-child { color: #777c76; font-size: 20rpx; line-height: 1.6; }
+.lab-principle text:last-child { color: var(--ink-secondary); font-size: 20rpx; line-height: 1.6; }

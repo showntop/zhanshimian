@@ -1,11 +1,11 @@
 const api = require('../../services/api')
-const { lookImage, userImage } = require('../../utils/media')
+const { lookImage, exampleImage, userImage } = require('../../utils/media')
 
 const SCENE_LABELS = { interview: '面试', wedding: '婚礼', date: '约会', daily: '日常' }
 
 Page({
   data: {
-    reportId: '', scene: '', plans: [], savedHair: [], selected: 0, showCurrent: false, loading: true,
+    reportId: '', scene: '', plans: [], savedHair: [], selected: 0, showCurrent: false, status: 'loading', errorMessage: '',
     sceneLabel: '', asTab: true, generating: false, allIdle: false, allFailed: false, allReady: false,
     hasReport: false, generationCount: 0, currentFaceUrl: '', currentBodyUrl: '',
     sceneTabs: [{ id: '', label: '形象方案' }, { id: 'interview', label: '面试' }, { id: 'wedding', label: '婚礼' }, { id: 'date', label: '约会' }, { id: 'daily', label: '日常' }]
@@ -29,7 +29,7 @@ Page({
     const scene = intent || (force ? '' : this.data.scene)
     const changed = scene !== this.data.scene || reportId !== this.data.reportId
     if (force || changed) {
-      this.setData({ reportId, scene, sceneLabel: SCENE_LABELS[scene] || '', hasReport: Boolean(reportId), loading: true })
+      this.setData({ reportId, scene, sceneLabel: SCENE_LABELS[scene] || '', hasReport: Boolean(reportId), status: 'loading', errorMessage: '' })
       this.load()
       return
     }
@@ -40,34 +40,38 @@ Page({
     const scene = event.currentTarget.dataset.id
     if (scene === this.data.scene || !this.data.reportId) return
     if (this.timer) clearTimeout(this.timer)
-    this.setData({ scene, sceneLabel: SCENE_LABELS[scene] || '', plans: [], loading: true, allIdle: false, allFailed: false, allReady: false })
+    this.setData({ scene, sceneLabel: SCENE_LABELS[scene] || '', plans: [], status: 'loading', errorMessage: '', allIdle: false, allFailed: false, allReady: false })
     this.load()
   },
   openSceneBrief() {
     if (this.data.scene) wx.navigateTo({ url: `/pages/scene/index?scene=${this.data.scene}` })
   },
   onUnload() { if (this.timer) clearTimeout(this.timer) },
-  retry() { this.setData({ loading: true }); this.load() },
+  retry() { this.setData({ status: 'loading', errorMessage: '' }); this.load() },
   mapPlans(plans, currentFaceUrl = this.data.currentFaceUrl, currentBodyUrl = this.data.currentBodyUrl) {
     return (plans || []).map((plan) => {
       const generated = Boolean(plan.generated_image_url)
       const isDemo = /^demo\//.test(plan.look_provider || '') || /^demo-/.test(plan.look_provider || '')
       const status = plan.generation_status || 'idle'
       const generatedURL = generated ? userImage(plan.generated_image_url) : ''
+      const slug = plan.slug || 'natural'
+      // 无本人生成图时,图一律来自 API 示例或内置模特图,卡片必须叠加「风格参考」角标
+      const example = !generatedURL
       return {
         ...plan,
         generated,
         isDemo,
         generating: status === 'queued' || status === 'processing',
         generateFailed: status === 'failed',
-        display_url: generatedURL || lookImage(plan.image_url, plan.slug, 'plan'),
+        example,
+        display_url: generatedURL || lookImage(plan.image_url) || exampleImage(slug, 'plan'),
         display_mode: generatedURL ? 'aspectFit' : 'aspectFill',
         current_image_url: currentBodyUrl || currentFaceUrl || userImage(plan.current_image_url),
         current_image_mode: currentBodyUrl ? 'aspectFit' : 'aspectFill',
-        thumbnail_url: generatedURL || lookImage(plan.image_url, plan.slug, 'portrait'),
+        thumbnail_url: generatedURL || lookImage(plan.image_url) || exampleImage(slug, 'portrait'),
         thumbnail_mode: generatedURL ? 'aspectFit' : 'aspectFill',
-        look_label: isDemo ? '免费流程预览' : (generated ? 'AI 本人方案' : '效果示例'),
-        compare_label: isDemo ? '流程预览' : (generated ? '本人方案' : '风格参考')
+        look_label: generated ? '本人方案' : '',
+        compare_label: generated ? '本人方案' : '风格参考'
       }
     })
   },
@@ -86,15 +90,15 @@ Page({
       const currentFaceUrl = userImage(face && face.url)
       const currentBodyUrl = userImage(body && body.url)
       const mapped = this.mapPlans(plans, currentFaceUrl, currentBodyUrl)
-      const mappedHair = savedHair.map((item) => ({ ...item, preview_label: (item.provider_version || '').indexOf('demo') === 0 ? '效果示例' : 'AI 本人预览' }))
+      const mappedHair = savedHair.map((item) => ({ ...item, preview_label: (item.provider_version || '').indexOf('demo') === 0 ? '风格参考' : '本人效果预览' }))
       const allIdle = mapped.length > 0 && mapped.every((item) => !item.generated && !item.generating && !item.generateFailed)
       const allFailed = mapped.length > 0 && mapped.every((item) => item.generateFailed)
       const allReady = mapped.length > 0 && mapped.every((item) => item.generated)
       const generationCount = mapped.filter((item) => item.generated).length
-      this.setData({ plans: mapped, savedHair: mappedHair, allIdle, allFailed, allReady, generationCount, currentFaceUrl, currentBodyUrl, selected: Math.max(0, mapped.findIndex((item) => item.recommended)), loading: false })
+      this.setData({ plans: mapped, savedHair: mappedHair, allIdle, allFailed, allReady, generationCount, currentFaceUrl, currentBodyUrl, selected: Math.max(0, mapped.findIndex((item) => item.recommended)), status: mapped.length ? 'ready' : 'empty', errorMessage: '' })
       if (allReady) wx.removeStorageSync('jianwo_active_plan_generation')
       this.schedulePoll(mapped)
-    }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false }) })
+    }).catch((error) => { this.setData({ plans: [], status: 'error', errorMessage: (error && error.message) || '网络异常' }) })
   },
   schedulePoll(plans) {
     if (this.timer) clearTimeout(this.timer)
@@ -116,11 +120,16 @@ Page({
         // 入队成功后再记录进行中的生成，避免失败后 key 残留误导首页
         wx.setStorageSync('jianwo_active_plan_generation', { reportId: this.data.reportId, scene: this.data.scene })
         const mapped = this.mapPlans(plans)
-        this.setData({ plans: mapped, allIdle: false, allFailed: false })
+        this.setData({ plans: mapped, allIdle: false, allFailed: false, status: mapped.length ? 'ready' : 'empty' })
         this.schedulePoll(mapped)
       })
       .catch((error) => wx.showToast({ title: error.message || '生成暂时不可用', icon: 'none' }))
       .finally(() => this.setData({ generating: false }))
+  },
+  // 服务端没有单套重试接口,失败卡片重试 = 整组重新入队,toast 说明
+  retryPlan() {
+    wx.showToast({ title: '已重新发起生成，三套方案会一起更新', icon: 'none' })
+    this.generate()
   },
   swiperChange(event) { this.setData({ selected: event.detail.current, showCurrent: false }); wx.vibrateShort({ type: 'light' }) },
   selectThumb(event) { this.setData({ selected: Number(event.currentTarget.dataset.index), showCurrent: false }) },

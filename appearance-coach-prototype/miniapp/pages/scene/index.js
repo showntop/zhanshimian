@@ -1,7 +1,7 @@
 const scenes = {
   interview: { id: 'interview', label: '面试', icon: '/assets/icons/briefcase.png' },
-  wedding: { id: 'wedding', label: '婚礼', icon: '/assets/icons/sparkles.png' },
-  date: { id: 'date', label: '约会', icon: '/assets/icons/heart.png' },
+  wedding: { id: 'wedding', label: '婚礼', icon: '/assets/icons/heart.png' },
+  date: { id: 'date', label: '约会', icon: '/assets/icons/bookmark.png' },
   daily: { id: 'daily', label: '日常', icon: '/assets/icons/sun.png' }
 }
 

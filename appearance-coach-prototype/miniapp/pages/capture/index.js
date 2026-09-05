@@ -43,7 +43,7 @@ Page({
   primaryAction() { this.data.completed === 3 ? this.startAnalysis() : this.choosePhotos('camera') },
   chooseFromAlbum() { this.choosePhotos('album') },
   showHelp() {
-    wx.showModal({ title: '这样拍更准确', content: '站在窗边自然光下，关闭美颜与滤镜。正脸平视镜头；侧脸转向 90°；全身照露出肩颈与腰线即可，脚部可以不完整入镜。', showCancel: false, confirmText: '知道了', confirmColor: '#587344' })
+    wx.showModal({ title: '这样拍更准确', content: '站在窗边自然光下，关闭美颜与滤镜。正脸平视镜头；侧脸转向 90°；全身照露出肩颈与腰线即可，脚部可以不完整入镜。', showCancel: false, confirmText: '知道了', confirmColor: '#567243' })
   },
   upload(index, path) {
     const kind = this.data.shots[index].kind
@@ -83,7 +83,8 @@ Page({
         }
         wx.removeStorageSync('jianwo_active_analysis_id')
         this.createAnalysis()
-      }).catch(() => {
+      }).catch((error) => {
+        console.warn('[capture] 进行中的分析状态查询失败,按新分析继续', error)
         wx.removeStorageSync('jianwo_active_analysis_id')
         this.createAnalysis()
       })

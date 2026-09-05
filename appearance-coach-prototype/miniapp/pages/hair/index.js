@@ -1,15 +1,10 @@
 const api = require('../../services/api')
-const { lookImage, userImage } = require('../../utils/media')
-
-const fallbackStyles = [
-  { id: 'sharp', name: '锁骨层次发', note: '首选推荐', image: '/assets/hair/sharp.jpg', reason: '提高视觉重心并保留脸侧空气感。', tags: ['重心提高', '肩颈更清晰'] },
-  { id: 'warm', name: '空气微卷', note: '柔和表达', image: '/assets/hair/warm.jpg', reason: '柔和的发尾弧度能保留亲和感。', tags: ['自然柔和', '上镜'] },
-  { id: 'natural', name: '自然偏分', note: '低维护', image: '/assets/hair/natural.jpg', reason: '只调整分缝与耳侧线条，最容易维持。', tags: ['改动小', '低维护'] }
-]
+const { lookImage, exampleImage, userImage, isBundledAsset } = require('../../utils/media')
 
 Page({
   data: {
-    styles: fallbackStyles, activeIndex: 0, activeStyle: fallbackStyles[0], loading: true, error: '',
+    // 发型推荐只来自接口;为空或失败时页面显示真实的空态/错误态,不再展示写死的假发型
+    styles: [], activeIndex: 0, activeStyle: null, loading: true, error: '',
     sourceMediaID: '', currentImage: '', resultImage: '', previewID: '', previewStatus: '', progress: 0,
     stage: '', showCurrent: false, generating: false, saving: false, saved: false, isDemo: false, usingProfilePhoto: false
   },
@@ -18,13 +13,17 @@ Page({
   loadRecommendations() {
     this.setData({ loading: true, error: '' })
     api.runTool({ kind: 'hair', report_id: wx.getStorageSync('jianwo_report_id') || '', scene: 'daily' }).then((result) => {
-      const styles = (result.options || []).map((item) => ({ ...item, image: lookImage(item.image_url, item.id, 'hair') }))
-      const available = styles.length ? styles : fallbackStyles
+      // 推荐图 URL 无效时显式回退到内置示例图,wxml 用 item.isExample 叠加「风格参考」角标
+      const styles = (result.options || []).map((item) => {
+        const imageURL = lookImage(item.image_url)
+        return { ...item, image: imageURL || exampleImage(item.id, 'hair'), isExample: !imageURL || isBundledAsset(imageURL) }
+      })
       const resumedStyleID = this.data.previewID && this.data.activeStyle && this.data.activeStyle.id
-      const activeIndex = resumedStyleID ? Math.max(0, available.findIndex((item) => item.id === resumedStyleID)) : 0
-      this.setData({ styles: available, activeStyle: available[activeIndex], activeIndex, loading: false })
+      const activeIndex = resumedStyleID ? Math.max(0, styles.findIndex((item) => item.id === resumedStyleID)) : 0
+      this.setData({ styles, activeStyle: styles[activeIndex] || null, activeIndex, loading: false })
     }).catch((error) => this.setData({ error: error.message, loading: false }))
   },
+  goAnalyze() { wx.navigateTo({ url: '/pages/capture/index?scene=general' }) },
   selectStyle(event) {
     if (this.data.generating) return
     const activeIndex = Number(event.currentTarget.dataset.index)
@@ -44,7 +43,7 @@ Page({
     }).catch((error) => wx.showToast({ title: error.message, icon: 'none' })).finally(() => wx.hideLoading())
   },
   useDemoPhoto() {
-    api.createDemoMedia('face').then((asset) => { wx.removeStorageSync('jianwo_active_hair_preview'); this.setData({ sourceMediaID: asset.id, currentImage: lookImage(asset.url, 'natural', 'portrait'), resultImage: '', previewID: '', showCurrent: true, usingProfilePhoto: false }) })
+    api.createDemoMedia('face').then((asset) => { wx.removeStorageSync('jianwo_active_hair_preview'); this.setData({ sourceMediaID: asset.id, currentImage: userImage(asset.url), resultImage: '', previewID: '', showCurrent: true, usingProfilePhoto: false }) })
       .catch((error) => wx.showToast({ title: error.message, icon: 'none' }))
   },
   resumePreview() {
@@ -54,7 +53,7 @@ Page({
       const activeIndex = Math.max(0, this.data.styles.findIndex((item) => item.id === preview.style_id))
       const base = { previewID: preview.id, previewStatus: preview.status, progress: preview.progress, stage: preview.stage, activeIndex, activeStyle: this.data.styles[activeIndex] || this.data.activeStyle }
       if (preview.status === 'completed') {
-        this.setData({ ...base, generating: false, currentImage: userImage(preview.source_image_url) || this.data.currentImage, resultImage: lookImage(preview.result_image_url, preview.style_id, 'hair'), showCurrent: false, isDemo: (preview.provider_version || '').indexOf('demo') === 0 })
+        this.setData({ ...base, generating: false, currentImage: userImage(preview.source_image_url) || this.data.currentImage, resultImage: lookImage(preview.result_image_url), showCurrent: false, isDemo: (preview.provider_version || '').indexOf('demo') === 0 })
         return
       }
       if (preview.status === 'failed') {
@@ -64,7 +63,7 @@ Page({
       }
       this.setData({ ...base, generating: true, error: '', currentImage: userImage(preview.source_image_url) || this.data.currentImage })
       this.pollPreview()
-    }).catch(() => wx.removeStorageSync('jianwo_active_hair_preview'))
+    }).catch((error) => { console.warn('[hair] 预览进度恢复失败', error); wx.removeStorageSync('jianwo_active_hair_preview') })
   },
   loadProfilePhoto() {
     const reportID = wx.getStorageSync('jianwo_report_id') || ''
@@ -78,7 +77,7 @@ Page({
         if (!face || !currentImage) return
         this.setData({ sourceMediaID: face.id, currentImage, showCurrent: true, usingProfilePhoto: true })
       })
-      .catch(() => {})
+      .catch((error) => console.warn('[hair] 形象档案正脸照加载失败', error))
   },
   primaryAction() {
     if (this.data.resultImage) return this.savePreview()
@@ -99,7 +98,7 @@ Page({
     if (!this.data.previewID) return
     api.getHairPreview(this.data.previewID).then((preview) => {
       if (preview.status === 'completed') {
-        this.setData({ generating: false, previewStatus: preview.status, progress: 100, stage: preview.stage, currentImage: userImage(preview.source_image_url) || this.data.currentImage, resultImage: lookImage(preview.result_image_url, this.data.activeStyle.id, 'hair'), showCurrent: false, isDemo: (preview.provider_version || '').indexOf('demo') === 0 })
+        this.setData({ generating: false, previewStatus: preview.status, progress: 100, stage: preview.stage, currentImage: userImage(preview.source_image_url) || this.data.currentImage, resultImage: lookImage(preview.result_image_url), showCurrent: false, isDemo: (preview.provider_version || '').indexOf('demo') === 0 })
         wx.vibrateShort({ type: 'light' })
         return
       }

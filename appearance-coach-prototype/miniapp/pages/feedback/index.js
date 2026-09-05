@@ -8,7 +8,7 @@ Page({
     selected: [],
     comment: '',
     feedbackImage: '',
-    referenceImage: '/assets/looks/sharp.jpg',
+    referenceImage: '',
     loading: false,
     done: false
   },
@@ -16,7 +16,8 @@ Page({
     const planId = options.planId || wx.getStorageSync('jianwo_plan_id')
     this.setData({ planId })
     if (!planId) return
-    api.getPlan(planId).then((plan) => this.setData({ referenceImage: lookImage(plan.image_url, plan.slug, 'full') })).catch(() => {})
+    // 方案参考图 URL 无效就保持为空,wxml 显示空态,不再默认展示内置模特图
+    api.getPlan(planId).then((plan) => this.setData({ referenceImage: lookImage(plan.image_url) })).catch((error) => console.warn('[feedback] 方案参考图加载失败', error))
   },
   toggle(event) {
     const tag = event.currentTarget.dataset.tag

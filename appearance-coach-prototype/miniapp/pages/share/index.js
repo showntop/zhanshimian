@@ -12,10 +12,11 @@ Page({
       return
     }
     if (!options.type || !options.id) { this.setData({ loading: false, loadError: true }); return }
-    api.createShareCard({ source_type: options.type, source_id: options.id, include_photo: false }).then((card) => { this.setCard(card, true); api.trackEvent('share_card_create', { source_type: options.type, source_id: options.id }).catch(() => {}) }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false, loadError: true }) })
+    api.createShareCard({ source_type: options.type, source_id: options.id, include_photo: false }).then((card) => { this.setCard(card, true); api.trackEvent('share_card_create', { source_type: options.type, source_id: options.id }).catch((error) => console.warn('[share] 埋点上报失败', error)) }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false, loadError: true }) })
   },
   setCard(card, owner) {
-    const snapshot = card.snapshot ? { ...card.snapshot, image_url: card.snapshot.image_url ? lookImage(card.snapshot.image_url, 'natural', 'plan') : '' } : null
+    // 分享卡快照图严格校验:URL 无效就留空,海报只展示文字,不再回退内置模特图
+    const snapshot = card.snapshot ? { ...card.snapshot, image_url: lookImage(card.snapshot.image_url) } : null
     this.setData({ card, snapshot, owner, loading: false })
   },
   savePoster() {
@@ -29,11 +30,11 @@ Page({
       canvas.width = width * ratio; canvas.height = height * ratio
       const context = canvas.getContext('2d'); context.scale(ratio, ratio)
       context.fillStyle = '#f8f5f0'; context.fillRect(0, 0, width, height)
-      context.fillStyle = '#587344'; context.font = '18px sans-serif'; context.fillText('怎么打扮 · AI 形象顾问', 28, 42)
+      context.fillStyle = '#567243'; context.font = '18px sans-serif'; context.fillText('怎么打扮 · 私人形象顾问', 28, 42)
       context.fillStyle = '#292d29'; context.font = 'bold 28px sans-serif'; this.drawText(context, this.data.snapshot.title || '我的形象方案', 28, 92, width - 56, 38)
       context.fillStyle = '#676d66'; context.font = '16px sans-serif'; this.drawText(context, this.data.snapshot.summary || '', 28, 180, width - 56, 26)
-      context.fillStyle = '#eef2e9'; context.fillRect(28, height - 118, width - 56, 68)
-      context.fillStyle = '#587344'; context.font = '16px sans-serif'; context.fillText('发型 · 妆容 · 穿搭已为我组合好', 48, height - 78)
+      context.fillStyle = '#edf2e9'; context.fillRect(28, height - 118, width - 56, 68)
+      context.fillStyle = '#567243'; context.font = '16px sans-serif'; context.fillText('发型 · 妆容 · 穿搭已为我组合好', 48, height - 78)
       context.fillStyle = '#858a84'; context.font = '13px sans-serif'; context.fillText('方案由本人主动分享 · 照片默认不公开', 28, height - 22)
       wx.canvasToTempFilePath({ canvas, success: ({ tempFilePath }) => wx.saveImageToPhotosAlbum({ filePath: tempFilePath, success: () => wx.showToast({ title: '已保存到相册', icon: 'success' }), fail: () => wx.showToast({ title: '请允许保存到相册', icon: 'none' }), complete: () => this.setData({ saving: false }) }), fail: () => this.setData({ saving: false }) })
     })

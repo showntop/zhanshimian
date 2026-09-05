@@ -5,7 +5,7 @@ const sceneCodes = { '日常': 'daily', '面试': 'interview', '约会': 'date' 
 Page({
   data: {
     photo: '', mediaID: '', context: '日常', contexts: ['日常', '面试', '约会'],
-	loading: false, analyzed: false, result: null, error: '', diagnosisLabel: ''
+	loading: false, analyzed: false, result: null, error: '', diagnosisLabel: '', demo: false
   },
   choosePhoto() {
     wx.chooseMedia({
@@ -13,7 +13,7 @@ Page({
       mediaType: ['image'],
       sourceType: ['camera', 'album'],
       success: ({ tempFiles }) => this.setData({
-        photo: tempFiles[0].tempFilePath, mediaID: '', analyzed: false, result: null, error: ''
+        photo: tempFiles[0].tempFilePath, mediaID: '', analyzed: false, result: null, error: '', demo: false
       })
     })
   },
@@ -21,7 +21,7 @@ Page({
     if (this.data.loading) return
     this.setData({ loading: true, error: '' })
     api.createDemoMedia('outfit').then((asset) => this.setData({
-      photo: '/assets/looks/natural.jpg', mediaID: asset.id, analyzed: false, result: null, loading: false
+      photo: '/assets/looks/natural.jpg', mediaID: asset.id, analyzed: false, result: null, loading: false, demo: true
     })).catch((error) => this.setData({ error: error.message, loading: false }))
   },
   selectContext(event) {
@@ -47,7 +47,7 @@ Page({
 			const y = Math.max(12, Math.min(78, Math.round((item.anchor_y || [.3, .46, .68][index]) * 100)))
 			return { ...item, position: `left:${x}%;top:${y}%`, side: index % 2 ? 'right' : 'left' }
 		})
-		const diagnosisLabel = (result.provider_version || '').indexOf('demo') === 0 ? '效果示例' : 'AI 真实诊断'
+		const diagnosisLabel = (result.provider_version || '').indexOf('demo') === 0 ? '效果示例' : '实拍诊断'
 		this.setData({ result: { ...result, findings }, diagnosisLabel, analyzed: true, loading: false })
 	})
       .catch((error) => this.setData({ error: error.message, loading: false }))

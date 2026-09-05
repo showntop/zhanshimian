@@ -7,10 +7,11 @@ const categories = [
 
 Page({
   data: { items: [], filtered: [], categories, active: 'all', adding: false, saving: false, outfit: null, loadError: false, form: { media_id: '', path: '', name: '', category: 'top', color: '黑色' } },
-  onShow() { api.trackEvent('page_view', { page: 'wardrobe' }).catch(() => {}); this.load() },
+  onShow() { api.trackEvent('page_view', { page: 'wardrobe' }).catch((error) => console.warn('[wardrobe] 埋点上报失败', error)); this.load() },
   load() { this.setData({ loadError: false }); api.getWardrobeItems().then((items) => this.setItems(items)).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loadError: true }) }) },
-  // 服务端占位图历史上写过 .webp 路径，小程序包内只发 JPEG；统一过 lookImage 兜底。
-  mapItems(items) { return (items || []).map((item) => ({ ...item, image_url: lookImage(item.image_url, 'natural', 'plan') })) },
+  // 服务端占位图历史上写过 .webp 路径,小程序包内只发 JPEG;经 lookImage 严格校验,
+  // 无效 URL 返回 '',wxml 显示空态占位,不再回退内置模特图冒充单品照片。
+  mapItems(items) { return (items || []).map((item) => ({ ...item, image_url: lookImage(item.image_url) })) },
   mapOutfit(outfit) { return outfit ? { ...outfit, items: this.mapItems(outfit.items) } : outfit },
   setItems(items) { const mapped = this.mapItems(items); this.setData({ items: mapped, filtered: this.data.active === 'all' ? mapped : mapped.filter((item) => item.category === this.data.active) }) },
   filter(event) { const active = event.currentTarget.dataset.value; this.setData({ active, filtered: active === 'all' ? this.data.items : this.data.items.filter((item) => item.category === active) }) },
@@ -30,7 +31,7 @@ Page({
     this.setData({ saving: true })
     const form = this.data.form
     api.createWardrobeItem({ media_id: form.media_id, name: form.name || `${categories.find((item) => item.value === form.category).label}单品`, category: form.category, color: form.color, scenes: ['daily'] })
-      .then((item) => { this.setItems([item, ...this.data.items]); this.setData({ adding: false }); api.trackEvent('wardrobe_item_add', { item_id: item.id, category: item.category }).catch(() => {}); wx.showToast({ title: '已加入衣橱', icon: 'success' }) })
+      .then((item) => { this.setItems([item, ...this.data.items]); this.setData({ adding: false }); api.trackEvent('wardrobe_item_add', { item_id: item.id, category: item.category }).catch((error) => console.warn('[wardrobe] 埋点上报失败', error)); wx.showToast({ title: '已加入衣橱', icon: 'success' }) })
       .catch((error) => wx.showToast({ title: error.message, icon: 'none' })).finally(() => this.setData({ saving: false }))
   },
   remove(event) {
@@ -38,8 +39,8 @@ Page({
     wx.showModal({ title: '移除这件单品？', content: '不会删除你手机相册中的照片。', success: ({ confirm }) => { if (confirm) api.deleteWardrobeItem(id).then(() => this.setItems(this.data.items.filter((item) => item.id !== id))).catch((error) => wx.showToast({ title: error.message, icon: 'none' })) } })
   },
   createOutfit() {
-    api.getTodayContext(wx.getStorageSync('jianwo_city') || '').then((context) => api.createWardrobeOutfit(context)).then((outfit) => { this.setData({ outfit: this.mapOutfit(outfit) }); api.trackEvent('wardrobe_outfit_generate', { outfit_id: outfit.id, item_count: outfit.items.length }).catch(() => {}) }).catch((error) => wx.showToast({ title: error.message, icon: 'none' }))
+    api.getTodayContext(wx.getStorageSync('jianwo_city') || '').then((context) => api.createWardrobeOutfit(context)).then((outfit) => { this.setData({ outfit: this.mapOutfit(outfit) }); api.trackEvent('wardrobe_outfit_generate', { outfit_id: outfit.id, item_count: outfit.items.length }).catch((error) => console.warn('[wardrobe] 埋点上报失败', error)) }).catch((error) => wx.showToast({ title: error.message, icon: 'none' }))
   },
   closeOutfit() { this.setData({ outfit: null }) },
-  wearOutfit() { api.wearWardrobeOutfit(this.data.outfit.id).then((outfit) => { this.setData({ outfit: this.mapOutfit(outfit) }); api.trackEvent('wardrobe_outfit_wear', { outfit_id: outfit.id }).catch(() => {}); wx.showToast({ title: '已记录今天穿了', icon: 'success' }) }).catch((error) => wx.showToast({ title: error.message, icon: 'none' })) }
+  wearOutfit() { api.wearWardrobeOutfit(this.data.outfit.id).then((outfit) => { this.setData({ outfit: this.mapOutfit(outfit) }); api.trackEvent('wardrobe_outfit_wear', { outfit_id: outfit.id }).catch((error) => console.warn('[wardrobe] 埋点上报失败', error)); wx.showToast({ title: '已记录今天穿了', icon: 'success' }) }).catch((error) => wx.showToast({ title: error.message, icon: 'none' })) }
 })

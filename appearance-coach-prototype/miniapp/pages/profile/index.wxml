@@ -28,8 +28,7 @@
       <view><text class="archive-title">已保存的方案</text><text>{{hasPlan ? '继续查看或打开执行清单' : '尚未保存方案'}}</text></view>
       <image class="row-chevron" src="/assets/icons/arrow-left.png" />
     </button>
-    <button class="archive-row {{!hasReport ? 'disabled' : ''}}" bindtap="reanalyze" disabled="{{!hasReport}}">
-      <image class="row-icon" src="/assets/icons/user.png" />
+    <button class="archive-row no-icon {{!hasReport ? 'disabled' : ''}}" bindtap="reanalyze" disabled="{{!hasReport}}">
       <view><text class="archive-title">重新拍摄并更新分析</text><text>{{hasReport ? '重新上传正脸、侧脸和全身照' : '建立档案后可重新分析'}}</text></view>
       <image class="row-chevron" src="/assets/icons/arrow-left.png" />
     </button>
@@ -38,22 +37,21 @@
   <view class="section-head fade-up delay-2"><text class="section-title">个人资料</text><text>让推荐更贴合你</text></view>
   <view class="data-list surface fade-up delay-2">
     <button class="data-row" bindtap="openWardrobe">
-      <image class="row-icon" src="/assets/icons/bookmark.png" />
+      <image class="row-icon" src="/assets/icons/briefcase.png" />
       <view><text class="archive-title">我的衣橱 Lite</text><text>先录入最常穿的 8 件单品</text></view>
       <image class="row-chevron" src="/assets/icons/arrow-left.png" />
     </button>
     <button class="data-row" bindtap="openAdvisor">
-      <image class="row-icon" src="/assets/icons/sparkles.png" />
+      <image class="row-icon" src="/assets/icons/user.png" />
       <view><text class="archive-title">私人顾问对话</text><text>继续问这件怎么穿、明天怎么搭</text></view>
       <image class="row-chevron" src="/assets/icons/arrow-left.png" />
     </button>
     <button class="data-row" bindtap="editBasic">
-      <image class="row-icon" src="/assets/icons/user.png" />
+      <image class="row-icon" src="/assets/icons/document.png" />
       <view><text class="archive-title">基础信息</text><text>完善身高、职业后，推荐会更贴合你</text></view>
       <image class="row-chevron" src="/assets/icons/arrow-left.png" />
     </button>
-    <button class="data-row" bindtap="editBody">
-      <image class="row-icon" src="/assets/icons/sparkles.png" />
+    <button class="data-row no-icon" bindtap="editBody">
       <view><text class="archive-title">身体数据 <text class="optional-tag">选填</text></text><text>体重与三围需要时再补充</text></view>
       <image class="row-chevron" src="/assets/icons/arrow-left.png" />
     </button>
@@ -61,8 +59,7 @@
 
   <view class="section-head"><text class="section-title">探索更多</text><text>按需体验</text></view>
   <view class="explore surface">
-    <button class="explore-row" bindtap="openLab">
-      <image class="explore-icon" src="/assets/icons/sparkles.png" />
+    <button class="explore-row no-icon" bindtap="openLab">
       <view><text class="archive-title">体验实验室</text><text>发型预览 · 3D 形象 Lite · 上半身试衣</text></view>
       <image class="row-chevron" src="/assets/icons/arrow-left.png" />
     </button>

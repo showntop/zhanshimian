@@ -1,26 +1,27 @@
 <app-header title="我的形象方案" />
 <view class="page plans-page">
-  <view class="intro fade-up" wx:if="{{!allFailed}}"><text wx:if="{{sceneLabel}}" class="scene-context">{{sceneLabel}} · 针对性方案</text><text class="plans-title serif">同一个你，三种更适合的表达</text><text class="lede">发型、妆容与穿搭已为你组合好</text></view>
+  <view class="intro fade-up" wx:if="{{status === 'ready' && !allFailed}}"><text wx:if="{{sceneLabel}}" class="scene-context">{{sceneLabel}} · 针对性方案</text><text class="plans-title serif">同一个你，三种更适合的表达</text><text class="lede">发型、妆容与穿搭已为你组合好</text></view>
   <scroll-view wx:if="{{hasReport}}" class="scene-switch" scroll-x enhanced show-scrollbar="{{false}}"><view class="scene-switch-row"><button wx:for="{{sceneTabs}}" wx:key="id" class="scene-tab {{scene === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="switchScene">{{item.label}}</button></view></scroll-view>
-  <block wx:if="{{!loading && plans.length && !allFailed}}">
-    <view wx:if="{{allIdle}}" class="gen-cta fade-up"><primary-button text="生成 3 套本人方案" bind:tap="generate" /></view>
+  <block wx:if="{{status === 'ready' && !allFailed}}">
+    <view wx:if="{{allIdle}}" class="gen-cta fade-up"><primary-button text="生成我的 3 套造型方案" bind:tap="generate" /></view>
     <view wx:elif="{{generationCount < plans.length}}" class="generation-summary"><view class="gen-spinner" /><text>正在生成本人整体方案</text><text>{{generationCount}} / {{plans.length}} 套完成 · 发型、妆容和穿搭会一起呈现</text></view>
     <text class="counter">{{selected + 1}} / {{plans.length}}</text>
     <swiper class="plan-swiper" current="{{selected}}" previous-margin="42rpx" next-margin="42rpx" bindchange="swiperChange" duration="380">
       <swiper-item wx:for="{{plans}}" wx:key="id">
         <view class="plan-card {{selected === index ? 'active' : ''}}">
-          <image wx:if="{{!item.generateFailed}}" class="{{!showCurrent && item.generated ? 'generated-look' : ''}}" src="{{showCurrent && selected === index && item.current_image_url ? item.current_image_url : item.display_url}}" mode="{{showCurrent && selected === index ? item.current_image_mode : item.display_mode}}" fade-show="{{false}}" />
+          <image wx:if="{{!item.generateFailed}}" class="{{!showCurrent && item.generated ? 'generated-look' : ''}} {{item.example && !(showCurrent && selected === index) ? 'example-soft' : ''}}" src="{{showCurrent && selected === index && item.current_image_url ? item.current_image_url : item.display_url}}" mode="{{showCurrent && selected === index ? item.current_image_mode : item.display_mode}}" fade-show="{{false}}" />
           <view wx:if="{{!item.generateFailed}}" class="photo-shade" />
           <text wx:if="{{item.recommended && !item.generateFailed}}" class="recommend">首选推荐</text>
+          <text wx:if="{{item.example && !item.generating && !item.generateFailed && !(showCurrent && selected === index)}}" class="example-badge">风格参考</text>
           <view class="compare" wx:if="{{selected === index && !item.generating && !item.generateFailed}}"><button class="{{showCurrent ? 'active' : ''}}" data-mode="current" bindtap="toggleCompare">我的当前</button><button class="{{!showCurrent ? 'active' : ''}}" data-mode="plan" bindtap="toggleCompare">{{item.compare_label}}</button></view>
-          <view wx:if="{{!item.generateFailed}}" class="card-copy"><text class="look-badge">{{item.look_label}}</text><text class="card-name serif">{{item.name}}</text><text>{{item.descriptor}}</text></view>
+          <view wx:if="{{!item.generateFailed}}" class="card-copy"><text wx:if="{{item.look_label}}" class="look-badge">{{item.look_label}}</text><text class="card-name serif">{{item.name}}</text><text>{{item.descriptor}}</text></view>
           <view wx:if="{{item.generating}}" class="gen-overlay"><view class="gen-spinner" /><text>正在生成你的本人整体方案</text><text class="gen-note">同时处理脸部、发型与全身穿搭 · 可退出后回来查看</text></view>
-          <view wx:elif="{{item.generateFailed}}" class="gen-overlay fail"><text>这一套暂时没有生成成功</text><button class="gen-retry" bindtap="generate">重新生成</button></view>
+          <view wx:elif="{{item.generateFailed}}" class="gen-overlay fail"><text>生成失败</text><button class="gen-retry" bindtap="retryPlan">重试</button></view>
         </view>
       </swiper-item>
     </swiper>
     <view class="thumbs fade-up delay-1">
-      <button wx:for="{{plans}}" wx:key="id" class="thumb {{selected === index ? 'active' : ''}}" data-index="{{index}}" bindtap="selectThumb"><image class="{{item.generated ? 'generated-thumb' : ''}}" src="{{item.thumbnail_url}}" mode="{{item.thumbnail_mode}}" /><text>{{item.name}}</text></button>
+      <button wx:for="{{plans}}" wx:key="id" class="thumb {{selected === index ? 'active' : ''}}" data-index="{{index}}" bindtap="selectThumb"><view class="thumb-image"><image class="{{item.generated ? 'generated-thumb' : ''}} {{item.example ? 'example-soft' : ''}}" src="{{item.thumbnail_url}}" mode="{{item.thumbnail_mode}}" /><text wx:if="{{item.example}}" class="example-badge">风格参考</text></view><text>{{item.name}}</text></button>
     </view>
     <view class="why surface fade-up delay-2">
       <text class="why-title serif">为什么更适合你</text><text class="why-copy">{{plans[selected].why}}</text>
@@ -28,18 +29,21 @@
     </view>
     <view class="plans-action"><primary-button text="{{plans[selected].generating ? '本人方案生成中' : (plans[selected].generated ? '查看这套完整方案' : '生成后查看完整方案')}}" disabled="{{plans[selected].generating}}" bind:tap="primaryPlanAction" /></view>
   </block>
-  <view wx:elif="{{!loading && allFailed}}" class="generation-fail fade-up">
-    <view class="generation-fail-badge"><image src="/assets/icons/sparkles.png" mode="aspectFit" /></view>
+  <view wx:elif="{{status === 'ready' && allFailed}}" class="generation-fail fade-up">
     <text class="generation-fail-title serif">本人方案暂时生成失败</text>
     <text class="generation-fail-copy">你的分析报告已保存，方案图片生成服务暂时不可用。稍后可以重新尝试。</text>
     <view class="generation-fail-action"><primary-button text="重新生成" bind:tap="generate" /></view>
   </view>
-  <view wx:elif="{{loading}}" class="skeleton plan-placeholder" />
-  <view wx:elif="{{!savedHair.length}}" class="plans-empty">
+  <view wx:elif="{{status === 'error'}}" class="state-error fade-up">
+    <text class="state-error-title serif">方案暂时没有加载成功</text>
+    <text class="state-error-copy">{{errorMessage || '网络异常'}}，请检查网络后重试。</text>
+    <view class="state-error-action"><primary-button text="重新加载" bind:tap="retry" /></view>
+  </view>
+  <view wx:elif="{{status === 'empty'}}" class="plans-empty">
     <block wx:if="{{!hasReport}}">
       <text class="serif">还没有形象方案</text>
       <text>完成形象分析后，这里会出现 3 套适合你的方案。</text>
-      <primary-button text="开始形象分析" bind:tap="startAnalysis" />
+      <primary-button text="去完成形象分析" bind:tap="startAnalysis" />
     </block>
     <block wx:else>
       <block wx:if="{{scene}}">
@@ -50,12 +54,13 @@
       <block wx:else>
         <text class="serif">暂时没有生成方案</text>
         <text>你的档案还在，随时可以生成本人方案。</text>
-        <primary-button text="生成 3 套本人方案" bind:tap="generate" />
+        <primary-button text="生成我的 3 套造型方案" bind:tap="generate" />
         <button class="plans-empty-secondary" bindtap="retry">重新加载</button>
       </block>
     </block>
   </view>
-  <view wx:if="{{!loading && savedHair.length}}" class="saved-section fade-up">
+  <view wx:else class="skeleton plan-placeholder" />
+  <view wx:if="{{(status === 'ready' || status === 'empty') && savedHair.length}}" class="saved-section fade-up">
 	<view class="saved-head"><view><text class="saved-title serif">已保存的发型预览</text><text class="saved-note">你的本人效果图</text></view><text>{{savedHair.length}} 个</text></view>
 	<scroll-view class="saved-scroll" scroll-x enhanced show-scrollbar="{{false}}"><view class="saved-row"><view wx:for="{{savedHair}}" wx:key="id" class="saved-card"><image src="{{item.result_image_url}}" mode="aspectFill" /><view><text>{{item.style_name}}</text><text>{{item.preview_label}}</text></view></view></view></scroll-view>
   </view>

@@ -13,3 +13,7 @@ server/config/ai-routing.*.json
 !server/config/ai-routing.example.json
 *.env
 coverage.out
+
+# OS / local tool state
+.DS_Store
+.workbuddy/

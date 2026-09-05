@@ -33,7 +33,7 @@ button::after { border: 0; }
 
 .page-with-nav { padding-bottom: calc(env(safe-area-inset-bottom) + 164rpx); }
 .serif { font-family: "Songti SC", "STSong", serif; }
-.eyebrow { color: #587344; font-size: 23rpx; font-weight: 600; letter-spacing: 4rpx; }
+.eyebrow { color: var(--ink-tertiary); font-size: 23rpx; font-weight: 600; letter-spacing: 4rpx; }
 .title { margin: 18rpx 0; font-family: "Songti SC", "STSong", serif; font-size: 50rpx; line-height: 1.26; font-weight: 700; letter-spacing: -1rpx; }
 .lede { color: var(--ink-secondary); font-size: 26rpx; line-height: 1.65; }
 .section-title { margin: 40rpx 0 20rpx; color: var(--ink); font-size: 32rpx; font-weight: 700; }
@@ -56,6 +56,14 @@ button::after { border: 0; }
 
 .pressable { transition: transform .16s ease, opacity .16s ease; }
 .pressable:active { transform: scale(.985); opacity: .88; }
+
+/* 「风格参考」/「示例」角标:任何非用户本人的内置示例图都必须叠加此标。
+   父容器需 position: relative;report/plans/plan 等页复用本类。 */
+.example-badge { position: absolute; right: 12rpx; bottom: 12rpx; z-index: 2; padding: 5rpx 14rpx; border-radius: 999rpx; background: rgba(30,35,29,.62); color: #fff; font-size: 20rpx; line-height: 1.5; }
+.example-badge.badge-left { right: auto; left: 12rpx; }
+/* 示例图弱化:模糊+降饱和,避免内置模特图看起来像已生成的本人效果;
+   scale 放大由父容器 overflow:hidden 裁掉模糊边缘。仅用于带角标的示例图。 */
+.example-soft { -webkit-filter: blur(4px) saturate(.8); filter: blur(4px) saturate(.8); transform: scale(1.1); }
 
 .skeleton { position: relative; overflow: hidden; background: #ebe8e1; }
 .skeleton::after { content: ""; position: absolute; inset: 0; background: rgba(255,255,255,.35); transform: translateX(-100%); animation: shimmer 1.3s infinite; }

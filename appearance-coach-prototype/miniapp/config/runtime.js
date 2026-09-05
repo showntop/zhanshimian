@@ -3,7 +3,7 @@
 // the project is managed by a third-party platform.
 module.exports = {
   apiBaseURLs: {
-    develop: 'http://127.0.0.1:58000',
+    develop: 'https://prompt.wuyill.com/zhanshimian',
     trial: 'https://prompt.wuyill.com/zhanshimian',
     release: 'https://prompt.wuyill.com/zhanshimian'
   }

@@ -1,22 +1,29 @@
 <app-header title="形象分析报告" back="{{true}}" />
 <view class="page report-page">
-  <view wx:if="{{loading}}" class="loading-view"><view class="skeleton skeleton-title" /><view class="skeleton skeleton-photo" /></view>
-  <block wx:else-if="{{report}}">
-    <view class="status fade-up"><icon type="success" size="18" color="#587344" /><text>分析完成 · 已保存至形象档案</text></view>
-    <text class="report-title serif fade-up">你的形象特点，已经看清楚了</text>
-    <view class="current-card fade-up delay-1">
-      <image wx:if="{{image}}" src="{{image}}" mode="aspectFill" fade-show="{{false}}" />
+  <view wx:if="{{status === 'loading'}}" class="state-view">
+    <view class="skeleton skeleton-photo" />
+    <view class="skeleton skeleton-line" />
+    <view class="skeleton skeleton-line short" />
+  </view>
+  <block wx:elif="{{status === 'ready'}}">
+    <view class="current-card fade-up">
+      <image wx:if="{{image}}" src="{{image}}" mode="widthFix" fade-show="{{false}}" />
       <view wx:else class="image-unavailable"><image src="/assets/capture/face-line.png" mode="aspectFit" /><text>当前照片不可用</text></view>
       <text class="current-label">当前形象</text>
-      <view wx:for="{{annotations}}" wx:key="id" class="finding {{item.alignClass}}" style="left: {{item.styleLeft}}; top: {{item.styleTop}};"><text class="number">{{index + 1}}</text><text>{{item.label}}</text><view class="connector" /></view>
+      <block wx:for="{{annotations}}" wx:key="id">
+        <view class="finding-dot" style="{{item.dotStyle}}"><text>{{item.number}}</text></view>
+        <view class="finding-line" style="{{item.lineStyle}}" />
+        <view class="finding-chip" style="{{item.chipStyle}}"><text class="finding-chip-number">{{item.number}}</text><text class="finding-chip-label">{{item.label}}</text></view>
+      </block>
     </view>
-    <view class="impression fade-up delay-2">
+    <view class="impression fade-up delay-1">
       <text class="impression-title serif">你的当前印象</text>
       <view class="pill-row"><text wx:for="{{report.impression_tags}}" wx:key="*this" class="pill">{{item}}</text></view>
     </view>
     <view class="priority surface fade-up delay-2">
-      <view class="priority-star"><image src="/assets/icons/sparkles.png" /></view>
-      <view class="priority-content"><text class="priority-label">最值得先改的一处</text><text class="priority-title serif">{{report.priority_title}}</text><text class="priority-copy">{{report.priority_copy}}</text></view>
+      <text class="priority-label">最值得先改的一处</text>
+      <text class="priority-title serif">{{report.priority_title}}</text>
+      <text class="priority-copy">{{report.priority_copy}}</text>
     </view>
     <view wx:if="{{findingItems.length}}" class="details fade-up delay-2">
       <text class="section-title">细致解读</text>
@@ -30,18 +37,33 @@
         <text wx:if="{{item.detail}}" class="detail-copy">{{item.detail}}</text>
       </view>
     </view>
-    <view wx:if="{{suggestions.length}}" class="suggestions fade-up delay-3">
+    <view wx:if="{{suggestions.length || suggestionsError}}" class="suggestions fade-up delay-3">
       <text class="section-title">给你的 3 个建议</text>
-      <view wx:for="{{suggestions}}" wx:key="category" class="suggestion-row" bindtap="viewPlans">
-        <image src="{{item.icon}}" /><text class="suggestion-type">{{item.type}}</text><text class="suggestion-copy">{{item.title}}，{{item.summary}}</text><text class="chevron">〉</text>
+      <block wx:if="{{suggestions.length}}">
+        <view wx:for="{{suggestions}}" wx:key="category" class="suggestion-row" hover-class="suggestion-row-hover" bindtap="viewPlans">
+          <text class="suggestion-type">{{item.type}}</text>
+          <text class="suggestion-copy">{{item.title}}，{{item.summary}}</text>
+          <text class="chevron">〉</text>
+        </view>
+      </block>
+      <view wx:elif="{{suggestionsError}}" class="suggestions-error">
+        <text>建议加载失败</text>
+        <button class="suggestions-retry" bindtap="retrySuggestions">重试</button>
       </view>
     </view>
-    <view class="report-action"><primary-button text="{{ctaText}}" loading="{{generating}}" disabled="{{generating}}" bind:tap="viewPlans" /><button class="reanalyze-action" bindtap="reanalyze">重新上传 3 张照片并更新分析</button></view>
+    <view class="report-action fade-up delay-3">
+      <primary-button text="{{ctaText}}" loading="{{generating}}" disabled="{{generating}}" bind:tap="viewPlans" />
+      <button class="reanalyze-action" bindtap="reanalyze">重新上传 3 张照片并更新分析</button>
+    </view>
   </block>
-  <view wx:else-if="{{loadError}}" class="report-error fade-up">
-    <image src="/assets/icons/sparkles.png" mode="aspectFit" />
-    <text class="serif">报告加载失败</text>
-    <text>请检查网络后重试。</text>
-    <button bindtap="load">重新加载</button>
+  <view wx:elif="{{status === 'error'}}" class="state-view fade-up">
+    <text class="state-title serif">报告加载失败</text>
+    <text class="state-copy">请检查网络后重试</text>
+    <view class="state-action"><primary-button text="重新加载" bind:tap="load" /></view>
+  </view>
+  <view wx:else class="state-view fade-up">
+    <text class="state-title serif">还没有形象报告</text>
+    <text class="state-copy">完成一次形象分析后，这里会展示你的当前形象解读、最值得先改的一处，以及发型、妆容、穿搭建议。</text>
+    <view class="state-action"><primary-button text="开始形象分析" bind:tap="startAnalysis" /></view>
   </view>
 </view>

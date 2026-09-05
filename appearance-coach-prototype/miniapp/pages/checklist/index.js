@@ -1,5 +1,5 @@
 const api = require('../../services/api')
-const { lookImage } = require('../../utils/media')
+const { lookImage, exampleImage, isBundledAsset } = require('../../utils/media')
 
 Page({
   data: { id: '', plan: null, items: [], completed: 0, loading: true, loadError: false },
@@ -9,7 +9,10 @@ Page({
     Promise.all([api.getPlan(this.data.id), api.getChecklist(this.data.id)]).then((results) => {
       const plan = results[0]
       const items = results[1]
-      plan.image_url = lookImage(plan.image_url, plan.slug)
+      // 方案图 URL 无效时显式回退到内置示例图,wxml 用 plan.imageExample 叠加「风格参考」角标
+      const planImageURL = lookImage(plan.image_url)
+      plan.image_url = planImageURL || exampleImage(plan.slug, 'plan')
+      plan.imageExample = !planImageURL || isBundledAsset(planImageURL)
       this.setData({ plan, items, completed: items.filter((item) => item.completed).length, loading: false })
     }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false, loadError: true }) })
   },

@@ -22,7 +22,7 @@ Page({
           this.setData({ hasReport: true })
           this.loadProfileImage()
         })
-        .catch(() => {})
+        .catch((error) => console.warn('[profile] 历史报告恢复失败', error))
       return
     }
     // Keep the previously loaded avatar instead of clearing it on every show,
@@ -39,7 +39,7 @@ Page({
         const face = (analysis.media || []).find((item) => item.kind === 'face')
         this.setData({ profileImage: userImage(face && face.url) })
       })
-      .catch(() => {})
+      .catch((error) => console.warn('[profile] 档案照片加载失败', error))
   },
   openReport() { const id = wx.getStorageSync('jianwo_report_id'); if (id) wx.navigateTo({ url: `/pages/report/index?id=${id}` }) },
   openPlan() { const id = wx.getStorageSync('jianwo_saved_plan_id') || wx.getStorageSync('jianwo_plan_id'); if (id) wx.navigateTo({ url: `/pages/plan/index?id=${id}` }) },

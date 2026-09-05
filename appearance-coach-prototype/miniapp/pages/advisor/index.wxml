@@ -3,7 +3,7 @@
   <scroll-view class="chat-scroll" scroll-y scroll-into-view="{{scrollInto}}" enhanced show-scrollbar="{{false}}">
     <view class="chat-body">
       <view class="advisor-context fade-up">
-        <view class="advisor-avatar"><image src="/assets/icons/sparkles.png" /></view>
+        <view class="advisor-avatar"><image src="/assets/icons/user.png" /></view>
         <view><text class="context-kicker">顾问已经了解</text><text class="context-title serif">你的档案、方案与今日安排</text></view>
         <view class="context-tags"><text>形象档案</text><text>今日天气</text><text>现有方案</text><text>我的衣橱</text></view>
       </view>

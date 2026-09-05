@@ -1,7 +1,7 @@
 <app-header title="方案执行清单" back="{{true}}" />
 <view class="page checklist-page">
   <block wx:if="{{plan}}">
-    <view class="check-hero fade-up"><image src="{{plan.image_url}}" mode="aspectFill" /><view><text class="eyebrow">你选择了</text><text class="check-title serif">{{plan.name}}</text><text class="muted">{{plan.descriptor}}</text></view></view>
+    <view class="check-hero fade-up"><view class="check-hero-thumb"><image src="{{plan.image_url}}" mode="aspectFill" class="{{plan.imageExample ? 'example-soft' : ''}}" /><text wx:if="{{plan.imageExample}}" class="example-badge">风格参考</text></view><view><text class="eyebrow">你选择了</text><text class="check-title serif">{{plan.name}}</text><text class="muted">{{plan.descriptor}}</text></view></view>
     <view class="progress-card surface fade-up delay-1"><view><text>完成进度</text><text class="progress-count">{{completed}} / {{items.length}}</text></view><view class="progress"><view style="width: {{items.length ? completed / items.length * 100 : 0}}%" /></view></view>
     <view class="task-list fade-up delay-2">
       <button wx:for="{{items}}" wx:key="id" class="task {{item.completed ? 'done' : ''}}" data-index="{{index}}" bindtap="toggle">

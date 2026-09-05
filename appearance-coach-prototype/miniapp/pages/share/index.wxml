@@ -1,7 +1,7 @@
 <app-header title="方案分享卡" back="{{true}}" />
 <view class="page share-page">
   <view wx:if="{{snapshot}}" class="poster fade-up">
-    <view class="poster-brand"><text>怎么打扮</text><text>AI 形象顾问</text></view>
+    <view class="poster-brand"><text>怎么打扮</text><text>私人形象顾问</text></view>
     <text class="poster-label">{{snapshot.label}}</text>
     <text class="poster-title serif">{{snapshot.title}}</text>
     <text class="poster-summary">{{snapshot.summary}}</text>

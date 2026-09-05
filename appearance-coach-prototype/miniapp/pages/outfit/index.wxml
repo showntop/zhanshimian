@@ -5,6 +5,7 @@
     <button class="upload-card fade-up delay-1" bindtap="choosePhoto">
       <image wx:if="{{photo}}" src="{{photo}}" mode="aspectFill" />
       <view wx:else class="upload-empty"><view class="upload-icon"><image src="/assets/icons/document.png" /></view><text>拍照或从相册选择</text><text>建议站在自然光下拍摄正面全身</text></view>
+      <text wx:if="{{photo && demo}}" class="example-badge">示例</text>
       <text wx:if="{{photo}}" class="replace-chip">重新选择</text>
     </button>
     <view class="context-row fade-up delay-1"><text>使用场景</text><view><button wx:for="{{contexts}}" wx:key="*this" class="{{context === item ? 'active' : ''}}" data-value="{{item}}" bindtap="selectContext">{{item}}</button></view></view>
@@ -29,6 +30,6 @@
     </view>
     <text wx:if="{{error}}" class="tool-error-copy">{{error}}</text>
     <view class="result-actions"><primary-button text="{{loading ? '正在保存…' : '按建议生成替换方案'}}" loading="{{loading}}" disabled="{{loading}}" bind:tap="generateAlternative" /><button class="secondary-action" bindtap="reset">诊断另一套</button></view>
-	<text class="ai-disclaimer">AI 建议基于照片中可见穿搭，仅供搭配决策参考</text>
+	<text class="ai-disclaimer">建议基于照片中的可见穿搭，仅供搭配决策参考</text>
   </view>
 </view>

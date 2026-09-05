@@ -5,7 +5,7 @@ const sceneCodes = { '日常': 'daily', '面试': 'interview', '约会': 'date' 
 Page({
   data: {
     photo: '', mediaID: '', context: '日常', contexts: ['日常', '面试', '约会'],
-    loading: false, result: null, error: '', saving: false
+    loading: false, result: null, error: '', saving: false, demo: false
   },
   chooseProduct() {
     wx.chooseMedia({
@@ -13,7 +13,7 @@ Page({
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
       success: ({ tempFiles }) => this.setData({
-        photo: tempFiles[0].tempFilePath, mediaID: '', result: null, error: ''
+        photo: tempFiles[0].tempFilePath, mediaID: '', result: null, error: '', demo: false
       })
     })
   },
@@ -21,7 +21,7 @@ Page({
     if (this.data.loading) return
     this.setData({ loading: true, error: '' })
     api.createDemoMedia('product').then((asset) => this.setData({
-      photo: '/assets/looks/warm.jpg', mediaID: asset.id, result: null, loading: false
+      photo: '/assets/looks/warm.jpg', mediaID: asset.id, result: null, loading: false, demo: true
     })).catch((error) => this.setData({ error: error.message, loading: false }))
   },
   selectContext(event) {
