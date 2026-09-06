@@ -1,7 +1,11 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -9,6 +13,8 @@ import (
 	"github.com/example/jianwo/server/internal/provider"
 	"github.com/example/jianwo/server/internal/repository"
 )
+
+var errRetry = errors.New("provider unavailable")
 
 // failWriteRecorder captures the state of the context used by the
 // failure/rejection write-backs at the moment they are invoked.
@@ -80,4 +86,25 @@ func TestProcessJobRejectWriteUsesFreshContext(t *testing.T) {
 	service := &Service{repo: repo, analyzer: errAnalyzer{err: &provider.PhotoRejectedError{}}}
 	service.processJob(context.Background(), domain.AnalysisJob{ID: "job-1", AnalysisID: "analysis-1", UserID: "user-1"})
 	assertFreshFailContext(t, repo.rejectErr, repo.rejectDeadline, repo.rejectHasDeadline)
+}
+
+// 任务失败必须留下任务级日志:未达重试上限打 WARN,达到上限打 ERROR。
+// 此前失败只落库不打日志,模型故障时任务像"凭空消失"。
+func TestRecordAnalysisFailureLogsByAttempt(t *testing.T) {
+	repo := &failWriteRecorder{}
+	var logs bytes.Buffer
+	service := &Service{repo: repo, logger: slog.New(slog.NewTextHandler(&logs, nil))}
+
+	service.recordAnalysisFailure(context.Background(), domain.AnalysisJob{ID: "job-1", AnalysisID: "analysis-1", Attempt: 1}, errRetry)
+	if !strings.Contains(logs.String(), "analysis job failed, retry scheduled") || !strings.Contains(logs.String(), "attempt=1") {
+		t.Fatalf("expected retry WARN with attempt, got: %s", logs.String())
+	}
+	logs.Reset()
+	service.recordAnalysisFailure(context.Background(), domain.AnalysisJob{ID: "job-1", AnalysisID: "analysis-1", Attempt: maxJobAttempts}, errRetry)
+	if !strings.Contains(logs.String(), "analysis job failed permanently") {
+		t.Fatalf("expected terminal ERROR, got: %s", logs.String())
+	}
+	if strings.Contains(logs.String(), "retry scheduled") {
+		t.Fatalf("terminal failure must not be logged as retryable: %s", logs.String())
+	}
 }

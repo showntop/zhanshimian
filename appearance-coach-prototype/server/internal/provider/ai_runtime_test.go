@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -210,5 +211,42 @@ func TestNewAIRuntimeRequiresNamedSecret(t *testing.T) {
 	_, err := NewAIRuntime([]AIModel{{ID: "x", Vendor: "x", Protocol: "openai_responses", Model: "x", BaseURL: "https://example.com", APIKeyEnv: key}}, []AIRoute{{Capability: CapabilityAppearanceAnalysis, Primary: "x"}}, nil, nil)
 	if err == nil || !strings.Contains(err.Error(), key) {
 		t.Fatalf("expected missing secret error, got %v", err)
+	}
+}
+
+// 失败与成功的 AI invocation 日志都必须携带任务标识,否则 worker 故障时
+// 无法把零散的 WARN 关联回具体任务。
+func TestAIRuntimeInvocationLogsCarryTaskSource(t *testing.T) {
+	t.Setenv("AI_TEST_PRIMARY_KEY", "primary")
+	t.Setenv("AI_TEST_FALLBACK_KEY", "fallback")
+	var logs bytes.Buffer
+	fallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "req-fallback", "choices": []map[string]any{{"finish_reason": "stop", "message": map[string]any{"content": `{"reply":"可以"}`}}},
+			"usage": map[string]any{"prompt_tokens": 100, "completion_tokens": 10},
+		})
+	}))
+	defer fallback.Close()
+	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "temporary", http.StatusServiceUnavailable)
+	}))
+	defer primary.Close()
+	runtime, err := NewAIRuntime([]AIModel{
+		{ID: "primary", Vendor: "aliyun", Protocol: "openai_chat_completions", Model: "qwen-plus", BaseURL: primary.URL, APIKeyEnv: "AI_TEST_PRIMARY_KEY", Timeout: time.Second},
+		{ID: "fallback", Vendor: "aliyun", Protocol: "openai_chat_completions", Model: "qwen-flash", BaseURL: fallback.URL, APIKeyEnv: "AI_TEST_FALLBACK_KEY", StructuredMode: "json_object", Timeout: time.Second},
+	}, []AIRoute{{Capability: CapabilityAdvisorChat, Primary: "primary", Fallbacks: []string{"fallback"}}}, fallback.Client(), slog.New(slog.NewTextHandler(&logs, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := WithInvocationSource(context.Background(), "analysis:analysis-1")
+	result, err := runtime.Structured(ctx, CapabilityAdvisorChat, StructuredRequest{Prompt: "问题", Instructions: "规则", SchemaName: "advisor", Schema: map[string]any{"type": "object"}, MaxOutputTokens: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Meta.Source != "analysis:analysis-1" {
+		t.Fatalf("result meta missing task source: %#v", result.Meta)
+	}
+	if got := strings.Count(logs.String(), "task=analysis:analysis-1"); got != 2 {
+		t.Fatalf("expected task source on both failure and success log lines, got %d:\n%s", got, logs.String())
 	}
 }

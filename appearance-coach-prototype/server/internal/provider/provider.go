@@ -29,6 +29,23 @@ func ProgressReporter(ctx context.Context) func(progress int, stage string) {
 	return nil
 }
 
+type invocationSourceKey struct{}
+
+// WithInvocationSource attaches a worker task identifier (e.g.
+// "analysis:<id>") to the context so every AI invocation log line carries the
+// job that issued it. Synchronous request-scoped callers may omit it.
+func WithInvocationSource(ctx context.Context, source string) context.Context {
+	return context.WithValue(ctx, invocationSourceKey{}, source)
+}
+
+// InvocationSource returns the task identifier attached to ctx, or "".
+func InvocationSource(ctx context.Context) string {
+	if value, ok := ctx.Value(invocationSourceKey{}).(string); ok {
+		return value
+	}
+	return ""
+}
+
 type AnalysisImage struct {
 	ID       string
 	Kind     string

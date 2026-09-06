@@ -77,6 +77,7 @@ type InvocationMeta struct {
 	Vendor           string  `json:"vendor"`
 	Protocol         string  `json:"protocol"`
 	Model            string  `json:"model"`
+	Source           string  `json:"source,omitempty"`
 	RequestID        string  `json:"request_id,omitempty"`
 	LatencyMS        int64   `json:"latency_ms"`
 	InputTokens      int     `json:"input_tokens,omitempty"`
@@ -197,7 +198,7 @@ func (r *AIRuntime) Structured(ctx context.Context, capability string, input Str
 		causes = append(causes, modelID+": "+err.Error())
 		failedMeta := result.Meta
 		if failedMeta.ModelID == "" {
-			failedMeta = InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model}
+			failedMeta = InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model, Source: InvocationSource(ctx)}
 		}
 		if failedMeta.LatencyMS == 0 {
 			failedMeta.LatencyMS = time.Since(started).Milliseconds()
@@ -269,7 +270,7 @@ func (r *AIRuntime) EditImage(ctx context.Context, capability string, input Imag
 		causes = append(causes, modelID+": "+err.Error())
 		failedMeta := result.Meta
 		if failedMeta.ModelID == "" {
-			failedMeta = InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model}
+			failedMeta = InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model, Source: InvocationSource(ctx)}
 		}
 		if failedMeta.LatencyMS == 0 {
 			failedMeta.LatencyMS = time.Since(started).Milliseconds()
@@ -366,7 +367,7 @@ func (r *AIRuntime) dashScopeWanxImageEdit(ctx context.Context, capability strin
 			if resolveErr != nil {
 				return ImageEditResult{}, resolveErr
 			}
-			meta := invocationMeta(capability, model, started)
+			meta := invocationMeta(ctx, capability, model, started)
 			meta.RequestID, meta.InputImages, meta.OutputImages = submitted.RequestID, 1, 1
 			meta.EstimatedCostCNY = model.OutputImageCost
 			return ImageEditResult{Data: data, MIMEType: mimeType, Meta: meta}, nil
@@ -441,7 +442,7 @@ func (r *AIRuntime) openAIResponses(ctx context.Context, capability string, mode
 	if !json.Valid([]byte(text)) {
 		return StructuredResult{}, errors.New("structured model returned invalid JSON")
 	}
-	meta := invocationMeta(capability, model, started)
+	meta := invocationMeta(ctx, capability, model, started)
 	meta.RequestID = response.ID
 	meta.InputTokens = response.Usage.InputTokens
 	meta.OutputTokens = response.Usage.OutputTokens
@@ -490,7 +491,7 @@ func (r *AIRuntime) openAIChatCompletions(ctx context.Context, capability string
 	if response.Choices[0].FinishReason == "length" {
 		return StructuredResult{}, errors.New("chat model output was truncated")
 	}
-	meta := invocationMeta(capability, model, started)
+	meta := invocationMeta(ctx, capability, model, started)
 	meta.RequestID, meta.InputTokens, meta.OutputTokens, meta.InputImages = response.ID, response.Usage.PromptTokens, response.Usage.CompletionTokens, len(input.Images)
 	meta.EstimatedCostCNY = float64(meta.InputTokens)*model.InputCostPerMillion/1_000_000 + float64(meta.OutputTokens)*model.OutputCostPerMillion/1_000_000 + float64(meta.InputImages)*model.InputImageCost
 	return StructuredResult{JSON: []byte(response.Choices[0].Message.Content), Meta: meta}, nil
@@ -539,7 +540,7 @@ func (r *AIRuntime) openAIImageEdit(ctx context.Context, capability string, mode
 	if err != nil {
 		return ImageEditResult{}, err
 	}
-	meta := invocationMeta(capability, model, started)
+	meta := invocationMeta(ctx, capability, model, started)
 	meta.InputImages, meta.OutputImages = len(input.Images), 1
 	meta.EstimatedCostCNY = float64(meta.InputImages)*model.InputImageCost + model.OutputImageCost
 	return ImageEditResult{Data: data, MIMEType: mimeType, Meta: meta}, nil
@@ -590,7 +591,7 @@ func (r *AIRuntime) dashScopeImageEdit(ctx context.Context, capability string, m
 	if err != nil {
 		return ImageEditResult{}, err
 	}
-	meta := invocationMeta(capability, model, started)
+	meta := invocationMeta(ctx, capability, model, started)
 	meta.RequestID, meta.InputImages, meta.OutputImages = response.RequestID, len(input.Images), 1
 	meta.EstimatedCostCNY = float64(meta.InputImages)*model.InputImageCost + model.OutputImageCost
 	return ImageEditResult{Data: data, MIMEType: mimeType, Meta: meta}, nil
@@ -621,7 +622,7 @@ func (r *AIRuntime) arkImageEdit(ctx context.Context, capability string, model A
 	if err != nil {
 		return ImageEditResult{}, err
 	}
-	meta := invocationMeta(capability, model, started)
+	meta := invocationMeta(ctx, capability, model, started)
 	meta.RequestID, meta.InputImages, meta.OutputImages = response.ID, len(input.Images), 1
 	meta.EstimatedCostCNY = float64(meta.InputImages)*model.InputImageCost + model.OutputImageCost
 	return ImageEditResult{Data: data, MIMEType: mimeType, Meta: meta}, nil
@@ -710,14 +711,16 @@ func (r *AIRuntime) resolveImage(ctx context.Context, model AIModel, encoded, im
 	return data, mimeType, nil
 }
 
-func invocationMeta(capability string, model AIModel, started time.Time) InvocationMeta {
-	return InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model, LatencyMS: time.Since(started).Milliseconds()}
+// invocationMeta builds the log/telemetry record for one AI call. The worker
+// task identifier comes from ctx so failure WARNs can be traced to the job.
+func invocationMeta(ctx context.Context, capability string, model AIModel, started time.Time) InvocationMeta {
+	return InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model, Source: InvocationSource(ctx), LatencyMS: time.Since(started).Milliseconds()}
 }
 
 func (r *AIRuntime) logInvocation(meta InvocationMeta, err error) {
 	attributes := []any{
 		"capability", meta.Capability, "model_id", meta.ModelID, "vendor", meta.Vendor,
-		"protocol", meta.Protocol, "model", meta.Model, "request_id", meta.RequestID,
+		"protocol", meta.Protocol, "model", meta.Model, "task", meta.Source, "request_id", meta.RequestID,
 		"latency_ms", meta.LatencyMS, "input_tokens", meta.InputTokens, "output_tokens", meta.OutputTokens,
 		"input_images", meta.InputImages, "output_images", meta.OutputImages,
 		"estimated_cost_cny", meta.EstimatedCostCNY, "fallback_reason", meta.FallbackReason,

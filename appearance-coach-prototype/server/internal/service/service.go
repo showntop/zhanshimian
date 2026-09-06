@@ -689,20 +689,21 @@ func (s *Service) runPlanLookWorker(ctx context.Context, poll time.Duration) {
 func (s *Service) processPlanLook(ctx context.Context, job domain.PlanLookJob) {
 	jobCtx, cancel := context.WithTimeout(ctx, planLookJobTimeout)
 	defer cancel()
+	jobCtx = provider.WithInvocationSource(jobCtx, "plan_look:"+job.PlanID)
 	failCtx, failCancel := failContext()
 	defer failCancel()
 	if s.lookGenerator == nil {
-		_ = s.repo.FailPlanLook(failCtx, job, errors.New("plan look generator is not configured"))
+		s.recordPlanLookFailure(failCtx, job, errors.New("plan look generator is not configured"))
 		return
 	}
 	output, err := s.lookGenerator.Generate(jobCtx, provider.LookInput{Name: job.Name, Slug: job.Slug, Why: job.Why, Steps: job.Steps, MediaIDs: job.MediaIDs})
 	if err != nil {
-		_ = s.repo.FailPlanLook(failCtx, job, err)
+		s.recordPlanLookFailure(failCtx, job, err)
 		return
 	}
 	extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
 	if extension == "" {
-		_ = s.repo.FailPlanLook(failCtx, job, errors.New("look provider returned an unsupported image format"))
+		s.recordPlanLookFailure(failCtx, job, errors.New("look provider returned an unsupported image format"))
 		return
 	}
 	// 生成可能已经用满 jobCtx，存储与回写改用独立上下文，避免成果被丢弃重排。
@@ -711,24 +712,25 @@ func (s *Service) processPlanLook(ctx context.Context, job domain.PlanLookJob) {
 	storageKey := fmt.Sprintf("%s/generated/looks/%s%s", job.UserID, uuid.NewString(), extension)
 	storedKey, saveErr := s.storage.Save(writeCtx, storageKey, bytes.NewReader(output.ImageData))
 	if saveErr != nil {
-		_ = s.repo.FailPlanLook(failCtx, job, saveErr)
+		s.recordPlanLookFailure(failCtx, job, saveErr)
 		return
 	}
 	if err := s.repo.CompletePlanLook(writeCtx, job, "/uploads/"+storedKey, storedKey, output.ProviderVersion); err != nil {
 		_ = s.storage.Delete(writeCtx, storedKey)
 		s.logger.Error("complete plan look", "plan_id", job.PlanID, "error", err)
-		_ = s.repo.FailPlanLook(failCtx, job, err)
+		s.recordPlanLookFailure(failCtx, job, err)
 	}
 }
 
 func (s *Service) processHairPreview(ctx context.Context, job domain.HairPreviewJob) {
 	jobCtx, cancel := context.WithTimeout(ctx, hairPreviewJobTimeout)
 	defer cancel()
+	jobCtx = provider.WithInvocationSource(jobCtx, "hair_preview:"+job.PreviewID)
 	failCtx, failCancel := failContext()
 	defer failCancel()
 	output, err := s.hairGenerator.Generate(jobCtx, job.Input)
 	if err != nil {
-		_ = s.repo.FailHairPreview(failCtx, job, err)
+		s.recordHairPreviewFailure(failCtx, job, err)
 		return
 	}
 	resultURL, storageKey := output.ImageURL, ""
@@ -737,20 +739,20 @@ func (s *Service) processHairPreview(ctx context.Context, job domain.HairPreview
 	if len(output.ImageData) > 0 {
 		extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
 		if extension == "" {
-			_ = s.repo.FailHairPreview(failCtx, job, errors.New("hair preview provider returned an unsupported image format"))
+			s.recordHairPreviewFailure(failCtx, job, errors.New("hair preview provider returned an unsupported image format"))
 			return
 		}
 		storageKey = fmt.Sprintf("%s/generated/hair/%s%s", job.UserID, uuid.NewString(), extension)
 		storedKey, saveErr := s.storage.Save(writeCtx, storageKey, bytes.NewReader(output.ImageData))
 		if saveErr != nil {
-			_ = s.repo.FailHairPreview(failCtx, job, saveErr)
+			s.recordHairPreviewFailure(failCtx, job, saveErr)
 			return
 		}
 		storageKey = storedKey
 		resultURL = "/uploads/" + storedKey
 	}
 	if resultURL == "" {
-		_ = s.repo.FailHairPreview(failCtx, job, errors.New("hair preview provider returned no image"))
+		s.recordHairPreviewFailure(failCtx, job, errors.New("hair preview provider returned no image"))
 		return
 	}
 	if err := s.repo.CompleteHairPreview(writeCtx, job, resultURL, storageKey, output.ProviderVersion); err != nil {
@@ -758,7 +760,7 @@ func (s *Service) processHairPreview(ctx context.Context, job domain.HairPreview
 			_ = s.storage.Delete(writeCtx, storageKey)
 		}
 		s.logger.Error("complete hair preview", "preview_id", job.PreviewID, "error", err)
-		_ = s.repo.FailHairPreview(failCtx, job, err)
+		s.recordHairPreviewFailure(failCtx, job, err)
 	}
 }
 
@@ -766,7 +768,54 @@ const (
 	analysisJobTimeout    = 5 * time.Minute
 	hairPreviewJobTimeout = 5 * time.Minute
 	planLookJobTimeout    = 5 * time.Minute
+	// maxJobAttempts 与 repository 层 FailAnalysis/FailPlanLook/FailHairPreview
+	// 的终态阈值保持一致:达到该次数的失败不再重新入队。
+	maxJobAttempts = 3
 )
+
+// loggerOrDefault 兜底 nil logger:测试常用结构体字面量构造 Service,
+// 失败路径的日志不允许因缺 logger 而 panic。
+func (s *Service) loggerOrDefault() *slog.Logger {
+	if s.logger != nil {
+		return s.logger
+	}
+	return slog.Default()
+}
+
+// recordAnalysisFailure 回写分析任务失败状态并记录任务级日志。此前失败只落库
+// 不打日志,模型故障时任务像"凭空消失",只能靠零散的 AI invocation WARN 反推。
+func (s *Service) recordAnalysisFailure(ctx context.Context, job domain.AnalysisJob, cause error) {
+	if err := s.repo.FailAnalysis(ctx, job, cause); err != nil {
+		s.loggerOrDefault().Error("fail analysis writeback", "analysis_id", job.AnalysisID, "error", err)
+	}
+	if job.Attempt >= maxJobAttempts {
+		s.loggerOrDefault().Error("analysis job failed permanently", "analysis_id", job.AnalysisID, "attempt", job.Attempt, "error", cause)
+		return
+	}
+	s.loggerOrDefault().Warn("analysis job failed, retry scheduled", "analysis_id", job.AnalysisID, "attempt", job.Attempt, "error", cause)
+}
+
+func (s *Service) recordPlanLookFailure(ctx context.Context, job domain.PlanLookJob, cause error) {
+	if err := s.repo.FailPlanLook(ctx, job, cause); err != nil {
+		s.loggerOrDefault().Error("fail plan look writeback", "plan_id", job.PlanID, "error", err)
+	}
+	if job.Attempt >= maxJobAttempts {
+		s.loggerOrDefault().Error("plan look job failed permanently", "plan_id", job.PlanID, "attempt", job.Attempt, "error", cause)
+		return
+	}
+	s.loggerOrDefault().Warn("plan look job failed, retry scheduled", "plan_id", job.PlanID, "attempt", job.Attempt, "error", cause)
+}
+
+func (s *Service) recordHairPreviewFailure(ctx context.Context, job domain.HairPreviewJob, cause error) {
+	if err := s.repo.FailHairPreview(ctx, job, cause); err != nil {
+		s.loggerOrDefault().Error("fail hair preview writeback", "preview_id", job.PreviewID, "error", err)
+	}
+	if job.Attempt >= maxJobAttempts {
+		s.loggerOrDefault().Error("hair preview job failed permanently", "preview_id", job.PreviewID, "attempt", job.Attempt, "error", cause)
+		return
+	}
+	s.loggerOrDefault().Warn("hair preview job failed, retry scheduled", "preview_id", job.PreviewID, "attempt", job.Attempt, "error", cause)
+}
 
 // failContext 返回一个从 context.Background() 派生的 10 秒超时上下文，
 // 专供任务失败后的状态回写使用。worker 的 jobCtx 在 provider 调用因 5 分钟
@@ -801,6 +850,8 @@ func (s *Service) guardWorkerJob(kind, id string, fail func(error), run func()) 
 func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 	jobCtx, cancel := context.WithTimeout(ctx, analysisJobTimeout)
 	defer cancel()
+	// 任务标识随 ctx 传入 AI runtime,让每次调用的日志能关联到具体任务。
+	jobCtx = provider.WithInvocationSource(jobCtx, "analysis:"+job.AnalysisID)
 	failCtx, failCancel := failContext()
 	defer failCancel()
 	jobCtx = provider.WithProgressReporter(jobCtx, func(progress int, stage string) {
@@ -815,7 +866,7 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 			}
 			return
 		}
-		_ = s.repo.FailAnalysis(failCtx, job, err)
+		s.recordAnalysisFailure(failCtx, job, err)
 		return
 	}
 	_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, 82, "正在组合发型、妆容与穿搭方案")
@@ -823,7 +874,7 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 	defer writeCancel()
 	currentImageURL, err := s.analysisPreviewURL(writeCtx, job.UserID, job.Input.MediaIDs)
 	if err != nil {
-		_ = s.repo.FailAnalysis(failCtx, job, err)
+		s.recordAnalysisFailure(failCtx, job, err)
 		return
 	}
 	// The "current" image is source evidence, never a provider-generated or
@@ -837,7 +888,7 @@ func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
 			return
 		}
 		s.logger.Error("complete analysis", "analysis_id", job.AnalysisID, "error", err)
-		_ = s.repo.FailAnalysis(failCtx, job, err)
+		s.recordAnalysisFailure(failCtx, job, err)
 	}
 }
 
