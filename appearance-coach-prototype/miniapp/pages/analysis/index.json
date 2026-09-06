@@ -1,1 +1,1 @@
-{ "usingComponents": { "app-header": "/components/app-header/index" } }
+{ "usingComponents": { "app-header": "/components/app-header/index", "primary-button": "/components/primary-button/index" } }

@@ -33,7 +33,6 @@
 .progress-value { height: 100%; border-radius: inherit; background: var(--moss); transition: width .45s ease; }
 .stage-row { margin-top: 18rpx; display: flex; justify-content: space-between; color: #a1a49f; font-size: 21rpx; }
 .stage-row .done { color: var(--moss); font-weight: 600; }
-.retry { margin-top: 34rpx; border: 1rpx solid var(--moss); border-radius: 22rpx; background: transparent; color: var(--moss); }
 
 /* Failure view (photo-gate rejection or generic failure) */
 .fail-wrap { width: 100%; box-sizing: border-box; min-height: calc(100vh - 200rpx - env(safe-area-inset-bottom) - 56rpx); padding: 0 56rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -46,5 +45,4 @@
 .fail-reason { flex: 1; color: #4c514a; font-size: 26rpx; line-height: 1.6; }
 .fail-tip { align-self: flex-start; padding: 20rpx 4rpx 0; color: #a1a49f; font-size: 23rpx; }
 .fail-lede { margin-top: 26rpx; color: #747873; font-size: 26rpx; line-height: 1.7; text-align: center; }
-.fail-wrap .retry { width: 100%; margin-top: 48rpx; border: none; background: var(--moss); color: #fff; font-weight: 600; }
-.fail-wrap .retry::after { border: none; }
+.fail-action { width: 100%; margin-top: 48rpx; }

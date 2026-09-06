@@ -36,6 +36,6 @@
       <text class="fail-tip">{{failTip}}</text>
     </view>
     <text wx:else class="fail-lede">{{failMessage}}</text>
-    <button class="retry" bindtap="retry">{{failAction}}</button>
+    <primary-button class="fail-action" text="{{failAction}}" bind:tap="retry" />
   </view>
 </view>
