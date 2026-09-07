@@ -605,6 +605,7 @@ func (s *Service) DeleteUserData(ctx context.Context, userID string) error {
 func (s *Service) RunWorker(ctx context.Context, poll time.Duration) {
 	go s.runHairPreviewWorker(ctx, poll)
 	go s.runPlanLookWorker(ctx, poll)
+	go s.runTodayPlanLookWorker(ctx, poll)
 	ticker := time.NewTicker(poll)
 	defer ticker.Stop()
 	s.logger.Info("analysis worker started", "poll", poll)
@@ -683,6 +684,73 @@ func (s *Service) runPlanLookWorker(ctx context.Context, poll time.Duration) {
 				}, func() { s.processPlanLook(ctx, job) })
 			}
 		}
+	}
+}
+
+func (s *Service) runTodayPlanLookWorker(ctx context.Context, poll time.Duration) {
+	ticker := time.NewTicker(poll)
+	defer ticker.Stop()
+	s.logger.Info("today plan look worker started", "poll", poll)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			job, ok, err := s.repo.ClaimTodayPlanLook(ctx)
+			if err != nil {
+				s.logger.Error("claim today plan look", "error", err)
+				continue
+			}
+			if ok {
+				s.guardWorkerJob("today_plan_look", job.PlanID, func(cause error) {
+					failCtx, failCancel := failContext()
+					defer failCancel()
+					if err := s.repo.FailTodayPlanLook(failCtx, job, cause); err != nil {
+						s.logger.Error("fail today plan look after panic", "plan_id", job.PlanID, "error", err)
+					}
+				}, func() { s.processTodayPlanLook(ctx, job) })
+			}
+		}
+	}
+}
+
+func (s *Service) processTodayPlanLook(ctx context.Context, job domain.TodayPlanLookJob) {
+	jobCtx, cancel := context.WithTimeout(ctx, planLookJobTimeout)
+	defer cancel()
+	jobCtx = provider.WithInvocationSource(jobCtx, "today_look:"+job.PlanID)
+	failCtx, failCancel := failContext()
+	defer failCancel()
+	if s.lookGenerator == nil {
+		s.recordTodayPlanLookFailure(failCtx, job, errors.New("plan look generator is not configured"))
+		return
+	}
+	steps := make([]domain.PlanStep, 0, len(job.Steps))
+	for _, step := range job.Steps {
+		steps = append(steps, domain.PlanStep{Category: step.Category, Title: step.Title, Summary: step.Copy})
+	}
+	output, err := s.lookGenerator.Generate(jobCtx, provider.LookInput{Name: job.Title, Why: job.Summary, Steps: steps, MediaIDs: job.MediaIDs})
+	if err != nil {
+		s.recordTodayPlanLookFailure(failCtx, job, err)
+		return
+	}
+	extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
+	if extension == "" {
+		s.recordTodayPlanLookFailure(failCtx, job, errors.New("look provider returned an unsupported image format"))
+		return
+	}
+	// 生成可能已经用满 jobCtx，存储与回写改用独立上下文，避免成果被丢弃重排。
+	writeCtx, writeCancel := writeContext()
+	defer writeCancel()
+	storageKey := fmt.Sprintf("%s/generated/today/%s%s", job.UserID, uuid.NewString(), extension)
+	storedKey, saveErr := s.storage.Save(writeCtx, storageKey, bytes.NewReader(output.ImageData))
+	if saveErr != nil {
+		s.recordTodayPlanLookFailure(failCtx, job, saveErr)
+		return
+	}
+	if err := s.repo.CompleteTodayPlanLook(writeCtx, job, "/uploads/"+storedKey, storedKey, output.ProviderVersion); err != nil {
+		_ = s.storage.Delete(writeCtx, storedKey)
+		s.loggerOrDefault().Error("complete today plan look", "plan_id", job.PlanID, "error", err)
+		s.recordTodayPlanLookFailure(failCtx, job, err)
 	}
 }
 
@@ -768,9 +836,12 @@ const (
 	analysisJobTimeout    = 5 * time.Minute
 	hairPreviewJobTimeout = 5 * time.Minute
 	planLookJobTimeout    = 5 * time.Minute
-	// maxJobAttempts 与 repository 层 FailAnalysis/FailPlanLook/FailHairPreview
-	// 的终态阈值保持一致:达到该次数的失败不再重新入队。
+	// maxJobAttempts 与 repository 层 FailAnalysis/FailHairPreview 的终态阈值
+	// 保持一致:达到该次数的失败不再重新入队。
 	maxJobAttempts = 3
+	// maxGenerationAttempts 对齐 FailPlanLook/FailTodayPlanLook 的终态阈值
+	// (生成类任务只重试 1 次)。
+	maxGenerationAttempts = 2
 )
 
 // loggerOrDefault 兜底 nil logger:测试常用结构体字面量构造 Service,
@@ -799,11 +870,22 @@ func (s *Service) recordPlanLookFailure(ctx context.Context, job domain.PlanLook
 	if err := s.repo.FailPlanLook(ctx, job, cause); err != nil {
 		s.loggerOrDefault().Error("fail plan look writeback", "plan_id", job.PlanID, "error", err)
 	}
-	if job.Attempt >= maxJobAttempts {
+	if job.Attempt >= maxGenerationAttempts {
 		s.loggerOrDefault().Error("plan look job failed permanently", "plan_id", job.PlanID, "attempt", job.Attempt, "error", cause)
 		return
 	}
 	s.loggerOrDefault().Warn("plan look job failed, retry scheduled", "plan_id", job.PlanID, "attempt", job.Attempt, "error", cause)
+}
+
+func (s *Service) recordTodayPlanLookFailure(ctx context.Context, job domain.TodayPlanLookJob, cause error) {
+	if err := s.repo.FailTodayPlanLook(ctx, job, cause); err != nil {
+		s.loggerOrDefault().Error("fail today plan look writeback", "plan_id", job.PlanID, "error", err)
+	}
+	if job.Attempt >= maxGenerationAttempts {
+		s.loggerOrDefault().Error("today plan look job failed permanently", "plan_id", job.PlanID, "attempt", job.Attempt, "error", cause)
+		return
+	}
+	s.loggerOrDefault().Warn("today plan look job failed, retry scheduled", "plan_id", job.PlanID, "attempt", job.Attempt, "error", cause)
 }
 
 func (s *Service) recordHairPreviewFailure(ctx context.Context, job domain.HairPreviewJob, cause error) {

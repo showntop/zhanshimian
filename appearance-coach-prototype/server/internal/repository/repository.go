@@ -62,6 +62,9 @@ type Repository interface {
 	SaveHairPreview(context.Context, string, string) (domain.HairPreview, error)
 	GetTodayPlan(context.Context, string) (domain.TodayPlan, error)
 	SaveTodayPlan(context.Context, string, domain.TodayPlan) (domain.TodayPlan, error)
+	ClaimTodayPlanLook(context.Context) (domain.TodayPlanLookJob, bool, error)
+	CompleteTodayPlanLook(context.Context, domain.TodayPlanLookJob, string, string, string) error
+	FailTodayPlanLook(context.Context, domain.TodayPlanLookJob, error) error
 	ActivateTodayPlan(context.Context, string, string) (domain.TodayPlan, error)
 	FeedbackTodayPlan(context.Context, string, string, string) (domain.TodayPlan, error)
 	CreateShareCard(context.Context, string, domain.ShareCardInput, json.RawMessage) (domain.ShareCard, error)

@@ -47,6 +47,7 @@ func (s *Service) GetTodayPlan(ctx context.Context, userID string) (domain.Today
 	item, err := s.repo.GetTodayPlan(ctx, userID)
 	if err == nil {
 		item.ImageURL = s.absoluteURL(item.ImageURL)
+		item.GeneratedImageURL = s.absoluteURL(item.GeneratedImageURL)
 	}
 	return item, err
 }
@@ -100,6 +101,7 @@ func (s *Service) GenerateTodayPlan(ctx context.Context, userID string, input do
 	item, err := s.repo.SaveTodayPlan(ctx, userID, plan)
 	if err == nil {
 		item.ImageURL = s.absoluteURL(item.ImageURL)
+		item.GeneratedImageURL = s.absoluteURL(item.GeneratedImageURL)
 	}
 	return item, err
 }

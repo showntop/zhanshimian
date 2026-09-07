@@ -159,8 +159,14 @@ type TodayPlan struct {
 	Active          bool            `json:"active"`
 	Feedback        string          `json:"feedback,omitempty"`
 	RegenerateCount int             `json:"regenerate_count"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
+	// GeneratedImageURL is the user's own try-on rendered asynchronously from
+	// the report photos; ImageURL stays the bundled 风格参考 shown meanwhile.
+	GeneratedImageURL string    `json:"generated_image_url,omitempty"`
+	GenerationStatus  string    `json:"generation_status"`
+	LookProvider      string    `json:"look_provider,omitempty"`
+	GenerationError   string    `json:"generation_error,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type TodayPlanInput struct {
@@ -378,6 +384,19 @@ type PlanLookJob struct {
 	Slug     string
 	Why      string
 	Steps    []PlanStep
+	MediaIDs []string
+	Attempt  int
+}
+
+// TodayPlanLookJob mirrors PlanLookJob for the daily plan's own try-on: the
+// worker renders the user's body photo styled per the plan's three steps.
+type TodayPlanLookJob struct {
+	PlanID   string
+	ReportID string
+	UserID   string
+	Title    string
+	Summary  string
+	Steps    []TodayPlanStep
 	MediaIDs []string
 	Attempt  int
 }

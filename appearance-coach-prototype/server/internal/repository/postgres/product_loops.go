@@ -3,15 +3,18 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"time"
 
 	"github.com/example/jianwo/server/internal/domain"
 	"github.com/example/jianwo/server/internal/repository"
+	"github.com/jackc/pgx/v5"
 )
 
 func scanTodayPlan(row interface{ Scan(...any) error }) (domain.TodayPlan, error) {
 	var item domain.TodayPlan
 	var contextData, stepsData []byte
-	err := row.Scan(&item.ID, &item.ReportID, &contextData, &item.Title, &item.Summary, &item.ImageURL, &stepsData, &item.Active, &item.Feedback, &item.RegenerateCount, &item.CreatedAt, &item.UpdatedAt)
+	err := row.Scan(&item.ID, &item.ReportID, &contextData, &item.Title, &item.Summary, &item.ImageURL, &stepsData, &item.Active, &item.Feedback, &item.RegenerateCount, &item.GeneratedImageURL, &item.GenerationStatus, &item.LookProvider, &item.GenerationError, &item.CreatedAt, &item.UpdatedAt)
 	if err == nil {
 		err = json.Unmarshal(contextData, &item.Context)
 	}
@@ -21,7 +24,9 @@ func scanTodayPlan(row interface{ Scan(...any) error }) (domain.TodayPlan, error
 	return item, err
 }
 
-const todayPlanSelect = `SELECT id::text,coalesce(report_id::text,''),context,title,summary,image_url,steps,active,feedback,regenerate_count,created_at,updated_at FROM today_plans`
+const todayPlanSelect = `SELECT id::text,coalesce(report_id::text,''),context,title,summary,image_url,steps,active,feedback,regenerate_count,generated_image_url,generation_status,look_provider,generation_error,created_at,updated_at FROM today_plans`
+
+const todayPlanReturning = `RETURNING id::text,coalesce(report_id::text,''),context,title,summary,image_url,steps,active,feedback,regenerate_count,generated_image_url,generation_status,look_provider,generation_error,created_at,updated_at`
 
 func (s *Store) GetTodayPlan(ctx context.Context, userID string) (domain.TodayPlan, error) {
 	item, err := scanTodayPlan(s.pool.QueryRow(ctx, todayPlanSelect+` WHERE user_id=$1 AND plan_date=current_date`, userID))
@@ -49,13 +54,16 @@ func (s *Store) SaveTodayPlan(ctx context.Context, userID string, input domain.T
 		reportID = input.ReportID
 	}
 	item, err := scanTodayPlan(s.pool.QueryRow(ctx, `
-		INSERT INTO today_plans(user_id,report_id,plan_date,context,title,summary,image_url,steps,regenerate_count)
-		VALUES($1,$2,$3::date,$4,$5,$6,$7,$8,$9)
+		INSERT INTO today_plans(user_id,report_id,plan_date,context,title,summary,image_url,steps,regenerate_count,generation_status)
+		VALUES($1,$2,$3::date,$4,$5,$6,$7,$8,$9,CASE WHEN $2::uuid IS NULL THEN 'idle' ELSE 'queued' END)
 		ON CONFLICT(user_id,plan_date) DO UPDATE SET
 			report_id=EXCLUDED.report_id,context=EXCLUDED.context,title=EXCLUDED.title,summary=EXCLUDED.summary,
 			image_url=EXCLUDED.image_url,steps=EXCLUDED.steps,regenerate_count=EXCLUDED.regenerate_count,updated_at=now(),
-			active=false,feedback=''
-		RETURNING id::text,coalesce(report_id::text,''),context,title,summary,image_url,steps,active,feedback,regenerate_count,created_at,updated_at`,
+			active=false,feedback='',
+			generation_status=CASE WHEN EXCLUDED.report_id IS NULL THEN 'idle' ELSE 'queued' END,
+			generation_attempts=0,generation_next_run_at=now(),generation_locked_at=NULL,
+			generated_image_url='',generated_storage_key='',look_provider='',generation_error=''
+		`+todayPlanReturning,
 		userID, reportID, input.Context.Date, contextData, input.Title, input.Summary, input.ImageURL, stepsData, input.RegenerateCount))
 	return item, err
 }
@@ -73,8 +81,69 @@ func (s *Store) ActivateTodayPlan(ctx context.Context, userID, planID string) (d
 func (s *Store) FeedbackTodayPlan(ctx context.Context, userID, planID, feedback string) (domain.TodayPlan, error) {
 	item, err := scanTodayPlan(s.pool.QueryRow(ctx, `
 		UPDATE today_plans SET feedback=$3,updated_at=now() WHERE id=$1 AND user_id=$2
-		RETURNING id::text,coalesce(report_id::text,''),context,title,summary,image_url,steps,active,feedback,regenerate_count,created_at,updated_at`, planID, userID, feedback))
+		`+todayPlanReturning, planID, userID, feedback))
 	return item, mapNotFound(err)
+}
+
+// ClaimTodayPlanLook mirrors ClaimPlanLook for the daily plan's own try-on.
+// Stuck processing jobs are reclaimed after 10 minutes (attempts capped at 2,
+// matching FailTodayPlanLook); only plans bound to a report are claimable,
+// because the render needs the analysis source photos.
+func (s *Store) ClaimTodayPlanLook(ctx context.Context) (domain.TodayPlanLookJob, bool, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return domain.TodayPlanLookJob{}, false, err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, `UPDATE today_plans SET generation_status='failed',generation_error='形象生成超时，请稍后重试' WHERE generation_status='processing' AND generation_locked_at < now() - interval '10 minutes' AND generation_attempts>=2`); err != nil {
+		return domain.TodayPlanLookJob{}, false, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE today_plans SET generation_status='queued',generation_next_run_at=now() WHERE generation_status='processing' AND generation_locked_at < now() - interval '10 minutes' AND generation_attempts<2`); err != nil {
+		return domain.TodayPlanLookJob{}, false, err
+	}
+	var job domain.TodayPlanLookJob
+	err = tx.QueryRow(ctx, `
+		SELECT t.id::text,coalesce(t.report_id::text,''),t.user_id::text,t.title,t.summary,t.generation_attempts,a.media_ids::text[]
+		FROM today_plans t
+		JOIN reports r ON r.id=t.report_id
+		JOIN analyses a ON a.id=r.analysis_id
+		WHERE t.generation_status='queued' AND t.generation_next_run_at<=now()
+		ORDER BY t.generation_next_run_at,t.id FOR UPDATE OF t SKIP LOCKED LIMIT 1`).
+		Scan(&job.PlanID, &job.ReportID, &job.UserID, &job.Title, &job.Summary, &job.Attempt, &job.MediaIDs)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.TodayPlanLookJob{}, false, nil
+	}
+	if err != nil {
+		return domain.TodayPlanLookJob{}, false, err
+	}
+	var stepsData []byte
+	if err = tx.QueryRow(ctx, `SELECT steps FROM today_plans WHERE id=$1`, job.PlanID).Scan(&stepsData); err != nil {
+		return domain.TodayPlanLookJob{}, false, err
+	}
+	if err = json.Unmarshal(stepsData, &job.Steps); err != nil {
+		return domain.TodayPlanLookJob{}, false, err
+	}
+	job.Attempt++
+	if _, err = tx.Exec(ctx, `UPDATE today_plans SET generation_status='processing',generation_attempts=$2,generation_locked_at=now() WHERE id=$1`, job.PlanID, job.Attempt); err != nil {
+		return domain.TodayPlanLookJob{}, false, err
+	}
+	return job, true, tx.Commit(ctx)
+}
+
+func (s *Store) CompleteTodayPlanLook(ctx context.Context, job domain.TodayPlanLookJob, resultURL, storageKey, providerVersion string) error {
+	_, err := s.pool.Exec(ctx, `UPDATE today_plans SET generation_status='completed',generated_image_url=$2,generated_storage_key=$3,look_provider=$4,generation_error='',updated_at=now() WHERE id=$1`, job.PlanID, resultURL, storageKey, providerVersion)
+	return err
+}
+
+func (s *Store) FailTodayPlanLook(ctx context.Context, job domain.TodayPlanLookJob, cause error) error {
+	// 与 FailPlanLook 同一策略:鉴权/配额/契约类错误重试也不会成功,直接终态,
+	// 避免界面在若干个轮询周期里看起来仍在生成。
+	if job.Attempt >= 2 || !retryPlanLookError(cause) {
+		_, err := s.pool.Exec(ctx, `UPDATE today_plans SET generation_status='failed',generation_error=$2,updated_at=now() WHERE id=$1`, job.PlanID, cause.Error())
+		return err
+	}
+	_, err := s.pool.Exec(ctx, `UPDATE today_plans SET generation_status='queued',generation_error=$2,generation_next_run_at=$3,updated_at=now() WHERE id=$1`, job.PlanID, cause.Error(), time.Now().Add(time.Duration(job.Attempt*5)*time.Second))
+	return err
 }
 
 func (s *Store) CreateShareCard(ctx context.Context, userID string, input domain.ShareCardInput, snapshot json.RawMessage) (domain.ShareCard, error) {
