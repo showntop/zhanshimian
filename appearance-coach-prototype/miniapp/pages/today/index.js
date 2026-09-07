@@ -1,27 +1,47 @@
 const api = require('../../services/api')
-const { lookImage, exampleImage, isBundledAsset } = require('../../utils/media')
+const { lookImage, exampleImage, userImage } = require('../../utils/media')
 
-// 方案主图 URL 无效或服务端下发内置素材时按示例对待,wxml 用 plan.isExample 切换「风格参考」角标
+// 本人生成图(generated_image_url)优先;没有时回退到内置示例图并按「风格参考」对待,
+// wxml 用 plan.isExample 切换角标与模糊弱化,plan.generating 驱动轮询。
 function mapPlan(plan) {
+  const generatedURL = userImage(plan.generated_image_url)
   const imageURL = lookImage(plan.image_url)
-  return { ...plan, image_url: imageURL || exampleImage('sharp', 'full'), isExample: !imageURL || isBundledAsset(imageURL) }
+  const status = plan.generation_status || 'idle'
+  return {
+    ...plan,
+    image_url: generatedURL || imageURL || exampleImage('sharp', 'full'),
+    isExample: !generatedURL,
+    generating: status === 'queued' || status === 'processing'
+  }
 }
 
 Page({
   data: { plan: null, loading: true, refreshing: false, activating: false, sendingFeedback: false, error: '', previewOpen: false, feedbacks: ['适合我', '太正式', '想更轻松', '今天穿了'] },
   onLoad() { api.trackEvent('page_view', { page: 'today' }).catch((error) => console.warn('[today] 埋点上报失败', error)); this.load() },
+  onUnload() { if (this.timer) clearTimeout(this.timer) },
   load() {
     api.getTodayPlan().then((plan) => {
-      if (plan) this.setData({ plan: mapPlan(plan), loading: false, error: '' })
-      else this.generate(false)
+      if (plan) {
+        this.setData({ plan: mapPlan(plan), loading: false, error: '' })
+        this.schedulePoll()
+      } else this.generate(false)
     }).catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false, error: error.message || '今日方案暂时没有生成' }) })
+  },
+  // 本人搭配图由服务端异步生成,生成中轮询直到 completed/failed
+  schedulePoll() {
+    if (this.timer) clearTimeout(this.timer)
+    if (this.data.plan && this.data.plan.generating) this.timer = setTimeout(() => this.load(), 3000)
   },
   mapPlan,
   generate(refresh) {
     if (this.data.refreshing) return
     this.setData({ refreshing: true, loading: !this.data.plan, error: '' })
     api.createTodayPlan({ report_id: wx.getStorageSync('jianwo_report_id'), city: wx.getStorageSync('jianwo_city') || '', schedule: '', refresh })
-      .then((plan) => { this.setData({ plan: mapPlan(plan), loading: false, error: '' }); api.trackEvent('today_plan_generate', { refresh: Boolean(refresh), plan_id: plan.id }).catch((error) => console.warn('[today] 埋点上报失败', error)) })
+      .then((plan) => {
+        this.setData({ plan: mapPlan(plan), loading: false, error: '' })
+        this.schedulePoll()
+        api.trackEvent('today_plan_generate', { refresh: Boolean(refresh), plan_id: plan.id }).catch((error) => console.warn('[today] 埋点上报失败', error))
+      })
       .catch((error) => { wx.showToast({ title: error.message, icon: 'none' }); this.setData({ loading: false, error: error.message || '今日方案暂时没有生成' }) })
       .finally(() => this.setData({ refreshing: false }))
   },

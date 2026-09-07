@@ -72,9 +72,10 @@ Page({
     if (reportID) {
       api.getTodayPlan().then((todayPlan) => {
         if (todayPlan) {
-          // 方案图 URL 无效时显式回退到内置示例图,wxml 用 todayLookExample 叠加「风格参考」角标
-          const lookURL = lookImage(todayPlan.image_url)
-          this.setData({ todayPlan, todayContext: todayPlan.context, todayLookUrl: lookURL || exampleImage('sharp', 'full'), todayLookExample: !lookURL || isBundledAsset(lookURL) })
+          // 本人生成图优先;无效时显式回退到内置示例图,wxml 用 todayLookExample 叠加「风格参考」角标
+          const generatedURL = userImage(todayPlan.generated_image_url)
+          const lookURL = generatedURL || lookImage(todayPlan.image_url)
+          this.setData({ todayPlan, todayContext: todayPlan.context, todayLookUrl: lookURL || exampleImage('sharp', 'full'), todayLookExample: !generatedURL && (!lookURL || isBundledAsset(lookURL)) })
         } else {
           this.setData({ todayPlan: null, todayLookUrl: '', todayLookExample: false })
           this.loadTodayContext()
