@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/example/jianwo/server/internal/domain"
+	"github.com/zhanshimian/server/internal/domain"
 )
 
 // LookInput describes one plan's target full-look direction plus the source

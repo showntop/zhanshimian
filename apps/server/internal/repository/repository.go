@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/example/jianwo/server/internal/domain"
+	"github.com/zhanshimian/server/internal/domain"
 )
 
 var ErrNotFound = errNotFound("resource not found")

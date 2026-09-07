@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/jianwo/server/internal/domain"
+	"github.com/zhanshimian/server/internal/domain"
 )
 
 type hairGeneratorFunc func(context.Context, domain.HairPreviewInput) (HairPreviewOutput, error)

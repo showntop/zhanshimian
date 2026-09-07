@@ -1,4 +1,4 @@
-module github.com/example/jianwo/server
+module github.com/zhanshimian/server
 
 go 1.24.0
 

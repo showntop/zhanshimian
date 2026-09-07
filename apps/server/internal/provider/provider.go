@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/example/jianwo/server/internal/domain"
+	"github.com/zhanshimian/server/internal/domain"
 )
 
 type Analyzer interface {

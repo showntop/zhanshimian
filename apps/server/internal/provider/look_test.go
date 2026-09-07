@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/jianwo/server/internal/domain"
+	"github.com/zhanshimian/server/internal/domain"
 )
 
 type lookMediaLoaderStub struct {

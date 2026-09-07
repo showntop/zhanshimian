@@ -7,12 +7,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/example/jianwo/server/internal/bootstrap"
-	"github.com/example/jianwo/server/internal/config"
-	"github.com/example/jianwo/server/internal/database"
-	"github.com/example/jianwo/server/internal/repository/postgres"
-	"github.com/example/jianwo/server/internal/service"
-	"github.com/example/jianwo/server/internal/storage"
+	"github.com/zhanshimian/server/internal/bootstrap"
+	"github.com/zhanshimian/server/internal/config"
+	"github.com/zhanshimian/server/internal/database"
+	"github.com/zhanshimian/server/internal/repository/postgres"
+	"github.com/zhanshimian/server/internal/service"
+	"github.com/zhanshimian/server/internal/storage"
 )
 
 func main() {

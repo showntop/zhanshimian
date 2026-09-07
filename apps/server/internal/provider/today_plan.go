@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/example/jianwo/server/internal/domain"
+	"github.com/zhanshimian/server/internal/domain"
 )
 
 // TodayPlanGrounding carries everything the planner may use: the user's

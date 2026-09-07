@@ -5,11 +5,11 @@ import (
 	"sort"
 	"time"
 
-	"github.com/example/jianwo/server/internal/config"
-	"github.com/example/jianwo/server/internal/provider"
-	"github.com/example/jianwo/server/internal/repository/postgres"
-	"github.com/example/jianwo/server/internal/service"
-	"github.com/example/jianwo/server/internal/storage"
+	"github.com/zhanshimian/server/internal/config"
+	"github.com/zhanshimian/server/internal/provider"
+	"github.com/zhanshimian/server/internal/repository/postgres"
+	"github.com/zhanshimian/server/internal/service"
+	"github.com/zhanshimian/server/internal/storage"
 )
 
 type AIBundle struct {

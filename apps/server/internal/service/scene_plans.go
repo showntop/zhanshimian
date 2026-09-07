@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/example/jianwo/server/internal/domain"
+	"github.com/zhanshimian/server/internal/domain"
 )
 
 var sceneLabels = map[string]string{

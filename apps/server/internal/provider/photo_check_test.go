@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/example/jianwo/server/internal/domain"
+	"github.com/zhanshimian/server/internal/domain"
 )
 
 func TestValidatePhotoCheckPayload(t *testing.T) {

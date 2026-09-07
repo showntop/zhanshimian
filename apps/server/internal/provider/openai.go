@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/jianwo/server/internal/domain"
+	"github.com/zhanshimian/server/internal/domain"
 )
 
 type OpenAIConfig struct {

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/example/jianwo/server/internal/domain"
-	"github.com/example/jianwo/server/internal/repository"
-	"github.com/example/jianwo/server/internal/storage"
+	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/storage"
 )
 
 type analysisMediaRepositoryStub struct {

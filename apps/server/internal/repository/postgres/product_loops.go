@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/example/jianwo/server/internal/domain"
-	"github.com/example/jianwo/server/internal/repository"
+	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/repository"
 	"github.com/jackc/pgx/v5"
 )
 

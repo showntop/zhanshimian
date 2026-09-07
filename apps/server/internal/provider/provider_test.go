@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/example/jianwo/server/internal/domain"
+	"github.com/zhanshimian/server/internal/domain"
 )
 
 func TestDemoAnalyzerReturnsRespectfulCompleteOutput(t *testing.T) {
