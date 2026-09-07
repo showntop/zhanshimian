@@ -1,0 +1,4 @@
+packages:
+  - apps/*
+  - packages/*
+# apps/server 为 Go 工程（无 package.json），pnpm 会自动跳过

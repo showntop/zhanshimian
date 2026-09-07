@@ -1,0 +1,25 @@
+# deps & builds
+node_modules/
+dist/
+dist-export/
+.taro/
+.expo/
+*.tsbuildinfo
+
+# go server 运行时数据（对象存储本地模式）
+apps/server/data/uploads/
+apps/server/bin/
+
+# env（example 保留）
+.env
+apps/*/.env
+!**/.env.example
+!**/.env.production.example
+
+# 微信上传密钥等敏感文件
+*.key
+
+# misc
+.DS_Store
+coverage/
+*.log

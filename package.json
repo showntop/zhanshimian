@@ -1,0 +1,20 @@
+{
+  "name": "zhanshimian",
+  "version": "1.0.0",
+  "private": true,
+  "description": "怎么打扮 —— AI 形象顾问：Taro 小程序 + Go 服务端 + Expo 手机端 monorepo",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm -r run test",
+    "build": "pnpm -r run build",
+    "up": "make up",
+    "down": "make down",
+    "e2e": "make e2e",
+    "check": "make check"
+  }
+}

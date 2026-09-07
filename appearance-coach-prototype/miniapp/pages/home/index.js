@@ -43,6 +43,17 @@ Page({
     initialized: false
   },
   onLoad() {
+    // The home surface is deliberately light. Set the system status-bar
+    // foreground explicitly because this page uses a custom navigation bar.
+    try {
+      wx.setNavigationBarColor({
+        frontColor: '#000000',
+        backgroundColor: '#f8f7f3',
+        animation: { duration: 0, timingFunc: 'linear' }
+      })
+    } catch (error) {
+      console.warn('[home] 状态栏颜色设置失败', error)
+    }
     // Trigger entrance animations only on first page load, not on tab switch.
     this.setData({ initialized: true })
   },
@@ -203,6 +214,20 @@ Page({
     this.setData({ previewOpen: true })
   },
   closeTodayLook() { this.setData({ previewOpen: false }) },
+  // 生成图 URL 可能因 COS 签名过期、对象缺失或下载域名未放行而加载失败;
+  // <image> 加载失败是静默的,不兜底就会留下永久空白,这里回退到带角标的示例图
+  onTodayLookError() {
+    const fallback = exampleImage('sharp', 'full')
+    if (this.data.todayLookUrl !== fallback) this.setData({ todayLookUrl: fallback, todayLookExample: true })
+  },
+  onCurrentLookError() {
+    // 清空后 wxml 自会落到内置 natural.jpg + example-soft,无需再补图
+    if (this.data.currentLookUrl) this.setData({ currentLookUrl: '' })
+  },
+  onReferenceLookError() {
+    // 方案图加载失败时退回「生成后可对比」占位,而不是留下半张空白
+    if (this.data.referenceGenerated || this.data.referenceDemo) this.setData({ referenceLookUrl: '', referenceGenerated: false, referenceDemo: false })
+  },
   start() { wx.navigateTo({ url: '/pages/capture/index?scene=general' }) },
   openReport() {
     if (this.data.reportID) { wx.navigateTo({ url: `/pages/report/index?id=${this.data.reportID}` }); return }
