@@ -1,0 +1,91 @@
+.task-rail {
+  display: flex;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.task-card {
+  display: inline-flex;
+  flex-direction: column;
+  width: 320rpx;
+  margin-right: 20rpx;
+  padding: 24rpx;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1rpx solid var(--line);
+  box-shadow: 0 6px 18px rgba(52, 59, 47, 0.05);
+
+  &--failed {
+    background: rgba(155, 109, 88, 0.06);
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__type {
+    font-size: 20rpx;
+    font-weight: 600;
+    letter-spacing: 2rpx;
+    color: var(--ink-3);
+  }
+
+  &__status {
+    font-size: 20rpx;
+
+    &--failed {
+      color: var(--warn);
+    }
+  }
+
+  &__spinner {
+    width: 24rpx;
+    height: 24rpx;
+    border-radius: 999rpx;
+    border: 3rpx solid var(--moss-soft);
+    border-top-color: var(--moss);
+    animation: task-spin 0.9s linear infinite;
+  }
+
+  &__title {
+    margin-top: 12rpx;
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__progress {
+    margin-top: 16rpx;
+    height: 6rpx;
+    border-radius: 999rpx;
+    background: var(--moss-soft);
+    overflow: hidden;
+  }
+
+  &__progress-fill {
+    height: 100%;
+    border-radius: 999rpx;
+    background: var(--moss);
+    transition: width 0.2s ease;
+  }
+
+  &__stage {
+    margin-top: 12rpx;
+    font-size: 20rpx;
+    color: var(--ink-3);
+  }
+}
+
+@keyframes task-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

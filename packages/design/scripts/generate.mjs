@@ -77,5 +77,9 @@ function buildThemeTs() {
 
 await mkdir(distDir, { recursive: true })
 await writeFile(join(distDir, 'tokens.wxss'), buildWxss(), 'utf8')
+// scss 局部副本：内容与 tokens.wxss 完全一致。Taro/Vite 的 scss 管线无法
+// 从 node_modules 解析 .wxss 后缀（nativeStyleImporter 只做相对路径），
+// 小程序 app.scss 走标准 scss 包解析 import 本文件。
+await writeFile(join(distDir, 'tokens.scss'), buildWxss(), 'utf8')
 await writeFile(join(distDir, 'theme.ts'), buildThemeTs(), 'utf8')
-console.log('[design] generated dist/tokens.wxss + dist/theme.ts')
+console.log('[design] generated dist/tokens.wxss + dist/tokens.scss + dist/theme.ts')

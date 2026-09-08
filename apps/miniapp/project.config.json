@@ -1,0 +1,26 @@
+{
+  "compileType": "miniprogram",
+  "miniprogramRoot": "dist/",
+  "srcMiniprogramRoot": "dist/",
+  "projectname": "zhanshimian-miniapp",
+  "appid": "wx911e0fbcba0b24d0",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "urlCheck": false,
+    "ignoreUploadUnusedFiles": true,
+    "babelSetting": { "ignore": [], "disablePlugins": [], "outputPath": "" }
+  },
+  "packOptions": {
+    "ignore": [
+      { "type": "file", "value": "assets/LICENSE.txt" },
+      { "type": "file", "value": "README.md" }
+    ],
+    "include": []
+  },
+  "condition": {}
+}

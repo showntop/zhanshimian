@@ -1,0 +1,4 @@
+{
+  "desc": "怎么打扮小程序页面索引",
+  "rules": [{ "action": "allow", "page": "*" }]
+}

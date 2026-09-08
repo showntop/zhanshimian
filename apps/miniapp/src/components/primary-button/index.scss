@@ -1,0 +1,25 @@
+.primary-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96rpx;
+  padding: 0 40rpx;
+  border-radius: var(--radius-md);
+  background: var(--moss);
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 600;
+  box-shadow: var(--shadow-primary-button);
+  transition: transform 0.16s ease, opacity 0.16s ease, background 0.16s ease;
+
+  &:active {
+    transform: scale(0.985);
+    background: var(--moss-pressed);
+  }
+
+  &--disabled {
+    background: #cdd3c8;
+    box-shadow: none;
+    color: rgba(255, 255, 255, 0.9);
+  }
+}

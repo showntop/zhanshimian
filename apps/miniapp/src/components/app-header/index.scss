@@ -1,0 +1,70 @@
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(248, 245, 240, 0.96);
+  backdrop-filter: blur(20rpx);
+  border-bottom: 1rpx solid var(--line);
+
+  &--transparent {
+    background: rgba(248, 245, 240, 0.6);
+    border-bottom-color: transparent;
+  }
+
+  &__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64rpx;
+    padding: 0 24rpx;
+  }
+
+  &__left,
+  &__right {
+    display: flex;
+    align-items: center;
+    min-width: 96rpx;
+  }
+
+  &__right {
+    justify-content: flex-end;
+  }
+
+  &__back {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64rpx;
+    height: 64rpx;
+    border-radius: 999rpx;
+    background: var(--surface-strong);
+    border: 1rpx solid var(--line);
+  }
+
+  &__back-icon {
+    font-size: 40rpx;
+    line-height: 1;
+    color: var(--ink);
+    margin-top: -4rpx;
+  }
+
+  &__wordmark {
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 30rpx;
+    font-weight: 700;
+    letter-spacing: -3rpx;
+    color: var(--ink);
+  }
+
+  &__wordmark-accent {
+    color: var(--moss);
+  }
+
+  &__title {
+    font-size: 32rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+}

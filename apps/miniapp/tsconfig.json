@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "allowImportingTsExtensions": true,
+    "types": ["@tarojs/taro"],
+    "paths": {
+      "@/*": ["src/*"],
+      "@zsm/core": ["../../packages/core/src/index.ts"],
+      "@zsm/design": ["../../packages/design/src/index.ts"]
+    }
+  },
+  "include": ["src", "global.d.ts", "scripts"]
+}

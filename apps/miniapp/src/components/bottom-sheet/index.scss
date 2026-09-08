@@ -1,0 +1,71 @@
+.bottom-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+
+  &__mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(30, 33, 29, 0.35);
+    animation: bottom-sheet-fade 0.16s ease both;
+  }
+
+  &__panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 24rpx 32rpx calc(env(safe-area-inset-bottom) + 40rpx);
+    background: var(--surface-strong);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.2);
+    animation: bottom-sheet-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  &__grabber {
+    width: 72rpx;
+    height: 8rpx;
+    margin: 0 auto 20rpx;
+    border-radius: 999rpx;
+    background: #d8ddd4;
+  }
+
+  &__title {
+    display: block;
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 34rpx;
+    font-weight: 700;
+    color: var(--ink);
+    text-align: center;
+  }
+
+  &__desc {
+    display: block;
+    margin-top: 12rpx;
+    font-size: 24rpx;
+    color: var(--ink-2);
+    text-align: center;
+  }
+
+  &__body {
+    margin-top: 28rpx;
+  }
+}
+
+@keyframes bottom-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes bottom-sheet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

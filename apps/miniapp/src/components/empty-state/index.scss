@@ -1,0 +1,26 @@
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 96rpx 48rpx;
+
+  &__title {
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 34rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  &__desc {
+    margin-top: 16rpx;
+    font-size: 26rpx;
+    line-height: 1.65;
+    color: var(--ink-2);
+    text-align: center;
+  }
+
+  &__action {
+    margin-top: 40rpx;
+    width: 60%;
+  }
+}

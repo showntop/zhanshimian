@@ -1,0 +1,20 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 68rpx;
+  padding: 0 32rpx;
+  border-radius: 999rpx;
+  background: var(--surface-strong);
+  border: 1rpx solid var(--line);
+  color: var(--ink-2);
+  font-size: 26rpx;
+  transition: all 0.16s ease;
+
+  &--active {
+    background: var(--moss-soft);
+    border-color: var(--moss);
+    color: var(--moss);
+    font-weight: 600;
+  }
+}
