@@ -1,1 +1,52 @@
-/* 分享卡 · 占位样式（M2/M3 替换为真实现） */
+.sh {
+  display: flex; flex-direction: column; gap: 32rpx;
+
+  &__card {
+    display: flex; flex-direction: column; gap: 16rpx;
+    padding: 56rpx 44rpx;
+    border-radius: var(--radius-xl);
+    background: linear-gradient(170deg, #fbf9f4 0%, var(--moss-soft) 100%);
+    border: 1rpx solid var(--line);
+  }
+
+  &__brand {
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 30rpx; font-weight: 700; letter-spacing: -2rpx; color: var(--ink);
+  }
+
+  &__label {
+    align-self: flex-start;
+    padding: 4rpx 18rpx; border-radius: 999rpx;
+    background: var(--moss); color: #ffffff;
+    font-size: 18rpx; font-weight: 600;
+  }
+
+  &__title {
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 44rpx; font-weight: 700; line-height: 1.3; color: var(--ink);
+  }
+
+  &__summary {
+    font-size: 26rpx; line-height: 1.7; color: var(--ink-2);
+  }
+
+  &__image, &__image.example-image, &__image .example-image__img {
+    width: 100%;
+    height: 360rpx;
+    border-radius: var(--radius-md);
+  }
+
+  &__foot { margin-top: 16rpx; border-top: 1rpx solid var(--line); padding-top: 16rpx; }
+  &__foot-note { font-size: 18rpx; color: var(--ink-3); }
+
+  &__actions { display: flex; flex-direction: column; gap: 20rpx; align-items: center; }
+  &__share-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; min-height: 96rpx; border-radius: var(--radius-md);
+    background: var(--moss); box-shadow: var(--shadow-primary-button);
+    padding: 0; margin: 0; border: none; line-height: 1;
+    &::after { border: none; }
+  }
+  &__share-text { color: #ffffff; font-size: 30rpx; font-weight: 600; }
+  &__revoke { font-size: 22rpx; color: var(--danger); text-decoration: underline; }
+}

@@ -67,7 +67,7 @@ export interface TaskRef {
 }
 
 // ---------- 媒体 ----------
-export type MediaKind = 'face' | 'side' | 'body' | 'wardrobe' | 'feedback' | 'diagnostic'
+export type MediaKind = 'face' | 'side' | 'body' | 'feedback' | 'outfit' | 'product' | 'wardrobe'
 
 export interface MediaAsset {
   id: string
@@ -353,6 +353,8 @@ export interface CreateWardrobeOutfitInput {
   title: string
   note?: string
   item_ids: string[]
+  /** 冻结生成时的今日上下文（缺省由服务端现取） */
+  context?: TodayContext
 }
 
 export interface WardrobeOutfit {
