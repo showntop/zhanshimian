@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "怎么打扮",
+    "slug": "zhanshimian",
+    "scheme": "zhanshimian",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "plugins": ["expo-router", "expo-image-picker"],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "ios": {
+      "bundleIdentifier": "com.zhanshimian.app",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.zhanshimian.app"
+    },
+    "extra": {
+      "apiBaseURL": "http://127.0.0.1:58000"
+    }
+  }
+}
