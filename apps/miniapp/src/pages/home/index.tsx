@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
-import { POLL_INTERVALS, greetingForNow, trackEvent, type HomeBootstrap, type Task } from '@zsm/core'
+import { HOME_TITLE, POLL_INTERVALS, SCENES, greetingForNow, trackEvent, type HomeBootstrap, type Task } from '@zsm/core'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
@@ -13,13 +13,6 @@ import ExampleImage from '../../components/example-image'
 import ErrorState from '../../components/error-state'
 import Skeleton from '../../components/skeleton'
 import './index.scss'
-
-const SCENES = [
-  { key: 'interview', label: '面试', desc: '精神可信', icon: 'briefcase' },
-  { key: 'wedding', label: '婚礼', desc: '得体上镜', icon: 'heart' },
-  { key: 'date', label: '约会', desc: '自然有记忆点', icon: 'sparkles' },
-  { key: 'daily', label: '日常', desc: '省心耐看', icon: 'sun' },
-] as const
 
 const TOOLS = [
   { key: 'hair', label: '发型预览', desc: '先看效果再决定', path: '/packages/tools/pages/hair/index', badge: '推荐' },
@@ -138,7 +131,7 @@ export default function Home() {
 
   return (
     <View className="page page--tab">
-      <AppHeader />
+      <AppHeader transparent />
       {failed ? (
         <ErrorState onRetry={load} />
       ) : loading ? (
@@ -146,8 +139,10 @@ export default function Home() {
       ) : (
         <View className="home">
           <View className="home__greeting fade-up">
-            <Text className="home__greeting-hi">{greetingForNow()}，</Text>
-            <Text className="home__greeting-title">我是你的私人形象顾问</Text>
+            <Text className="home__greeting-kicker">私人形象顾问</Text>
+            <Text className="home__greeting-title">
+              {hasReport ? `${greetingForNow()}，今日造型穿搭建议` : HOME_TITLE}
+            </Text>
           </View>
 
           {railItems.length > 0 ? (
@@ -206,16 +201,18 @@ export default function Home() {
           <View className="home__section fade-up delay-3">
             <Text className="section-title">按场合开始</Text>
             <ScrollView className="home__scenes" scrollX enhanced showScrollbar={false}>
-              {SCENES.map((scene) => (
-                <View
-                  key={scene.key}
-                  className="home__scene pressable"
-                  onClick={() => Taro.navigateTo({ url: `/pages/scene/index?scene=${scene.key}` })}
-                >
-                  <Text className="home__scene-label">{scene.label}</Text>
-                  <Text className="home__scene-desc">{scene.desc}</Text>
-                </View>
-              ))}
+              <View className="home__scene-row">
+                {SCENES.map((scene) => (
+                  <View
+                    key={scene.id}
+                    className="home__scene pressable"
+                    onClick={() => Taro.navigateTo({ url: `/pages/scene/index?scene=${scene.id}` })}
+                  >
+                    <Text className="home__scene-label">{scene.label}</Text>
+                    <Text className="home__scene-desc">{scene.note}</Text>
+                  </View>
+                ))}
+              </View>
             </ScrollView>
             {hasReport ? <Text className="home__scene-note">已复用你的形象档案，不会再要照片</Text> : null}
           </View>

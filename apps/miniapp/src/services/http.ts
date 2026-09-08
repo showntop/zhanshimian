@@ -81,20 +81,41 @@ const middleware: ResponseMiddleware[] = baseURL.startsWith('https://')
   ? []
   : [localizeDevImages(downloader)]
 
+function isDevelopEnv(): boolean {
+  try {
+    return Taro.getAccountInfoSync().miniProgram.envVersion === 'develop'
+  } catch {
+    return true
+  }
+}
+
+function tokenFrom(res: { statusCode: number; data: unknown }): string {
+  if (res.statusCode !== 201 && res.statusCode !== 200) return ''
+  return (res.data as { data?: { token?: string } })?.data?.token ?? ''
+}
+
 /** 401 单飞重登：wx.login 换微信 code → POST /v1/auth/wechat → 存 token。 */
 async function relogin(): Promise<void> {
   const { code } = await Taro.login()
-  const res = await Taro.request({
+  const wechat = await Taro.request({
     url: `${baseURL}/v1/auth/wechat`,
     method: 'POST',
     data: { code, nickname: '怎么打扮用户' },
     header: { 'content-type': 'application/json' },
     timeout: 15000,
   })
-  if (res.statusCode !== 201 && res.statusCode !== 200) {
-    throw new Error('微信登录失败，请重试')
+  let token = tokenFrom(wechat)
+  // 开发者工具本地预览：原型 .env 里小程序 secret 为空时走开发登录（生产不启用）。
+  if (!token && isDevelopEnv()) {
+    const dev = await Taro.request({
+      url: `${baseURL}/v1/auth/dev`,
+      method: 'POST',
+      data: { nickname: '怎么打扮用户' },
+      header: { 'content-type': 'application/json' },
+      timeout: 15000,
+    })
+    token = tokenFrom(dev)
   }
-  const token = (res.data as { data?: { token?: string } })?.data?.token ?? ''
   if (!token) throw new Error('微信登录失败，请重试')
   writeStorage(STORAGE_KEYS.token, token)
 }

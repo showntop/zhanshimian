@@ -51,11 +51,11 @@
   }
 
   &__wordmark {
-    font-family: 'Songti SC', 'STSong', serif;
-    font-size: 30rpx;
+    font-size: 34rpx;
     font-weight: 700;
-    letter-spacing: -3rpx;
+    letter-spacing: -2rpx;
     color: var(--ink);
+    white-space: nowrap;
   }
 
   &__wordmark-accent {

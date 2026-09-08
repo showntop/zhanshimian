@@ -22,7 +22,7 @@ export default defineConfig(async (merge) => {
       '@': path.resolve(__dirname, '..', 'src'),
     },
     defineConstants: {
-      API_BASE_URL: JSON.stringify(process.env.ZSM_API_BASE_URL || 'http://127.0.0.1:58000'),
+      API_BASE_URL: JSON.stringify(process.env.ZSM_API_BASE_URL || 'https://prompt.wuyill.com/zhanshimian'),
     },
     copy: {
       patterns: [

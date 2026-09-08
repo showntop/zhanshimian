@@ -3,12 +3,37 @@
 // 但取值一律换新 token（§4.2 品牌值）。
 // 自定义组件需 styleIsolation: 'apply-shared' 才能吃到这些类。
 
+// 对齐原型 app.wxss：微信组件默认 content-box，不加这个卡片宽高会被 padding 撑破。
+page,
+view,
+text,
+image,
+button,
+scroll-view,
+swiper,
+swiper-item {
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+}
+
+button::after {
+  border: 0;
+}
+
 // ---------- 页面骨架 ----------
+// 自定义导航是 position:fixed，顶距必须给过状态栏+胶囊（原型 .page 200rpx）。
 .page {
   min-height: 100vh;
-  padding: 40rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 48rpx);
+  padding: 200rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 48rpx);
   background: var(--bg);
   color: var(--ink);
+}
+
+.page--tab {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 48rpx);
 }
 
 .safe-bottom {
