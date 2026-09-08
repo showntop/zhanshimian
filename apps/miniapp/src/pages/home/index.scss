@@ -1,1 +1,223 @@
-/* 首页 · 占位样式（M2/M3 替换为真实现） */
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 36rpx;
+
+  &__greeting {
+    display: flex;
+    flex-direction: column;
+    gap: 4rpx;
+
+    &-hi {
+      font-size: 26rpx;
+      color: var(--ink-2);
+    }
+
+    &-title {
+      font-family: 'Songti SC', 'STSong', serif;
+      font-size: 44rpx;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: -1rpx;
+    }
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 20rpx;
+  }
+
+  &__onboard {
+    display: flex;
+    flex-direction: column;
+    gap: 20rpx;
+    padding: 40rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+
+    &-title {
+      font-family: 'Songti SC', 'STSong', serif;
+      font-size: 36rpx;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    &-desc {
+      font-size: 26rpx;
+      line-height: 1.65;
+      color: var(--ink-2);
+    }
+
+    &-privacy {
+      font-size: 22rpx;
+      color: var(--ink-3);
+      text-align: center;
+    }
+  }
+
+  &__today {
+    display: flex;
+    align-items: center;
+    gap: 24rpx;
+    padding: 28rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+    box-shadow: 0 6px 18px rgba(52, 59, 47, 0.05);
+
+    &-copy {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10rpx;
+      min-width: 0;
+    }
+
+    &-label {
+      font-size: 20rpx;
+      font-weight: 600;
+      letter-spacing: 4rpx;
+      color: var(--moss);
+    }
+
+    &-title {
+      font-size: 30rpx;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    &-summary {
+      font-size: 24rpx;
+      color: var(--ink-2);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    &-img {
+      width: 180rpx;
+      height: 220rpx;
+      flex-shrink: 0;
+    }
+  }
+
+  &__tools {
+    display: flex;
+    gap: 16rpx;
+  }
+
+  &__tool {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    padding: 24rpx 20rpx;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+
+    &-badge {
+      position: absolute;
+      top: -12rpx;
+      right: 16rpx;
+      padding: 4rpx 14rpx;
+      border-radius: 999rpx;
+      background: var(--moss-soft);
+      color: var(--moss);
+      font-size: 18rpx;
+      font-weight: 600;
+    }
+
+    &-name {
+      font-size: 28rpx;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    &-desc {
+      font-size: 20rpx;
+      line-height: 1.5;
+      color: var(--ink-3);
+    }
+  }
+
+  &__scenes {
+    display: flex;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  &__scene {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 8rpx;
+    width: 240rpx;
+    margin-right: 16rpx;
+    padding: 28rpx 24rpx;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+
+    &-label {
+      font-family: 'Songti SC', 'STSong', serif;
+      font-size: 34rpx;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    &-desc {
+      font-size: 22rpx;
+      color: var(--ink-3);
+    }
+  }
+
+  &__scene-note {
+    font-size: 20rpx;
+    color: var(--moss);
+  }
+
+  &__recent {
+    display: flex;
+    align-items: center;
+    gap: 24rpx;
+    padding: 24rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+
+    &-img {
+      width: 160rpx;
+      height: 200rpx;
+      flex-shrink: 0;
+    }
+
+    &-copy {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10rpx;
+      min-width: 0;
+    }
+
+    &-name {
+      font-size: 30rpx;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    &-why {
+      font-size: 24rpx;
+      line-height: 1.6;
+      color: var(--ink-2);
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  }
+}

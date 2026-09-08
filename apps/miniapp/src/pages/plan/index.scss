@@ -1,1 +1,154 @@
-/* 方案详情 · 占位样式（M2/M3 替换为真实现） */
+.pd {
+  display: flex;
+  flex-direction: column;
+  gap: 28rpx;
+
+  &__hero {
+    &-frame {
+      position: relative;
+      height: 680rpx;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--moss-soft);
+      border: 1rpx solid var(--line);
+    }
+
+    &-img {
+      width: 100%;
+      height: 100%;
+    }
+
+    &-toggle {
+      position: absolute;
+      top: 20rpx;
+      left: 20rpx;
+    }
+  }
+
+  &__head {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+  }
+
+  &__eyebrow {
+    font-size: 22rpx;
+    font-weight: 600;
+    letter-spacing: 4rpx;
+    color: var(--moss);
+  }
+
+  &__name {
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 44rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__summary {
+    font-size: 26rpx;
+    color: var(--ink-2);
+  }
+
+  &__tabs {
+    display: flex;
+    gap: 12rpx;
+  }
+
+  &__tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-height: 76rpx;
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+    font-size: 26rpx;
+    color: var(--ink-2);
+
+    &--active {
+      background: var(--moss-soft);
+      border-color: var(--moss);
+      color: var(--moss);
+      font-weight: 600;
+    }
+  }
+
+  &__step {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+    padding: 32rpx;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+
+    &--empty {
+      align-items: center;
+    }
+
+    &-title {
+      font-size: 30rpx;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    &-summary {
+      font-size: 26rpx;
+      line-height: 1.7;
+      color: var(--ink-2);
+    }
+  }
+
+  &__foot {
+    display: flex;
+    flex-direction: column;
+    gap: 20rpx;
+    margin-top: 8rpx;
+  }
+
+  &__salon-link {
+    text-align: center;
+    font-size: 24rpx;
+    color: var(--moss);
+    text-decoration: underline;
+  }
+
+  &__sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 24rpx;
+  }
+
+  &__sheet-img {
+    width: 100%;
+    height: 520rpx;
+  }
+
+  &__spec {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+
+    &-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18rpx 24rpx;
+      border-radius: var(--radius-sm);
+      background: var(--moss-soft);
+    }
+
+    &-key {
+      font-size: 24rpx;
+      color: var(--ink-3);
+    }
+
+    &-val {
+      font-size: 26rpx;
+      font-weight: 600;
+      color: var(--ink);
+    }
+  }
+}

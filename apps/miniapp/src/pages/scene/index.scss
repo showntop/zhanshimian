@@ -1,1 +1,70 @@
-/* 场合需求 · 占位样式（M2/M3 替换为真实现） */
+.scene {
+  display: flex;
+  flex-direction: column;
+  gap: 28rpx;
+
+  &__intro {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+  }
+
+  &__intro-head {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+  }
+
+  &__title {
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 44rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__badge {
+    padding: 6rpx 18rpx;
+    border-radius: 999rpx;
+    background: var(--moss-soft);
+    color: var(--moss);
+    font-size: 20rpx;
+    font-weight: 600;
+  }
+
+  &__lede {
+    font-size: 26rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+
+    &-label {
+      font-size: 26rpx;
+      font-weight: 600;
+      color: var(--ink);
+    }
+  }
+
+  &__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16rpx;
+  }
+
+  &__foot {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+    margin-top: 8rpx;
+
+    &-note {
+      text-align: center;
+      font-size: 22rpx;
+      color: var(--ink-3);
+    }
+  }
+}

@@ -1,1 +1,97 @@
-/* 我的 · 占位样式（M2/M3 替换为真实现） */
+.me {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    gap: 4rpx;
+    padding: 28rpx;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+  }
+
+  &__avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 96rpx;
+    height: 96rpx;
+    border-radius: 999rpx;
+    background: var(--moss);
+    color: #ffffff;
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 44rpx;
+    font-weight: 700;
+  }
+
+  &__card > &__avatar {
+    margin-bottom: 16rpx;
+  }
+
+  &__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6rpx;
+  }
+
+  &__nickname {
+    font-size: 32rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  &__identities {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__section {
+    font-size: 22rpx;
+    font-weight: 600;
+    letter-spacing: 3rpx;
+    color: var(--moss);
+    margin-bottom: 12rpx;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20rpx 0;
+    border-bottom: 1rpx solid var(--line);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &-label {
+      font-size: 28rpx;
+      color: var(--ink);
+
+      &--danger {
+        color: var(--danger);
+      }
+    }
+
+    &-value {
+      font-size: 24rpx;
+      color: var(--ink-3);
+    }
+  }
+
+  &__note {
+    font-size: 20rpx;
+    color: var(--ink-3);
+    margin-top: 8rpx;
+  }
+
+  &__privacy {
+    text-align: center;
+    font-size: 20rpx;
+    color: var(--ink-3);
+    margin-top: 8rpx;
+  }
+}

@@ -1,1 +1,95 @@
-/* 补充资料 · 占位样式（M2/M3 替换为真实现） */
+.psetup {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+
+  &__intro {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+  }
+
+  &__eyebrow {
+    font-size: 22rpx;
+    font-weight: 600;
+    letter-spacing: 4rpx;
+    color: var(--moss);
+  }
+
+  &__title {
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 44rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__lede {
+    font-size: 26rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    gap: 20rpx;
+    padding: 28rpx;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+  }
+
+  &__field {
+    font-size: 24rpx;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+
+  &__stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16rpx 24rpx;
+    border-radius: var(--radius-sm);
+    background: var(--moss-soft);
+  }
+
+  &__step {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72rpx;
+    height: 72rpx;
+    border-radius: 999rpx;
+    background: var(--surface-strong);
+    border: 1rpx solid var(--line);
+    font-size: 36rpx;
+    color: var(--ink);
+  }
+
+  &__height {
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 40rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16rpx;
+  }
+
+  &__foot {
+    display: flex;
+    flex-direction: column;
+    gap: 20rpx;
+    margin-top: 8rpx;
+  }
+
+  &__privacy {
+    text-align: center;
+    font-size: 20rpx;
+    color: var(--ink-3);
+  }
+}

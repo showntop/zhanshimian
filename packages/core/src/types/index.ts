@@ -145,6 +145,8 @@ export interface Plan {
   generated_image_url?: string
   /** 列表内嵌的 look 生成任务状态（页面不再二次查询） */
   look_task?: Task
+  /** 生成来源（demo* 前缀 → 前端按示例处理并挂角标） */
+  look_provider?: string
   recommended: boolean
   descriptor: string
   why: string
@@ -288,6 +290,7 @@ export interface TodayPlan {
   regenerate_count: number
   generated_image_url?: string
   look_task?: Task
+  look_provider?: string
   generation_error?: string
   created_at: string
   updated_at: string
