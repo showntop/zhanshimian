@@ -54,6 +54,21 @@ func (r *todayPlanRepoStub) GetTodayPlan(context.Context, string) (domain.TodayP
 	return r.existing, r.existingErr
 }
 
+// 补充资料未填写：grounding 安全降级（无 profile 参与）。
+func (r *todayPlanRepoStub) GetUserProfile(context.Context, string) (domain.UserProfile, error) {
+	return domain.UserProfile{}, repository.ErrNotFound
+}
+
+// 未显式指定报告时取最新报告参与 grounding。
+func (r *todayPlanRepoStub) LatestReport(context.Context, string) (domain.Report, error) {
+	return domain.Report{ID: "report-1"}, nil
+}
+
+// 无已入队的今日搭配图任务：任务投影为空。
+func (r *todayPlanRepoStub) LatestTasksByRef(context.Context, string, domain.TaskType, string, []string) (map[string]domain.Task, error) {
+	return map[string]domain.Task{}, nil
+}
+
 func (r *todayPlanRepoStub) SaveTodayPlan(_ context.Context, _ string, plan domain.TodayPlan) (domain.TodayPlan, error) {
 	plan.ID = "today-1"
 	r.saved = plan
@@ -75,7 +90,7 @@ func (p failingTodayPlanner) Generate(context.Context, provider.TodayPlanGroundi
 func TestGenerateTodayPlanWithDemoPlannerReturnsTemplatePlan(t *testing.T) {
 	repo := &todayPlanRepoStub{existingErr: repository.ErrNotFound}
 	service := &Service{repo: repo, weather: provider.NewDemoWeatherProvider(), todayPlanner: provider.NewDemoTodayPlanner()}
-	plan, err := service.GenerateTodayPlan(context.Background(), "user-1", domain.TodayPlanInput{City: "杭州"})
+	plan, _, err := service.GenerateTodayPlan(context.Background(), "user-1", domain.TodayPlanInput{City: "杭州"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +108,7 @@ func TestGenerateTodayPlanWithDemoPlannerReturnsTemplatePlan(t *testing.T) {
 func TestGenerateTodayPlanRotatesVariantOnRefresh(t *testing.T) {
 	repo := &todayPlanRepoStub{existing: domain.TodayPlan{Title: "旧方案", RegenerateCount: 0}}
 	service := &Service{repo: repo, weather: provider.NewDemoWeatherProvider(), todayPlanner: provider.NewDemoTodayPlanner()}
-	plan, err := service.GenerateTodayPlan(context.Background(), "user-1", domain.TodayPlanInput{City: "杭州", Refresh: true})
+	plan, _, err := service.GenerateTodayPlan(context.Background(), "user-1", domain.TodayPlanInput{City: "杭州", Refresh: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +121,7 @@ func TestGenerateTodayPlanRotatesVariantOnRefresh(t *testing.T) {
 func TestGenerateTodayPlanReturnsErrorWhenPlannerFails(t *testing.T) {
 	repo := &todayPlanRepoStub{existingErr: repository.ErrNotFound}
 	service := &Service{repo: repo, weather: provider.NewDemoWeatherProvider(), todayPlanner: failingTodayPlanner{err: errors.New("model unavailable")}}
-	if _, err := service.GenerateTodayPlan(context.Background(), "user-1", domain.TodayPlanInput{City: "杭州"}); err == nil {
+	if _, _, err := service.GenerateTodayPlan(context.Background(), "user-1", domain.TodayPlanInput{City: "杭州"}); err == nil {
 		t.Fatal("planner failure must surface as an error, not a template plan")
 	}
 	if repo.saved.Title != "" {

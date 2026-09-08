@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -59,23 +58,6 @@ var sceneBriefFields = map[string][]string{
 	"daily":     {"activity", "weather", "preparation", "impression"},
 }
 
-func (s *Service) CreateScenePlans(ctx context.Context, userID, reportID string, input domain.ScenePlanInput) ([]domain.Plan, error) {
-	answers, err := normalizedSceneAnswers(input)
-	if err != nil {
-		return nil, err
-	}
-	input.Answers = answers
-	plans := buildScenePlans(input)
-	created, err := s.repo.CreateScenePlans(ctx, userID, reportID, input, plans)
-	if err != nil {
-		return nil, err
-	}
-	for index := range created {
-		created[index].ImageURL = s.absoluteURL(created[index].ImageURL)
-	}
-	return created, nil
-}
-
 func validateScenePlanInput(input domain.ScenePlanInput) error {
 	_, err := normalizedSceneAnswers(input)
 	return err
@@ -90,9 +72,6 @@ func normalizedSceneAnswers(input domain.ScenePlanInput) (map[string]string, err
 	for key, value := range input.Answers {
 		answers[key] = value
 	}
-	if len(answers) == 0 {
-		answers = legacySceneAnswers(input)
-	}
 	for _, field := range fields {
 		value := answers[field]
 		if sceneBriefOptions[input.Scene][field][value] == "" {
@@ -100,38 +79,6 @@ func normalizedSceneAnswers(input domain.ScenePlanInput) (map[string]string, err
 		}
 	}
 	return answers, nil
-}
-
-func legacySceneAnswers(input domain.ScenePlanInput) map[string]string {
-	preparation := map[string]string{"low": "closet", "mid": "key-piece", "high": "complete"}[input.Budget]
-	if preparation == "" {
-		preparation = "key-piece"
-	}
-	impression := input.Impression
-	if sceneImpressions[impression] == "" {
-		impression = "reliable"
-	}
-	switch input.Scene {
-	case "interview":
-		when := input.Time
-		if sceneBriefOptions["interview"]["when"][when] == "" {
-			when = "week"
-		}
-		return map[string]string{"when": when, "format": "onsite", "preparation": preparation, "impression": impression}
-	case "wedding":
-		dressCode := input.Formality
-		if dressCode == "proper" {
-			dressCode = "elegant"
-		}
-		if sceneBriefOptions["wedding"]["dress-code"][dressCode] == "" {
-			dressCode = "elegant"
-		}
-		return map[string]string{"role": "guest", "timing": "dinner", "dress-code": dressCode, "impression": impression}
-	case "date":
-		return map[string]string{"activity": "dinner", "timing": "evening", "preparation": preparation, "impression": impression}
-	default:
-		return map[string]string{"activity": "commute", "weather": "office", "preparation": preparation, "impression": impression}
-	}
 }
 
 func sceneAnswer(input domain.ScenePlanInput, field string) string {

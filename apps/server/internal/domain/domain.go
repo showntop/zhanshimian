@@ -12,6 +12,99 @@ const (
 	AnalysisFailed     = "failed"
 )
 
+// ---- 统一任务系统 ----
+
+type TaskType string
+
+const (
+	TaskTypeAnalysis    TaskType = "analysis"
+	TaskTypeHairPreview TaskType = "hair_preview"
+	TaskTypePlanLook    TaskType = "plan_look"
+	TaskTypeTodayLook   TaskType = "today_look"
+)
+
+// Task statuses follow the contract enum queued/processing/completed/failed,
+// shared with the analyses table.
+const (
+	TaskQueued     = "queued"
+	TaskProcessing = "processing"
+	TaskCompleted  = "completed"
+	TaskFailed     = "failed"
+)
+
+// Task is one row of the unified queue. Payload carries the domain reference
+// (analysis_id / preview_id / plan_id); handlers re-hydrate business data by
+// that reference so the queue never duplicates domain state.
+type Task struct {
+	ID        string
+	UserID    string
+	Type      string
+	Payload   json.RawMessage
+	Status    string
+	Progress  int
+	Stage     string
+	Attempts  int
+	LastError string
+	ResultRef string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// TaskInput is what service layers hand to the queue when enqueueing.
+type TaskInput struct {
+	Type     TaskType
+	Payload  any
+	Progress int
+	Stage    string
+}
+
+// TaskView is the API shape of a task, embedded in analyses/plans/previews and
+// served directly by GET /v1/tasks/{id}.
+type TaskView struct {
+	ID        string     `json:"id"`
+	Type      string     `json:"type"`
+	Status    string     `json:"status"`
+	Progress  int        `json:"progress"`
+	Stage     string     `json:"stage,omitempty"`
+	ResultRef string     `json:"result_ref,omitempty"`
+	Error     *TaskError `json:"error,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+}
+
+// TaskError carries the user-facing failure. photo_reasons is populated when
+// the analysis photos failed the content check (one Chinese reason per photo).
+type TaskError struct {
+	Code         string   `json:"code"`
+	Message      string   `json:"message"`
+	PhotoReasons []string `json:"photo_reasons,omitempty"`
+}
+
+// TaskPayloadOf extracts the domain reference from a task payload.
+type AnalysisTaskPayload struct {
+	AnalysisID string `json:"analysis_id"`
+}
+
+type HairPreviewTaskPayload struct {
+	PreviewID string `json:"preview_id"`
+}
+
+type PlanLookTaskPayload struct {
+	PlanID string `json:"plan_id"`
+}
+
+type TodayLookTaskPayload struct {
+	PlanID string `json:"plan_id"`
+}
+
+// JobsHealth feeds /healthz observability for the unified queue.
+type JobsHealth struct {
+	OldestQueuedSeconds int64 `json:"oldest_queued_seconds"`
+	FailedLastHour      int64 `json:"failed_last_hour"`
+}
+
+// ---- 身份与会话 ----
+
 type Session struct {
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expires_at"`
@@ -22,6 +115,53 @@ type User struct {
 	ID       string `json:"id"`
 	Nickname string `json:"nickname"`
 }
+
+// IdentityProvider values are fixed by the user_identities CHECK constraint.
+const (
+	ProviderWeChatMiniApp = "wechat_miniapp"
+	ProviderWeChatApp     = "wechat_app"
+	ProviderApple         = "apple"
+	ProviderPhone         = "phone"
+)
+
+type Identity struct {
+	ID         string    `json:"id"`
+	Provider   string    `json:"provider"`
+	Identifier string    `json:"identifier"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// UserProfile is the persisted 补充资料: height/role/budget are required on
+// PUT, the measurements are optional. A missing row simply means the user has
+// not filled the profile yet (GET returns null).
+type UserProfile struct {
+	HeightCM int      `json:"height_cm"`
+	Role     string   `json:"role"`
+	Budget   string   `json:"budget"`
+	WeightKG *float64 `json:"weight_kg,omitempty"`
+	BustCM   *float64 `json:"bust_cm,omitempty"`
+	WaistCM  *float64 `json:"waist_cm,omitempty"`
+	HipCM    *float64 `json:"hip_cm,omitempty"`
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
+}
+
+// MeAccount is the GET /v1/me payload: the account plus every bound identity.
+type MeAccount struct {
+	ID         string     `json:"id"`
+	Nickname   string     `json:"nickname"`
+	Identities []Identity `json:"identities"`
+}
+
+type SmsCode struct {
+	ID        string
+	Phone     string
+	Digest    []byte
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	CreatedAt time.Time
+}
+
+// ---- 媒体与分析 ----
 
 type MediaAsset struct {
 	ID         string    `json:"id"`
@@ -55,6 +195,7 @@ type Analysis struct {
 	Media           []MediaAsset `json:"media,omitempty"`
 	MediaIDs        []string     `json:"-"`
 	ReportID        string       `json:"report_id,omitempty"`
+	TaskID          string       `json:"task_id,omitempty"`
 	ErrorMessage    string       `json:"error_message,omitempty"`
 	CreatedAt       time.Time    `json:"created_at"`
 	UpdatedAt       time.Time    `json:"updated_at"`
@@ -86,6 +227,8 @@ type Report struct {
 	GeneratedAt     time.Time `json:"generated_at"`
 }
 
+// ---- 方案 ----
+
 type PlanStep struct {
 	ID       string          `json:"id"`
 	Category string          `json:"category"`
@@ -104,9 +247,11 @@ type Plan struct {
 	ImageURL          string     `json:"image_url"`
 	CurrentImageURL   string     `json:"current_image_url,omitempty"`
 	GeneratedImageURL string     `json:"generated_image_url,omitempty"`
-	GenerationStatus  string     `json:"generation_status,omitempty"`
-	GenerationError   string     `json:"generation_error,omitempty"`
-	LookProvider      string     `json:"look_provider,omitempty"`
+	// GenerationStatus/GenerationError are API-facing projections of the
+	// plan_look task (the queue state itself lives in tasks).
+	GenerationStatus string     `json:"generation_status,omitempty"`
+	GenerationError  string     `json:"generation_error,omitempty"`
+	LookProvider     string     `json:"look_provider,omitempty"`
 	Recommended       bool       `json:"recommended"`
 	Descriptor        string     `json:"descriptor"`
 	Why               string     `json:"why"`
@@ -115,22 +260,60 @@ type Plan struct {
 	Sort              int        `json:"sort"`
 	Selected          bool       `json:"selected"`
 	Steps             []PlanStep `json:"steps,omitempty"`
+	// LookTask embeds the latest plan_look task so plan lists render image
+	// generation state without a second round of polling endpoints.
+	LookTask *TaskView `json:"look_task,omitempty"`
 }
 
-// ScenePlanInput is the lightweight brief used to tailor a saved image
-// profile to a specific upcoming occasion. It deliberately excludes photos
-// and body measurements because an existing report is reused.
+// ScenePlanInput is the normalized brief used to tailor a saved image profile
+// to a specific upcoming occasion. It deliberately excludes photos and body
+// measurements because an existing report is reused.
 type ScenePlanInput struct {
+	Scene   string
+	Answers map[string]string
+}
+
+// PlansUpsertInput is the request body of PUT /v1/reports/{id}/plans:
+// the target scene plus the flat scene questionnaire answers.
+type PlansUpsertInput struct {
 	Scene   string            `json:"scene"`
 	Answers map[string]string `json:"answers"`
-
-	// Legacy fields keep clients from earlier development builds compatible.
-	// New clients send Answers, whose keys vary by scene.
-	Time       string `json:"time,omitempty"`
-	Budget     string `json:"budget,omitempty"`
-	Formality  string `json:"formality,omitempty"`
-	Impression string `json:"impression,omitempty"`
 }
+
+type FeedbackInput struct {
+	Tags    []string `json:"tags"`
+	Comment string   `json:"comment"`
+	MediaID string   `json:"media_id"`
+}
+
+// PlanLookJob carries everything the worker needs to render one plan's
+// full-look image: the plan's direction (name/descriptor/steps) and the
+// source photos from the originating analysis.
+type PlanLookJob struct {
+	PlanID   string
+	ReportID string
+	UserID   string
+	Name     string
+	Slug     string
+	Why      string
+	Steps    []PlanStep
+	MediaIDs []string
+	Attempt  int
+}
+
+// TodayPlanLookJob mirrors PlanLookJob for the daily plan's own try-on.
+type TodayPlanLookJob struct {
+	PlanID   string
+	ReportID string
+	UserID   string
+	Title    string
+	Summary  string
+	Steps    []TodayPlanStep
+	MediaIDs []string
+	Attempt  int
+}
+
+// ---- 今日 ----
 
 type TodayContext struct {
 	Date        string `json:"date"`
@@ -163,10 +346,11 @@ type TodayPlan struct {
 	// the report photos; ImageURL stays the bundled 风格参考 shown meanwhile.
 	GeneratedImageURL string    `json:"generated_image_url,omitempty"`
 	GenerationStatus  string    `json:"generation_status"`
-	LookProvider      string    `json:"look_provider,omitempty"`
 	GenerationError   string    `json:"generation_error,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	LookProvider      string    `json:"look_provider,omitempty"`
+	LookTask          *TaskView `json:"look_task,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 type TodayPlanInput struct {
@@ -176,10 +360,21 @@ type TodayPlanInput struct {
 	Refresh  bool   `json:"refresh,omitempty"`
 }
 
+// ---- 分享 / 衣橱 / 顾问 / 埋点 ----
+
 type ShareCardInput struct {
 	SourceType   string `json:"source_type"`
 	SourceID     string `json:"source_id"`
 	IncludePhoto bool   `json:"include_photo"`
+}
+
+// ShareView is the public projection of a share card (GET /v1/shares/{token}):
+// management fields like id/token never leave.
+type ShareView struct {
+	SourceType   string          `json:"source_type"`
+	Snapshot     json.RawMessage `json:"snapshot"`
+	IncludePhoto bool            `json:"include_photo"`
+	ExpiresAt    time.Time       `json:"expires_at"`
 }
 
 type ShareCard struct {
@@ -192,6 +387,15 @@ type ShareCard struct {
 	Revoked      bool            `json:"revoked"`
 	ExpiresAt    time.Time       `json:"expires_at"`
 	CreatedAt    time.Time       `json:"created_at"`
+}
+
+// WardrobeOutfitInput is the request body of POST /v1/wardrobe/outfits: the
+// client composes item_ids explicitly and freezes the current context.
+type WardrobeOutfitInput struct {
+	Title    string        `json:"title"`
+	Note     string        `json:"note,omitempty"`
+	Context  *TodayContext `json:"context,omitempty"`
+	ItemIDs  []string      `json:"item_ids"`
 }
 
 type WardrobeItemInput struct {
@@ -212,7 +416,7 @@ type WardrobeItem struct {
 	Color     string    `json:"color"`
 	Season    string    `json:"season"`
 	Formality string    `json:"formality"`
-	Scenes    []string  `json:"scenes"`
+	Scenes    []string   `json:"scenes"`
 	ImageURL  string    `json:"image_url"`
 	Favorite  bool      `json:"favorite"`
 	WearCount int       `json:"wear_count"`
@@ -279,18 +483,14 @@ type ChecklistItem struct {
 	Sort        int    `json:"sort"`
 }
 
-type FeedbackInput struct {
-	PlanID  string   `json:"plan_id"`
-	Tags    []string `json:"tags"`
-	Comment string   `json:"comment"`
-	MediaID string   `json:"media_id"`
-}
+// ---- 诊断与发型（原 tools 重组） ----
 
-type ToolInput struct {
-	Kind     string       `json:"kind"`
-	ReportID string       `json:"report_id,omitempty"`
-	MediaID  string       `json:"media_id,omitempty"`
-	Scene    string       `json:"scene,omitempty"`
+// DiagnosticInput is the request body of POST /v1/diagnostics.
+type DiagnosticInput struct {
+	Kind     string `json:"kind"`
+	MediaID  string `json:"media_id"`
+	Scene    string `json:"scene,omitempty"`
+	ReportID string `json:"report_id,omitempty"`
 	Context  *ToolContext `json:"-"`
 }
 
@@ -299,6 +499,7 @@ type ToolContext struct {
 	PriorityTitle  string
 	PriorityCopy   string
 	Wardrobe       []ToolWardrobeItem
+	Profile        *UserProfile
 }
 
 type ToolWardrobeItem struct {
@@ -351,9 +552,11 @@ type HairPreviewInput struct {
 
 type HairPreview struct {
 	ID              string    `json:"id"`
+	// Status/Progress/Stage/ErrorMessage project the hair_preview task state.
 	Status          string    `json:"status"`
 	Progress        int       `json:"progress"`
 	Stage           string    `json:"stage"`
+	ErrorMessage    string    `json:"error_message,omitempty"`
 	StyleID         string    `json:"style_id"`
 	StyleName       string    `json:"style_name"`
 	Scene           string    `json:"scene"`
@@ -361,44 +564,9 @@ type HairPreview struct {
 	ResultImageURL  string    `json:"result_image_url,omitempty"`
 	ProviderVersion string    `json:"provider_version,omitempty"`
 	Saved           bool      `json:"saved"`
-	ErrorMessage    string    `json:"error_message,omitempty"`
+	Task            *TaskView `json:"task,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
-}
-
-type HairPreviewJob struct {
-	PreviewID string
-	UserID    string
-	Attempt   int
-	Input     HairPreviewInput
-}
-
-// PlanLookJob carries everything the worker needs to render one plan's
-// full-look image: the plan's direction (name/descriptor/steps) and the
-// source photos from the originating analysis.
-type PlanLookJob struct {
-	PlanID   string
-	ReportID string
-	UserID   string
-	Name     string
-	Slug     string
-	Why      string
-	Steps    []PlanStep
-	MediaIDs []string
-	Attempt  int
-}
-
-// TodayPlanLookJob mirrors PlanLookJob for the daily plan's own try-on: the
-// worker renders the user's body photo styled per the plan's three steps.
-type TodayPlanLookJob struct {
-	PlanID   string
-	ReportID string
-	UserID   string
-	Title    string
-	Summary  string
-	Steps    []TodayPlanStep
-	MediaIDs []string
-	Attempt  int
 }
 
 type AnalysisOutput struct {
@@ -411,10 +579,13 @@ type AnalysisOutput struct {
 	ProviderVersion string
 }
 
-type AnalysisJob struct {
-	ID         string
-	AnalysisID string
-	UserID     string
-	Attempt    int
-	Input      CreateAnalysisInput
+// ---- 首页聚合 ----
+
+type HomeBootstrap struct {
+	// ProfileSummary is the persisted profile when present (null otherwise).
+	ProfileSummary *UserProfile `json:"profile_summary"`
+	Report         *Report      `json:"report"`
+	TodayPlan      *TodayPlan   `json:"today_plan"`
+	ActiveTasks    []TaskView   `json:"active_tasks"`
+	RecentPlan     *Plan        `json:"recent_plan"`
 }

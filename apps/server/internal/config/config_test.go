@@ -132,6 +132,11 @@ func TestLoadAcceptsProductionReleaseProviders(t *testing.T) {
 	t.Setenv("COS_SECRET_KEY", "test-key")
 	t.Setenv("WEATHER_PROVIDER", "amap")
 	t.Setenv("AMAP_WEB_SERVICE_KEY", "test-weather-key")
+	t.Setenv("SMS_PROVIDER", "aliyun")
+	t.Setenv("ALIYUN_SMS_ACCESS_KEY_ID", "test-sms-id")
+	t.Setenv("ALIYUN_SMS_ACCESS_KEY_SECRET", "test-sms-secret")
+	t.Setenv("ALIYUN_SMS_SIGN", "怎么打扮")
+	t.Setenv("ALIYUN_SMS_TEMPLATE_CODE", "SMS-123456")
 	t.Setenv("ALIYUN_API_KEY", "test-ai-key")
 	t.Setenv("AI_ROUTING_JSON", `{
 		"models":{

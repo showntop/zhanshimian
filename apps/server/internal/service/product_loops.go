@@ -14,6 +14,8 @@ import (
 	"github.com/google/uuid"
 )
 
+// ---- 今日方案 ----
+
 func (s *Service) buildTodayContext(ctx context.Context, city, schedule string) (domain.TodayContext, error) {
 	now := time.Now()
 	weather, err := s.weather.Current(ctx, city)
@@ -26,7 +28,7 @@ func (s *Service) buildTodayContext(ctx context.Context, city, schedule string) 
 		weather = provider.Weather{City: strings.TrimSpace(city)}
 	}
 	dayType := "工作日"
-	if now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
+	if now.Weekday() == 0 || now.Weekday() == 6 {
 		dayType = "休息日"
 	}
 	// 日程未指定时按工作日/休息日给出合理默认，不再对所有用户硬编码"通勤"
@@ -39,30 +41,61 @@ func (s *Service) buildTodayContext(ctx context.Context, city, schedule string) 
 	return domain.TodayContext{Date: now.Format("2006-01-02"), City: weather.City, Condition: weather.Condition, Temperature: weather.Temperature, DayType: dayType, Schedule: schedule}, nil
 }
 
-func (s *Service) GetTodayContext(ctx context.Context, city, schedule string) (domain.TodayContext, error) {
+func (s *Service) GetTodayContext(ctx context.Context, userID, city, schedule string) (domain.TodayContext, error) {
+	// 资料注入：上下文本身不依赖身高，但保持与其他读路径一致的签名。
+	_ = userID
 	return s.buildTodayContext(ctx, city, schedule)
+}
+
+// attachTodayLookTask projects the today_look task onto the plan-facing
+// generation_status/generation_error fields and embeds look_task.
+func (s *Service) attachTodayLookTask(ctx context.Context, userID string, plan *domain.TodayPlan) {
+	if plan.GeneratedImageURL != "" {
+		plan.GenerationStatus = domain.TaskCompleted
+	}
+	tasks, err := s.repo.LatestTasksByRef(ctx, userID, domain.TaskTypeTodayLook, "plan_id", []string{plan.ID})
+	if err != nil {
+		return
+	}
+	if task, ok := tasks[plan.ID]; ok {
+		view := decodeTaskErrorView(taskView(task))
+		plan.LookTask = ptrTaskView(view)
+		plan.GenerationStatus = task.Status
+		if task.Status == domain.TaskFailed && view.Error != nil {
+			plan.GenerationError = view.Error.Message
+		}
+	}
+}
+
+func (s *Service) hydrateTodayPlan(ctx context.Context, userID string, plan *domain.TodayPlan) {
+	plan.ImageURL = s.resolveAssetURL(plan.ImageURL)
+	plan.GeneratedImageURL = s.resolveAssetURL(plan.GeneratedImageURL)
+	s.attachTodayLookTask(ctx, userID, plan)
 }
 
 func (s *Service) GetTodayPlan(ctx context.Context, userID string) (domain.TodayPlan, error) {
 	item, err := s.repo.GetTodayPlan(ctx, userID)
-	if err == nil {
-		item.ImageURL = s.absoluteURL(item.ImageURL)
-		item.GeneratedImageURL = s.absoluteURL(item.GeneratedImageURL)
+	if err != nil {
+		return item, err
 	}
-	return item, err
+	s.hydrateTodayPlan(ctx, userID, &item)
+	return item, nil
 }
 
 // todayPlanImages 是今日方案的示意图，客户端会把 /assets/ 路径标注为「风格参考」。
 var todayPlanImages = []string{"/assets/plans/sharp.jpg", "/assets/plans/warm.jpg", "/assets/plans/natural.jpg"}
 
-func (s *Service) GenerateTodayPlan(ctx context.Context, userID string, input domain.TodayPlanInput) (domain.TodayPlan, error) {
+// GenerateTodayPlan builds today's plan (201) and enqueues the today_look
+// render. The plan is always grounded in a report: report_id defaults to the
+// latest one and a user without any report gets a 404.
+func (s *Service) GenerateTodayPlan(ctx context.Context, userID string, input domain.TodayPlanInput) (domain.TodayPlan, *domain.Task, error) {
 	existing, err := s.repo.GetTodayPlan(ctx, userID)
 	if err == nil && !input.Refresh {
-		existing.ImageURL = s.absoluteURL(existing.ImageURL)
-		return existing, nil
+		s.hydrateTodayPlan(ctx, userID, &existing)
+		return existing, nil, nil
 	}
 	if err != nil && !errors.Is(err, repository.ErrNotFound) {
-		return domain.TodayPlan{}, err
+		return domain.TodayPlan{}, nil, err
 	}
 	variant := 0
 	if err == nil {
@@ -70,28 +103,39 @@ func (s *Service) GenerateTodayPlan(ctx context.Context, userID string, input do
 	}
 	contexts, err := s.buildTodayContext(ctx, input.City, input.Schedule)
 	if err != nil {
-		return domain.TodayPlan{}, err
+		return domain.TodayPlan{}, nil, err
 	}
 	grounding := provider.TodayPlanGrounding{Context: contexts, Variant: variant}
 	if err == nil {
 		grounding.PreviousTitle = existing.Title
 	}
+	// 资料注入：已填写的补充资料参与 grounding，缺失时安全降级。
+	if profile, profileErr := s.repo.GetUserProfile(ctx, userID); profileErr == nil {
+		grounding.Profile = &profile
+	}
 	if input.ReportID != "" {
 		if _, parseErr := uuid.Parse(input.ReportID); parseErr != nil {
-			return domain.TodayPlan{}, fmt.Errorf("%w: 无效的形象档案", ErrValidation)
+			return domain.TodayPlan{}, nil, fmt.Errorf("%w: 无效的形象档案", ErrValidation)
 		}
 		report, reportErr := s.repo.GetReport(ctx, userID, input.ReportID)
 		if reportErr == nil {
 			grounding.Report = &report
 		} else if !errors.Is(reportErr, repository.ErrNotFound) {
-			return domain.TodayPlan{}, reportErr
+			return domain.TodayPlan{}, nil, reportErr
 		}
+	} else {
+		report, reportErr := s.repo.LatestReport(ctx, userID)
+		if reportErr != nil {
+			return domain.TodayPlan{}, nil, reportErr
+		}
+		grounding.Report = &report
+		input.ReportID = report.ID
 	}
 	// 真实 provider 失败时直接报错，绝不回退到模板假数据；模板内容只由
 	// demo provider 在本地开发环境输出。
 	output, err := s.todayPlanner.Generate(ctx, grounding)
 	if err != nil {
-		return domain.TodayPlan{}, fmt.Errorf("generate today plan: %w", err)
+		return domain.TodayPlan{}, nil, fmt.Errorf("generate today plan: %w", err)
 	}
 	plan := domain.TodayPlan{
 		ReportID: input.ReportID, Context: contexts, Title: output.Title, Summary: output.Summary,
@@ -99,19 +143,31 @@ func (s *Service) GenerateTodayPlan(ctx context.Context, userID string, input do
 		Steps: output.Steps,
 	}
 	item, err := s.repo.SaveTodayPlan(ctx, userID, plan)
-	if err == nil {
-		item.ImageURL = s.absoluteURL(item.ImageURL)
-		item.GeneratedImageURL = s.absoluteURL(item.GeneratedImageURL)
+	if err != nil {
+		return domain.TodayPlan{}, nil, err
 	}
-	return item, err
+	var task *domain.Task
+	if item.ReportID != "" && s.lookGenerator != nil {
+		created, taskErr := s.repo.CreateTask(ctx, userID, domain.TaskInput{
+			Type:    domain.TaskTypeTodayLook,
+			Payload: domain.TodayLookTaskPayload{PlanID: item.ID},
+		})
+		if taskErr != nil {
+			return domain.TodayPlan{}, nil, taskErr
+		}
+		task = &created
+	}
+	s.hydrateTodayPlan(ctx, userID, &item)
+	return item, task, nil
 }
 
 func (s *Service) ActivateTodayPlan(ctx context.Context, userID, planID string) (domain.TodayPlan, error) {
 	item, err := s.repo.ActivateTodayPlan(ctx, userID, planID)
-	if err == nil {
-		item.ImageURL = s.absoluteURL(item.ImageURL)
+	if err != nil {
+		return item, err
 	}
-	return item, err
+	s.hydrateTodayPlan(ctx, userID, &item)
+	return item, nil
 }
 
 func (s *Service) FeedbackTodayPlan(ctx context.Context, userID, planID, feedback string) (domain.TodayPlan, error) {
@@ -119,11 +175,14 @@ func (s *Service) FeedbackTodayPlan(ctx context.Context, userID, planID, feedbac
 		return domain.TodayPlan{}, fmt.Errorf("%w: 请选择反馈", ErrValidation)
 	}
 	item, err := s.repo.FeedbackTodayPlan(ctx, userID, planID, feedback)
-	if err == nil {
-		item.ImageURL = s.absoluteURL(item.ImageURL)
+	if err != nil {
+		return item, err
 	}
-	return item, err
+	s.hydrateTodayPlan(ctx, userID, &item)
+	return item, nil
 }
+
+// ---- 分享 ----
 
 func (s *Service) CreateShareCard(ctx context.Context, userID string, input domain.ShareCardInput) (domain.ShareCard, error) {
 	if _, err := uuid.Parse(input.SourceID); err != nil {
@@ -191,9 +250,11 @@ func (s *Service) hydrateShareSnapshot(snapshot json.RawMessage) json.RawMessage
 	return data
 }
 
-func (s *Service) RevokeShareCard(ctx context.Context, userID, cardID string) error {
-	return s.repo.RevokeShareCard(ctx, userID, cardID)
+func (s *Service) DeleteShareCard(ctx context.Context, userID, cardID string) error {
+	return s.repo.DeleteShareCard(ctx, userID, cardID)
 }
+
+// ---- 衣橱 ----
 
 func (s *Service) CreateWardrobeItem(ctx context.Context, userID string, input domain.WardrobeItemInput) (domain.WardrobeItem, error) {
 	validCategories := map[string]bool{"top": true, "bottom": true, "outer": true, "shoes": true, "bag": true}
@@ -218,10 +279,11 @@ func (s *Service) CreateWardrobeItem(ctx context.Context, userID string, input d
 		imageURL = "/uploads/" + assets[0].StorageKey
 	}
 	item, err := s.repo.CreateWardrobeItem(ctx, userID, input, imageURL)
-	if err == nil {
-		item.ImageURL = s.absoluteURL(item.ImageURL)
+	if err != nil {
+		return item, err
 	}
-	return item, err
+	item.ImageURL = s.absoluteURL(item.ImageURL)
+	return item, nil
 }
 
 func (s *Service) ListWardrobeItems(ctx context.Context, userID string) ([]domain.WardrobeItem, error) {
@@ -236,28 +298,51 @@ func (s *Service) DeleteWardrobeItem(ctx context.Context, userID, itemID string)
 	return s.repo.DeleteWardrobeItem(ctx, userID, itemID)
 }
 
-func (s *Service) CreateWardrobeOutfit(ctx context.Context, userID string, contextData domain.TodayContext) (domain.WardrobeOutfit, error) {
+// CreateWardrobeOutfit freezes a client-composed combination (title + item
+// ids + optional context snapshot). Item ids are re-validated against the
+// owner so a foreign id surfaces as 404.
+func (s *Service) CreateWardrobeOutfit(ctx context.Context, userID string, input domain.WardrobeOutfitInput) (domain.WardrobeOutfit, error) {
+	title := strings.TrimSpace(input.Title)
+	if title == "" || len([]rune(title)) > 60 {
+		return domain.WardrobeOutfit{}, fmt.Errorf("%w: 请填写 60 字以内的搭配名称", ErrValidation)
+	}
+	if len(input.ItemIDs) == 0 || len(input.ItemIDs) > 12 {
+		return domain.WardrobeOutfit{}, fmt.Errorf("%w: 请选择 1–12 件单品组成搭配", ErrValidation)
+	}
 	items, err := s.repo.ListWardrobeItems(ctx, userID)
 	if err != nil {
 		return domain.WardrobeOutfit{}, err
 	}
-	if len(items) < 2 {
-		return domain.WardrobeOutfit{}, fmt.Errorf("%w: 至少添加 2 件单品后再生成搭配", ErrValidation)
-	}
-	selected := make([]domain.WardrobeItem, 0, 4)
-	seen := map[string]bool{}
+	byID := make(map[string]domain.WardrobeItem, len(items))
 	for _, item := range items {
-		if !seen[item.Category] && len(selected) < 4 {
-			selected = append(selected, item)
-			seen[item.Category] = true
-		}
+		byID[item.ID] = item
 	}
-	contextJSON, _ := json.Marshal(contextData)
-	outfit, err := s.repo.CreateWardrobeOutfit(ctx, userID, selected, contextJSON)
+	selected := make([]domain.WardrobeItem, 0, len(input.ItemIDs))
+	for _, id := range input.ItemIDs {
+		item, ok := byID[id]
+		if !ok {
+			return domain.WardrobeOutfit{}, repository.ErrNotFound
+		}
+		selected = append(selected, item)
+	}
+	note := input.Note
+	if note == "" {
+		note = "优先复用你常穿的单品，用颜色与比例完成这套表达。"
+	}
+	var contextData json.RawMessage
+	if input.Context != nil {
+		contextData, _ = json.Marshal(input.Context)
+	} else if contextValue, contextErr := s.buildTodayContext(ctx, "", ""); contextErr == nil {
+		contextData, _ = json.Marshal(contextValue)
+	}
+	outfit, err := s.repo.CreateWardrobeOutfit(ctx, userID, domain.WardrobeOutfitInput{Title: title, Note: note, ItemIDs: input.ItemIDs}, contextData, selected)
+	if err != nil {
+		return outfit, err
+	}
 	for index := range outfit.Items {
 		outfit.Items[index].ImageURL = s.absoluteURL(outfit.Items[index].ImageURL)
 	}
-	return outfit, err
+	return outfit, nil
 }
 
 func (s *Service) MarkWardrobeOutfitWorn(ctx context.Context, userID, outfitID string) (domain.WardrobeOutfit, error) {
@@ -268,15 +353,13 @@ func (s *Service) MarkWardrobeOutfitWorn(ctx context.Context, userID, outfitID s
 	return outfit, err
 }
 
-func (s *Service) CreateAdvisorConversation(ctx context.Context, userID string, input domain.AdvisorMessageInput) (domain.AdvisorConversation, error) {
-	contextJSON, _ := json.Marshal(map[string]string{"report_id": input.ReportID, "today_plan_id": input.TodayPlanID})
-	return s.repo.CreateAdvisorConversation(ctx, userID, contextJSON)
-}
+// ---- 顾问 ----
 
 type advisorGrounding struct {
 	Today    *domain.TodayPlan
 	Wardrobe []domain.WardrobeItem
 	Report   *domain.Report
+	Profile  *domain.UserProfile
 }
 
 func advisorContextForAI(grounding advisorGrounding) map[string]any {
@@ -292,6 +375,28 @@ func advisorContextForAI(grounding advisorGrounding) map[string]any {
 			"priority_copy":   grounding.Report.PriorityCopy,
 			"findings":        findings,
 		}
+	}
+	if grounding.Profile != nil {
+		profile := map[string]any{"height_cm": grounding.Profile.HeightCM}
+		if grounding.Profile.WeightKG != nil {
+			profile["weight_kg"] = *grounding.Profile.WeightKG
+		}
+		if grounding.Profile.BustCM != nil {
+			profile["bust_cm"] = *grounding.Profile.BustCM
+		}
+		if grounding.Profile.WaistCM != nil {
+			profile["waist_cm"] = *grounding.Profile.WaistCM
+		}
+		if grounding.Profile.HipCM != nil {
+			profile["hip_cm"] = *grounding.Profile.HipCM
+		}
+		if grounding.Profile.Role != "" {
+			profile["role"] = grounding.Profile.Role
+		}
+		if grounding.Profile.Budget != "" {
+			profile["budget"] = grounding.Profile.Budget
+		}
+		result["profile"] = profile
 	}
 	if grounding.Today != nil {
 		result["today"] = map[string]any{"context": grounding.Today.Context, "title": grounding.Today.Title, "summary": grounding.Today.Summary, "steps": grounding.Today.Steps, "feedback": grounding.Today.Feedback}
@@ -385,12 +490,21 @@ func (s *Service) loadAdvisorGrounding(ctx context.Context, userID string, input
 		}
 	}
 
+	if profile, err := s.repo.GetUserProfile(ctx, userID); err == nil {
+		grounding.Profile = &profile
+	}
+
 	items, err := s.repo.ListWardrobeItems(ctx, userID)
 	if err != nil {
 		return grounding, err
 	}
 	grounding.Wardrobe = items
 	return grounding, nil
+}
+
+func (s *Service) CreateAdvisorConversation(ctx context.Context, userID string, input domain.AdvisorMessageInput) (domain.AdvisorConversation, error) {
+	contextJSON, _ := json.Marshal(map[string]string{"report_id": input.ReportID, "today_plan_id": input.TodayPlanID})
+	return s.repo.CreateAdvisorConversation(ctx, userID, contextJSON)
 }
 
 func (s *Service) SendAdvisorMessage(ctx context.Context, userID string, input domain.AdvisorMessageInput) (domain.AdvisorMessage, error) {
@@ -427,6 +541,8 @@ func (s *Service) ApplyAdvisorAction(ctx context.Context, userID, actionID strin
 	return s.repo.ApplyAdvisorAction(ctx, userID, actionID)
 }
 
+// ---- 埋点 ----
+
 func validEventName(name string) bool {
 	if len(name) < 2 || len(name) > 64 || name[0] < 'a' || name[0] > 'z' {
 		return false
@@ -452,4 +568,264 @@ func (s *Service) TrackProductEvent(ctx context.Context, userID string, input do
 		return fmt.Errorf("%w: 埋点参数必须是 JSON 对象", ErrValidation)
 	}
 	return s.repo.TrackProductEvent(ctx, userID, input)
+}
+
+// ---- 诊断与发型（原 tools 重组为资源端点） ----
+
+func (s *Service) RunDiagnostic(ctx context.Context, userID string, input domain.DiagnosticInput) (domain.ToolResult, error) {
+	validKinds := map[string]bool{"outfit": true, "purchase": true}
+	if !validKinds[input.Kind] {
+		return domain.ToolResult{}, fmt.Errorf("%w: 不支持的诊断类型", ErrValidation)
+	}
+	if input.Scene == "" {
+		input.Scene = "daily"
+	}
+	if !validPlanScenes[input.Scene] {
+		return domain.ToolResult{}, fmt.Errorf("%w: 不支持的使用场景", ErrValidation)
+	}
+	toolContext := &domain.ToolContext{}
+	if input.ReportID == "" {
+		// report_id 缺省用当前报告；没有任何报告时照常诊断，只是缺少 grounding。
+		if report, err := s.repo.LatestReport(ctx, userID); err == nil {
+			input.ReportID = report.ID
+		}
+	}
+	if input.ReportID != "" {
+		if _, err := uuid.Parse(input.ReportID); err != nil {
+			return domain.ToolResult{}, fmt.Errorf("%w: 无效的形象档案", ErrValidation)
+		}
+		report, err := s.repo.GetReport(ctx, userID, input.ReportID)
+		if err != nil {
+			return domain.ToolResult{}, err
+		}
+		toolContext.ImpressionTags, toolContext.PriorityTitle, toolContext.PriorityCopy = report.ImpressionTags, report.PriorityTitle, report.PriorityCopy
+	}
+	if profile, err := s.repo.GetUserProfile(ctx, userID); err == nil {
+		toolContext.Profile = &profile
+	}
+	if input.Kind == "purchase" {
+		items, err := s.repo.ListWardrobeItems(ctx, userID)
+		if err != nil {
+			return domain.ToolResult{}, err
+		}
+		for index, item := range items {
+			if index == 20 {
+				break
+			}
+			toolContext.Wardrobe = append(toolContext.Wardrobe, domain.ToolWardrobeItem{Name: item.Name, Category: item.Category, Color: item.Color, Season: item.Season, Formality: item.Formality, Scenes: item.Scenes})
+		}
+	}
+	if input.ReportID != "" || len(toolContext.Wardrobe) > 0 {
+		input.Context = toolContext
+	}
+	if input.MediaID == "" {
+		return domain.ToolResult{}, fmt.Errorf("%w: 请先上传需要判断的照片", ErrValidation)
+	}
+	if _, err := uuid.Parse(input.MediaID); err != nil {
+		return domain.ToolResult{}, fmt.Errorf("%w: 无效的照片", ErrValidation)
+	}
+	assets, err := s.repo.GetMediaAssetsForUser(ctx, userID, []string{input.MediaID})
+	if err != nil {
+		return domain.ToolResult{}, err
+	}
+	expectedKind := map[string]string{"outfit": "outfit", "purchase": "product"}[input.Kind]
+	if len(assets) != 1 || assets[0].Kind != expectedKind {
+		return domain.ToolResult{}, fmt.Errorf("%w: 照片类型与诊断不匹配", ErrValidation)
+	}
+	result := buildToolResult(input.Kind, input.Scene)
+	if input.Kind == "outfit" {
+		result, err = s.outfitAdvisor.Diagnose(ctx, input)
+		if err != nil {
+			return domain.ToolResult{}, err
+		}
+	} else if s.purchaseAdvisor != nil {
+		result, err = s.purchaseAdvisor.Diagnose(ctx, input)
+		if err != nil {
+			return domain.ToolResult{}, err
+		}
+	}
+	result, err = s.repo.CreateDiagnostic(ctx, userID, input, result)
+	if err != nil {
+		return domain.ToolResult{}, err
+	}
+	for index := range result.Options {
+		result.Options[index].ImageURL = s.absoluteURL(result.Options[index].ImageURL)
+	}
+	return result, nil
+}
+
+func (s *Service) SetDiagnosticSaved(ctx context.Context, userID, diagnosticID string, saved bool) (domain.ToolResult, error) {
+	if _, err := uuid.Parse(diagnosticID); err != nil {
+		return domain.ToolResult{}, repository.ErrNotFound
+	}
+	result, err := s.repo.SetDiagnosticSaved(ctx, userID, diagnosticID, saved)
+	if err != nil {
+		return domain.ToolResult{}, err
+	}
+	for index := range result.Options {
+		result.Options[index].ImageURL = s.absoluteURL(result.Options[index].ImageURL)
+	}
+	return result, nil
+}
+
+// Hairstyles is the pure-read hairstyle recommendation (GET /v1/hairstyles):
+// nothing is persisted, the three reference options come from the bundled
+// catalogue and stay labelled as 风格参考 on the client. report_id defaults
+// to the latest report; a user without any report gets a 404.
+func (s *Service) Hairstyles(ctx context.Context, userID, reportID string) ([]domain.ToolOption, error) {
+	if reportID == "" {
+		if _, err := s.repo.LatestReport(ctx, userID); err != nil {
+			return nil, err
+		}
+	} else if _, err := uuid.Parse(reportID); err != nil {
+		return nil, fmt.Errorf("%w: 无效的形象档案", ErrValidation)
+	} else if _, err := s.repo.GetReport(ctx, userID, reportID); err != nil {
+		return nil, err
+	}
+	result := buildToolResult("hair", "daily")
+	for index := range result.Options {
+		result.Options[index].ImageURL = s.absoluteURL(result.Options[index].ImageURL)
+	}
+	return result.Options, nil
+}
+
+// ---- 发型预览 ----
+
+var hairStyleNames = map[string]string{"sharp": "锁骨层次发", "warm": "空气微卷", "natural": "自然偏分"}
+
+func (s *Service) CreateHairPreview(ctx context.Context, userID string, input domain.HairPreviewInput) (domain.HairPreview, *domain.Task, error) {
+	if _, err := uuid.Parse(input.MediaID); err != nil {
+		return domain.HairPreview{}, nil, fmt.Errorf("%w: 请先上传一张清晰正脸照", ErrValidation)
+	}
+	styleName := hairStyleNames[input.StyleID]
+	if styleName == "" {
+		return domain.HairPreview{}, nil, fmt.Errorf("%w: 请选择一个发型方向", ErrValidation)
+	}
+	if input.ReportID != "" {
+		if _, err := uuid.Parse(input.ReportID); err != nil {
+			return domain.HairPreview{}, nil, fmt.Errorf("%w: 无效的形象档案", ErrValidation)
+		}
+	}
+	if input.Scene == "" {
+		input.Scene = "daily"
+	}
+	if !validPlanScenes[input.Scene] {
+		return domain.HairPreview{}, nil, fmt.Errorf("%w: 不支持的使用场景", ErrValidation)
+	}
+	preview, task, err := s.repo.CreateHairPreview(ctx, userID, input, styleName)
+	if err != nil {
+		return domain.HairPreview{}, nil, err
+	}
+	preview.SourceImageURL = s.absoluteURL(preview.SourceImageURL)
+	return preview, task, nil
+}
+
+// attachHairPreviewTask projects the hair_preview task onto the preview's
+// status/progress/stage/error fields and embeds task.
+func (s *Service) attachHairPreviewTask(ctx context.Context, userID string, preview *domain.HairPreview) {
+	if preview.ResultImageURL != "" {
+		preview.Status = domain.TaskCompleted
+		preview.Progress = 100
+		preview.Stage = "预览已生成"
+	}
+	tasks, err := s.repo.LatestTasksByRef(ctx, userID, domain.TaskTypeHairPreview, "preview_id", []string{preview.ID})
+	if err != nil {
+		return
+	}
+	if task, ok := tasks[preview.ID]; ok {
+		view := decodeTaskErrorView(taskView(task))
+		preview.Task = ptrTaskView(view)
+		preview.Status = task.Status
+		preview.Progress = task.Progress
+		preview.Stage = task.Stage
+		if task.Status == domain.TaskFailed && view.Error != nil {
+			preview.ErrorMessage = view.Error.Message
+		}
+	}
+}
+
+func (s *Service) GetHairPreview(ctx context.Context, userID, previewID string) (domain.HairPreview, error) {
+	if _, err := uuid.Parse(previewID); err != nil {
+		return domain.HairPreview{}, repository.ErrNotFound
+	}
+	preview, err := s.repo.GetHairPreview(ctx, userID, previewID)
+	if err != nil {
+		return domain.HairPreview{}, err
+	}
+	preview.SourceImageURL = s.absoluteURL(preview.SourceImageURL)
+	if preview.ResultImageURL != "" {
+		preview.ResultImageURL = s.absoluteURL(preview.ResultImageURL)
+	}
+	s.attachHairPreviewTask(ctx, userID, &preview)
+	return preview, nil
+}
+
+func (s *Service) ListSavedHairPreviews(ctx context.Context, userID string) ([]domain.HairPreview, error) {
+	items, err := s.repo.ListSavedHairPreviews(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	for index := range items {
+		items[index].SourceImageURL = s.absoluteURL(items[index].SourceImageURL)
+		items[index].ResultImageURL = s.absoluteURL(items[index].ResultImageURL)
+	}
+	return items, nil
+}
+
+func (s *Service) SaveHairPreview(ctx context.Context, userID, previewID string) (domain.HairPreview, error) {
+	if _, err := uuid.Parse(previewID); err != nil {
+		return domain.HairPreview{}, repository.ErrNotFound
+	}
+	preview, err := s.repo.SaveHairPreview(ctx, userID, previewID)
+	if err != nil {
+		return domain.HairPreview{}, err
+	}
+	preview.SourceImageURL = s.absoluteURL(preview.SourceImageURL)
+	preview.ResultImageURL = s.absoluteURL(preview.ResultImageURL)
+	return preview, nil
+}
+
+// buildToolResult produces the deterministic template every diagnosis falls
+// back to (demo provider output and purchase defaults).
+func buildToolResult(kind, scene string) domain.ToolResult {
+	sceneNames := map[string]string{"general": "当前场景", "daily": "日常", "interview": "面试", "wedding": "婚礼", "date": "约会"}
+	sceneName := sceneNames[scene]
+	switch kind {
+	case "hair":
+		return domain.ToolResult{
+			Kind: "hair", Scene: scene, Conclusion: "首选锁骨层次发",
+			PriorityTitle: "提高发型重心，露出肩颈",
+			PriorityCopy:  "比贴脸长直发更能突出眉眼与头肩比例，同时保留自然亲和感。",
+			Tags:          []string{"重心提高", "肩颈更清晰", "容易打理"},
+			Options: []domain.ToolOption{
+				{ID: "sharp", Name: "锁骨层次发", ImageURL: "/assets/looks/sharp.png", Note: "首选推荐", Reason: "提高视觉重心并保留脸侧空气感。", Tags: []string{"重心提高", "肩颈清晰"}},
+				{ID: "warm", Name: "空气微卷", ImageURL: "/assets/looks/warm.png", Note: "柔和表达", Reason: "发尾弧度保留亲和感，更适合沟通场景。", Tags: []string{"自然柔和", "上镜"}},
+				{ID: "natural", Name: "自然偏分", ImageURL: "/assets/looks/natural.png", Note: "低维护", Reason: "只调整分缝与耳侧线条，日常最容易维持。", Tags: []string{"改动小", "低维护"}},
+			},
+		}
+	case "outfit":
+		return domain.ToolResult{
+			Kind: "outfit", Scene: scene, Conclusion: "整体方向对了，先改一处",
+			PriorityTitle: "把深色内搭换成象牙白",
+			PriorityCopy:  fmt.Sprintf("不换整套衣服，就能让眉眼更清晰、上半身更轻盈，也更适合%s。", sceneName),
+			Tags:          []string{"预计 3 分钟", "无需购买新衣", "变化明显"},
+			Findings: []domain.ToolFinding{
+				{Label: "上身配色偏沉", Category: "color", Tone: "improve"},
+				{Label: "肩线不够清晰", Category: "silhouette", Tone: "improve"},
+				{Label: "腰线可以上移", Category: "proportion", Tone: "optional"},
+			},
+		}
+	default:
+		return domain.ToolResult{
+			Kind: "purchase", Scene: scene, Conclusion: "比较适合",
+			PriorityTitle: fmt.Sprintf("适合%s，但建议搭配挺括下装", sceneName),
+			PriorityCopy:  "清晰肩线有利于头肩比例，低饱和颜色也容易与现有衣橱组合。",
+			Tags:          []string{"象牙白内搭", "深灰直筒裤", "黑色低跟鞋"},
+			Findings: []domain.ToolFinding{
+				{Label: "清晰肩线能改善头肩比例", Category: "silhouette", Tone: "positive"},
+				{Label: "低饱和颜色容易组合", Category: "color", Tone: "positive"},
+				{Label: "正式场合需要更挺括下装", Category: "fabric", Tone: "caution"},
+			},
+		}
+	}
 }

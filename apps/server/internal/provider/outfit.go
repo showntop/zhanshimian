@@ -15,14 +15,14 @@ import (
 )
 
 type OutfitAdvisor interface {
-	Diagnose(context.Context, domain.ToolInput) (domain.ToolResult, error)
+	Diagnose(context.Context, domain.DiagnosticInput) (domain.ToolResult, error)
 }
 
 type DemoOutfitAdvisor struct{}
 
 func NewDemoOutfitAdvisor() *DemoOutfitAdvisor { return &DemoOutfitAdvisor{} }
 
-func (*DemoOutfitAdvisor) Diagnose(_ context.Context, input domain.ToolInput) (domain.ToolResult, error) {
+func (*DemoOutfitAdvisor) Diagnose(_ context.Context, input domain.DiagnosticInput) (domain.ToolResult, error) {
 	sceneNames := map[string]string{"general": "当前场景", "daily": "日常", "interview": "面试", "wedding": "婚礼", "date": "约会"}
 	return domain.ToolResult{
 		Kind: "outfit", Scene: input.Scene, Conclusion: "整体方向对了，先改一处",
@@ -81,7 +81,7 @@ type outfitFinding struct {
 	AnchorY  float64 `json:"anchor_y"`
 }
 
-func (a *OpenAIOutfitAdvisor) Diagnose(ctx context.Context, input domain.ToolInput) (domain.ToolResult, error) {
+func (a *OpenAIOutfitAdvisor) Diagnose(ctx context.Context, input domain.DiagnosticInput) (domain.ToolResult, error) {
 	images, err := a.loader.Load(ctx, []string{input.MediaID})
 	if err != nil {
 		return domain.ToolResult{}, fmt.Errorf("load outfit photo: %w", err)
@@ -200,7 +200,7 @@ func diagnosisSchema(tones []string) map[string]any {
 	}
 }
 
-func outfitPrompt(input domain.ToolInput) string {
+func outfitPrompt(input domain.DiagnosticInput) string {
 	scenes := map[string]string{"general": "通用", "daily": "日常", "interview": "面试", "wedding": "婚礼", "date": "约会"}
 	return "请诊断这张" + scenes[input.Scene] + "场景的正面全身穿搭照。只指出三处可见的颜色、廓形、比例、材质或搭配信息，并选出最值得先改的一处。建议优先利用现有衣服，通过卷袖、塞衣角、换内搭、调整腰线、配色或鞋包完成，不评价人的身体。" + toolContextPrompt(input.Context)
 }
@@ -232,7 +232,7 @@ func NewFallbackOutfitAdvisor(primary, fallback OutfitAdvisor) *FallbackOutfitAd
 	return &FallbackOutfitAdvisor{primary: primary, fallback: fallback}
 }
 
-func (a *FallbackOutfitAdvisor) Diagnose(ctx context.Context, input domain.ToolInput) (domain.ToolResult, error) {
+func (a *FallbackOutfitAdvisor) Diagnose(ctx context.Context, input domain.DiagnosticInput) (domain.ToolResult, error) {
 	result, err := a.primary.Diagnose(ctx, input)
 	if err == nil {
 		return result, nil

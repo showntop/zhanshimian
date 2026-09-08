@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
@@ -23,24 +25,31 @@ import (
 
 var ErrValidation = errors.New("validation error")
 var ErrForbidden = errors.New("forbidden")
+var ErrRateLimited = errors.New("rate limited")
 
 type Service struct {
-	repo            repository.Repository
-	storage         storage.ObjectStorage
-	analyzer        provider.Analyzer
-	hairGenerator   provider.HairPreviewGenerator
-	lookGenerator   provider.LookGenerator
-	outfitAdvisor   provider.OutfitAdvisor
-	purchaseAdvisor provider.OutfitAdvisor
-	advisorChat     provider.AdvisorChat
-	todayPlanner    provider.TodayPlanner
-	weather         provider.WeatherProvider
-	wechat          provider.WeChatAuthenticator
-	publicBaseURL   string
-	assetURLTTL     time.Duration
-	sessionTTL      time.Duration
-	maxUpload       int64
-	logger          *slog.Logger
+	repo                   repository.Repository
+	storage                storage.ObjectStorage
+	analyzer               provider.Analyzer
+	hairGenerator          provider.HairPreviewGenerator
+	lookGenerator          provider.LookGenerator
+	outfitAdvisor          provider.OutfitAdvisor
+	purchaseAdvisor        provider.OutfitAdvisor
+	advisorChat            provider.AdvisorChat
+	todayPlanner           provider.TodayPlanner
+	weather                provider.WeatherProvider
+	wechat                 provider.WeChatAuthenticator
+	wechatApp              provider.WeChatAuthenticator
+	apple                  provider.AppleAuthenticator
+	sms                    provider.SmsSender
+	smsRatePerPhonePerHour int64
+	ipLimiter              *slidingWindowLimiter
+	handlers               map[domain.TaskType]TaskHandler
+	publicBaseURL          string
+	assetURLTTL            time.Duration
+	sessionTTL             time.Duration
+	maxUpload              int64
+	logger                 *slog.Logger
 }
 
 type ProviderOptions struct {
@@ -52,10 +61,14 @@ type ProviderOptions struct {
 	Today       provider.TodayPlanner
 	Weather     provider.WeatherProvider
 	WeChat      provider.WeChatAuthenticator
+	WeChatApp   provider.WeChatAuthenticator
+	Apple       provider.AppleAuthenticator
+	Sms         provider.SmsSender
+	SmsPerPhone int64
 	AssetURLTTL time.Duration
 }
 
-func New(repo repository.Repository, storage storage.ObjectStorage, analyzer provider.Analyzer, publicBaseURL string, sessionTTL time.Duration, maxUpload int64, logger *slog.Logger, options ...ProviderOptions) *Service {
+func New(repo repository.Repository, objects storage.ObjectStorage, analyzer provider.Analyzer, publicBaseURL string, sessionTTL time.Duration, maxUpload int64, logger *slog.Logger, options ...ProviderOptions) *Service {
 	hairGenerator := provider.HairPreviewGenerator(provider.NewDemoHairGenerator())
 	outfitAdvisor := provider.OutfitAdvisor(provider.NewDemoOutfitAdvisor())
 	var purchaseAdvisor provider.OutfitAdvisor
@@ -63,6 +76,10 @@ func New(repo repository.Repository, storage storage.ObjectStorage, analyzer pro
 	todayPlanner := provider.TodayPlanner(provider.NewDemoTodayPlanner())
 	weather := provider.WeatherProvider(provider.NewDemoWeatherProvider())
 	var wechat provider.WeChatAuthenticator
+	var wechatApp provider.WeChatAuthenticator
+	var apple provider.AppleAuthenticator
+	var smsSender provider.SmsSender = provider.NewConsoleSms(logger, true)
+	smsPerPhone := int64(5)
 	var lookGenerator provider.LookGenerator
 	assetURLTTL := 15 * time.Minute
 	if len(options) > 0 {
@@ -81,16 +98,53 @@ func New(repo repository.Repository, storage storage.ObjectStorage, analyzer pro
 			weather = options[0].Weather
 		}
 		wechat = options[0].WeChat
+		wechatApp = options[0].WeChatApp
+		apple = options[0].Apple
+		if options[0].Sms != nil {
+			smsSender = options[0].Sms
+		}
+		if options[0].SmsPerPhone > 0 {
+			smsPerPhone = options[0].SmsPerPhone
+		}
 		lookGenerator = options[0].Look
 		if options[0].AssetURLTTL > 0 {
 			assetURLTTL = options[0].AssetURLTTL
 		}
 	}
-	return &Service{repo: repo, storage: storage, analyzer: analyzer, hairGenerator: hairGenerator, lookGenerator: lookGenerator, outfitAdvisor: outfitAdvisor, purchaseAdvisor: purchaseAdvisor, advisorChat: advisorChat, todayPlanner: todayPlanner, weather: weather, wechat: wechat, publicBaseURL: strings.TrimSuffix(publicBaseURL, "/"), assetURLTTL: assetURLTTL, sessionTTL: sessionTTL, maxUpload: maxUpload, logger: logger}
+	service := &Service{
+		repo: repo, storage: objects, analyzer: analyzer, hairGenerator: hairGenerator,
+		lookGenerator: lookGenerator, outfitAdvisor: outfitAdvisor, purchaseAdvisor: purchaseAdvisor,
+		advisorChat: advisorChat, todayPlanner: todayPlanner, weather: weather,
+		wechat: wechat, wechatApp: wechatApp, apple: apple, sms: smsSender,
+		smsRatePerPhonePerHour: smsPerPhone,
+		ipLimiter:              newSlidingWindowLimiter(10, time.Minute),
+		publicBaseURL:          strings.TrimSuffix(publicBaseURL, "/"),
+		assetURLTTL:            assetURLTTL, sessionTTL: sessionTTL, maxUpload: maxUpload, logger: logger,
+	}
+	service.handlers = map[domain.TaskType]TaskHandler{
+		domain.TaskTypeAnalysis:    analysisTaskHandler{service},
+		domain.TaskTypeHairPreview: hairPreviewTaskHandler{service},
+		domain.TaskTypePlanLook:    planLookTaskHandler{service},
+		domain.TaskTypeTodayLook:   todayLookTaskHandler{service},
+	}
+	return service
+}
+
+// ---- 登录与身份 ----
+
+func defaultNickname(nickname string) string {
+	if strings.TrimSpace(nickname) == "" {
+		return "怎么打扮用户"
+	}
+	return strings.TrimSpace(nickname)
 }
 
 func (s *Service) DevLogin(ctx context.Context, nickname string) (domain.Session, error) {
-	return s.createSession(ctx, "dev:"+uuid.NewString(), nickname)
+	user, err := s.repo.CreateDevUser(ctx, defaultNickname(nickname))
+	if err != nil {
+		return domain.Session{}, err
+	}
+	return s.createSession(ctx, user)
 }
 
 func (s *Service) WeChatLogin(ctx context.Context, code, nickname string) (domain.Session, error) {
@@ -101,13 +155,47 @@ func (s *Service) WeChatLogin(ctx context.Context, code, nickname string) (domai
 	if err != nil {
 		return domain.Session{}, err
 	}
-	return s.createSession(ctx, identity.OpenID, nickname)
+	return s.loginWithIdentity(ctx, domain.ProviderWeChatMiniApp, identity.OpenID, nickname)
 }
 
-func (s *Service) createSession(ctx context.Context, openID, nickname string) (domain.Session, error) {
-	if strings.TrimSpace(nickname) == "" {
-		nickname = "怎么打扮用户"
+func (s *Service) WeChatAppLogin(ctx context.Context, code, nickname string) (domain.Session, error) {
+	if s.wechatApp == nil {
+		return domain.Session{}, provider.ErrWeChatUnavailable
 	}
+	identity, err := s.wechatApp.ExchangeCode(ctx, code)
+	if err != nil {
+		return domain.Session{}, err
+	}
+	identifier := identity.UnionID
+	if identifier == "" {
+		identifier = identity.OpenID
+	}
+	return s.loginWithIdentity(ctx, domain.ProviderWeChatApp, identifier, nickname)
+}
+
+func (s *Service) AppleLogin(ctx context.Context, identityToken, nickname string) (domain.Session, error) {
+	if s.apple == nil {
+		return domain.Session{}, provider.ErrAppleUnavailable
+	}
+	sub, err := s.apple.VerifyToken(ctx, identityToken)
+	if err != nil {
+		return domain.Session{}, err
+	}
+	return s.loginWithIdentity(ctx, domain.ProviderApple, sub, nickname)
+}
+
+// loginWithIdentity is the shared multi-channel path: one (provider,
+// identifier) pair always maps back to the same account, so a user who logs
+// in on the phone today and the mini-program tomorrow keeps one dataset.
+func (s *Service) loginWithIdentity(ctx context.Context, providerName, identifier, nickname string) (domain.Session, error) {
+	user, err := s.repo.EnsureUserByIdentity(ctx, providerName, identifier, defaultNickname(nickname))
+	if err != nil {
+		return domain.Session{}, err
+	}
+	return s.createSession(ctx, user)
+}
+
+func (s *Service) createSession(ctx context.Context, user domain.User) (domain.Session, error) {
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return domain.Session{}, err
@@ -115,8 +203,7 @@ func (s *Service) createSession(ctx context.Context, openID, nickname string) (d
 	token := base64.RawURLEncoding.EncodeToString(tokenBytes)
 	digest := sha256.Sum256([]byte(token))
 	expiresAt := time.Now().Add(s.sessionTTL)
-	user, err := s.repo.CreateSession(ctx, openID, nickname, digest[:], expiresAt)
-	if err != nil {
+	if err := s.repo.CreateSession(ctx, user.ID, digest[:], expiresAt); err != nil {
 		return domain.Session{}, err
 	}
 	return domain.Session{Token: token, ExpiresAt: expiresAt, User: user}, nil
@@ -133,6 +220,220 @@ func (s *Service) Authenticate(ctx context.Context, token string) (domain.User, 
 	}
 	return user, err
 }
+
+func (s *Service) Logout(ctx context.Context, token string) error {
+	digest := sha256.Sum256([]byte(token))
+	return s.repo.DeleteSessionByTokenDigest(ctx, digest[:])
+}
+
+func (s *Service) GetAccount(ctx context.Context, user domain.User) (domain.MeAccount, error) {
+	identities, err := s.repo.ListIdentities(ctx, user.ID)
+	if err != nil {
+		return domain.MeAccount{}, err
+	}
+	return domain.MeAccount{ID: user.ID, Nickname: user.Nickname, Identities: identities}, nil
+}
+
+// ---- 补充资料 ----
+
+// GetProfile returns the persisted 补充资料; callers translate a missing row
+// into a null payload (clients show the profile onboarding).
+func (s *Service) GetProfile(ctx context.Context, userID string) (domain.UserProfile, error) {
+	return s.repo.GetUserProfile(ctx, userID)
+}
+
+func (s *Service) UpdateProfile(ctx context.Context, userID string, profile domain.UserProfile) (domain.UserProfile, error) {
+	if profile.HeightCM < 100 || profile.HeightCM > 250 {
+		return domain.UserProfile{}, fmt.Errorf("%w: 身高需在 100–250 cm 之间", ErrValidation)
+	}
+	if strings.TrimSpace(profile.Role) == "" || strings.TrimSpace(profile.Budget) == "" {
+		return domain.UserProfile{}, fmt.Errorf("%w: 请填写职业与预算", ErrValidation)
+	}
+	if len([]rune(profile.Role)) > 60 || len([]rune(profile.Budget)) > 60 {
+		return domain.UserProfile{}, fmt.Errorf("%w: 职业与预算最多 60 字", ErrValidation)
+	}
+	for _, check := range []struct {
+		name   string
+		value  *float64
+		min    float64
+		max    float64
+	}{
+		{"体重", profile.WeightKG, 25, 300},
+		{"胸围", profile.BustCM, 40, 200},
+		{"腰围", profile.WaistCM, 40, 200},
+		{"臀围", profile.HipCM, 40, 200},
+	} {
+		if check.value != nil && (*check.value < check.min || *check.value > check.max) {
+			return domain.UserProfile{}, fmt.Errorf("%w: %s需在 %.0f–%.0f 之间", ErrValidation, check.name, check.min, check.max)
+		}
+	}
+	return s.repo.SaveUserProfile(ctx, userID, profile)
+}
+
+// ---- 短信验证码 ----
+
+// normalizePhone accepts the common Chinese formats (1xxxxxxxxxx, +86 prefix,
+// spaces/dashes) and returns the bare 11-digit number.
+func normalizePhone(input string) (string, error) {
+	value := strings.TrimSpace(input)
+	value = strings.ReplaceAll(value, " ", "")
+	value = strings.ReplaceAll(value, "-", "")
+	value = strings.TrimPrefix(value, "+86")
+	if len(value) != 11 || value[0] != '1' {
+		return "", fmt.Errorf("%w: 请输入正确的手机号", ErrValidation)
+	}
+	for _, character := range value {
+		if character < '0' || character > '9' {
+			return "", fmt.Errorf("%w: 请输入正确的手机号", ErrValidation)
+		}
+	}
+	return value, nil
+}
+
+func smsCodeDigest(phone, code string) []byte {
+	digest := sha256.Sum256([]byte(phone + ":" + code))
+	return digest[:]
+}
+
+const (
+	smsCodeCooldown    = 60 * time.Second
+	smsCodeTTL         = 5 * time.Minute
+	smsCodeHourlyLimit = 5
+)
+
+// RequestSmsCode issues one verification code. Limits: 60s cooldown while the
+// previous code is still unused, 10/min/IP, 5/hour/phone. The cooldown only
+// applies to unused codes: after a successful verify the user may immediately
+// request a fresh code (e.g. logging in again on another device).
+func (s *Service) RequestSmsCode(ctx context.Context, rawPhone, clientIP string) (devCode string, err error) {
+	phone, err := normalizePhone(rawPhone)
+	if err != nil {
+		return "", err
+	}
+	if !s.ipLimiter.Allow(clientIP, time.Now()) {
+		return "", fmt.Errorf("%w: 验证码请求过于频繁，请稍后再试", ErrRateLimited)
+	}
+	if s.sms == nil {
+		return "", provider.ErrSmsConfig
+	}
+	latest, latestErr := s.repo.LatestSmsCode(ctx, phone)
+	if latestErr != nil && !errors.Is(latestErr, repository.ErrNotFound) {
+		return "", latestErr
+	}
+	if latestErr == nil && latest.UsedAt == nil && time.Since(latest.CreatedAt) < smsCodeCooldown {
+		return "", fmt.Errorf("%w: 验证码已发送，请 1 分钟后再试", ErrRateLimited)
+	}
+	if count, countErr := s.repo.CountSmsCodesSince(ctx, phone, time.Now().Add(-time.Hour)); countErr == nil && count >= s.maxSmsPerPhoneHour() {
+		return "", fmt.Errorf("%w: 该手机号今日验证码请求次数过多，请 1 小时后再试", ErrRateLimited)
+	}
+	code := provider.DevSmsCode
+	if !s.sms.ReturnsCode() {
+		if code, err = randomSmsCode(); err != nil {
+			return "", err
+		}
+	}
+	if err := s.sms.Send(ctx, phone, code); err != nil {
+		return "", err
+	}
+	if err := s.repo.CreateSmsCode(ctx, phone, smsCodeDigest(phone, code), time.Now().Add(smsCodeTTL)); err != nil {
+		return "", err
+	}
+	if s.sms.ReturnsCode() {
+		return code, nil
+	}
+	return "", nil
+}
+
+func (s *Service) maxSmsPerPhoneHour() int64 {
+	limit := s.smsRatePerPhonePerHour
+	if limit <= 0 {
+		limit = smsCodeHourlyLimit
+	}
+	return limit
+}
+
+func randomSmsCode() (string, error) {
+	buffer := make([]byte, 4)
+	if _, err := rand.Read(buffer); err != nil {
+		return "", err
+	}
+	value := uint32(buffer[0])<<24 | uint32(buffer[1])<<16 | uint32(buffer[2])<<8 | uint32(buffer[3])
+	return fmt.Sprintf("%06d", value%1000000), nil
+}
+
+// VerifySmsCode checks the code against the newest row for that phone and
+// burns it exactly once, then returns a session for the phone identity.
+func (s *Service) VerifySmsCode(ctx context.Context, rawPhone, code, nickname string) (domain.Session, error) {
+	phone, err := normalizePhone(rawPhone)
+	if err != nil {
+		return domain.Session{}, err
+	}
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return domain.Session{}, fmt.Errorf("%w: 请输入验证码", ErrValidation)
+	}
+	latest, err := s.repo.LatestSmsCode(ctx, phone)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return domain.Session{}, fmt.Errorf("%w: 请先获取验证码", ErrValidation)
+		}
+		return domain.Session{}, err
+	}
+	if time.Now().After(latest.ExpiresAt) {
+		return domain.Session{}, fmt.Errorf("%w: 验证码已过期，请重新获取", ErrValidation)
+	}
+	expected := smsCodeDigest(phone, code)
+	if subtle.ConstantTimeCompare(expected, latest.Digest) != 1 {
+		return domain.Session{}, fmt.Errorf("%w: 验证码不正确", ErrValidation)
+	}
+	if err := s.repo.ConsumeSmsCode(ctx, latest.ID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return domain.Session{}, fmt.Errorf("%w: 验证码已使用，请重新获取", ErrValidation)
+		}
+		return domain.Session{}, err
+	}
+	return s.loginWithIdentity(ctx, domain.ProviderPhone, phone, nickname)
+}
+
+// slidingWindowLimiter is a tiny in-memory limiter for per-IP request rates.
+// The API runs single-instance; phone-level limits live in the database.
+type slidingWindowLimiter struct {
+	mu     sync.Mutex
+	events map[string][]time.Time
+	limit  int
+	window time.Duration
+}
+
+func newSlidingWindowLimiter(limit int, window time.Duration) *slidingWindowLimiter {
+	return &slidingWindowLimiter{events: map[string][]time.Time{}, limit: limit, window: window}
+}
+
+func (l *slidingWindowLimiter) Allow(key string, now time.Time) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	events := l.events[key]
+	kept := events[:0]
+	for _, event := range events {
+		if now.Sub(event) < l.window {
+			kept = append(kept, event)
+		}
+	}
+	if len(kept) >= l.limit {
+		l.events[key] = kept
+		return false
+	}
+	l.events[key] = append(kept, now)
+	if len(l.events) > 4096 {
+		for eventKey, eventList := range l.events {
+			if len(eventList) == 0 || now.Sub(eventList[len(eventList)-1]) >= l.window {
+				delete(l.events, eventKey)
+			}
+		}
+	}
+	return true
+}
+
+// ---- 媒体 ----
 
 func (s *Service) UploadMedia(ctx context.Context, userID, kind, filename, mimeType string, size int64, reader io.Reader) (domain.MediaAsset, error) {
 	_ = filename
@@ -188,30 +489,40 @@ func (s *Service) CreateDemoMedia(ctx context.Context, userID, kind string) (dom
 	return asset, nil
 }
 
-func (s *Service) CreateAnalysis(ctx context.Context, userID string, input domain.CreateAnalysisInput) (domain.Analysis, error) {
+// ---- 分析与报告 ----
+
+func (s *Service) CreateAnalysis(ctx context.Context, userID string, input domain.CreateAnalysisInput) (domain.Analysis, *domain.Task, error) {
 	if len(input.MediaIDs) != 3 {
-		return domain.Analysis{}, fmt.Errorf("%w: 请上传正脸、侧脸和全身三张照片", ErrValidation)
+		return domain.Analysis{}, nil, fmt.Errorf("%w: 请上传正脸、侧脸和全身三张照片", ErrValidation)
 	}
 	seen := map[string]bool{}
 	for _, id := range input.MediaIDs {
 		if _, err := uuid.Parse(id); err != nil || seen[id] {
-			return domain.Analysis{}, fmt.Errorf("%w: invalid media ids", ErrValidation)
+			return domain.Analysis{}, nil, fmt.Errorf("%w: invalid media ids", ErrValidation)
 		}
 		seen[id] = true
 	}
 	if input.Scene == "" {
 		input.Scene = "general"
 	}
-	analysis, err := s.repo.CreateAnalysis(ctx, userID, input)
+	// Grounding: the request profile wins; an empty one falls back to the
+	// persisted 补充资料 so users never re-type what they already saved.
+	if input.Profile == (domain.Profile{}) {
+		if profile, err := s.repo.GetUserProfile(ctx, userID); err == nil {
+			input.Profile = domain.Profile{HeightCM: profile.HeightCM, Role: profile.Role, Budget: profile.Budget}
+		}
+	}
+	analysis, task, err := s.repo.CreateAnalysis(ctx, userID, input)
 	if err != nil {
-		return domain.Analysis{}, err
+		return domain.Analysis{}, nil, err
 	}
 	// 幂等返回的旧分析已经带原始照片；只有真正新建的分析才回填本次照片，
 	// 避免响应里挂上和实际分析输入不符的 media ids。
 	if len(analysis.MediaIDs) == 0 {
 		analysis.MediaIDs = input.MediaIDs
 	}
-	return s.hydrateAnalysisMedia(ctx, userID, analysis)
+	hydrated, err := s.hydrateAnalysisMedia(ctx, userID, analysis)
+	return hydrated, task, err
 }
 
 func (s *Service) GetAnalysis(ctx context.Context, userID, id string) (domain.Analysis, error) {
@@ -302,6 +613,7 @@ func demoMediaAssetPath(kind string) string {
 	}
 	return "/assets/looks/" + assetName
 }
+
 func (s *Service) GetReport(ctx context.Context, userID, id string) (domain.Report, error) {
 	report, err := s.repo.GetReport(ctx, userID, id)
 	if err == nil {
@@ -320,274 +632,6 @@ func (s *Service) GetCurrentReport(ctx context.Context, userID string) (domain.R
 	}
 	return report, err
 }
-func (s *Service) ListPlans(ctx context.Context, userID, reportID, scene string) ([]domain.Plan, error) {
-	plans, err := s.repo.ListPlans(ctx, userID, reportID, scene)
-	for i := range plans {
-		plans[i].ImageURL = s.resolveAssetURL(plans[i].ImageURL)
-		plans[i].CurrentImageURL = s.resolveAssetURL(plans[i].CurrentImageURL)
-		if plans[i].GeneratedImageURL != "" {
-			plans[i].GeneratedImageURL = s.resolveAssetURL(plans[i].GeneratedImageURL)
-		}
-	}
-	return plans, err
-}
-
-// GeneratePlanLooks queues full-look image generation for every plan of the
-// report+scene and returns the plans with their current generation state.
-func (s *Service) GeneratePlanLooks(ctx context.Context, userID, reportID, scene string, refresh bool) ([]domain.Plan, error) {
-	if s.lookGenerator == nil {
-		return nil, fmt.Errorf("%w: 当前环境暂未开启本人方案生成", ErrValidation)
-	}
-	if _, err := uuid.Parse(reportID); err != nil {
-		return nil, fmt.Errorf("%w: 无效的形象报告", ErrValidation)
-	}
-	if scene == "" {
-		scene = "general"
-	}
-	if !map[string]bool{"general": true, "daily": true, "interview": true, "wedding": true, "date": true}[scene] {
-		return nil, fmt.Errorf("%w: 不支持的使用场景", ErrValidation)
-	}
-	if err := s.repo.QueuePlanLooks(ctx, userID, reportID, scene, refresh); err != nil {
-		return nil, err
-	}
-	plans, err := s.ListPlans(ctx, userID, reportID, scene)
-	if err == nil && len(plans) == 0 {
-		return nil, repository.ErrNotFound
-	}
-	return plans, err
-}
-func (s *Service) GetPlan(ctx context.Context, userID, planID string) (domain.Plan, error) {
-	plan, err := s.repo.GetPlan(ctx, userID, planID)
-	if err == nil {
-		plan.ImageURL = s.resolveAssetURL(plan.ImageURL)
-		plan.CurrentImageURL = s.resolveAssetURL(plan.CurrentImageURL)
-		if plan.GeneratedImageURL != "" {
-			plan.GeneratedImageURL = s.resolveAssetURL(plan.GeneratedImageURL)
-		}
-	}
-	return plan, err
-}
-func (s *Service) SelectPlan(ctx context.Context, userID, planID string) error {
-	return s.repo.SelectPlan(ctx, userID, planID)
-}
-func (s *Service) GetChecklist(ctx context.Context, userID, planID string) ([]domain.ChecklistItem, error) {
-	return s.repo.GetChecklist(ctx, userID, planID)
-}
-func (s *Service) SetChecklistItem(ctx context.Context, userID, itemID string, completed bool) (domain.ChecklistItem, error) {
-	return s.repo.SetChecklistItem(ctx, userID, itemID, completed)
-}
-func (s *Service) AddFeedback(ctx context.Context, userID string, input domain.FeedbackInput) error {
-	if input.PlanID == "" || len(input.Tags) == 0 {
-		return fmt.Errorf("%w: feedback plan and tags are required", ErrValidation)
-	}
-	if len(input.Comment) > 500 {
-		return fmt.Errorf("%w: comment is too long", ErrValidation)
-	}
-	if input.MediaID != "" {
-		assets, err := s.repo.GetMediaAssetsForUser(ctx, userID, []string{input.MediaID})
-		if err != nil || len(assets) != 1 || assets[0].Kind != "feedback" {
-			return repository.ErrNotFound
-		}
-	}
-	return s.repo.AddFeedback(ctx, userID, input)
-}
-
-func (s *Service) RunTool(ctx context.Context, userID string, input domain.ToolInput) (domain.ToolResult, error) {
-	validKinds := map[string]bool{"hair": true, "outfit": true, "purchase": true}
-	if !validKinds[input.Kind] {
-		return domain.ToolResult{}, fmt.Errorf("%w: 不支持的顾问工具", ErrValidation)
-	}
-	if input.Scene == "" {
-		input.Scene = "daily"
-	}
-	validScenes := map[string]bool{"general": true, "daily": true, "interview": true, "wedding": true, "date": true}
-	if !validScenes[input.Scene] {
-		return domain.ToolResult{}, fmt.Errorf("%w: 不支持的使用场景", ErrValidation)
-	}
-	toolContext := &domain.ToolContext{}
-	if input.ReportID != "" {
-		if _, err := uuid.Parse(input.ReportID); err != nil {
-			return domain.ToolResult{}, fmt.Errorf("%w: 无效的形象档案", ErrValidation)
-		}
-		report, err := s.repo.GetReport(ctx, userID, input.ReportID)
-		if err != nil {
-			return domain.ToolResult{}, err
-		}
-		toolContext.ImpressionTags, toolContext.PriorityTitle, toolContext.PriorityCopy = report.ImpressionTags, report.PriorityTitle, report.PriorityCopy
-	}
-	if input.Kind == "purchase" {
-		items, err := s.repo.ListWardrobeItems(ctx, userID)
-		if err != nil {
-			return domain.ToolResult{}, err
-		}
-		for index, item := range items {
-			if index == 20 {
-				break
-			}
-			toolContext.Wardrobe = append(toolContext.Wardrobe, domain.ToolWardrobeItem{Name: item.Name, Category: item.Category, Color: item.Color, Season: item.Season, Formality: item.Formality, Scenes: item.Scenes})
-		}
-	}
-	if input.ReportID != "" || len(toolContext.Wardrobe) > 0 {
-		input.Context = toolContext
-	}
-	if input.Kind != "hair" && input.MediaID == "" {
-		return domain.ToolResult{}, fmt.Errorf("%w: 请先上传需要判断的照片", ErrValidation)
-	}
-	if input.MediaID != "" {
-		if _, err := uuid.Parse(input.MediaID); err != nil {
-			return domain.ToolResult{}, fmt.Errorf("%w: 无效的照片", ErrValidation)
-		}
-		assets, err := s.repo.GetMediaAssetsForUser(ctx, userID, []string{input.MediaID})
-		if err != nil {
-			return domain.ToolResult{}, err
-		}
-		expectedKind := map[string]string{"outfit": "outfit", "purchase": "product"}[input.Kind]
-		if expectedKind != "" && (len(assets) != 1 || assets[0].Kind != expectedKind) {
-			return domain.ToolResult{}, fmt.Errorf("%w: 照片类型与诊断工具不匹配", ErrValidation)
-		}
-	}
-	result := buildToolResult(input.Kind, input.Scene)
-	var err error
-	if input.Kind == "outfit" {
-		result, err = s.outfitAdvisor.Diagnose(ctx, input)
-		if err != nil {
-			return domain.ToolResult{}, err
-		}
-	} else if input.Kind == "purchase" && s.purchaseAdvisor != nil {
-		result, err = s.purchaseAdvisor.Diagnose(ctx, input)
-		if err != nil {
-			return domain.ToolResult{}, err
-		}
-	}
-	result, err = s.repo.CreateToolResult(ctx, userID, input, result)
-	if err != nil {
-		return domain.ToolResult{}, err
-	}
-	for index := range result.Options {
-		result.Options[index].ImageURL = s.absoluteURL(result.Options[index].ImageURL)
-	}
-	return result, nil
-}
-
-func (s *Service) SaveToolResult(ctx context.Context, userID, resultID string) (domain.ToolResult, error) {
-	if _, err := uuid.Parse(resultID); err != nil {
-		return domain.ToolResult{}, repository.ErrNotFound
-	}
-	result, err := s.repo.SaveToolResult(ctx, userID, resultID)
-	if err != nil {
-		return domain.ToolResult{}, err
-	}
-	for index := range result.Options {
-		result.Options[index].ImageURL = s.absoluteURL(result.Options[index].ImageURL)
-	}
-	return result, nil
-}
-
-var hairStyleNames = map[string]string{"sharp": "锁骨层次发", "warm": "空气微卷", "natural": "自然偏分"}
-
-func (s *Service) CreateHairPreview(ctx context.Context, userID string, input domain.HairPreviewInput) (domain.HairPreview, error) {
-	if _, err := uuid.Parse(input.MediaID); err != nil {
-		return domain.HairPreview{}, fmt.Errorf("%w: 请先上传一张清晰正脸照", ErrValidation)
-	}
-	styleName := hairStyleNames[input.StyleID]
-	if styleName == "" {
-		return domain.HairPreview{}, fmt.Errorf("%w: 请选择一个发型方向", ErrValidation)
-	}
-	if input.ReportID != "" {
-		if _, err := uuid.Parse(input.ReportID); err != nil {
-			return domain.HairPreview{}, fmt.Errorf("%w: 无效的形象档案", ErrValidation)
-		}
-	}
-	if input.Scene == "" {
-		input.Scene = "daily"
-	}
-	if !map[string]bool{"general": true, "daily": true, "interview": true, "wedding": true, "date": true}[input.Scene] {
-		return domain.HairPreview{}, fmt.Errorf("%w: 不支持的使用场景", ErrValidation)
-	}
-	preview, err := s.repo.CreateHairPreview(ctx, userID, input, styleName)
-	if err == nil {
-		preview.SourceImageURL = s.absoluteURL(preview.SourceImageURL)
-	}
-	return preview, err
-}
-
-func (s *Service) GetHairPreview(ctx context.Context, userID, previewID string) (domain.HairPreview, error) {
-	if _, err := uuid.Parse(previewID); err != nil {
-		return domain.HairPreview{}, repository.ErrNotFound
-	}
-	preview, err := s.repo.GetHairPreview(ctx, userID, previewID)
-	if err == nil {
-		preview.SourceImageURL = s.absoluteURL(preview.SourceImageURL)
-		if preview.ResultImageURL != "" {
-			preview.ResultImageURL = s.absoluteURL(preview.ResultImageURL)
-		}
-	}
-	return preview, err
-}
-
-func (s *Service) ListSavedHairPreviews(ctx context.Context, userID string) ([]domain.HairPreview, error) {
-	items, err := s.repo.ListSavedHairPreviews(ctx, userID)
-	for index := range items {
-		items[index].SourceImageURL = s.absoluteURL(items[index].SourceImageURL)
-		items[index].ResultImageURL = s.absoluteURL(items[index].ResultImageURL)
-	}
-	return items, err
-}
-
-func (s *Service) SaveHairPreview(ctx context.Context, userID, previewID string) (domain.HairPreview, error) {
-	if _, err := uuid.Parse(previewID); err != nil {
-		return domain.HairPreview{}, repository.ErrNotFound
-	}
-	preview, err := s.repo.SaveHairPreview(ctx, userID, previewID)
-	if err == nil {
-		preview.SourceImageURL = s.absoluteURL(preview.SourceImageURL)
-		preview.ResultImageURL = s.absoluteURL(preview.ResultImageURL)
-	}
-	return preview, err
-}
-
-func buildToolResult(kind, scene string) domain.ToolResult {
-	sceneNames := map[string]string{"general": "当前场景", "daily": "日常", "interview": "面试", "wedding": "婚礼", "date": "约会"}
-	sceneName := sceneNames[scene]
-	switch kind {
-	case "hair":
-		return domain.ToolResult{
-			Kind: "hair", Scene: scene, Conclusion: "首选锁骨层次发",
-			PriorityTitle: "提高发型重心，露出肩颈",
-			PriorityCopy:  "比贴脸长直发更能突出眉眼与头肩比例，同时保留自然亲和感。",
-			Tags:          []string{"重心提高", "肩颈更清晰", "容易打理"},
-			Options: []domain.ToolOption{
-				{ID: "sharp", Name: "锁骨层次发", ImageURL: "/assets/looks/sharp.png", Note: "首选推荐", Reason: "提高视觉重心并保留脸侧空气感。", Tags: []string{"重心提高", "肩颈清晰"}},
-				{ID: "warm", Name: "空气微卷", ImageURL: "/assets/looks/warm.png", Note: "柔和表达", Reason: "发尾弧度保留亲和感，更适合沟通场景。", Tags: []string{"自然柔和", "上镜"}},
-				{ID: "natural", Name: "自然偏分", ImageURL: "/assets/looks/natural.png", Note: "低维护", Reason: "只调整分缝与耳侧线条，日常最容易维持。", Tags: []string{"改动小", "低维护"}},
-			},
-		}
-	case "outfit":
-		return domain.ToolResult{
-			Kind: "outfit", Scene: scene, Conclusion: "整体方向对了，先改一处",
-			PriorityTitle: "把深色内搭换成象牙白",
-			PriorityCopy:  fmt.Sprintf("不换整套衣服，就能让眉眼更清晰、上半身更轻盈，也更适合%s。", sceneName),
-			Tags:          []string{"预计 3 分钟", "无需购买新衣", "变化明显"},
-			Findings: []domain.ToolFinding{
-				{Label: "上身配色偏沉", Category: "color", Tone: "improve"},
-				{Label: "肩线不够清晰", Category: "silhouette", Tone: "improve"},
-				{Label: "腰线可以上移", Category: "proportion", Tone: "optional"},
-			},
-		}
-	default:
-		return domain.ToolResult{
-			Kind: "purchase", Scene: scene, Conclusion: "比较适合",
-			PriorityTitle: fmt.Sprintf("适合%s，但建议搭配挺括下装", sceneName),
-			PriorityCopy:  "清晰肩线有利于头肩比例，低饱和颜色也容易与现有衣橱组合。",
-			Tags:          []string{"象牙白内搭", "深灰直筒裤", "黑色低跟鞋"},
-			Findings: []domain.ToolFinding{
-				{Label: "清晰肩线能改善头肩比例", Category: "silhouette", Tone: "positive"},
-				{Label: "低饱和颜色容易组合", Category: "color", Tone: "positive"},
-				{Label: "正式场合需要更挺括下装", Category: "fabric", Tone: "caution"},
-			},
-		}
-	}
-}
 
 func (s *Service) DeleteUserData(ctx context.Context, userID string) error {
 	keys, err := s.repo.DeleteUserData(ctx, userID)
@@ -600,378 +644,6 @@ func (s *Service) DeleteUserData(ctx context.Context, userID string) error {
 		}
 	}
 	return nil
-}
-
-func (s *Service) RunWorker(ctx context.Context, poll time.Duration) {
-	go s.runHairPreviewWorker(ctx, poll)
-	go s.runPlanLookWorker(ctx, poll)
-	go s.runTodayPlanLookWorker(ctx, poll)
-	ticker := time.NewTicker(poll)
-	defer ticker.Stop()
-	s.logger.Info("analysis worker started", "poll", poll)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			job, ok, err := s.repo.ClaimAnalysisJob(ctx)
-			if err != nil {
-				s.logger.Error("claim analysis job", "error", err)
-				continue
-			}
-			if !ok {
-				continue
-			}
-			s.guardWorkerJob("analysis", job.AnalysisID, func(cause error) {
-				failCtx, failCancel := failContext()
-				defer failCancel()
-				if err := s.repo.FailAnalysis(failCtx, job, cause); err != nil {
-					s.logger.Error("fail analysis after panic", "analysis_id", job.AnalysisID, "error", err)
-				}
-			}, func() { s.processJob(ctx, job) })
-		}
-	}
-}
-
-func (s *Service) runHairPreviewWorker(ctx context.Context, poll time.Duration) {
-	ticker := time.NewTicker(poll)
-	defer ticker.Stop()
-	s.logger.Info("hair preview worker started", "poll", poll)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			job, ok, err := s.repo.ClaimHairPreview(ctx)
-			if err != nil {
-				s.logger.Error("claim hair preview", "error", err)
-				continue
-			}
-			if ok {
-				s.guardWorkerJob("hair_preview", job.PreviewID, func(cause error) {
-					failCtx, failCancel := failContext()
-					defer failCancel()
-					if err := s.repo.FailHairPreview(failCtx, job, cause); err != nil {
-						s.logger.Error("fail hair preview after panic", "preview_id", job.PreviewID, "error", err)
-					}
-				}, func() { s.processHairPreview(ctx, job) })
-			}
-		}
-	}
-}
-
-func (s *Service) runPlanLookWorker(ctx context.Context, poll time.Duration) {
-	ticker := time.NewTicker(poll)
-	defer ticker.Stop()
-	s.logger.Info("plan look worker started", "poll", poll)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			job, ok, err := s.repo.ClaimPlanLook(ctx)
-			if err != nil {
-				s.logger.Error("claim plan look", "error", err)
-				continue
-			}
-			if ok {
-				s.guardWorkerJob("plan_look", job.PlanID, func(cause error) {
-					failCtx, failCancel := failContext()
-					defer failCancel()
-					if err := s.repo.FailPlanLook(failCtx, job, cause); err != nil {
-						s.logger.Error("fail plan look after panic", "plan_id", job.PlanID, "error", err)
-					}
-				}, func() { s.processPlanLook(ctx, job) })
-			}
-		}
-	}
-}
-
-func (s *Service) runTodayPlanLookWorker(ctx context.Context, poll time.Duration) {
-	ticker := time.NewTicker(poll)
-	defer ticker.Stop()
-	s.logger.Info("today plan look worker started", "poll", poll)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			job, ok, err := s.repo.ClaimTodayPlanLook(ctx)
-			if err != nil {
-				s.logger.Error("claim today plan look", "error", err)
-				continue
-			}
-			if ok {
-				s.guardWorkerJob("today_plan_look", job.PlanID, func(cause error) {
-					failCtx, failCancel := failContext()
-					defer failCancel()
-					if err := s.repo.FailTodayPlanLook(failCtx, job, cause); err != nil {
-						s.logger.Error("fail today plan look after panic", "plan_id", job.PlanID, "error", err)
-					}
-				}, func() { s.processTodayPlanLook(ctx, job) })
-			}
-		}
-	}
-}
-
-func (s *Service) processTodayPlanLook(ctx context.Context, job domain.TodayPlanLookJob) {
-	jobCtx, cancel := context.WithTimeout(ctx, planLookJobTimeout)
-	defer cancel()
-	jobCtx = provider.WithInvocationSource(jobCtx, "today_look:"+job.PlanID)
-	failCtx, failCancel := failContext()
-	defer failCancel()
-	if s.lookGenerator == nil {
-		s.recordTodayPlanLookFailure(failCtx, job, errors.New("plan look generator is not configured"))
-		return
-	}
-	steps := make([]domain.PlanStep, 0, len(job.Steps))
-	for _, step := range job.Steps {
-		steps = append(steps, domain.PlanStep{Category: step.Category, Title: step.Title, Summary: step.Copy})
-	}
-	output, err := s.lookGenerator.Generate(jobCtx, provider.LookInput{Name: job.Title, Why: job.Summary, Steps: steps, MediaIDs: job.MediaIDs})
-	if err != nil {
-		s.recordTodayPlanLookFailure(failCtx, job, err)
-		return
-	}
-	extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
-	if extension == "" {
-		s.recordTodayPlanLookFailure(failCtx, job, errors.New("look provider returned an unsupported image format"))
-		return
-	}
-	// 生成可能已经用满 jobCtx，存储与回写改用独立上下文，避免成果被丢弃重排。
-	writeCtx, writeCancel := writeContext()
-	defer writeCancel()
-	storageKey := fmt.Sprintf("%s/generated/today/%s%s", job.UserID, uuid.NewString(), extension)
-	storedKey, saveErr := s.storage.Save(writeCtx, storageKey, bytes.NewReader(output.ImageData))
-	if saveErr != nil {
-		s.recordTodayPlanLookFailure(failCtx, job, saveErr)
-		return
-	}
-	if err := s.repo.CompleteTodayPlanLook(writeCtx, job, "/uploads/"+storedKey, storedKey, output.ProviderVersion); err != nil {
-		_ = s.storage.Delete(writeCtx, storedKey)
-		s.loggerOrDefault().Error("complete today plan look", "plan_id", job.PlanID, "error", err)
-		s.recordTodayPlanLookFailure(failCtx, job, err)
-	}
-}
-
-func (s *Service) processPlanLook(ctx context.Context, job domain.PlanLookJob) {
-	jobCtx, cancel := context.WithTimeout(ctx, planLookJobTimeout)
-	defer cancel()
-	jobCtx = provider.WithInvocationSource(jobCtx, "plan_look:"+job.PlanID)
-	failCtx, failCancel := failContext()
-	defer failCancel()
-	if s.lookGenerator == nil {
-		s.recordPlanLookFailure(failCtx, job, errors.New("plan look generator is not configured"))
-		return
-	}
-	output, err := s.lookGenerator.Generate(jobCtx, provider.LookInput{Name: job.Name, Slug: job.Slug, Why: job.Why, Steps: job.Steps, MediaIDs: job.MediaIDs})
-	if err != nil {
-		s.recordPlanLookFailure(failCtx, job, err)
-		return
-	}
-	extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
-	if extension == "" {
-		s.recordPlanLookFailure(failCtx, job, errors.New("look provider returned an unsupported image format"))
-		return
-	}
-	// 生成可能已经用满 jobCtx，存储与回写改用独立上下文，避免成果被丢弃重排。
-	writeCtx, writeCancel := writeContext()
-	defer writeCancel()
-	storageKey := fmt.Sprintf("%s/generated/looks/%s%s", job.UserID, uuid.NewString(), extension)
-	storedKey, saveErr := s.storage.Save(writeCtx, storageKey, bytes.NewReader(output.ImageData))
-	if saveErr != nil {
-		s.recordPlanLookFailure(failCtx, job, saveErr)
-		return
-	}
-	if err := s.repo.CompletePlanLook(writeCtx, job, "/uploads/"+storedKey, storedKey, output.ProviderVersion); err != nil {
-		_ = s.storage.Delete(writeCtx, storedKey)
-		s.logger.Error("complete plan look", "plan_id", job.PlanID, "error", err)
-		s.recordPlanLookFailure(failCtx, job, err)
-	}
-}
-
-func (s *Service) processHairPreview(ctx context.Context, job domain.HairPreviewJob) {
-	jobCtx, cancel := context.WithTimeout(ctx, hairPreviewJobTimeout)
-	defer cancel()
-	jobCtx = provider.WithInvocationSource(jobCtx, "hair_preview:"+job.PreviewID)
-	failCtx, failCancel := failContext()
-	defer failCancel()
-	output, err := s.hairGenerator.Generate(jobCtx, job.Input)
-	if err != nil {
-		s.recordHairPreviewFailure(failCtx, job, err)
-		return
-	}
-	resultURL, storageKey := output.ImageURL, ""
-	writeCtx, writeCancel := writeContext()
-	defer writeCancel()
-	if len(output.ImageData) > 0 {
-		extension := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[output.MIMEType]
-		if extension == "" {
-			s.recordHairPreviewFailure(failCtx, job, errors.New("hair preview provider returned an unsupported image format"))
-			return
-		}
-		storageKey = fmt.Sprintf("%s/generated/hair/%s%s", job.UserID, uuid.NewString(), extension)
-		storedKey, saveErr := s.storage.Save(writeCtx, storageKey, bytes.NewReader(output.ImageData))
-		if saveErr != nil {
-			s.recordHairPreviewFailure(failCtx, job, saveErr)
-			return
-		}
-		storageKey = storedKey
-		resultURL = "/uploads/" + storedKey
-	}
-	if resultURL == "" {
-		s.recordHairPreviewFailure(failCtx, job, errors.New("hair preview provider returned no image"))
-		return
-	}
-	if err := s.repo.CompleteHairPreview(writeCtx, job, resultURL, storageKey, output.ProviderVersion); err != nil {
-		if storageKey != "" {
-			_ = s.storage.Delete(writeCtx, storageKey)
-		}
-		s.logger.Error("complete hair preview", "preview_id", job.PreviewID, "error", err)
-		s.recordHairPreviewFailure(failCtx, job, err)
-	}
-}
-
-const (
-	analysisJobTimeout    = 5 * time.Minute
-	hairPreviewJobTimeout = 5 * time.Minute
-	planLookJobTimeout    = 5 * time.Minute
-	// maxJobAttempts 与 repository 层 FailAnalysis/FailHairPreview 的终态阈值
-	// 保持一致:达到该次数的失败不再重新入队。
-	maxJobAttempts = 3
-	// maxGenerationAttempts 对齐 FailPlanLook/FailTodayPlanLook 的终态阈值
-	// (生成类任务只重试 1 次)。
-	maxGenerationAttempts = 2
-)
-
-// loggerOrDefault 兜底 nil logger:测试常用结构体字面量构造 Service,
-// 失败路径的日志不允许因缺 logger 而 panic。
-func (s *Service) loggerOrDefault() *slog.Logger {
-	if s.logger != nil {
-		return s.logger
-	}
-	return slog.Default()
-}
-
-// recordAnalysisFailure 回写分析任务失败状态并记录任务级日志。此前失败只落库
-// 不打日志,模型故障时任务像"凭空消失",只能靠零散的 AI invocation WARN 反推。
-func (s *Service) recordAnalysisFailure(ctx context.Context, job domain.AnalysisJob, cause error) {
-	if err := s.repo.FailAnalysis(ctx, job, cause); err != nil {
-		s.loggerOrDefault().Error("fail analysis writeback", "analysis_id", job.AnalysisID, "error", err)
-	}
-	if job.Attempt >= maxJobAttempts {
-		s.loggerOrDefault().Error("analysis job failed permanently", "analysis_id", job.AnalysisID, "attempt", job.Attempt, "error", cause)
-		return
-	}
-	s.loggerOrDefault().Warn("analysis job failed, retry scheduled", "analysis_id", job.AnalysisID, "attempt", job.Attempt, "error", cause)
-}
-
-func (s *Service) recordPlanLookFailure(ctx context.Context, job domain.PlanLookJob, cause error) {
-	if err := s.repo.FailPlanLook(ctx, job, cause); err != nil {
-		s.loggerOrDefault().Error("fail plan look writeback", "plan_id", job.PlanID, "error", err)
-	}
-	if job.Attempt >= maxGenerationAttempts {
-		s.loggerOrDefault().Error("plan look job failed permanently", "plan_id", job.PlanID, "attempt", job.Attempt, "error", cause)
-		return
-	}
-	s.loggerOrDefault().Warn("plan look job failed, retry scheduled", "plan_id", job.PlanID, "attempt", job.Attempt, "error", cause)
-}
-
-func (s *Service) recordTodayPlanLookFailure(ctx context.Context, job domain.TodayPlanLookJob, cause error) {
-	if err := s.repo.FailTodayPlanLook(ctx, job, cause); err != nil {
-		s.loggerOrDefault().Error("fail today plan look writeback", "plan_id", job.PlanID, "error", err)
-	}
-	if job.Attempt >= maxGenerationAttempts {
-		s.loggerOrDefault().Error("today plan look job failed permanently", "plan_id", job.PlanID, "attempt", job.Attempt, "error", cause)
-		return
-	}
-	s.loggerOrDefault().Warn("today plan look job failed, retry scheduled", "plan_id", job.PlanID, "attempt", job.Attempt, "error", cause)
-}
-
-func (s *Service) recordHairPreviewFailure(ctx context.Context, job domain.HairPreviewJob, cause error) {
-	if err := s.repo.FailHairPreview(ctx, job, cause); err != nil {
-		s.loggerOrDefault().Error("fail hair preview writeback", "preview_id", job.PreviewID, "error", err)
-	}
-	if job.Attempt >= maxJobAttempts {
-		s.loggerOrDefault().Error("hair preview job failed permanently", "preview_id", job.PreviewID, "attempt", job.Attempt, "error", cause)
-		return
-	}
-	s.loggerOrDefault().Warn("hair preview job failed, retry scheduled", "preview_id", job.PreviewID, "attempt", job.Attempt, "error", cause)
-}
-
-// failContext 返回一个从 context.Background() 派生的 10 秒超时上下文，
-// 专供任务失败后的状态回写使用。worker 的 jobCtx 在 provider 调用因 5 分钟
-// 超时取消后已经过期，继续用它调 FailAnalysis/RejectAnalysis 等回写会让
-// SQL 全部因 DeadlineExceeded 失败，任务永远停在 running/processing。
-func failContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 10*time.Second)
-}
-
-// writeContext 返回一个独立的 1 分钟超时上下文，供生成完成后的对象存储写入
-// 与状态回写使用。provider 调用可能几乎用满 jobCtx 的 5 分钟，继续用 jobCtx
-// 会把已经生成完的图丢弃并把任务重新排队，用户看到的是方案一直"生成中"。
-func writeContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), time.Minute)
-}
-
-// guardWorkerJob 把单个任务的 panic 转成普通失败回写，避免一个"毒任务"直接
-// 崩掉 worker 进程（RUN_WORKER 内嵌时会连 API 一起崩），导致所有已领取的
-// 任务永远停在 running/processing。
-func (s *Service) guardWorkerJob(kind, id string, fail func(error), run func()) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			s.logger.Error("worker job panicked", "kind", kind, "id", id, "panic", recovered)
-			if fail != nil {
-				fail(fmt.Errorf("worker %s job panicked: %v", kind, recovered))
-			}
-		}
-	}()
-	run()
-}
-
-func (s *Service) processJob(ctx context.Context, job domain.AnalysisJob) {
-	jobCtx, cancel := context.WithTimeout(ctx, analysisJobTimeout)
-	defer cancel()
-	// 任务标识随 ctx 传入 AI runtime,让每次调用的日志能关联到具体任务。
-	jobCtx = provider.WithInvocationSource(jobCtx, "analysis:"+job.AnalysisID)
-	failCtx, failCancel := failContext()
-	defer failCancel()
-	jobCtx = provider.WithProgressReporter(jobCtx, func(progress int, stage string) {
-		_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, progress, stage)
-	})
-	output, err := s.analyzer.Analyze(jobCtx, job.Input)
-	if err != nil {
-		var rejected *provider.PhotoRejectedError
-		if errors.As(err, &rejected) {
-			if failErr := s.repo.RejectAnalysis(failCtx, job, rejected.UserMessage()); failErr != nil {
-				s.logger.Error("reject analysis", "analysis_id", job.AnalysisID, "error", failErr)
-			}
-			return
-		}
-		s.recordAnalysisFailure(failCtx, job, err)
-		return
-	}
-	_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, 82, "正在组合发型、妆容与穿搭方案")
-	writeCtx, writeCancel := writeContext()
-	defer writeCancel()
-	currentImageURL, err := s.analysisPreviewURL(writeCtx, job.UserID, job.Input.MediaIDs)
-	if err != nil {
-		s.recordAnalysisFailure(failCtx, job, err)
-		return
-	}
-	// The "current" image is source evidence, never a provider-generated or
-	// stock reference. This keeps every provider and fallback on the same
-	// user-photo contract.
-	output.CurrentImageURL = currentImageURL
-	_ = s.repo.UpdateAnalysisProgress(jobCtx, job.AnalysisID, 95, "正在保存形象档案")
-	if _, err := s.repo.CompleteAnalysis(writeCtx, job, output); err != nil {
-		if errors.Is(err, repository.ErrAnalysisRemoved) {
-			s.logger.Info("analysis removed while processing; discarding result", "analysis_id", job.AnalysisID)
-			return
-		}
-		s.logger.Error("complete analysis", "analysis_id", job.AnalysisID, "error", err)
-		s.recordAnalysisFailure(failCtx, job, err)
-	}
 }
 
 // resolveAssetURL expands a stored asset reference to a currently loadable

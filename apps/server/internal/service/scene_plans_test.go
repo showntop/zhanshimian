@@ -63,13 +63,5 @@ func TestValidateScenePlanInput(t *testing.T) {
 	}
 }
 
-func TestLegacyScenePlanBriefIsStillAccepted(t *testing.T) {
-	legacy := domain.ScenePlanInput{Scene: "interview", Time: "week", Budget: "mid", Formality: "proper", Impression: "reliable"}
-	answers, err := normalizedSceneAnswers(legacy)
-	if err != nil {
-		t.Fatalf("legacy brief rejected: %v", err)
-	}
-	if answers["format"] != "onsite" || answers["preparation"] != "key-piece" {
-		t.Fatalf("legacy fields were not normalized: %#v", answers)
-	}
-}
+// 旧版散字段（time/budget/formality/impression）不再兼容：新契约 PUT 请求体
+// 统一为 {scene, answers}，客户端全新实现，无历史包袱（见 docs/architecture.md D2）。

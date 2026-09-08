@@ -35,7 +35,17 @@ type Config struct {
 	AMapDefaultCity               string
 	AMapDefaultAdcode             string
 	WeatherRequestTimeout         time.Duration
-	RunWorker                     bool
+	// 二期：多端身份与登录
+	SmsProvider               string
+	SmsRatePerPhonePerHour    int64
+	AliyunSmsAccessKeyID      string
+	AliyunSmsAccessKeySecret  string
+	AliyunSmsSign             string
+	AliyunSmsTemplateCode     string
+	AppleBundleID             string
+	WeChatOpenAppID           string
+	WeChatOpenAppSecret       string
+	RunWorker                 bool
 	SessionTTL                    time.Duration
 	MaxUploadBytes                int64
 	AnalysisPollTime              time.Duration
@@ -90,10 +100,19 @@ func Load() (Config, error) {
 		AMapDefaultCity:               env("AMAP_DEFAULT_CITY", "上海"),
 		AMapDefaultAdcode:             env("AMAP_DEFAULT_ADCODE", "310000"),
 		WeatherRequestTimeout:         time.Duration(envInt("WEATHER_REQUEST_TIMEOUT_SECONDS", 5)) * time.Second,
+		SmsProvider:                   env("SMS_PROVIDER", "console"),
+		SmsRatePerPhonePerHour:        int64(envInt("SMS_RATE_PER_PHONE_PER_HOUR", 5)),
+		AliyunSmsAccessKeyID:          os.Getenv("ALIYUN_SMS_ACCESS_KEY_ID"),
+		AliyunSmsAccessKeySecret:      os.Getenv("ALIYUN_SMS_ACCESS_KEY_SECRET"),
+		AliyunSmsSign:                 os.Getenv("ALIYUN_SMS_SIGN"),
+		AliyunSmsTemplateCode:         os.Getenv("ALIYUN_SMS_TEMPLATE_CODE"),
+		AppleBundleID:                 os.Getenv("APPLE_BUNDLE_ID"),
+		WeChatOpenAppID:               os.Getenv("WECHAT_OPEN_APP_ID"),
+		WeChatOpenAppSecret:           os.Getenv("WECHAT_OPEN_APP_SECRET"),
 		RunWorker:                     envBool("RUN_WORKER", true),
 		SessionTTL:                    30 * 24 * time.Hour,
 		MaxUploadBytes:                10 << 20,
-		AnalysisPollTime:              700 * time.Millisecond,
+		AnalysisPollTime:              time.Duration(envInt("ANALYSIS_POLL_MS", 700)) * time.Millisecond,
 		AIProvider:                    aiProvider,
 		AIFallbackToDemo:              envBool("AI_FALLBACK_TO_DEMO", true),
 		AIRequestTimeout:              time.Duration(envInt("AI_REQUEST_TIMEOUT_SECONDS", 90)) * time.Second,
@@ -133,6 +152,15 @@ func Load() (Config, error) {
 	if cfg.AIProvider != "demo" && cfg.AIProvider != "openai" {
 		return Config{}, fmt.Errorf("AI_PROVIDER must be demo or openai")
 	}
+	if cfg.SmsProvider != "console" && cfg.SmsProvider != "aliyun" {
+		return Config{}, fmt.Errorf("SMS_PROVIDER must be console or aliyun")
+	}
+	if cfg.SmsProvider == "aliyun" && (cfg.AliyunSmsSign == "" || cfg.AliyunSmsTemplateCode == "") {
+		return Config{}, fmt.Errorf("ALIYUN_SMS_SIGN and ALIYUN_SMS_TEMPLATE_CODE are required for aliyun SMS")
+	}
+	if cfg.SmsProvider == "aliyun" && (cfg.AliyunSmsAccessKeyID == "" || cfg.AliyunSmsAccessKeySecret == "") {
+		return Config{}, fmt.Errorf("ALIYUN_SMS_ACCESS_KEY_ID and ALIYUN_SMS_ACCESS_KEY_SECRET are required for aliyun SMS")
+	}
 	if cfg.HairPreviewProvider != "demo" && cfg.HairPreviewProvider != "openai" {
 		return Config{}, fmt.Errorf("HAIR_PREVIEW_PROVIDER must be demo or openai")
 	}
@@ -163,6 +191,10 @@ func Load() (Config, error) {
 		}
 		if cfg.WeatherProvider != "amap" {
 			return Config{}, fmt.Errorf("WEATHER_PROVIDER must be amap in production")
+		}
+		// ConsoleSms 是固定验证码的开发实现，生产禁用（否则任何人可登录任意手机号）。
+		if cfg.SmsProvider != "aliyun" {
+			return Config{}, fmt.Errorf("SMS_PROVIDER must be aliyun in production")
 		}
 		if err := validateHTTPSURL(cfg.AMapAPIBaseURL); err != nil {
 			return Config{}, fmt.Errorf("AMAP_API_BASE_URL: %w", err)

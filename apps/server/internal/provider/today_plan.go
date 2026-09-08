@@ -19,6 +19,9 @@ type TodayPlanGrounding struct {
 	Context       domain.TodayContext
 	Variant       int
 	PreviousTitle string
+	// Profile carries the persisted 补充资料 when the user filled one;
+	// providers degrade safely when it is nil.
+	Profile *domain.UserProfile
 }
 
 type TodayPlanOutput struct {

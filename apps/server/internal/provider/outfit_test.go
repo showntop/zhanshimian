@@ -12,9 +12,9 @@ import (
 	"github.com/zhanshimian/server/internal/domain"
 )
 
-type outfitAdvisorFunc func(context.Context, domain.ToolInput) (domain.ToolResult, error)
+type outfitAdvisorFunc func(context.Context, domain.DiagnosticInput) (domain.ToolResult, error)
 
-func (fn outfitAdvisorFunc) Diagnose(ctx context.Context, input domain.ToolInput) (domain.ToolResult, error) {
+func (fn outfitAdvisorFunc) Diagnose(ctx context.Context, input domain.DiagnosticInput) (domain.ToolResult, error) {
 	return fn(ctx, input)
 }
 
@@ -50,7 +50,7 @@ func TestOpenAIOutfitAdvisorUsesPrivateStructuredVision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := advisor.Diagnose(context.Background(), domain.ToolInput{Kind: "outfit", MediaID: "outfit", Scene: "interview"})
+	result, err := advisor.Diagnose(context.Background(), domain.DiagnosticInput{Kind: "outfit", MediaID: "outfit", Scene: "interview"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,10 +67,10 @@ func TestOutfitPayloadRejectsUnsafeCopy(t *testing.T) {
 }
 
 func TestFallbackOutfitAdvisorUsesDemo(t *testing.T) {
-	primary := outfitAdvisorFunc(func(context.Context, domain.ToolInput) (domain.ToolResult, error) {
+	primary := outfitAdvisorFunc(func(context.Context, domain.DiagnosticInput) (domain.ToolResult, error) {
 		return domain.ToolResult{}, errors.New("upstream unavailable")
 	})
-	result, err := NewFallbackOutfitAdvisor(primary, NewDemoOutfitAdvisor()).Diagnose(context.Background(), domain.ToolInput{Kind: "outfit", Scene: "daily"})
+	result, err := NewFallbackOutfitAdvisor(primary, NewDemoOutfitAdvisor()).Diagnose(context.Background(), domain.DiagnosticInput{Kind: "outfit", Scene: "daily"})
 	if err != nil || result.ProviderVersion != "demo-outfit-v1" {
 		t.Fatalf("fallback failed: %#v %v", result, err)
 	}

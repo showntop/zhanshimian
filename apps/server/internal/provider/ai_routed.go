@@ -136,7 +136,7 @@ func newRoutedToolAdvisor(runtime *AIRuntime, loader MediaLoader, capability, ki
 	return &RoutedToolAdvisor{runtime: runtime, loader: loader, capability: capability, kind: kind}, nil
 }
 
-func (a *RoutedToolAdvisor) Diagnose(ctx context.Context, input domain.ToolInput) (domain.ToolResult, error) {
+func (a *RoutedToolAdvisor) Diagnose(ctx context.Context, input domain.DiagnosticInput) (domain.ToolResult, error) {
 	images, err := a.loader.Load(ctx, []string{input.MediaID})
 	if err != nil {
 		return domain.ToolResult{}, fmt.Errorf("load %s photo: %w", a.kind, err)
@@ -186,7 +186,7 @@ func (a *RoutedToolAdvisor) Diagnose(ctx context.Context, input domain.ToolInput
 	return output, nil
 }
 
-func purchasePrompt(input domain.ToolInput) string {
+func purchasePrompt(input domain.DiagnosticInput) string {
 	scenes := map[string]string{"general": "通用", "daily": "日常", "interview": "面试", "wedding": "婚礼", "date": "约会"}
 	return "请判断图片中的商品是否值得用于用户的" + scenes[input.Scene] + "场景。给出一个明确但有条件的结论，指出三处可见依据，并选出最重要的购买建议。不要猜测图片中看不到的品牌、面料成分或价格；建议如何与现有基础款组合，并说明何种情况下不建议买。" + toolContextPrompt(input.Context)
 }

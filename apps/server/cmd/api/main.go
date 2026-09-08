@@ -63,9 +63,18 @@ func main() {
 		logger.Error("create wechat login provider", "error", err)
 		os.Exit(1)
 	}
+	wechatApp := buildWeChatApp(cfg, logger)
+	apple := buildApple(cfg, logger)
+	sms, err := buildSms(cfg, logger)
+	if err != nil {
+		logger.Error("create sms provider", "provider", cfg.SmsProvider, "error", err)
+		os.Exit(1)
+	}
 	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
 	svc := service.New(repo, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
-		Hair: ai.Hair, Look: ai.Look, Outfit: ai.Outfit, Purchase: ai.Purchase, Advisor: ai.Advisor, Today: ai.Today, Weather: weather, WeChat: wechat, AssetURLTTL: cfg.AssetURLTTL,
+		Hair: ai.Hair, Look: ai.Look, Outfit: ai.Outfit, Purchase: ai.Purchase, Advisor: ai.Advisor, Today: ai.Today,
+		Weather: weather, WeChat: wechat, WeChatApp: wechatApp, Apple: apple, Sms: sms,
+		SmsPerPhone: cfg.SmsRatePerPhonePerHour, AssetURLTTL: cfg.AssetURLTTL,
 	})
 	if cfg.RunWorker {
 		go svc.RunWorker(ctx, cfg.AnalysisPollTime)
@@ -75,15 +84,18 @@ func main() {
 	root.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(cfg.AssetDir))))
 	root.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadDir))))
 	root.Handle("/", httpapi.New(svc, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
-		Environment:             cfg.Environment,
-		StorageProvider:         cfg.StorageProvider,
-		WeatherProvider:         cfg.WeatherProvider,
-		WeChatLoginConfigured:   wechat != nil,
-		AnalysisProvider:        cfg.AIProvider,
-		FallbackEnabled:         cfg.AIProvider == "openai" && cfg.AIFallbackToDemo,
-		HairPreviewProvider:     cfg.HairPreviewProvider,
-		OutfitDiagnosisProvider: cfg.OutfitDiagnosisProvider,
-		AIRoutes:                ai.Routes,
+		Environment:               cfg.Environment,
+		StorageProvider:           cfg.StorageProvider,
+		WeatherProvider:           cfg.WeatherProvider,
+		WeChatLoginConfigured:     wechat != nil,
+		WeChatAppConfigured:       wechatApp != nil,
+		AppleLoginConfigured:      apple != nil,
+		SmsProvider:               cfg.SmsProvider,
+		AnalysisProvider:          cfg.AIProvider,
+		FallbackEnabled:           cfg.AIProvider == "openai" && cfg.AIFallbackToDemo,
+		HairPreviewProvider:       cfg.HairPreviewProvider,
+		OutfitDiagnosisProvider:   cfg.OutfitDiagnosisProvider,
+		AIRoutes:                  ai.Routes,
 	}))
 	writeTimeout := 30 * time.Second
 	if cfg.AIRoutingSource != "" {
@@ -128,6 +140,51 @@ func buildWeChat(cfg config.Config) (provider.WeChatAuthenticator, error) {
 		AppID: cfg.WeChatAppID, AppSecret: cfg.WeChatAppSecret,
 		BaseURL: cfg.WeChatAPIBaseURL, Timeout: cfg.WeChatRequestTimeout,
 	}, nil)
+}
+
+// buildWeChatApp：微信开放平台 App OAuth（Android 端）。凭据可选——未配置时
+// 该登录方式关闭（生产门禁不强制，因为小程序生产不依赖它）。
+func buildWeChatApp(cfg config.Config, logger *slog.Logger) provider.WeChatAuthenticator {
+	if cfg.WeChatOpenAppID == "" || cfg.WeChatOpenAppSecret == "" {
+		return nil
+	}
+	exchanger, err := provider.NewWeChatAppExchanger(provider.WeChatConfig{
+		AppID: cfg.WeChatOpenAppID, AppSecret: cfg.WeChatOpenAppSecret,
+		Timeout: cfg.WeChatRequestTimeout,
+	}, nil)
+	if err != nil {
+		logger.Warn("wechat app login disabled", "error", err)
+		return nil
+	}
+	return exchanger
+}
+
+// buildApple：Apple 登录（iOS 端）。未配置 BundleID 时关闭。
+func buildApple(cfg config.Config, logger *slog.Logger) provider.AppleAuthenticator {
+	if cfg.AppleBundleID == "" {
+		return nil
+	}
+	verifier, err := provider.NewAppleIDVerifier(cfg.AppleBundleID, nil)
+	if err != nil {
+		logger.Warn("apple login disabled", "error", err)
+		return nil
+	}
+	return verifier
+}
+
+// buildSms：短信验证码发送。console 仅供开发（固定码 888888 回传 dev_code），
+// 生产配置门禁强制 aliyun。
+func buildSms(cfg config.Config, logger *slog.Logger) (provider.SmsSender, error) {
+	if cfg.SmsProvider == "aliyun" {
+		return provider.NewAliyunSms(provider.AliyunSmsConfig{
+			AccessKeyID:     cfg.AliyunSmsAccessKeyID,
+			AccessKeySecret: cfg.AliyunSmsAccessKeySecret,
+			SignName:        cfg.AliyunSmsSign,
+			TemplateCode:    cfg.AliyunSmsTemplateCode,
+			Timeout:         5 * time.Second,
+		}, nil)
+	}
+	return provider.NewConsoleSms(logger, cfg.Environment == "development"), nil
 }
 
 func buildWeather(cfg config.Config) (provider.WeatherProvider, error) {

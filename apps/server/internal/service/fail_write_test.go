@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"strings"
@@ -16,39 +17,55 @@ import (
 
 var errRetry = errors.New("provider unavailable")
 
-// failWriteRecorder captures the state of the context used by the
-// failure/rejection write-backs at the moment they are invoked.
-type failWriteRecorder struct {
+// taskWriteRecorder 捕获统一任务系统回写发生瞬间的上下文与参数。
+type taskWriteRecorder struct {
 	repository.Repository
-	failErr           error
-	failDeadline      time.Time
-	failHasDeadline   bool
-	rejectErr         error
-	rejectDeadline    time.Time
-	rejectHasDeadline bool
+	getInputErr error
+
+	failErr         error
+	failDeadline    time.Time
+	failHasDeadline bool
+	failCode        string
+	failRetryAt     time.Time
+
+	completeCalled bool
+
+	presentationErr         error
+	presentationDeadline    time.Time
+	presentationHasDeadline bool
 }
 
-func (r *failWriteRecorder) FailAnalysis(ctx context.Context, _ domain.AnalysisJob, _ error) error {
+func (r *taskWriteRecorder) GetAnalysisInput(context.Context, string, string) (domain.CreateAnalysisInput, error) {
+	if r.getInputErr != nil {
+		return domain.CreateAnalysisInput{}, r.getInputErr
+	}
+	return domain.CreateAnalysisInput{Scene: "interview"}, nil
+}
+
+func (r *taskWriteRecorder) UpdateTaskProgress(context.Context, string, int, string) error { return nil }
+
+func (r *taskWriteRecorder) UpdateAnalysisProgress(context.Context, string, int, string) error { return nil }
+
+func (r *taskWriteRecorder) FailTask(ctx context.Context, _, code, _ string, _ []string, retryAt time.Time) error {
 	r.failErr = ctx.Err()
 	r.failDeadline, r.failHasDeadline = ctx.Deadline()
+	r.failCode = code
+	r.failRetryAt = retryAt
 	return nil
 }
 
-func (r *failWriteRecorder) RejectAnalysis(ctx context.Context, _ domain.AnalysisJob, _ string) error {
-	r.rejectErr = ctx.Err()
-	r.rejectDeadline, r.rejectHasDeadline = ctx.Deadline()
+func (r *taskWriteRecorder) CompleteTask(context.Context, string, string) error {
+	r.completeCalled = true
 	return nil
 }
 
-// errAnalyzer returns a fixed error without consulting ctx.
-type errAnalyzer struct{ err error }
-
-func (a errAnalyzer) Analyze(context.Context, domain.CreateAnalysisInput) (domain.AnalysisOutput, error) {
-	return domain.AnalysisOutput{}, a.err
+func (r *taskWriteRecorder) FailAnalysisPresentation(ctx context.Context, _, _, _ string) error {
+	r.presentationErr = ctx.Err()
+	r.presentationDeadline, r.presentationHasDeadline = ctx.Deadline()
+	return nil
 }
 
-// deadlineAnalyzer blocks until the job context is cancelled, mimicking a
-// provider call that returns only after the 5 minute job deadline fires.
+// deadlineAnalyzer 阻塞到 jobCtx 取消：模拟 provider 调满 5 分钟任务超时后才返回。
 type deadlineAnalyzer struct{}
 
 func (deadlineAnalyzer) Analyze(ctx context.Context, _ domain.CreateAnalysisInput) (domain.AnalysisOutput, error) {
@@ -56,55 +73,122 @@ func (deadlineAnalyzer) Analyze(ctx context.Context, _ domain.CreateAnalysisInpu
 	return domain.AnalysisOutput{}, ctx.Err()
 }
 
+type errAnalyzer struct{ err error }
+
+func (a errAnalyzer) Analyze(context.Context, domain.CreateAnalysisInput) (domain.AnalysisOutput, error) {
+	return domain.AnalysisOutput{}, a.err
+}
+
+func newTaskTestService(repo repository.Repository, analyzer provider.Analyzer, logger *slog.Logger) *Service {
+	svc := &Service{repo: repo, analyzer: analyzer, logger: logger}
+	svc.handlers = map[domain.TaskType]TaskHandler{
+		domain.TaskTypeAnalysis: analysisTaskHandler{svc},
+	}
+	return svc
+}
+
+func analysisTask(attempts int) domain.Task {
+	payload, _ := json.Marshal(domain.AnalysisTaskPayload{AnalysisID: "analysis-1"})
+	return domain.Task{
+		ID: "task-1", UserID: "user-1", Type: string(domain.TaskTypeAnalysis),
+		Attempts: attempts, Payload: payload,
+	}
+}
+
 func assertFreshFailContext(t *testing.T, err error, deadline time.Time, hasDeadline bool) {
 	t.Helper()
 	if err != nil {
-		t.Fatalf("failure write-back reused the expired job context: %v", err)
+		t.Fatalf("失败回写复用了已过期的 job 上下文: %v", err)
 	}
 	if !hasDeadline {
-		t.Fatal("failure write-back context carries no deadline")
+		t.Fatal("失败回写上下文缺少 deadline")
 	}
 	if remaining := time.Until(deadline); remaining <= 0 || remaining > 10*time.Second {
-		t.Fatalf("failure write-back context has unexpected deadline: %s", remaining)
+		t.Fatalf("失败回写上下文 deadline 异常: %s", remaining)
 	}
 }
 
-// 回归：provider 超时后 jobCtx 已过期，失败回写必须换一个未过期的短超时
-// 上下文，否则任务永远停在 running/processing。
-func TestProcessJobFailWriteUsesFreshContext(t *testing.T) {
-	repo := &failWriteRecorder{}
-	service := &Service{repo: repo, analyzer: deadlineAnalyzer{}}
+// 回归：provider 超时后 jobCtx 已过期，统一任务的失败回写必须换用独立的
+// failContext，否则任务永远停在 processing。
+func TestRunClaimedTaskFailWriteUsesFreshContext(t *testing.T) {
+	repo := &taskWriteRecorder{}
+	svc := newTaskTestService(repo, deadlineAnalyzer{}, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	service.processJob(ctx, domain.AnalysisJob{ID: "job-1", AnalysisID: "analysis-1", UserID: "user-1"})
+	svc.runClaimedTask(ctx, analysisTask(1))
 	assertFreshFailContext(t, repo.failErr, repo.failDeadline, repo.failHasDeadline)
+	if !repo.failRetryAt.After(time.Now()) {
+		t.Fatalf("瞬时失败应带退避 retryAt，实际: %v", repo.failRetryAt)
+	}
 }
 
-// 同上：照片被拒（RejectAnalysis 路径）也不能用已过期的 jobCtx 回写。
-func TestProcessJobRejectWriteUsesFreshContext(t *testing.T) {
-	repo := &failWriteRecorder{}
-	service := &Service{repo: repo, analyzer: errAnalyzer{err: &provider.PhotoRejectedError{}}}
-	service.processJob(context.Background(), domain.AnalysisJob{ID: "job-1", AnalysisID: "analysis-1", UserID: "user-1"})
-	assertFreshFailContext(t, repo.rejectErr, repo.rejectDeadline, repo.rejectHasDeadline)
+// 照片被拒（photo_rejected 永久失败路径）同样不能用已过期的 jobCtx 回写。
+func TestRunClaimedTaskPhotoRejectUsesFreshContext(t *testing.T) {
+	repo := &taskWriteRecorder{}
+	svc := newTaskTestService(repo, errAnalyzer{err: &provider.PhotoRejectedError{Rejections: []provider.PhotoRejection{
+		{Kind: "face", Reason: "光线过暗"},
+	}}}, nil)
+	svc.runClaimedTask(context.Background(), analysisTask(1))
+	assertFreshFailContext(t, repo.failErr, repo.failDeadline, repo.failHasDeadline)
+	if repo.failCode != taskErrorCodePhotoRejected {
+		t.Fatalf("期望 photo_rejected 错误码，实际: %q", repo.failCode)
+	}
+	if !repo.failRetryAt.IsZero() {
+		t.Fatalf("永久失败不应设置 retryAt，实际: %v", repo.failRetryAt)
+	}
+	assertFreshFailContext(t, repo.presentationErr, repo.presentationDeadline, repo.presentationHasDeadline)
 }
 
-// 任务失败必须留下任务级日志:未达重试上限打 WARN,达到上限打 ERROR。
-// 此前失败只落库不打日志,模型故障时任务像"凭空消失"。
-func TestRecordAnalysisFailureLogsByAttempt(t *testing.T) {
-	repo := &failWriteRecorder{}
+// 任务失败必须留下任务级日志：未达重试上限打 WARN（带 attempt 与退避），
+// 达到上限或永久错误打 ERROR。
+func TestFinishTaskLogsByAttempt(t *testing.T) {
+	repo := &taskWriteRecorder{}
 	var logs bytes.Buffer
-	service := &Service{repo: repo, logger: slog.New(slog.NewTextHandler(&logs, nil))}
+	svc := newTaskTestService(repo, nil, slog.New(slog.NewTextHandler(&logs, nil)))
 
-	service.recordAnalysisFailure(context.Background(), domain.AnalysisJob{ID: "job-1", AnalysisID: "analysis-1", Attempt: 1}, errRetry)
-	if !strings.Contains(logs.String(), "analysis job failed, retry scheduled") || !strings.Contains(logs.String(), "attempt=1") {
-		t.Fatalf("expected retry WARN with attempt, got: %s", logs.String())
+	svc.finishTask(analysisTask(1), errRetry)
+	if !strings.Contains(logs.String(), "task failed, retry scheduled") || !strings.Contains(logs.String(), "attempt=1") {
+		t.Fatalf("期望可重试 WARN 带 attempt，实际: %s", logs.String())
+	}
+	if repo.failCode != "" {
+		t.Fatalf("可重试失败不应带终态错误码，实际: %q", repo.failCode)
 	}
 	logs.Reset()
-	service.recordAnalysisFailure(context.Background(), domain.AnalysisJob{ID: "job-1", AnalysisID: "analysis-1", Attempt: maxJobAttempts}, errRetry)
-	if !strings.Contains(logs.String(), "analysis job failed permanently") {
-		t.Fatalf("expected terminal ERROR, got: %s", logs.String())
+	repo.failRetryAt = time.Time{}
+
+	svc.finishTask(analysisTask(taskMaxAttempts[domain.TaskTypeAnalysis]), errRetry)
+	if !strings.Contains(logs.String(), "task failed permanently") {
+		t.Fatalf("期望终态 ERROR，实际: %s", logs.String())
 	}
 	if strings.Contains(logs.String(), "retry scheduled") {
-		t.Fatalf("terminal failure must not be logged as retryable: %s", logs.String())
+		t.Fatalf("终态失败不得记录为可重试: %s", logs.String())
+	}
+	if !repo.failRetryAt.IsZero() {
+		t.Fatalf("终态失败不应设置 retryAt，实际: %v", repo.failRetryAt)
+	}
+}
+
+// 永久性 provider 错误（401/403/配额/契约违规）不重试。
+func TestFinishTaskPermanentProviderErrorStopsRetrying(t *testing.T) {
+	repo := &taskWriteRecorder{}
+	svc := newTaskTestService(repo, nil, nil)
+	permanent := []string{
+		"aliyun returned status 403: AccessDenied.Unpurchased",
+		"volcengine returned status 401: AuthenticationError",
+		"generated image has unsupported image format image/gif",
+		"image response contained no usable image",
+	}
+	for _, message := range permanent {
+		repo.failRetryAt = time.Time{}
+		svc.finishTask(analysisTask(1), errors.New(message))
+		if !repo.failRetryAt.IsZero() {
+			t.Fatalf("永久错误不应重试: %q", message)
+		}
+	}
+	transient := errors.New("aliyun request: context deadline exceeded")
+	repo.failRetryAt = time.Time{}
+	svc.finishTask(analysisTask(1), transient)
+	if repo.failRetryAt.IsZero() {
+		t.Fatal("瞬时 provider 错误应重试")
 	}
 }

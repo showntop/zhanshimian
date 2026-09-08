@@ -3,18 +3,15 @@ package postgres
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
-	"github.com/jackc/pgx/v5"
 )
 
 func scanTodayPlan(row interface{ Scan(...any) error }) (domain.TodayPlan, error) {
 	var item domain.TodayPlan
 	var contextData, stepsData []byte
-	err := row.Scan(&item.ID, &item.ReportID, &contextData, &item.Title, &item.Summary, &item.ImageURL, &stepsData, &item.Active, &item.Feedback, &item.RegenerateCount, &item.GeneratedImageURL, &item.GenerationStatus, &item.LookProvider, &item.GenerationError, &item.CreatedAt, &item.UpdatedAt)
+	err := row.Scan(&item.ID, &item.ReportID, &contextData, &item.Title, &item.Summary, &item.ImageURL, &stepsData, &item.Active, &item.Feedback, &item.RegenerateCount, &item.GeneratedImageURL, &item.LookProvider, &item.CreatedAt, &item.UpdatedAt)
 	if err == nil {
 		err = json.Unmarshal(contextData, &item.Context)
 	}
@@ -24,9 +21,9 @@ func scanTodayPlan(row interface{ Scan(...any) error }) (domain.TodayPlan, error
 	return item, err
 }
 
-const todayPlanSelect = `SELECT id::text,coalesce(report_id::text,''),context,title,summary,image_url,steps,active,feedback,regenerate_count,generated_image_url,generation_status,look_provider,generation_error,created_at,updated_at FROM today_plans`
+const todayPlanSelect = `SELECT id::text,coalesce(report_id::text,''),context,title,summary,image_url,steps,active,feedback,regenerate_count,generated_image_url,look_provider,created_at,updated_at FROM today_plans`
 
-const todayPlanReturning = `RETURNING id::text,coalesce(report_id::text,''),context,title,summary,image_url,steps,active,feedback,regenerate_count,generated_image_url,generation_status,look_provider,generation_error,created_at,updated_at`
+const todayPlanReturning = `RETURNING id::text,coalesce(report_id::text,''),context,title,summary,image_url,steps,active,feedback,regenerate_count,generated_image_url,look_provider,created_at,updated_at`
 
 func (s *Store) GetTodayPlan(ctx context.Context, userID string) (domain.TodayPlan, error) {
 	item, err := scanTodayPlan(s.pool.QueryRow(ctx, todayPlanSelect+` WHERE user_id=$1 AND plan_date=current_date`, userID))
@@ -45,7 +42,7 @@ func (s *Store) SaveTodayPlan(ctx context.Context, userID string, input domain.T
 	var reportID any
 	if input.ReportID != "" {
 		var exists bool
-		if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM reports WHERE id=$1 AND user_id=$2)`, input.ReportID, userID).Scan(&exists); err != nil {
+		if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM reports WHERE id=$1::uuid AND user_id=$2)`, input.ReportID, userID).Scan(&exists); err != nil {
 			return domain.TodayPlan{}, err
 		}
 		if !exists {
@@ -54,15 +51,13 @@ func (s *Store) SaveTodayPlan(ctx context.Context, userID string, input domain.T
 		reportID = input.ReportID
 	}
 	item, err := scanTodayPlan(s.pool.QueryRow(ctx, `
-		INSERT INTO today_plans(user_id,report_id,plan_date,context,title,summary,image_url,steps,regenerate_count,generation_status)
-		VALUES($1,$2,$3::date,$4,$5,$6,$7,$8,$9,CASE WHEN $2::uuid IS NULL THEN 'idle' ELSE 'queued' END)
+		INSERT INTO today_plans(user_id,report_id,plan_date,context,title,summary,image_url,steps,regenerate_count)
+		VALUES($1,$2,$3::date,$4,$5,$6,$7,$8,$9)
 		ON CONFLICT(user_id,plan_date) DO UPDATE SET
 			report_id=EXCLUDED.report_id,context=EXCLUDED.context,title=EXCLUDED.title,summary=EXCLUDED.summary,
 			image_url=EXCLUDED.image_url,steps=EXCLUDED.steps,regenerate_count=EXCLUDED.regenerate_count,updated_at=now(),
 			active=false,feedback='',
-			generation_status=CASE WHEN EXCLUDED.report_id IS NULL THEN 'idle' ELSE 'queued' END,
-			generation_attempts=0,generation_next_run_at=now(),generation_locked_at=NULL,
-			generated_image_url='',generated_storage_key='',look_provider='',generation_error=''
+			generated_image_url='',generated_storage_key='',look_provider=''
 		`+todayPlanReturning,
 		userID, reportID, input.Context.Date, contextData, input.Title, input.Summary, input.ImageURL, stepsData, input.RegenerateCount))
 	return item, err
@@ -85,64 +80,32 @@ func (s *Store) FeedbackTodayPlan(ctx context.Context, userID, planID, feedback 
 	return item, mapNotFound(err)
 }
 
-// ClaimTodayPlanLook mirrors ClaimPlanLook for the daily plan's own try-on.
-// Stuck processing jobs are reclaimed after 10 minutes (attempts capped at 2,
-// matching FailTodayPlanLook); only plans bound to a report are claimable,
-// because the render needs the analysis source photos.
-func (s *Store) ClaimTodayPlanLook(ctx context.Context) (domain.TodayPlanLookJob, bool, error) {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return domain.TodayPlanLookJob{}, false, err
-	}
-	defer tx.Rollback(ctx)
-	if _, err = tx.Exec(ctx, `UPDATE today_plans SET generation_status='failed',generation_error='形象生成超时，请稍后重试' WHERE generation_status='processing' AND generation_locked_at < now() - interval '10 minutes' AND generation_attempts>=2`); err != nil {
-		return domain.TodayPlanLookJob{}, false, err
-	}
-	if _, err = tx.Exec(ctx, `UPDATE today_plans SET generation_status='queued',generation_next_run_at=now() WHERE generation_status='processing' AND generation_locked_at < now() - interval '10 minutes' AND generation_attempts<2`); err != nil {
-		return domain.TodayPlanLookJob{}, false, err
-	}
+// GetTodayPlanLookJob re-hydrates the render job of one today plan: the
+// three steps plus the analysis photos the try-on must preserve.
+func (s *Store) GetTodayPlanLookJob(ctx context.Context, userID, planID string) (domain.TodayPlanLookJob, error) {
 	var job domain.TodayPlanLookJob
-	err = tx.QueryRow(ctx, `
-		SELECT t.id::text,coalesce(t.report_id::text,''),t.user_id::text,t.title,t.summary,t.generation_attempts,a.media_ids::text[]
+	var stepsData []byte
+	err := s.pool.QueryRow(ctx, `
+		SELECT t.id::text,coalesce(t.report_id::text,''),t.user_id::text,t.title,t.summary,t.steps,a.media_ids::text[]
 		FROM today_plans t
 		JOIN reports r ON r.id=t.report_id
 		JOIN analyses a ON a.id=r.analysis_id
-		WHERE t.generation_status='queued' AND t.generation_next_run_at<=now()
-		ORDER BY t.generation_next_run_at,t.id FOR UPDATE OF t SKIP LOCKED LIMIT 1`).
-		Scan(&job.PlanID, &job.ReportID, &job.UserID, &job.Title, &job.Summary, &job.Attempt, &job.MediaIDs)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.TodayPlanLookJob{}, false, nil
-	}
+		WHERE t.id=$1::uuid AND t.user_id=$2`, planID, userID).
+		Scan(&job.PlanID, &job.ReportID, &job.UserID, &job.Title, &job.Summary, &stepsData, &job.MediaIDs)
 	if err != nil {
-		return domain.TodayPlanLookJob{}, false, err
+		return job, mapNotFound(err)
 	}
-	var stepsData []byte
-	if err = tx.QueryRow(ctx, `SELECT steps FROM today_plans WHERE id=$1`, job.PlanID).Scan(&stepsData); err != nil {
-		return domain.TodayPlanLookJob{}, false, err
+	if err := json.Unmarshal(stepsData, &job.Steps); err != nil {
+		return job, err
 	}
-	if err = json.Unmarshal(stepsData, &job.Steps); err != nil {
-		return domain.TodayPlanLookJob{}, false, err
-	}
-	job.Attempt++
-	if _, err = tx.Exec(ctx, `UPDATE today_plans SET generation_status='processing',generation_attempts=$2,generation_locked_at=now() WHERE id=$1`, job.PlanID, job.Attempt); err != nil {
-		return domain.TodayPlanLookJob{}, false, err
-	}
-	return job, true, tx.Commit(ctx)
+	return job, nil
 }
 
-func (s *Store) CompleteTodayPlanLook(ctx context.Context, job domain.TodayPlanLookJob, resultURL, storageKey, providerVersion string) error {
-	_, err := s.pool.Exec(ctx, `UPDATE today_plans SET generation_status='completed',generated_image_url=$2,generated_storage_key=$3,look_provider=$4,generation_error='',updated_at=now() WHERE id=$1`, job.PlanID, resultURL, storageKey, providerVersion)
-	return err
-}
-
-func (s *Store) FailTodayPlanLook(ctx context.Context, job domain.TodayPlanLookJob, cause error) error {
-	// 与 FailPlanLook 同一策略:鉴权/配额/契约类错误重试也不会成功,直接终态,
-	// 避免界面在若干个轮询周期里看起来仍在生成。
-	if job.Attempt >= 2 || !retryPlanLookError(cause) {
-		_, err := s.pool.Exec(ctx, `UPDATE today_plans SET generation_status='failed',generation_error=$2,updated_at=now() WHERE id=$1`, job.PlanID, cause.Error())
-		return err
+func (s *Store) ApplyTodayLookResult(ctx context.Context, planID, resultURL, storageKey, providerVersion string) error {
+	tag, err := s.pool.Exec(ctx, `UPDATE today_plans SET generated_image_url=$2,generated_storage_key=$3,look_provider=$4,updated_at=now() WHERE id=$1::uuid`, planID, resultURL, storageKey, providerVersion)
+	if err == nil && tag.RowsAffected() == 0 {
+		return repository.ErrTaskRemoved
 	}
-	_, err := s.pool.Exec(ctx, `UPDATE today_plans SET generation_status='queued',generation_error=$2,generation_next_run_at=$3,updated_at=now() WHERE id=$1`, job.PlanID, cause.Error(), time.Now().Add(time.Duration(job.Attempt*5)*time.Second))
 	return err
 }
 
@@ -166,12 +129,21 @@ func (s *Store) GetShareCard(ctx context.Context, token string) (domain.ShareCar
 	return item, mapNotFound(err)
 }
 
-func (s *Store) RevokeShareCard(ctx context.Context, userID, cardID string) error {
-	tag, err := s.pool.Exec(ctx, `UPDATE share_cards SET revoked_at=now() WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL`, cardID, userID)
+// DeleteShareCard revokes a share card (DELETE /v1/shares/{id}); the public
+// read endpoint filters on revoked_at, so a deleted card 404s immediately.
+func (s *Store) DeleteShareCard(ctx context.Context, userID, cardID string) error {
+	tag, err := s.pool.Exec(ctx, `UPDATE share_cards SET revoked_at=now() WHERE id=$1::uuid AND user_id=$2 AND revoked_at IS NULL`, cardID, userID)
 	if err == nil && tag.RowsAffected() == 0 {
 		return repository.ErrNotFound
 	}
 	return err
+}
+
+// RecentPlan returns the plan the home screen should surface: the most
+// recently selected one, falling back to the newest plan row.
+func (s *Store) RecentPlan(ctx context.Context, userID string) (domain.Plan, error) {
+	item, err := scanPlan(s.pool.QueryRow(ctx, planSelect+` WHERE p.user_id=$1 ORDER BY p.selected_at DESC NULLS LAST, p.sort_order LIMIT 1`, userID))
+	return item, mapNotFound(err)
 }
 
 const wardrobeSelect = `SELECT id::text,coalesce(media_id::text,''),name,category,color,season,formality,scenes,image_url,favorite,wear_count,created_at,updated_at FROM wardrobe_items`
@@ -227,19 +199,16 @@ func (s *Store) DeleteWardrobeItem(ctx context.Context, userID, itemID string) e
 	return err
 }
 
-func (s *Store) CreateWardrobeOutfit(ctx context.Context, userID string, items []domain.WardrobeItem, contextData json.RawMessage) (domain.WardrobeOutfit, error) {
-	ids := make([]string, 0, len(items))
-	for _, item := range items {
-		ids = append(ids, item.ID)
+func (s *Store) CreateWardrobeOutfit(ctx context.Context, userID string, input domain.WardrobeOutfitInput, contextData json.RawMessage, items []domain.WardrobeItem) (domain.WardrobeOutfit, error) {
+	if len(contextData) == 0 {
+		contextData = json.RawMessage(`{}`)
 	}
 	var outfit domain.WardrobeOutfit
 	outfit.Items = items
-	outfit.Title = "现有衣橱 · 今日组合"
-	outfit.Note = "优先复用你常穿的单品，用颜色与比例完成今天的表达。"
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO wardrobe_outfits(user_id,title,note,context,item_ids) VALUES($1,$2,$3,$4,$5)
 		RETURNING id::text,title,note,context,item_ids,(worn_at IS NOT NULL),created_at`,
-		userID, outfit.Title, outfit.Note, contextData, ids).
+		userID, input.Title, input.Note, contextData, input.ItemIDs).
 		Scan(&outfit.ID, &outfit.Title, &outfit.Note, &outfit.Context, &outfit.ItemIDs, &outfit.Worn, &outfit.CreatedAt)
 	return outfit, err
 }

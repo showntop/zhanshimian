@@ -1,12 +1,10 @@
 package service
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
-	"log/slog"
-	"strings"
 	"testing"
 
 	"github.com/zhanshimian/server/internal/domain"
@@ -17,21 +15,24 @@ import (
 
 type todayLookRepoStub struct {
 	repository.Repository
-	completeJob   domain.TodayPlanLookJob
-	completeURL   string
-	completeCalls int
-	failJob       *domain.TodayPlanLookJob
-	failCause     error
+	jobErr   error
+	job      domain.TodayPlanLookJob
+	applied  bool
+	appliedURL string
+	appliedVersion string
 }
 
-func (r *todayLookRepoStub) CompleteTodayPlanLook(_ context.Context, job domain.TodayPlanLookJob, resultURL, _, _ string) error {
-	r.completeJob, r.completeURL = job, resultURL
-	r.completeCalls++
-	return nil
+func (r *todayLookRepoStub) GetTodayPlanLookJob(_ context.Context, _, _ string) (domain.TodayPlanLookJob, error) {
+	if r.jobErr != nil {
+		return domain.TodayPlanLookJob{}, r.jobErr
+	}
+	return r.job, nil
 }
 
-func (r *todayLookRepoStub) FailTodayPlanLook(_ context.Context, job domain.TodayPlanLookJob, cause error) error {
-	r.failJob, r.failCause = &job, cause
+func (r *todayLookRepoStub) ApplyTodayLookResult(_ context.Context, _ string, resultURL, _, providerVersion string) error {
+	r.applied = true
+	r.appliedURL = resultURL
+	r.appliedVersion = providerVersion
 	return nil
 }
 
@@ -57,32 +58,41 @@ func (s *memoryStorageStub) Save(_ context.Context, key string, _ io.Reader) (st
 	return key, nil
 }
 
-func todayLookService(t *testing.T, generator provider.LookGenerator, repo *todayLookRepoStub) *Service {
-	t.Helper()
-	var logs bytes.Buffer
-	return &Service{repo: repo, storage: &memoryStorageStub{}, lookGenerator: generator, logger: slog.New(slog.NewTextHandler(&logs, nil))}
+func todayTask(planID string, attempts int) domain.Task {
+	payload, _ := json.Marshal(domain.TodayLookTaskPayload{PlanID: planID})
+	return domain.Task{
+		ID: "task-today-1", UserID: "user-1", Type: string(domain.TaskTypeTodayLook),
+		Attempts: attempts, Payload: payload,
+	}
 }
 
-// 今日方案生成成功后要把本人搭配图落存储并回写 completed;生成提示词必须
-// 基于今日三步(发型/妆容/穿搭)与任务标识。
-func TestProcessTodayPlanLookCompletesWithGeneratedImage(t *testing.T) {
+// 今日方案生成成功后要把本人搭配图落存储并回写结果；生成提示词必须基于
+// 今日三步（发型/妆容/穿搭）并携带任务标识。
+func TestProcessTodayLookCompletesWithGeneratedImage(t *testing.T) {
 	generator := &capturingLookGenerator{output: provider.LookOutput{ImageData: []byte("png-bytes"), MIMEType: "image/png", ProviderVersion: "stub-look-v1"}}
-	repo := &todayLookRepoStub{}
-	service := todayLookService(t, generator, repo)
-	job := domain.TodayPlanLookJob{PlanID: "today-1", ReportID: "report-1", UserID: "user-1", Title: "休息日·利落黑调微整", Summary: "肩线拉合身",
+	store := &memoryStorageStub{}
+	repo := &todayLookRepoStub{job: domain.TodayPlanLookJob{PlanID: "today-1", ReportID: "report-1", UserID: "user-1", Title: "休息日·利落黑调微整", Summary: "肩线拉合身",
 		Steps: []domain.TodayPlanStep{{Category: "hair", Title: "重心后移", Copy: "头顶发根梳向后面"}, {Category: "outfit", Title: "肩线归位", Copy: "选合肩版型"}},
-		MediaIDs: []string{"media-1"}}
-	service.processTodayPlanLook(context.Background(), job)
-	if repo.completeCalls != 1 || repo.completeJob.PlanID != "today-1" {
-		t.Fatalf("completion was not recorded: calls=%d job=%#v", repo.completeCalls, repo.completeJob)
+		MediaIDs: []string{"media-1"}}}
+	service := &Service{repo: repo, storage: store, lookGenerator: generator}
+
+	resultRef, err := service.processTodayLook(context.Background(), todayTask("today-1", 1))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.HasPrefix(repo.completeURL, "/uploads/") || !strings.HasSuffix(repo.completeURL, ".png") {
-		t.Fatalf("unexpected completed url %q", repo.completeURL)
+	if resultRef != "today-1" {
+		t.Fatalf("result ref should reference the today plan: %q", resultRef)
 	}
-	if !strings.Contains(repo.completeURL, "/generated/today/") {
-		t.Fatalf("expected today storage prefix, got %q", repo.completeURL)
+	if !repo.applied {
+		t.Fatal("生成结果未回写")
 	}
-	if generator.input.Name != job.Title || len(generator.input.MediaIDs) != 1 || len(generator.input.Steps) != 2 || generator.input.Steps[1].Summary != "选合肩版型" {
+	if !contains(repo.appliedURL, "/uploads/") || !hasSuffix(repo.appliedURL, ".png") || !contains(repo.appliedURL, "/generated/today/") {
+		t.Fatalf("unexpected applied url %q", repo.appliedURL)
+	}
+	if repo.appliedVersion != "stub-look-v1" {
+		t.Fatalf("provider version lost: %q", repo.appliedVersion)
+	}
+	if generator.input.Name != repo.job.Title || len(generator.input.MediaIDs) != 1 || len(generator.input.Steps) != 2 || generator.input.Steps[1].Summary != "选合肩版型" {
 		t.Fatalf("look input lost today-plan grounding: %#v", generator.input)
 	}
 	if provider.InvocationSource(generator.ctx) != "today_look:today-1" {
@@ -90,21 +100,33 @@ func TestProcessTodayPlanLookCompletesWithGeneratedImage(t *testing.T) {
 	}
 }
 
-// 生成失败要走 FailTodayPlanLook,日志标记还会重试;任务标识必须一路传下去。
-func TestProcessTodayPlanLookFailsAndSchedulesRetry(t *testing.T) {
+// 生成失败必须把错误上抛给统一任务循环（由 finishTask 决定重试/终态），
+// 绝不落任何结果；任务标识必须一路传下去。
+func TestProcessTodayLookSurfacesGeneratorFailure(t *testing.T) {
 	generator := &capturingLookGenerator{err: errors.New("provider down")}
-	repo := &todayLookRepoStub{}
-	service := todayLookService(t, generator, repo)
-	var logs bytes.Buffer
-	service.logger = slog.New(slog.NewTextHandler(&logs, nil))
-	service.processTodayPlanLook(context.Background(), domain.TodayPlanLookJob{PlanID: "today-1", Attempt: 1})
-	if repo.failJob == nil || repo.failJob.PlanID != "today-1" || !strings.Contains(repo.failCause.Error(), "provider down") {
-		t.Fatalf("failure was not recorded: job=%#v cause=%v", repo.failJob, repo.failCause)
+	repo := &todayLookRepoStub{job: domain.TodayPlanLookJob{PlanID: "today-1", Attempt: 1}}
+	service := &Service{repo: repo, storage: &memoryStorageStub{}, lookGenerator: generator}
+
+	if _, err := service.processTodayLook(context.Background(), todayTask("today-1", 1)); err == nil || !contains(err.Error(), "provider down") {
+		t.Fatalf("generator failure must surface, got: %v", err)
 	}
-	if !strings.Contains(logs.String(), "today plan look job failed, retry scheduled") {
-		t.Fatalf("expected retry WARN, got: %s", logs.String())
+	if repo.applied {
+		t.Fatal("failed generation must not be applied")
 	}
 	if provider.InvocationSource(generator.ctx) != "today_look:today-1" {
 		t.Fatalf("invocation source missing from generator context: %q", provider.InvocationSource(generator.ctx))
 	}
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSuffix(s, suffix string) bool {
+	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
 }
