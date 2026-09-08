@@ -71,5 +71,6 @@ typecheck:
 lint:
 	pnpm -r run lint
 
-check: typecheck lint design-build miniapp-check server-vet server-test
+check: typecheck lint design-build miniapp-check mobile-export server-vet server-test
+	pnpm --filter @zsm/core test
 	@echo "=== ALL CHECKS PASSED ==="
