@@ -1,0 +1,16 @@
+# Redocly lint 配置（contracts/ 专用，适用 @redocly/cli 2.x 配置格式：rules 顶层键）。
+#
+# 用法：npx --yes @redocly/cli lint --config contracts/redocly.yaml contracts/openapi.yaml
+#（Redocly CLI 只在当前工作目录自动寻找配置，不会发现本文件，需显式 --config。）
+#
+# 豁免规则与理由：
+# - no-identical-paths / no-ambiguous-paths：
+#   契约同时定义 `GET /v1/shares/{token}`（公开访问，用分享令牌）与
+#   `DELETE /v1/shares/{id}`（撤销，用分享卡 ID）。二者 URL 结构相同、仅路径参数名不同，
+#   按重实施计划 §一端点总表必须保留这一区分（服务端按 HTTP 方法区分路由，无实际歧义），
+#   故对这两条结构规则显式豁免。
+extends:
+  - recommended
+rules:
+  no-identical-paths: off
+  no-ambiguous-paths: off

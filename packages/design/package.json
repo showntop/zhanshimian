@@ -1,0 +1,20 @@
+{
+  "name": "@zsm/design",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "怎么打扮设计系统单源：tokens.data.mjs → dist/{tokens.wxss, theme.ts} + 小程序语义样式",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles/*": "./styles/*",
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "node scripts/generate.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3"
+  }
+}

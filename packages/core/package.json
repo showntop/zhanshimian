@@ -1,0 +1,21 @@
+{
+  "name": "@zsm/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "怎么打扮传输无关内核：API 客户端 / 401 单飞重登 / 统一任务轮询 / 媒体真实性契约 / 文案 / 埋点（零运行时依赖）",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --experimental-strip-types tests/"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3"
+  }
+}

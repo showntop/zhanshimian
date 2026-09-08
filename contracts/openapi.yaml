@@ -1,0 +1,3277 @@
+# 「怎么打扮」API v1 契约（OpenAPI 3.1）
+#
+# 唯一权威：重实施计划 §一「API v1 端点总表」（49 端点）。
+# 字段命名/类型/枚举以 apps/server/internal/domain/domain.go 为准（snake_case JSON）；
+# 新增端点（auth/sms、auth/apple、auth/wechat-app、auth/session、me、me/profile、tasks、
+# home/bootstrap、diagnostics、hairstyles、shares、plans/{id}/look/regenerate 等）
+# 的字段按计划描述合理定义。
+#
+# 约定速览：
+# - 成功响应统一包装为 {"data": ...}；失败统一为 {"error": {"code", "message", "request_id"}}；
+# - 每个响应都带 X-Request-ID 响应头（中间件透传或自动生成）；
+# - 异步创建统一返回 202/201，顶层附带 {"task": {"id", "type"}}，用 GET /v1/tasks/{id} 轮询；
+# - 资源归属由鉴权隐含，越权访问一律 404（不泄露存在性）；
+# - 幂等创建用 PUT，动作型幂等操作重复调用无副作用。
+#
+# 本文件的 paths 结构同时被 contracts/scripts/check-sync.mjs 依赖：
+# 路径键缩进 2 空格、方法键缩进 4 空格，请勿改变缩进风格。
+
+openapi: 3.1.0
+
+info:
+  title: 怎么打扮 API
+  version: 1.0.0
+  summary: 「怎么打扮」小程序 / 手机端 v1 接口契约
+  description: |
+    面向屏幕（BFF 聚合）而非面向表设计的 v1 契约：统一异步任务模型、幂等创建、
+    资源化命名。全站仅 4 个动词子资源（/select、/activate、/wear、/apply），
+    其余动作用常规资源语义表达。
+
+    ## 响应包装
+    - 成功：`{"data": <业务对象>}`；异步受理（202）与今日方案创建（201）额外在顶层附带
+      `"task": {"id": "...", "type": "analysis|hair_preview|plan_look|today_look"}`。
+    - 失败：`{"error": {"code": "...", "message": "...", "request_id": "..."}}`。
+    - 所有响应携带 `X-Request-ID` 响应头；错误体内的 `request_id` 与之相同，用于排障关联。
+
+    ## 错误码 ↔ HTTP 状态
+    | code | HTTP | 场景 |
+    |---|---|---|
+    | validation_error | 400 | 参数或请求体校验失败 |
+    | unauthorized | 401 | 未登录 / 会话过期 / 微信 code 无效（wechat_code_invalid） |
+    | forbidden | 403 | 禁止的操作（保留码，当前契约内罕见） |
+    | not_found | 404 | 资源不存在或越权（越权一律 404） |
+    | wechat_code_invalid | 401 | 微信登录凭证被拒 |
+    | wechat_login_limited | 429 | 微信侧登录限频 |
+    | wechat_unavailable | 502 | 微信登录服务暂不可用 |
+    | rate_limited | 429 | 短信/接口限频（短信 60s 冷却、10/min/IP、5/h/号） |
+    | internal_error | 500 | 服务内部错误 |
+
+    ## 轮询纪律（「该请求时才请求」）
+    - 首页：单次 `GET /v1/home/bootstrap`；仅当 `active_tasks` 非空且页面可见时批量轮询
+      `GET /v1/tasks?ids=`（1.5s），空闲零轮询。
+    - 分析页：`GET /v1/tasks/{id}` 700ms，`onHide` 即停；进度 ≥90% 预取报告详情。
+    - 方案页：列表内嵌 look 任务状态，仅存在进行中任务时 2500ms 轮询列表自身。
+    - 发型预览 900ms；今日方案 3000ms。
+
+    ## 公开端点（无需 Bearer）
+    `GET /healthz`、`POST /v1/auth/*`、`GET /v1/shares/{token}`。
+  license:
+    name: UNLICENSED
+    identifier: LicenseRef-UNLICENSED
+
+servers:
+  - url: 'https://{host}'
+    description: 线上/预发网关（host 由部署环境注入）
+    variables:
+      host:
+        default: api.zhanshimian.internal
+        description: 网关域名占位符，本地开发请使用下方 127.0.0.1 服务地址
+  - url: 'http://127.0.0.1:58000'
+    description: 本地开发（docker-compose 暴露的服务端口）
+
+tags:
+  - name: Auth
+    description: 认证与会话（微信/短信/Apple 多端登录、退出）
+  - name: Me
+    description: 账户、多端身份、补充资料与数据删除
+  - name: Tasks
+    description: 统一异步任务状态查询（所有 202/含 task 端点的轮询入口）
+  - name: Home
+    description: 首页一屏聚合（BFF）
+  - name: Media
+    description: 媒体上传与示例素材
+  - name: Analysis
+    description: 形象分析与报告
+  - name: Plans
+    description: 形象方案（三方案组、清单、反馈、单方案图重试）
+  - name: Diagnostics
+    description: 穿搭诊断（穿搭/购单品，同步）
+  - name: Hair
+    description: 发型推荐与试戴预览
+  - name: Today
+    description: 今日造型（上下文、方案、激活、反馈）
+  - name: Shares
+    description: 分享卡创建、公开访问与撤销
+  - name: Wardrobe
+    description: 衣橱单品与搭配
+  - name: Advisor
+    description: 形象顾问对话与建议动作
+  - name: Events
+    description: 产品埋点上报
+  - name: System
+    description: 系统探针（healthz）
+
+# 全局默认：所有端点需要 Bearer 会话令牌；公开端点在各操作上以 security: [] 覆写。
+security:
+  - bearerAuth: []
+
+paths:
+  '/healthz':
+    get:
+      operationId: getHealth
+      summary: 存活与就绪探针
+      description: 返回运行环境、存储/天气/AI 能力路由概览与任务队列健康度（jobs）。公开端点，无需鉴权。
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: 服务存活；jobs 反映统一任务队列积压与失败情况
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HealthStatus'
+        '405':
+          description: 方法不允许（仅 GET；服务端路由对已注册路径的其他方法返回 405，非 JSON 错误包）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/auth/wechat':
+    post:
+      operationId: wechatLogin
+      summary: 微信小程序 code 登录
+      description: 用 wx.login 的 code 换取会话；code 无效返回 401 wechat_code_invalid，微信侧限频 429 wechat_login_limited，微信不可用 502 wechat_unavailable。公开端点。
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: wx.login 获取的登录凭证
+                nickname:
+                  type: string
+                  description: 首次登录的昵称（已注册用户忽略）
+      responses:
+        '201':
+          description: 登录成功，返回会话令牌与用户
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/auth/dev':
+    post:
+      operationId: devLogin
+      summary: 开发环境快捷登录
+      description: 仅开发/预发环境开放；生产环境固定返回 404 not_found。公开端点。
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nickname:
+                  type: string
+                  description: 昵称（缺省自动生成）
+      responses:
+        '201':
+          description: 登录成功，返回会话
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/auth/sms/request':
+    post:
+      operationId: requestSmsCode
+      summary: 请求短信验证码
+      description: 向手机号发送 6 位验证码。限频：60s 冷却、单 IP 10 条/分钟、单号 5 条/小时，超限返回 429 rate_limited；验证码仅以摘要存储。公开端点。
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+                  pattern: '^1[0-9]{10}$'
+                  description: 中国大陆手机号
+      responses:
+        '202':
+          description: 验证码已受理下发；cooldown_seconds 内重复请求将被限频
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SmsRequestAck'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/auth/sms/verify':
+    post:
+      operationId: verifySmsCode
+      summary: 短信验证码登录
+      description: 校验验证码并登录/注册；手机号已绑定其他端（如 Apple 同号）时自动合并到同一账户，数据互通。验证码错误或过期返回 400 validation_error。公开端点。
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone:
+                  type: string
+                  pattern: '^1[0-9]{10}$'
+                  description: 中国大陆手机号
+                code:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+                  description: 6 位短信验证码
+      responses:
+        '201':
+          description: 登录成功（或合并至已有账户），返回会话
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/auth/apple':
+    post:
+      operationId: appleLogin
+      summary: iOS Apple 追加登录
+      description: 以 Sign in with Apple 的 identityToken 登录；手机号与已有账户一致时自动合并（跨端数据互通）。identityToken 无效返回 401 unauthorized。公开端点。
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identity_token]
+              properties:
+                identity_token:
+                  type: string
+                  description: Sign in with Apple 返回的 identityToken
+      responses:
+        '201':
+          description: 登录/合并成功，返回会话
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/auth/wechat-app':
+    post:
+      operationId: wechatAppLogin
+      summary: Android 微信开放平台追加登录
+      description: Android 端微信 SDK code 登录；错误语义与小程序登录一致（wechat_code_invalid / wechat_login_limited / wechat_unavailable）。公开端点。
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: 微信开放平台 OAuth code
+                nickname:
+                  type: string
+                  description: 首次登录的昵称
+      responses:
+        '201':
+          description: 登录成功，返回会话
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/auth/session':
+    delete:
+      operationId: logout
+      summary: 退出登录
+      description: 删除当前会话行（仅当前端，不影响其他端已登录会话）。幂等：会话已失效也返回 204。
+      tags: [Auth]
+      responses:
+        '204':
+          description: 已退出，无响应体
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/me':
+    get:
+      operationId: getMe
+      summary: 当前账户与多端身份
+      description: 返回账户信息与 identities 多端身份列表（wechat_miniapp / wechat_app / apple / phone），按绑定时间排序。
+      tags: [Me]
+      responses:
+        '200':
+          description: 账户与身份列表
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MeAccount'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/me/profile':
+    get:
+      operationId: getMyProfile
+      summary: 读取补充资料
+      description: 返回身高/职业/预算与选填的体重、三围；从未填写时 data 为 null（客户端应引导进入资料页）。
+      tags: [Me]
+      responses:
+        '200':
+          description: 补充资料；未填写时 data 为 null
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/UserProfile'
+                          - type: 'null'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      operationId: updateMyProfile
+      summary: 保存补充资料
+      description: 全量保存（幂等，重复提交同一资料结果一致）；身高/职业/预算必填，体重与三围选填。
+      tags: [Me]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfile'
+      responses:
+        '200':
+          description: 保存后的资料
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/me/data':
+    delete:
+      operationId: deleteMyData
+      summary: 删除我的全部数据
+      description: 注销清除：删除该用户全部业务数据与会话（含各端身份），立即生效且不可恢复，返回 204。
+      tags: [Me]
+      responses:
+        '204':
+          description: 已删除，无响应体
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/tasks':
+    get:
+      operationId: listTasks
+      summary: 批量任务状态
+      description: 首页任务横轨一次请求拉取多个任务（ids 逗号分隔，最多 20 个）；不存在的 id 直接忽略。仅 active_tasks 非空且页面可见时以 1.5s 轮询。
+      tags: [Tasks]
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: 逗号分隔的任务 ID 列表
+          style: form
+          explode: false
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 20
+            items:
+              type: string
+      responses:
+        '200':
+          description: 任务列表（按传入顺序返回存在的任务）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/tasks/{id}':
+    get:
+      operationId: getTask
+      summary: 单任务状态
+      description: 统一轮询入口（分析 700ms / 方案图 2500ms / 发型 900ms / 今日 3000ms，页面隐藏即停）。照片不合格时 error.photo_reasons 逐图给出中文原因；完成后 result_ref 指向业务对象。
+      tags: [Tasks]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 任务 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 任务当前状态
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Task'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/home/bootstrap':
+    get:
+      operationId: getHomeBootstrap
+      summary: 首页一屏聚合
+      description: 一次请求返回资料摘要、最新报告、今日方案、进行中任务与最近方案，替代旧首页 4 次并发请求；仅 active_tasks 非空且页面可见时才轮询任务。
+      tags: [Home]
+      responses:
+        '200':
+          description: 首页聚合数据；各字段在对应内容不存在时缺省
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HomeBootstrap'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/media':
+    post:
+      operationId: uploadMedia
+      summary: 上传照片
+      description: multipart 直传（file + kind）；三图并行上传、单图失败单独重试。kind 决定后续用途校验（分析三图用 face/side/body）。超限或格式错误返回 400 validation_error。
+      tags: [Media]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, kind]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 图片文件（≤10MB）
+                kind:
+                  type: string
+                  enum: [face, side, body, feedback, outfit, product, wardrobe]
+                  description: 用途类型
+      responses:
+        '201':
+          description: 上传成功；url 为带 TTL 的签名地址，过期后需重新获取
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MediaAsset'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/media/demo':
+    post:
+      operationId: createDemoMedia
+      summary: 生成示例媒体
+      description: 返回内置示例素材（示例体验，生产保留）；provider_version 以 demo 开头的结果客户端必须按「效果示例」处理。Demo 内容只经服务端进入。
+      tags: [Media]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind:
+                  type: string
+                  enum: [face, side, body, outfit, product, wardrobe]
+                  description: 示例素材类型
+      responses:
+        '201':
+          description: 示例媒体资产
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MediaAsset'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/analyses':
+    post:
+      operationId: createAnalysis
+      summary: 提交形象分析
+      description: 三图（face/side/body）异步分析：202 立即返回 Analysis 与 analysis 任务引用，用 GET /v1/tasks/{id} 以 700ms 轮询；完成后 result_ref 为报告 ID。
+      tags: [Analysis]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scene, media_ids]
+              properties:
+                scene:
+                  type: string
+                  enum: [general, daily, interview, wedding, date]
+                  description: 分析场景
+                media_ids:
+                  type: array
+                  minItems: 3
+                  maxItems: 3
+                  items:
+                    type: string
+                  description: 三张分析照片的 media id（正脸/侧面/全身）
+                profile:
+                  $ref: '#/components/schemas/UserProfile'
+      responses:
+        '202':
+          description: 已受理；task 用于轮询
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data, task]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Analysis'
+                      task:
+                        $ref: '#/components/schemas/TaskRef'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/analyses/{id}':
+    get:
+      operationId: getAnalysis
+      summary: 查询分析状态
+      description: 单次分析的状态与媒体回显；越权访问一律 404。任务化后推荐用 /v1/tasks/{id} 轮询，本端点用于详情回显。
+      tags: [Analysis]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 分析 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 分析详情
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Analysis'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/reports/current':
+    get:
+      operationId: getCurrentReport
+      summary: 最新报告
+      description: 当前用户最新一份形象报告；尚无报告返回 404（客户端进入引导流程）。
+      tags: [Analysis]
+      responses:
+        '200':
+          description: 最新报告（findings 锚点按来源照片归位）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Report'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/reports/{id}':
+    get:
+      operationId: getReport
+      summary: 按 ID 读取报告
+      description: 读取指定报告（进度 ≥90% 时的预取端点）；越权访问一律 404。
+      tags: [Analysis]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 报告 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 报告详情
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Report'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/reports/{id}/plans':
+    get:
+      operationId: listPlans
+      summary: 方案列表（内嵌 look 任务）
+      description: 三方案组列表内嵌每套方案的 look_task 状态，页面无需二次查询；scene 缺省返回全部分组。存在进行中任务时以 2500ms 轮询本端点。
+      tags: [Plans]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 报告 ID
+          schema:
+            type: string
+        - name: scene
+          in: query
+          required: false
+          description: 按场景过滤
+          schema:
+            type: string
+            enum: [general, daily, interview, wedding, date]
+      responses:
+        '200':
+          description: 方案列表（含生成状态与 look_task）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Plan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      operationId: upsertPlans
+      summary: 幂等创建-或-刷新方案组
+      description: 按 (report, scene, slug) upsert 三方案组：同步产出文字并入队图片生成任务（plan_look）。幂等，重复提交结果一致。合并旧 scene-plans 与 plan-looks?refresh=1 两个重叠端点。
+      tags: [Plans]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 报告 ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scene]
+              properties:
+                scene:
+                  type: string
+                  enum: [general, daily, interview, wedding, date]
+                  description: 目标场景
+                answers:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: 场景问卷答案（键随场景变化，如 time/budget/formality/impression）
+      responses:
+        '200':
+          description: 刷新后的方案列表（已入队 look 任务，轮询列表端点或 GET /v1/tasks/{id}）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Plan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/plans/{id}':
+    get:
+      operationId: getPlan
+      summary: 方案详情
+      description: 单个方案详情（含 steps 与图片生成状态）；越权访问一律 404。
+      tags: [Plans]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 方案 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 方案详情
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Plan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/plans/{id}/select':
+    post:
+      operationId: selectPlan
+      summary: 选定方案
+      description: 选定该方案（同一报告内互斥，自动取消其余 selected）；幂等，重复选定无副作用。
+      tags: [Plans]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 方案 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 已选定
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        required: [selected]
+                        properties:
+                          selected:
+                            type: boolean
+                            const: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/plans/{id}/look/regenerate':
+    post:
+      operationId: regeneratePlanLook
+      summary: 单方案图重试
+      description: 仅重生成该方案的搭配图（不整组重排）：202 返回方案与新的 plan_look 任务引用，以 2500ms 轮询。修复旧版只能整组重排的 UX 缺陷。
+      tags: [Plans]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 方案 ID
+          schema:
+            type: string
+      responses:
+        '202':
+          description: 已受理重生成；task 用于轮询
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data, task]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Plan'
+                      task:
+                        $ref: '#/components/schemas/TaskRef'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/plans/{id}/checklist':
+    get:
+      operationId: getPlanChecklist
+      summary: 方案执行清单
+      description: 该方案的执行清单（勾选项按 sort 排序）；清单嵌套在 plan 下，归属显式。
+      tags: [Plans]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 方案 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 清单项列表
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ChecklistItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/plans/{id}/checklist/{itemId}':
+    patch:
+      operationId: updateChecklistItem
+      summary: 勾选/取消清单项
+      description: 更新单个清单项完成状态；幂等，重复提交同一状态结果一致。全部完成后的庆祝动效由客户端本地判定。
+      tags: [Plans]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 方案 ID
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          description: 清单项 ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [completed]
+              properties:
+                completed:
+                  type: boolean
+                  description: 目标完成状态
+      responses:
+        '200':
+          description: 更新后的清单项
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ChecklistItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/plans/{id}/feedback':
+    post:
+      operationId: submitPlanFeedback
+      summary: 提交方案反馈
+      description: 反馈嵌套在方案下；tags 必选，带图反馈时 media_id 必须是 kind=feedback 的媒体。响应 message 为服务端统一产出的个性化承诺文案（G3）。
+      tags: [Plans]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 方案 ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tags]
+              properties:
+                tags:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                  description: 反馈标签
+                comment:
+                  type: string
+                  description: 文字反馈（选填）
+                media_id:
+                  type: string
+                  description: 跟拍照片媒体 ID（kind=feedback，选填）
+      responses:
+        '201':
+          description: 已记录；message 为个性化回应文案
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FeedbackResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/diagnostics':
+    post:
+      operationId: createDiagnosis
+      summary: 穿搭诊断（同步）
+      description: 同步诊断，201 立即返回结论（无异步任务）。kind=outfit 穿搭诊断（media kind=outfit），kind=purchase 购单品决策（media kind=product）。替代旧 RPC 风格 tools/run。
+      tags: [Diagnostics]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, media_id]
+              properties:
+                kind:
+                  type: string
+                  enum: [outfit, purchase]
+                  description: 诊断类型
+                media_id:
+                  type: string
+                  description: 待诊断照片的媒体 ID
+                scene:
+                  type: string
+                  description: 场景（选填）
+                report_id:
+                  type: string
+                  description: 关联报告（选填，缺省用当前报告）
+      responses:
+        '201':
+          description: 诊断结论（findings 带锚点、options 给可执行建议）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Diagnosis'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/diagnostics/{id}':
+    patch:
+      operationId: updateDiagnosis
+      summary: 保存/取消保存诊断
+      description: 更新诊断结果收藏状态；幂等。替代旧 tools/{id}/save。
+      tags: [Diagnostics]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 诊断结果 ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [saved]
+              properties:
+                saved:
+                  type: boolean
+                  description: 目标收藏状态
+      responses:
+        '200':
+          description: 更新后的诊断结果
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Diagnosis'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/hairstyles':
+    get:
+      operationId: listHairstyles
+      summary: 发型推荐列表
+      description: 基于报告的发型推荐（纯读，从旧 tools/run kind=hair 拆出）；report_id 缺省用当前报告，无报告返回 404。
+      tags: [Hair]
+      parameters:
+        - name: report_id
+          in: query
+          required: false
+          description: 报告 ID（缺省用当前报告）
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 发型推荐列表
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/HairStyle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/hair-previews':
+    post:
+      operationId: createHairPreview
+      summary: 创建发型试戴预览
+      description: 异步生成试戴图：202 返回 HairPreview 与 hair_preview 任务引用，以 900ms 轮询。media_id 应为正脸照。
+      tags: [Hair]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [media_id, style_id]
+              properties:
+                media_id:
+                  type: string
+                  description: 正脸照媒体 ID
+                style_id:
+                  type: string
+                  description: 发型 ID（来自 GET /v1/hairstyles）
+                report_id:
+                  type: string
+                  description: 关联报告（选填）
+                scene:
+                  type: string
+                  description: 场景（选填）
+      responses:
+        '202':
+          description: 已受理；task 用于轮询
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data, task]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HairPreview'
+                      task:
+                        $ref: '#/components/schemas/TaskRef'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    get:
+      operationId: listHairPreviews
+      summary: 预览历史列表
+      description: 发型预览历史；saved=true 只返回已保存的记录。
+      tags: [Hair]
+      parameters:
+        - name: saved
+          in: query
+          required: false
+          description: 仅返回已保存记录
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: 预览列表（新到旧）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/HairPreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/hair-previews/{id}':
+    get:
+      operationId: getHairPreview
+      summary: 单个发型预览
+      description: 读取预览状态与结果图（也可通过统一任务端点轮询）；越权访问一律 404。
+      tags: [Hair]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 预览 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 预览详情
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HairPreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/hair-previews/{id}/save':
+    post:
+      operationId: saveHairPreview
+      summary: 收藏发型预览
+      description: 收藏/取消收藏由 PATCH 语义收敛为「收藏」动作（重复调用幂等，不切换状态）；已收藏记录出现在 saved=true 列表。
+      tags: [Hair]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 预览 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 已收藏（saved=true）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HairPreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/today/context':
+    get:
+      operationId: getTodayContext
+      summary: 今日上下文
+      description: 天气 + 日程识别，作为今日方案生成输入；city/schedule 查询参数可覆盖定位与日程。
+      tags: [Today]
+      parameters:
+        - name: city
+          in: query
+          required: false
+          description: 覆盖城市（缺省用定位）
+          schema:
+            type: string
+        - name: schedule
+          in: query
+          required: false
+          description: 覆盖日程描述
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 今日上下文
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TodayContext'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/today/plans/current':
+    get:
+      operationId: getCurrentTodayPlan
+      summary: 当前今日方案
+      description: 当前生效的今日方案（active=true）；无生效方案时 data 为 null（客户端展示生成引导）。
+      tags: [Today]
+      responses:
+        '200':
+          description: 今日方案；不存在时 data 为 null
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/TodayPlan'
+                          - type: 'null'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/today/plans':
+    post:
+      operationId: createTodayPlan
+      summary: 生成今日方案
+      description: 201 同步返回方案文字与风格参考图，并附 today_look 任务引用——本人搭配图异步生成，以 3000ms 轮询，完成后 image_url 切换为 generated_image_url。refresh=true 强制重生成（regenerate_count +1）。
+      tags: [Today]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                report_id:
+                  type: string
+                  description: 基于的报告（缺省用当前报告）
+                city:
+                  type: string
+                  description: 覆盖城市（选填）
+                schedule:
+                  type: string
+                  description: 覆盖日程（选填）
+                refresh:
+                  type: boolean
+                  default: false
+                  description: true 时强制重生成
+      responses:
+        '201':
+          description: 方案已创建（文字即时可见）；task 为本人搭配图生成任务
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data, task]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TodayPlan'
+                      task:
+                        $ref: '#/components/schemas/TaskRef'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/today/plans/{id}/activate':
+    post:
+      operationId: activateTodayPlan
+      summary: 激活今日方案
+      description: 激活为「今日造型」（互斥，激活其他方案自动失效）；幂等。
+      tags: [Today]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 今日方案 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 激活后的方案（active=true）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TodayPlan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/today/plans/{id}/feedback':
+    post:
+      operationId: submitTodayPlanFeedback
+      summary: 今日造型反馈
+      description: 一句话反馈，保存后回显在 TodayPlan.feedback；同一方案重复反馈以最后一次为准。
+      tags: [Today]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 今日方案 ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [feedback]
+              properties:
+                feedback:
+                  type: string
+                  maxLength: 500
+                  description: 反馈内容
+      responses:
+        '200':
+          description: 已保存（含 feedback 回显）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TodayPlan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/shares':
+    post:
+      operationId: createShare
+      summary: 创建分享卡
+      description: 为方案（plan）或今日造型（today）创建分享卡：内容在创建时固化为快照，include_photo 决定是否包含本人照片；过期时间见 expires_at。
+      tags: [Shares]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_type, source_id]
+              properties:
+                source_type:
+                  type: string
+                  enum: [plan, today]
+                  description: 分享来源类型
+                source_id:
+                  type: string
+                  description: 来源资源 ID
+                include_photo:
+                  type: boolean
+                  default: false
+                  description: 是否包含本人照片
+      responses:
+        '201':
+          description: 已创建；token 用于拼公开链接
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Share'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/shares/{token}':
+    get:
+      operationId: getShareByToken
+      summary: 公开访问分享快照
+      description: 无需鉴权的公开端点。token 无效、已撤销或已过期一律 404（不泄露存在性）；快照内图片 URL 每次访问重新签名。
+      tags: [Shares]
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: 分享令牌
+          schema:
+            type: string
+            minLength: 20
+      responses:
+        '200':
+          description: 分享快照（渲染分享落地页所需全部内容）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ShareView'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/shares/{id}':
+    delete:
+      operationId: revokeShare
+      summary: 撤销分享
+      description: 删除分享（撤销后公开链接立即 404）；幂等，重复撤销返回 404。
+      tags: [Shares]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 分享卡 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 已撤销
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        required: [revoked]
+                        properties:
+                          revoked:
+                            type: boolean
+                            const: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/wardrobe/items':
+    get:
+      operationId: listWardrobeItems
+      summary: 衣橱单品列表
+      description: 全量单品列表（tab 切换时缓存优先渲染，本端点作后台校验与差异更新）。
+      tags: [Wardrobe]
+      responses:
+        '200':
+          description: 单品列表
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WardrobeItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createWardrobeItem
+      summary: 新建衣橱单品
+      description: 先传图（POST /v1/media，kind=wardrobe）后建档，或 media_id 缺省纯文字建档。
+      tags: [Wardrobe]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, category, color]
+              properties:
+                media_id:
+                  type: string
+                  description: 单品照片媒体 ID（kind=wardrobe，选填）
+                name:
+                  type: string
+                  description: 单品名称
+                category:
+                  type: string
+                  description: 类目（如 上衣/裤装/鞋履/配饰）
+                color:
+                  type: string
+                  description: 主色
+                season:
+                  type: string
+                  description: 季节（选填）
+                formality:
+                  type: string
+                  description: 正式度（选填）
+                scenes:
+                  type: array
+                  items:
+                    type: string
+                  description: 适用场景（选填）
+      responses:
+        '201':
+          description: 已创建
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WardrobeItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/wardrobe/items/{id}':
+    delete:
+      operationId: deleteWardrobeItem
+      summary: 删除衣橱单品
+      description: 删除单品；已被搭配（outfit）引用时不阻塞删除，引用关系同步解除。幂等：不存在返回 404。
+      tags: [Wardrobe]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 单品 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 已删除
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        required: [deleted]
+                        properties:
+                          deleted:
+                            type: boolean
+                            const: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/wardrobe/outfits':
+    post:
+      operationId: createWardrobeOutfit
+      summary: 组建搭配
+      description: 把若干单品组成一套搭配，并固化当下上下文快照（天气/日程），供顾问与统计使用。
+      tags: [Wardrobe]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, item_ids]
+              properties:
+                title:
+                  type: string
+                  description: 搭配名称
+                note:
+                  type: string
+                  description: 备注（选填）
+                context:
+                  $ref: '#/components/schemas/TodayContext'
+                item_ids:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                  description: 组成该搭配的单品 ID 列表
+      responses:
+        '201':
+          description: 已创建（items 内嵌单品详情）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WardrobeOutfit'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/wardrobe/outfits/{id}/wear':
+    post:
+      operationId: wearWardrobeOutfit
+      summary: 标记今天穿了
+      description: outfit.worn 置 true 并为组内单品 wear_count +1；幂等，重复调用只记一次穿着。
+      tags: [Wardrobe]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 搭配 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新后的搭配（含单品最新 wear_count）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WardrobeOutfit'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/advisor/messages':
+    post:
+      operationId: sendAdvisorMessage
+      summary: 向形象顾问发消息
+      description: 发送消息并同步获得顾问回复（含可应用的动作 actions）；conversation_id 缺省新开会话，可携带 report/today_plan 上下文。
+      tags: [Advisor]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                conversation_id:
+                  type: string
+                  description: 会话 ID（缺省新开）
+                content:
+                  type: string
+                  maxLength: 2000
+                  description: 用户消息
+                report_id:
+                  type: string
+                  description: 关联报告（选填）
+                today_plan_id:
+                  type: string
+                  description: 关联今日方案（选填）
+      responses:
+        '201':
+          description: 顾问回复消息（role=assistant，actions 为可执行建议）
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdvisorMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/advisor/conversations/{id}/messages':
+    get:
+      operationId: listAdvisorMessages
+      summary: 会话消息时间线
+      description: 指定会话的消息列表（按时间正序）；越权访问一律 404。
+      tags: [Advisor]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 会话 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 消息时间线
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AdvisorMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/advisor/actions/{id}/apply':
+    post:
+      operationId: applyAdvisorAction
+      summary: 应用顾问建议动作
+      description: 应用顾问建议（如加入衣橱、调整方案步骤），返回 applied=true 的动作；幂等，重复应用不重复执行。
+      tags: [Advisor]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 动作 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 已应用
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdvisorAction'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/events':
+    post:
+      operationId: trackEvent
+      summary: 埋点上报
+      description: 产品埋点 fire-and-forget：202 即受理，客户端失败不重试、不阻塞业务流程。
+      tags: [Events]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  description: 事件名（如 plan_selected、checklist_completed）
+                payload:
+                  type: object
+                  additionalProperties: true
+                  description: 事件附加数据（选填）
+      responses:
+        '202':
+          description: 已受理
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/EventAck'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: session-token
+      description: 'Authorization: Bearer <token>，token 来自登录端点返回的 Session.token'
+
+  headers:
+    XRequestId:
+      description: 请求追踪 ID（客户端可透传，服务端缺省自动生成；与错误体 request_id 一致）
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: 参数或请求体校验失败（error.code=validation_error）
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unauthorized:
+      description: 未登录/会话过期（unauthorized）或微信登录凭证无效（wechat_code_invalid）
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    TooManyRequests:
+      description: 触发限频（rate_limited 或 wechat_login_limited）
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: 资源不存在或越权访问（not_found，越权一律 404 不泄露存在性）
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    BadGateway:
+      description: 上游微信登录服务暂不可用（wechat_unavailable）
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    InternalError:
+      description: 服务内部错误（internal_error）
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+  schemas:
+    Envelope:
+      type: object
+      description: '统一成功响应包装 {"data": ...}；各端点通过 allOf 覆写 data（以及 202/201 场景的 task）字段。'
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/Error'
+
+    Error:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: string
+          enum:
+            - validation_error
+            - unauthorized
+            - forbidden
+            - not_found
+            - wechat_code_invalid
+            - wechat_login_limited
+            - wechat_unavailable
+            - rate_limited
+            - internal_error
+          description: 业务错误码（保留码 forbidden 当前契约内罕见）
+        message:
+          type: string
+          description: 面向用户的中文错误信息
+        request_id:
+          type: string
+          description: 请求追踪 ID，与 X-Request-ID 响应头一致
+
+    Session:
+      type: object
+      required: [token, expires_at, user]
+      properties:
+        token:
+          type: string
+          description: 会话令牌（Bearer）
+        expires_at:
+          type: string
+          format: date-time
+          description: 过期时间（滑动续期：余量 <7 天自动续 30 天）
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      required: [id, nickname]
+      properties:
+        id:
+          type: string
+        nickname:
+          type: string
+
+    Identity:
+      type: object
+      required: [provider, identifier, created_at]
+      properties:
+        provider:
+          type: string
+          enum: [wechat_miniapp, wechat_app, apple, phone]
+          description: 身份提供方
+        identifier:
+          type: string
+          description: 脱敏展示的身份标识
+        created_at:
+          type: string
+          format: date-time
+          description: 绑定时间
+
+    MeAccount:
+      type: object
+      required: [id, nickname, identities]
+      properties:
+        id:
+          type: string
+        nickname:
+          type: string
+        identities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Identity'
+          description: 多端身份列表（按绑定时间排序）
+
+    UserProfile:
+      type: object
+      required: [height_cm, role, budget]
+      properties:
+        height_cm:
+          type: integer
+          minimum: 100
+          maximum: 250
+          description: 身高（厘米）
+        role:
+          type: string
+          description: 职业/身份
+        budget:
+          type: string
+          description: 置装预算区间
+        weight_kg:
+          type: number
+          description: 体重公斤（选填）
+        bust_cm:
+          type: number
+          description: 胸围厘米（选填）
+        waist_cm:
+          type: number
+          description: 腰围厘米（选填）
+        hip_cm:
+          type: number
+          description: 臀围厘米（选填）
+
+    MediaAsset:
+      type: object
+      required: [id, kind, url, created_at]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [face, side, body, feedback, outfit, product, wardrobe, demo]
+          description: 用途类型
+        url:
+          type: string
+          format: uri
+          description: 带 TTL 的签名访问地址（过期后需重新获取）
+        created_at:
+          type: string
+          format: date-time
+
+    TaskRef:
+      type: object
+      required: [id, type]
+      properties:
+        id:
+          type: string
+          description: 任务 ID（用于 GET /v1/tasks/{id} 轮询）
+        type:
+          type: string
+          enum: [analysis, hair_preview, plan_look, today_look]
+          description: 任务类型
+
+    Task:
+      type: object
+      required: [id, type, status, progress, stage]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [analysis, hair_preview, plan_look, today_look]
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 进度百分比
+        stage:
+          type: string
+          description: 当前阶段中文描述（如 照片检查/生成中/写库）
+        error:
+          $ref: '#/components/schemas/TaskError'
+        result_ref:
+          type: string
+          description: 完成后指向的业务对象 ID（报告/方案/预览）
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TaskError:
+      type: object
+      description: 仅 status=failed 时存在；照片不合格时 photo_reasons 逐图给出中文原因
+      properties:
+        code:
+          type: string
+          description: 失败原因代码
+        message:
+          type: string
+          description: 面向用户的中文失败说明
+        photo_reasons:
+          type: array
+          items:
+            type: string
+          description: 与提交媒体一一对应的照片不合格原因（空缺项表示该图合格）
+
+    Analysis:
+      type: object
+      required: [id, status, progress, stage, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        stage:
+          type: string
+        scene:
+          type: string
+        preview_image_url:
+          type: string
+          format: uri
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaAsset'
+        report_id:
+          type: string
+          description: 完成后生成的报告 ID
+        error_message:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Report:
+      type: object
+      required:
+        - id
+        - analysis_id
+        - current_image_url
+        - impression_tags
+        - priority_title
+        - priority_copy
+        - findings
+        - provider_version
+        - generated_at
+      properties:
+        id:
+          type: string
+        analysis_id:
+          type: string
+        current_image_url:
+          type: string
+          format: uri
+          description: 全身主图（签名地址）
+        impression_tags:
+          type: array
+          items:
+            type: string
+          description: 整体印象标签
+        priority_title:
+          type: string
+          description: 优先可提升点标题
+        priority_copy:
+          type: string
+          description: 优先可提升点说明（「可提升点」式尊重表达，不打分）
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Finding'
+        provider_version:
+          type: string
+          description: AI 供应商/版本标识（demo 开头表示示例内容）
+        generated_at:
+          type: string
+          format: date-time
+
+    Finding:
+      type: object
+      required: [id, label, category, severity, detail, anchor_x, anchor_y]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+          description: 可提升点短标签
+        category:
+          type: string
+          description: 分类（如 比例/色彩/轮廓）
+        severity:
+          type: string
+          description: 优先级（非评分，用于排序）
+        detail:
+          type: string
+          description: 具体说明
+        photo:
+          type: string
+          enum: [face, side, body]
+          description: 该观察来自哪张分析照片；锚点相对该照片定位。缺省表示历史数据（按 body 主图渲染）
+        anchor_x:
+          type: number
+          description: 相对照片宽度的横轴锚点（0-1）
+        anchor_y:
+          type: number
+          description: 相对照片高度的纵轴锚点（0-1）
+
+    Plan:
+      type: object
+      required:
+        - id
+        - report_id
+        - name
+        - slug
+        - image_url
+        - recommended
+        - descriptor
+        - why
+        - outcome_tags
+        - difference_tags
+        - sort
+        - selected
+      properties:
+        id:
+          type: string
+        report_id:
+          type: string
+        scene:
+          type: string
+          description: 所属场景分组
+        name:
+          type: string
+          description: 方案名
+        slug:
+          type: string
+          description: 组内稳定标识（幂等 upsert 键之一）
+        image_url:
+          type: string
+          format: uri
+          description: 风格参考图（未生成本人搭配图时展示）
+        current_image_url:
+          type: string
+          format: uri
+          description: 分析用当前全身照
+        generated_image_url:
+          type: string
+          format: uri
+          description: AI 生成的本人搭配图（完成前缺省；展示须带「AI 风格预览」标识）
+        generation_status:
+          type: string
+          enum: [queued, processing, completed, failed]
+          description: 图片生成状态（由统一任务系统承载）
+        generation_error:
+          type: string
+        look_provider:
+          type: string
+          description: 生成图供应商标识（demo 开头按示例处理）
+        look_task:
+          $ref: '#/components/schemas/Task'
+        recommended:
+          type: boolean
+          description: 是否推荐方案
+        descriptor:
+          type: string
+          description: 一句话风格定位
+        why:
+          type: string
+          description: 推荐理由
+        outcome_tags:
+          type: array
+          items:
+            type: string
+          description: 预期效果标签
+        difference_tags:
+          type: array
+          items:
+            type: string
+          description: 与现状的差异标签
+        sort:
+          type: integer
+        selected:
+          type: boolean
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanStep'
+          description: 执行步骤（详情场景返回）
+
+    PlanStep:
+      type: object
+      required: [id, category, title, summary, sort]
+      properties:
+        id:
+          type: string
+        category:
+          type: string
+          description: 步骤类目（如 单品/配色/发型）
+        title:
+          type: string
+        summary:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+          description: 结构化步骤详情（JSON，结构随 category 变化）
+        sort:
+          type: integer
+
+    ChecklistItem:
+      type: object
+      required: [id, plan_id, category, title, completed, sort]
+      properties:
+        id:
+          type: string
+        plan_id:
+          type: string
+        category:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        meta:
+          type: string
+          description: 补充元信息（如参考链接说明）
+        completed:
+          type: boolean
+        sort:
+          type: integer
+
+    FeedbackResult:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: 服务端统一产出的个性化承诺文案（G3）
+
+    Diagnosis:
+      type: object
+      required:
+        - id
+        - kind
+        - scene
+        - conclusion
+        - priority_title
+        - priority_copy
+        - tags
+        - findings
+        - saved
+        - created_at
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [outfit, purchase]
+        scene:
+          type: string
+        conclusion:
+          type: string
+          description: 一句话结论
+        priority_title:
+          type: string
+        priority_copy:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosisFinding'
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosisOption'
+          description: 可执行建议（购单品场景为替代/搭配单品）
+        saved:
+          type: boolean
+        provider_version:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    DiagnosisFinding:
+      type: object
+      required: [label, category, tone]
+      properties:
+        label:
+          type: string
+        category:
+          type: string
+        tone:
+          type: string
+          description: 表达语气（保持尊重表达）
+        anchor_x:
+          type: number
+          description: 相对照片的横轴锚点（0-1，选填）
+        anchor_y:
+          type: number
+          description: 相对照片的纵轴锚点（0-1，选填）
+
+    DiagnosisOption:
+      type: object
+      required: [id, name, image_url]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        note:
+          type: string
+        reason:
+          type: string
+          description: 推荐理由
+        tags:
+          type: array
+          items:
+            type: string
+
+    HairStyle:
+      type: object
+      required: [id, name, image_url]
+      properties:
+        id:
+          type: string
+          description: 发型 ID（用于创建预览的 style_id）
+        name:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        note:
+          type: string
+          description: 适配说明
+        reason:
+          type: string
+          description: 推荐理由
+        tags:
+          type: array
+          items:
+            type: string
+
+    HairPreview:
+      type: object
+      required:
+        - id
+        - status
+        - progress
+        - stage
+        - style_id
+        - style_name
+        - scene
+        - source_image_url
+        - saved
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        stage:
+          type: string
+        style_id:
+          type: string
+        style_name:
+          type: string
+        scene:
+          type: string
+        source_image_url:
+          type: string
+          format: uri
+        result_image_url:
+          type: string
+          format: uri
+          description: 试戴结果图（完成前缺省；须带「AI 风格预览」标识）
+        provider_version:
+          type: string
+        saved:
+          type: boolean
+        error_message:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TodayContext:
+      type: object
+      required: [date, city, condition, temperature, day_type, schedule]
+      properties:
+        date:
+          type: string
+          format: date
+          description: 日期（本地时区）
+        city:
+          type: string
+        condition:
+          type: string
+          description: 天气现象（晴/雨 等）
+        temperature:
+          type: integer
+          description: 气温摄氏度
+        day_type:
+          type: string
+          description: 日期类型（工作日/周末/节假日）
+        schedule:
+          type: string
+          description: 日程识别结果
+
+    TodayPlan:
+      type: object
+      required:
+        - id
+        - context
+        - title
+        - summary
+        - image_url
+        - steps
+        - active
+        - regenerate_count
+        - generation_status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        report_id:
+          type: string
+        context:
+          $ref: '#/components/schemas/TodayContext'
+        title:
+          type: string
+        summary:
+          type: string
+        image_url:
+          type: string
+          format: uri
+          description: 风格参考图（本人搭配图生成期间的展示，须带「风格参考」标识）
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/TodayPlanStep'
+        active:
+          type: boolean
+          description: 是否当前生效
+        feedback:
+          type: string
+          description: 用户反馈回显
+        regenerate_count:
+          type: integer
+        generated_image_url:
+          type: string
+          format: uri
+          description: 本人搭配图（today_look 任务完成后填充；须带「AI 风格预览」标识）
+        generation_status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        look_provider:
+          type: string
+        generation_error:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TodayPlanStep:
+      type: object
+      required: [category, label, title, copy]
+      properties:
+        category:
+          type: string
+        label:
+          type: string
+          description: 步骤标签（如 单品/配色）
+        title:
+          type: string
+        copy:
+          type: string
+          description: 步骤说明
+
+    Share:
+      type: object
+      required:
+        - id
+        - token
+        - source_type
+        - source_id
+        - snapshot
+        - include_photo
+        - revoked
+        - expires_at
+        - created_at
+      properties:
+        id:
+          type: string
+        token:
+          type: string
+          description: 公开访问令牌（拼入分享链接）
+        source_type:
+          type: string
+          enum: [plan, today]
+        source_id:
+          type: string
+        snapshot:
+          type: object
+          additionalProperties: true
+          description: 创建时固化的内容快照（title/summary/image_url/label 等）
+        include_photo:
+          type: boolean
+        revoked:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+          description: 过期时间（过期后公开访问返回 404）
+        created_at:
+          type: string
+          format: date-time
+
+    ShareView:
+      type: object
+      description: 公开访问视角（不含 id/token 等管理字段）
+      required: [source_type, snapshot, include_photo, expires_at]
+      properties:
+        source_type:
+          type: string
+          enum: [plan, today]
+        snapshot:
+          type: object
+          additionalProperties: true
+          description: 内容快照（图片 URL 为本次访问新签名的地址）
+        include_photo:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+
+    WardrobeItem:
+      type: object
+      required:
+        - id
+        - name
+        - category
+        - color
+        - season
+        - formality
+        - scenes
+        - image_url
+        - favorite
+        - wear_count
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        media_id:
+          type: string
+          description: 关联媒体（纯文字建档时缺省）
+        name:
+          type: string
+        category:
+          type: string
+        color:
+          type: string
+        season:
+          type: string
+        formality:
+          type: string
+        scenes:
+          type: array
+          items:
+            type: string
+        image_url:
+          type: string
+          format: uri
+          description: 单品图（无图时为空字符串）
+        favorite:
+          type: boolean
+        wear_count:
+          type: integer
+          description: 穿着次数（经 outfit/wear 累计）
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    WardrobeOutfit:
+      type: object
+      required: [id, title, note, context, item_ids, items, worn, created_at]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        note:
+          type: string
+        context:
+          $ref: '#/components/schemas/TodayContext'
+          description: 创建时的上下文快照
+        item_ids:
+          type: array
+          items:
+            type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WardrobeItem'
+        worn:
+          type: boolean
+          description: 是否已标记穿着
+        created_at:
+          type: string
+          format: date-time
+
+    AdvisorMessage:
+      type: object
+      required: [id, conversation_id, role, content, created_at]
+      properties:
+        id:
+          type: string
+        conversation_id:
+          type: string
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdvisorAction'
+          description: 顾问回复携带的可执行动作（仅 assistant 消息）
+        created_at:
+          type: string
+          format: date-time
+
+    AdvisorAction:
+      type: object
+      required: [id, kind, label, payload, applied]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          description: 动作类型（如 add_wardrobe_item/adjust_plan_step）
+        label:
+          type: string
+          description: 展示文案
+        payload:
+          type: object
+          additionalProperties: true
+          description: 动作参数（结构随 kind 变化）
+        applied:
+          type: boolean
+
+    HomeBootstrap:
+      type: object
+      required: [active_tasks]
+      properties:
+        profile_summary:
+          $ref: '#/components/schemas/UserProfile'
+          description: 资料摘要（未填写时缺省）
+        report:
+          $ref: '#/components/schemas/Report'
+          description: 最新报告（尚无报告时缺省）
+        today_plan:
+          $ref: '#/components/schemas/TodayPlan'
+          description: 当前今日方案（无生效方案时缺省）
+        active_tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+          description: 进行中的任务（非空且页面可见时才批量轮询）
+        recent_plan:
+          $ref: '#/components/schemas/Plan'
+          description: 最近选定/生成的方案（无方案时缺省）
+
+    SmsRequestAck:
+      type: object
+      required: [sent, cooldown_seconds]
+      properties:
+        sent:
+          type: boolean
+          const: true
+        cooldown_seconds:
+          type: integer
+          const: 60
+          description: 再次请求需等待的秒数
+
+    EventAck:
+      type: object
+      required: [accepted]
+      properties:
+        accepted:
+          type: boolean
+          const: true
+
+    HealthStatus:
+      type: object
+      required: [status, environment]
+      properties:
+        status:
+          type: string
+          const: ok
+        environment:
+          type: string
+          description: 运行环境（development/staging/production）
+        storage_provider:
+          type: string
+        weather_provider:
+          type: string
+        wechat_login_configured:
+          type: boolean
+        analysis_provider:
+          type: string
+        fallback_enabled:
+          type: boolean
+        hair_preview_provider:
+          type: string
+        outfit_diagnosis_provider:
+          type: string
+        ai_routes:
+          type: object
+          additionalProperties:
+            type: string
+          description: AI 能力路由概览（能力 → 供应商，不含厂商模型名细节）
+        jobs:
+          type: object
+          description: 统一任务队列健康度
+          properties:
+            oldest_queued_seconds:
+              type: integer
+              description: 最老排队任务的等待秒数
+            failed_last_hour:
+              type: integer
+              description: 最近一小时失败任务数

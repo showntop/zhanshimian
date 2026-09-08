@@ -1,0 +1,197 @@
+// @zsm/design 小程序语义样式 —— 全部 rpx（designWidth: 750），禁止裸 px。
+// 依赖 dist/tokens.wxss 提供的 page 级 CSS 变量；类语义参照原型 app.wxss，
+// 但取值一律换新 token（§4.2 品牌值）。
+// 自定义组件需 styleIsolation: 'apply-shared' 才能吃到这些类。
+
+// ---------- 页面骨架 ----------
+.page {
+  min-height: 100vh;
+  padding: 40rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 48rpx);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.safe-bottom {
+  height: calc(env(safe-area-inset-bottom) + 20rpx);
+}
+
+.surface {
+  background: var(--surface);
+  border: 1rpx solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.hairline {
+  height: 1rpx;
+  background: var(--line);
+}
+
+// ---------- 排版 ----------
+.serif {
+  font-family: 'Songti SC', 'STSong', serif;
+}
+
+.title {
+  margin: 18rpx 0;
+  font-family: 'Songti SC', 'STSong', serif;
+  font-size: 50rpx;
+  line-height: 1.26;
+  font-weight: 700;
+  letter-spacing: -1rpx;
+  color: var(--ink);
+}
+
+.section-title {
+  margin: 40rpx 0 20rpx;
+  color: var(--ink);
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.eyebrow {
+  color: var(--ink-3);
+  font-size: 23rpx;
+  font-weight: 600;
+  letter-spacing: 4rpx;
+}
+
+.lede {
+  color: var(--ink-2);
+  font-size: 26rpx;
+  line-height: 1.65;
+}
+
+.muted {
+  color: var(--ink-3);
+}
+
+// ---------- chip / pill ----------
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.pill {
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid var(--line);
+  background: var(--surface-strong);
+  color: var(--ink-2);
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.pill.active {
+  background: var(--moss);
+  border-color: var(--moss);
+  color: #ffffff;
+}
+
+// ---------- 微交互 ----------
+.pressable {
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.pressable:active {
+  transform: scale(0.985);
+  opacity: 0.88;
+}
+
+// ---------- 骨架屏 ----------
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(69, 78, 64, 0.08);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.35);
+  transform: translateX(-100%);
+  animation: shimmer 1.3s infinite;
+}
+
+// ---------- 示例标识（数据真实性契约的 UI 落点） ----------
+// 任何非用户本人的内置/AI 示例图必须叠加；父容器需 position: relative。
+.example-badge {
+  position: absolute;
+  right: 12rpx;
+  bottom: 12rpx;
+  z-index: 2;
+  padding: 5rpx 14rpx;
+  border-radius: 999rpx;
+  background: var(--badge);
+  color: #ffffff;
+  font-size: 20rpx;
+  line-height: 1.5;
+}
+
+.example-badge.badge-left {
+  right: auto;
+  left: 12rpx;
+}
+
+// 示例图弱化：模糊 + 降饱和，与本人生成结果拉开视觉区分度；
+// scale 放大由父容器 overflow: hidden 裁掉模糊边缘。
+.example-soft {
+  -webkit-filter: blur(4px) saturate(0.8);
+  filter: blur(4px) saturate(0.8);
+  transform: scale(1.1);
+}
+
+// ---------- 入场动效 ----------
+.fade-up {
+  animation: fade-up 0.52s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.fade-up.delay-1 {
+  animation-delay: 0.08s;
+}
+
+.fade-up.delay-2 {
+  animation-delay: 0.16s;
+}
+
+.fade-up.delay-3 {
+  animation-delay: 0.24s;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(22rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+// ---------- reduced motion 全部归零（不许删动画，压时长） ----------
+@media (prefers-reduced-motion: reduce) {
+  .fade-up,
+  .fade-up.delay-1,
+  .fade-up.delay-2,
+  .fade-up.delay-3 {
+    animation-duration: 0.01ms;
+    animation-delay: 0ms;
+  }
+
+  .skeleton::after {
+    animation-duration: 0.01ms;
+  }
+
+  .pressable,
+  .pressable:active {
+    transition-duration: 0.01ms;
+  }
+}
