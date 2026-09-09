@@ -2,7 +2,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createApiClient, ApiError } from '../src/http/client.ts'
-import { localizeDevImages } from '../src/http/images.ts'
+import { localizeDevImages, rewriteLoopbackAssetURLs } from '../src/http/images.ts'
 import { createApiEndpoints } from '../src/api/endpoints.ts'
 
 function memoryStore(initial = '') {
@@ -206,6 +206,22 @@ test('localizeDevImages 中间件：深遍历替换 http 图片，https 直通�
   // 无注入：直通
   const passthrough = localizeDevImages()
   assert.deepEqual(await passthrough({ a: 'http://x/1.jpg' }), { a: 'http://x/1.jpg' })
+})
+
+test('rewriteLoopbackAssetURLs：生产 API 下把 127.0.0.1/uploads 改到 API 域名', async () => {
+  const mw = rewriteLoopbackAssetURLs('https://prompt.wuyill.com/zhanshimian')
+  const out = await mw({
+    url: 'http://127.0.0.1:58000/uploads/u/a.png',
+    nested: { src: 'http://localhost:58000/uploads/u/b.jpg' },
+    other: 'http://127.0.0.1:58000/v1/healthz',
+    https: 'https://cdn.example/keep.jpg',
+  })
+  assert.equal(out.url, 'https://prompt.wuyill.com/zhanshimian/uploads/u/a.png')
+  assert.equal(out.nested.src, 'https://prompt.wuyill.com/zhanshimian/uploads/u/b.jpg')
+  assert.equal(out.other, 'http://127.0.0.1:58000/v1/healthz')
+  assert.equal(out.https, 'https://cdn.example/keep.jpg')
+  const local = rewriteLoopbackAssetURLs('http://127.0.0.1:58000')
+  assert.equal((await local({ url: 'http://127.0.0.1:58000/uploads/x.png' })).url, 'http://127.0.0.1:58000/uploads/x.png')
 })
 
 test('diagnose：404 清 report 引用后无 report_id 重试一次', async () => {

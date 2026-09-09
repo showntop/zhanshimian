@@ -4,6 +4,7 @@ import Taro from '@tarojs/taro'
 import {
   createApiClient,
   localizeDevImages,
+  rewriteLoopbackAssetURLs,
   type HttpAdapter,
   type ImageDownloader,
   type ResponseMiddleware,
@@ -77,9 +78,8 @@ const downloader: ImageDownloader = async (url: string): Promise<string> => {
   return target
 }
 
-const middleware: ResponseMiddleware[] = baseURL.startsWith('https://')
-  ? []
-  : [localizeDevImages(downloader)]
+// 先把生产误下发的 127.0.0.1/uploads 改到当前 API 域名，再本地化剩余 http 图。
+const middleware: ResponseMiddleware[] = [rewriteLoopbackAssetURLs(baseURL), localizeDevImages(downloader)]
 
 function isDevelopEnv(): boolean {
   try {

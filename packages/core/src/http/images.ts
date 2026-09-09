@@ -36,6 +36,36 @@ function swapImageUrls(value: unknown, resolved: Map<string, string>): unknown {
   return value
 }
 
+const LOOPBACK_ORIGIN = /^https?:\/\/(127\.0\.0\.1|localhost|0\.0\.0\.0)(:\d+)?/i
+
+function mapStrings(value: unknown, rewrite: (s: string) => string): unknown {
+  if (Array.isArray(value)) return value.map((item) => mapStrings(item, rewrite))
+  if (value && typeof value === 'object') {
+    const copy: Record<string, unknown> = {}
+    for (const key of Object.keys(value as Record<string, unknown>)) {
+      copy[key] = mapStrings((value as Record<string, unknown>)[key], rewrite)
+    }
+    return copy
+  }
+  return typeof value === 'string' ? rewrite(value) : value
+}
+
+/**
+ * 生产机 PUBLIC_BASE_URL 误写成 127.0.0.1 时，把 /uploads /assets
+ * 改写到当前 API 域名（nginx 会反代到同机 58000）。
+ * API 本身就是回环地址时不改，交给 localizeDevImages。
+ */
+export function rewriteLoopbackAssetURLs(apiBase: string): ResponseMiddleware {
+  const base = apiBase.replace(/\/$/, '')
+  if (LOOPBACK_ORIGIN.test(base)) return (data) => data
+  return (data) =>
+    mapStrings(data, (value) => {
+      if (!LOOPBACK_ORIGIN.test(value)) return value
+      if (!/\/(uploads|assets)\//.test(value)) return value
+      return value.replace(LOOPBACK_ORIGIN, base)
+    })
+}
+
 export function localizeDevImages(download?: ImageDownloader): ResponseMiddleware {
   if (!download) return (data) => data
   // 同一 URL 只下载一次（跨请求共享，等同原型的 imageDownloads Map）

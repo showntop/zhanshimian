@@ -24,10 +24,10 @@ button::after {
 }
 
 // ---------- 页面骨架 ----------
-// 自定义导航是 position:fixed，顶距必须给过状态栏+胶囊（原型 .page 200rpx）。
+// 顶距由 AppHeader 占位撑开（真机胶囊高度），这里不再写死 200rpx。
 .page {
   min-height: 100vh;
-  padding: 200rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 48rpx);
+  padding: 0 var(--page-gutter) calc(env(safe-area-inset-bottom) + 48rpx);
   background: var(--bg);
   color: var(--ink);
 }

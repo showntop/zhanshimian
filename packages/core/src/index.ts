@@ -10,7 +10,7 @@ export {
   type ResponseMiddleware,
   type TaskRef
 } from './http/client.ts'
-export { localizeDevImages, type ImageDownloader } from './http/images.ts'
+export { localizeDevImages, rewriteLoopbackAssetURLs, type ImageDownloader } from './http/images.ts'
 export { API_PATHS, createApiEndpoints, type ApiEndpoints, type ApiPathName, type EndpointOptions, type TaskCreated } from './api/endpoints.ts'
 export * from './types/index.ts'
 export {

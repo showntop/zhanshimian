@@ -1,5 +1,5 @@
-// 自定义导航：真机测量状态栏高度与胶囊位置（禁止写死 rpx），
-// 输出 --nav-height 供页面布局；styleIsolation apply-shared 共享全局类。
+// 自定义导航：状态栏与胶囊按真机测量，禁止写死 rpx。
+// 固定栏 + 同高占位，页面内容从导航下方开始，不再依赖 .page 的猜测顶距。
 import { useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
@@ -13,21 +13,30 @@ interface AppHeaderProps {
   right?: React.ReactNode
 }
 
+function measureNav() {
+  try {
+    const win = Taro.getWindowInfo()
+    const capsule = Taro.getMenuButtonBoundingClientRect?.()
+    const statusBar = win.statusBarHeight ?? 47
+    if (capsule && capsule.bottom > 0) {
+      const gap = Math.max(capsule.top - statusBar, 4)
+      return {
+        statusBar,
+        navHeight: capsule.bottom + gap,
+        rightPad: Math.max(96, win.windowWidth - capsule.left + 8),
+      }
+    }
+    return { statusBar, navHeight: statusBar + 44, rightPad: 96 }
+  } catch {
+    return { statusBar: 47, navHeight: 100, rightPad: 96 }
+  }
+}
+
 export default function AppHeader({ title, back, transparent, onBack, right }: AppHeaderProps) {
-  const [padTop, setPadTop] = useState(88)
+  const [nav, setNav] = useState(measureNav)
 
   useEffect(() => {
-    try {
-      const windowInfo = Taro.getWindowInfo()
-      const capsule = Taro.getMenuButtonBoundingClientRect?.()
-      const statusBar = windowInfo.statusBarHeight ?? 44
-      const capsuleHeight = capsule && capsule.height > 0 ? capsule.height : 32
-      // 导航内容高度对齐胶囊：胶囊高度 + 上下各 (capsuleTop - statusBar) 的空隙
-      const gap = capsule ? Math.max(capsule.top - statusBar, 4) * 2 : 12
-      setPadTop(statusBar + gap + capsuleHeight)
-    } catch {
-      setPadTop(88)
-    }
+    setNav(measureNav())
   }, [])
 
   const handleBack = () => {
@@ -41,22 +50,32 @@ export default function AppHeader({ title, back, transparent, onBack, right }: A
   }
 
   return (
-    <View className={`app-header ${transparent ? 'app-header--transparent' : ''}`} style={{ paddingTop: `${padTop}px` }}>
-      <View className="app-header__bar">
-        <View className="app-header__left">
-          {back ? (
-            <View className="app-header__back pressable" onClick={handleBack}>
-              <Text className="app-header__back-icon">‹</Text>
-            </View>
-          ) : (
-            <Text className="app-header__wordmark">
-              怎么打<Text className="app-header__wordmark-accent">扮</Text>
-            </Text>
-          )}
+    <View className="app-header-wrap">
+      <View
+        className={`app-header ${transparent ? 'app-header--transparent' : ''}`}
+        style={{
+          paddingTop: `${nav.statusBar}px`,
+          height: `${nav.navHeight}px`,
+          paddingRight: `${nav.rightPad}px`,
+        }}
+      >
+        <View className="app-header__bar">
+          <View className="app-header__left">
+            {back ? (
+              <View className="app-header__back pressable" onClick={handleBack}>
+                <Text className="app-header__back-icon">‹</Text>
+              </View>
+            ) : (
+              <Text className="app-header__wordmark">
+                怎么打<Text className="app-header__wordmark-accent">扮</Text>
+              </Text>
+            )}
+          </View>
+          {title ? <Text className="app-header__title">{title}</Text> : <View />}
+          <View className="app-header__right">{right}</View>
         </View>
-        {title ? <Text className="app-header__title">{title}</Text> : <View />}
-        <View className="app-header__right">{right}</View>
       </View>
+      <View className="app-header-spacer" style={{ height: `${nav.navHeight}px` }} />
     </View>
   )
 }

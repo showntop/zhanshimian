@@ -1,24 +1,32 @@
+.app-header-wrap {
+  width: 100%;
+}
+
 .app-header {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 100;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding-left: 32rpx;
   background: rgba(248, 245, 240, 0.96);
   backdrop-filter: blur(20rpx);
   border-bottom: 1rpx solid var(--line);
 
   &--transparent {
-    background: rgba(248, 245, 240, 0.6);
+    background: rgba(248, 245, 240, 0.86);
     border-bottom-color: transparent;
   }
 
   &__bar {
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 64rpx;
-    padding: 0 24rpx;
+    min-height: 0;
   }
 
   &__left,
@@ -63,8 +71,13 @@
   }
 
   &__title {
-    font-size: 32rpx;
-    font-weight: 600;
+    font-size: 31rpx;
+    font-weight: 700;
     color: var(--ink);
   }
+}
+
+.app-header-spacer {
+  width: 100%;
+  flex-shrink: 0;
 }

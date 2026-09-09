@@ -4,10 +4,12 @@
 // - 第三方平台可通过 extConfig.apiBaseURL 覆盖。
 import Taro from '@tarojs/taro'
 
+const PRODUCTION_API = 'https://prompt.wuyill.com/zhanshimian'
+
 const apiBaseURLs: Record<string, string> = {
-  develop: API_BASE_URL,
-  trial: 'https://prompt.wuyill.com/zhanshimian',
-  release: 'https://prompt.wuyill.com/zhanshimian',
+  develop: PRODUCTION_API,
+  trial: PRODUCTION_API,
+  release: PRODUCTION_API,
 }
 
 function pickBaseURL(): string | undefined {

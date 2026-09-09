@@ -45,7 +45,12 @@ export default function Capture() {
         setBusy(true)
         api
           .uploadMedia({ kind, filePath: file.tempFilePath })
-          .then((asset) => setAssets((prev) => ({ ...prev, [kind]: asset })))
+          .then((asset) =>
+            setAssets((prev) => ({
+              ...prev,
+              [kind]: { ...asset, url: file.tempFilePath || asset.url },
+            })),
+          )
           .catch((e: Error) => setError(e.message || '上传没有成功，请重试'))
           .finally(() => setBusy(false))
       },
@@ -67,7 +72,9 @@ export default function Capture() {
             files[i]
               ? api
                   .uploadMedia({ kind: shot.kind, filePath: files[i]!.tempFilePath })
-                  .then((asset) => [shot.kind, asset] as const)
+                  .then((asset) =>
+                    [shot.kind, { ...asset, url: files[i]!.tempFilePath || asset.url }] as const,
+                  )
               : Promise.resolve(null),
           ),
         )
