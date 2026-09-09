@@ -29,13 +29,16 @@ export default function TaskRail({ items }: TaskRailProps) {
               {failed ? (
                 <Text className="task-card__status task-card__status--failed">未完成</Text>
               ) : (
-                <View className="task-card__spinner" />
+                <View className="task-card__spinner spinner" />
               )}
             </View>
             <Text className="task-card__title">{title}</Text>
             {!failed ? (
               <View className="task-card__progress">
-                <View className="task-card__progress-fill" style={{ width: `${task.progress}%` }} />
+                <View
+                  className="task-card__progress-fill"
+                  style={{ transform: `scaleX(${Math.min(100, Math.max(0, task.progress ?? 0)) / 100})` }}
+                />
               </View>
             ) : null}
             <Text className="task-card__stage">{task.stage || (failed ? '点击查看原因' : '进行中')}</Text>

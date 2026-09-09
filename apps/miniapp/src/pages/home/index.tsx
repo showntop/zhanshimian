@@ -1,5 +1,6 @@
 // 首页工作台：新用户/回访双状态。
 // 请求纪律：单次 /v1/home/bootstrap 聚合；仅当有活跃任务且页面可见时批量轮询(1.5s)。
+// 重设计 IA：问候 → 任务轨 → 今日造型 hero（视觉锚点）→ 工具 → 场景 → 最近方案。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
@@ -140,7 +141,7 @@ export default function Home() {
         <View className="home">
           <View className="home__greeting fade-up">
             <Text className="home__greeting-kicker">私人形象顾问</Text>
-            <Text className="home__greeting-title">
+            <Text className="home__greeting-title display">
               {hasReport ? `${greetingForNow()}，今日造型穿搭建议` : HOME_TITLE}
             </Text>
           </View>
@@ -152,37 +153,47 @@ export default function Home() {
           ) : null}
 
           {!hasReport ? (
-            <View className="home__onboard fade-up delay-1">
-              <Text className="home__onboard-title">三张照片，开始你的形象档案</Text>
-              <Text className="home__onboard-desc">正脸、45° 侧脸、正面全身。不用化妆，也不需要刻意摆姿势。</Text>
-              <PrimaryButton
-                text="开始形象分析"
-                onClick={() => Taro.navigateTo({ url: '/pages/capture/index' })}
-              />
-              <Text className="home__onboard-privacy">照片与建议只对你可见，可随时删除</Text>
+            <View className="fade-up delay-1">
+              <View className="home__hero home__hero--onboard card--hero halo">
+                <Text className="home__hero-eyebrow">开始形象档案</Text>
+                <Text className="home__hero-title">三张照片，开始你的形象档案</Text>
+                <Text className="home__hero-desc">正脸、45° 侧脸、正面全身。不用化妆，也不需要刻意摆姿势。</Text>
+                <PrimaryButton
+                  text="开始形象分析"
+                  tone="onDark"
+                  onClick={() => Taro.navigateTo({ url: '/pages/capture/index' })}
+                />
+                <Text className="home__hero-note">照片与建议只对你可见，可随时删除</Text>
+              </View>
             </View>
           ) : (
             todayPlan && (
-              <View
-                className="home__today fade-up delay-1 pressable"
-                onClick={() => Taro.navigateTo({ url: '/packages/life/pages/today/index' })}
-              >
-                <View className="home__today-copy">
-                  <Text className="home__today-label">今日造型</Text>
-                  <Text className="home__today-title">{todayPlan.title}</Text>
-                  <Text className="home__today-summary">{todayPlan.summary}</Text>
+              <View className="fade-up delay-1">
+                <View
+                  className="home__hero home__hero--today card--hero halo pressable"
+                  onClick={() => Taro.navigateTo({ url: '/packages/life/pages/today/index' })}
+                >
+                  <View className="home__hero-copy">
+                    <Text className="home__hero-eyebrow">今日造型</Text>
+                    <Text className="home__hero-title">{todayPlan.title}</Text>
+                    <Text className="home__hero-desc">{todayPlan.summary}</Text>
+                    <Text className="home__hero-link">查看今天怎么穿 ›</Text>
+                  </View>
+                  <ExampleImage
+                    className="home__hero-img"
+                    src={todayPlan.generated_image_url || todayPlan.image_url}
+                    badgeText={todayPlan.look_provider?.startsWith('demo') ? '效果示例' : 'AI 预览'}
+                  />
                 </View>
-                <ExampleImage
-                  className="home__today-img"
-                  src={todayPlan.generated_image_url || todayPlan.image_url}
-                  badgeText={todayPlan.look_provider?.startsWith('demo') ? '效果示例' : 'AI 预览'}
-                />
               </View>
             )
           )}
 
           <View className="home__section fade-up delay-2">
-            <Text className="section-title">直接解决眼前的一件事</Text>
+            <View className="home__section-head">
+              <Text className="section-title">直接解决眼前的一件事</Text>
+              <View className="section-rule" />
+            </View>
             <View className="home__tools">
               {TOOLS.map((tool) => (
                 <View
@@ -199,7 +210,10 @@ export default function Home() {
           </View>
 
           <View className="home__section fade-up delay-3">
-            <Text className="section-title">按场合开始</Text>
+            <View className="home__section-head">
+              <Text className="section-title">按场合开始</Text>
+              <View className="section-rule" />
+            </View>
             <ScrollView className="home__scenes" scrollX enhanced showScrollbar={false}>
               <View className="home__scene-row">
                 {SCENES.map((scene) => (
@@ -219,9 +233,12 @@ export default function Home() {
 
           {recentPlan ? (
             <View className="home__section fade-up delay-3">
-              <Text className="section-title">最近方案</Text>
+              <View className="home__section-head">
+                <Text className="section-title">最近方案</Text>
+                <View className="section-rule" />
+              </View>
               <View
-                className="home__recent pressable"
+                className="home__recent card pressable"
                 onClick={() => Taro.navigateTo({ url: `/pages/plan/index?id=${recentPlan.id}` })}
               >
                 <ExampleImage className="home__recent-img" src={recentPlan.generated_image_url || recentPlan.image_url} />
@@ -229,6 +246,7 @@ export default function Home() {
                   <Text className="home__recent-name">{recentPlan.name}</Text>
                   <Text className="home__recent-why">{recentPlan.why}</Text>
                 </View>
+                <Text className="home__recent-arrow">›</Text>
               </View>
             </View>
           ) : null}

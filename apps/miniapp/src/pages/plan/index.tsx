@@ -9,7 +9,7 @@ import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
 import ExampleImage from '../../components/example-image'
-import CompareToggle from '../../components/compare-toggle'
+import CompareSlider from '../../components/compare-slider'
 import BottomSheet from '../../components/bottom-sheet'
 import Skeleton from '../../components/skeleton'
 import ErrorState from '../../components/error-state'
@@ -41,7 +41,6 @@ export default function PlanDetail() {
   const [planId, setPlanId] = useState('')
   const [plan, setPlan] = useState<Plan | null>(null)
   const [currentImage, setCurrentImage] = useState('')
-  const [mode, setMode] = useState<'current' | 'plan'>('plan')
   const [active, setActive] = useState<string>('hair')
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
@@ -143,27 +142,17 @@ export default function PlanDetail() {
       <View className="pd">
         <View className="pd__hero fade-up">
           <View className="pd__hero-frame">
-            {mode === 'plan' ? (
-              <ExampleImage
-                className="pd__hero-img"
-                src={planImage}
-                badgeText={(plan.look_provider ?? '').startsWith('demo') ? '效果示例' : 'AI 风格预览'}
-              />
-            ) : (
-              <ExampleImage className="pd__hero-img" src={currentImage} user />
-            )}
-            <View className="pd__hero-toggle">
-              <CompareToggle
-                value={mode}
-                onChange={(next) => {
-                  if (next === 'current' && !currentImage) {
-                    Taro.showToast({ title: '当前形象照暂不可用', icon: 'none' })
-                    return
-                  }
-                  setMode(next)
-                }}
-              />
-            </View>
+            <CompareSlider
+              single={!currentImage}
+              current={<ExampleImage className="pd__hero-img" src={currentImage} user />}
+              plan={
+                <ExampleImage
+                  className="pd__hero-img"
+                  src={planImage}
+                  badgeText={(plan.look_provider ?? '').startsWith('demo') ? '效果示例' : 'AI 风格预览'}
+                />
+              }
+            />
           </View>
         </View>
 

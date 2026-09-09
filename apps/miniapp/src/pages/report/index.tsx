@@ -141,8 +141,8 @@ export default function Report() {
 
         <View className="report__section fade-up delay-2">
           <Text className="section-title">可提升点</Text>
-          {grouped.map((finding) => (
-            <View key={finding.id} className="report__finding">
+          {grouped.map((finding, i) => (
+            <View key={finding.id} className={`report__finding fade-up delay-${Math.min(i, 3)}`}>
               <View className="report__finding-head">
                 <Text className="report__finding-cat">{CATEGORY_LABEL[finding.category] || finding.category}</Text>
                 {finding.photo ? (

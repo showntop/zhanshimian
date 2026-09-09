@@ -55,10 +55,7 @@
     &-spin {
       width: 48rpx;
       height: 48rpx;
-      border-radius: 999rpx;
-      border: 4rpx solid var(--moss-soft);
-      border-top-color: var(--moss);
-      animation: hair-spin 0.9s linear infinite;
+      border-width: 4rpx;
     }
 
     &-text {
@@ -154,21 +151,6 @@
       color: var(--moss);
       text-decoration: underline;
     }
-  }
-}
-
-@keyframes hair-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hair__mask-spin {
-    animation: none;
   }
 }
 

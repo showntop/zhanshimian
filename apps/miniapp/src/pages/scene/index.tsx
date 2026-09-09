@@ -38,7 +38,7 @@ const FIELDS: Record<string, Field[]> = {
     { key: 'impression', label: '最想呈现', options: [{ value: 'natural', label: '更自然' }, { value: 'memorable', label: '有记忆点' }, { value: 'energetic', label: '更有精神' }] },
   ],
   daily: [
-    { key: 'activity', label: '今天主要做', options: [{ value: 'commute', label: '通勤上班' }, { value: 'wfh', label: '居家办公' }, { value: 'errand', label: '外出办事' }, { value: 'meetup', label: '朋友小聚' }] },
+    { key: 'activity', label: '今天主要做', options: [{ value: 'commute', label: '上班' }, { value: 'wfh', label: '居家办公' }, { value: 'errand', label: '外出办事' }, { value: 'meetup', label: '朋友小聚' }] },
     { key: 'weather', label: '所处环境', options: [{ value: 'office', label: '室内为主' }, { value: 'mixed', label: '室内外都有' }, { value: 'outdoor', label: '户外为主' }] },
     { key: 'preparation', label: '准备方式', options: [{ value: 'closet', label: '只用现有衣橱' }, { value: 'key-piece', label: '补一件关键单品' }] },
     { key: 'impression', label: '最想呈现', options: [{ value: 'natural', label: '更自然' }, { value: 'energetic', label: '更有精神' }, { value: 'reliable', label: '更可靠' }] },

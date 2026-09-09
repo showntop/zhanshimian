@@ -1,25 +1,48 @@
+// 主按钮：交互件一律 pill（shape lock）。
+// loading = spinner + 文案（AI 生成 1-2 分钟场景下保留文字上下）。
 .primary-button {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 14rpx;
   min-height: 96rpx;
   padding: 0 40rpx;
-  border-radius: var(--radius-md);
-  background: var(--moss);
-  color: #ffffff;
+  border-radius: var(--radius-pill);
   font-size: 30rpx;
   font-weight: 600;
-  box-shadow: var(--shadow-primary-button);
   transition: transform 0.16s ease, opacity 0.16s ease, background 0.16s ease;
+
+  &--solid {
+    background: var(--moss);
+    color: #ffffff;
+    box-shadow: var(--shadow-primary-button);
+
+    &:active {
+      background: var(--moss-pressed);
+    }
+  }
+
+  // hero 深绿卡内：米白底 + moss 字（对比度 ≥ 4.5:1）
+  &--onDark {
+    background: var(--cream);
+    color: var(--moss-pressed);
+
+    &:active {
+      background: #e6dfd2;
+    }
+  }
 
   &:active {
     transform: scale(0.985);
-    background: var(--moss-pressed);
   }
 
   &--disabled {
     background: #cdd3c8;
     box-shadow: none;
     color: rgba(255, 255, 255, 0.9);
+  }
+
+  &__spinner {
+    flex-shrink: 0;
   }
 }

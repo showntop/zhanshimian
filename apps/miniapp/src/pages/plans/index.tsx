@@ -219,7 +219,7 @@ export default function Plans() {
             <Text className="plans__why">{plan.why}</Text>
             {activeLook ? (
               <View className="plans__generating" onClick={retryOne}>
-                <View className="plans__generating-spin" />
+                <View className="plans__generating-spin spinner" />
                 <Text className="plans__generating-text">{activeLook.look_task?.stage || '正在生成形象图'} · 点击查看</Text>
               </View>
             ) : null}

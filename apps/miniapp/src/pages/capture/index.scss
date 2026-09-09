@@ -65,7 +65,12 @@
     }
 
     &-action {
-      padding: 8rpx 24rpx;
+      // 触控热区下限 88rpx（sizes.touchTarget），文字按钮不缩水
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 88rpx;
+      padding: 0 32rpx;
       border-radius: 999rpx;
       background: var(--moss-soft);
       color: var(--moss);
@@ -136,6 +141,9 @@
   }
 
   &__alt-action {
+    display: flex;
+    align-items: center;
+    min-height: 88rpx;
     font-size: 24rpx;
     color: var(--moss);
     text-decoration: underline;

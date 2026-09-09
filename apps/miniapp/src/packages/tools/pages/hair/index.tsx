@@ -174,7 +174,7 @@ export default function Hair() {
             )}
             {preview && (preview.status === 'queued' || preview.status === 'processing') ? (
               <View className="hair__mask">
-                <View className="hair__mask-spin" />
+                <View className="hair__mask-spin spinner" />
                 <Text className="hair__mask-text">{preview.stage || '正在生成预览'}</Text>
               </View>
             ) : null}

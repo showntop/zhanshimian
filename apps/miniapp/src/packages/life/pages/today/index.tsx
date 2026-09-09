@@ -175,7 +175,7 @@ export default function Today() {
             ) : null}
             {generating ? (
               <View className="today__mask">
-                <View className="today__mask-spin" />
+                <View className="today__mask-spin spinner" />
                 <Text className="today__mask-text">{plan?.look_task?.stage || '正在生成搭配图'}</Text>
               </View>
             ) : null}

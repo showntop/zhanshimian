@@ -2,6 +2,12 @@
 // 依赖 dist/tokens.wxss 提供的 page 级 CSS 变量；类语义参照原型 app.wxss，
 // 但取值一律换新 token（§4.2 品牌值）。
 // 自定义组件需 styleIsolation: 'apply-shared' 才能吃到这些类。
+//
+// 分层体系（重设计）：
+//   .card          raised —— 白底 + 发丝描边 + 柔投影（常规内容）
+//   .card--quiet   柔底 —— moss-soft 底、无描边（次级入口/分组）
+//   .card--hero    hero —— moss-deep 底 + cream 文字（每页至多一个，视觉锚点）
+// 圆角纪律：交互件一律 pill；容器卡 lg；hero 卡 xl。
 
 // 对齐原型 app.wxss：微信组件默认 content-box，不加这个卡片宽高会被 padding 撑破。
 page,
@@ -51,9 +57,49 @@ button::after {
   background: var(--line);
 }
 
+// ---------- 卡片分层 ----------
+.card {
+  background: var(--surface-strong);
+  border: 1rpx solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.card--quiet {
+  background: var(--moss-soft);
+  border-radius: var(--radius-lg);
+}
+
+.card--hero {
+  background: var(--moss-deep);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-hero-card);
+  color: var(--cream);
+
+  .title,
+  .section-title,
+  .lede {
+    color: var(--cream);
+  }
+
+  .muted,
+  .eyebrow {
+    color: rgba(244, 239, 230, 0.72);
+  }
+}
+
 // ---------- 排版 ----------
 .serif {
   font-family: 'Songti SC', 'STSong', serif;
+}
+
+.display {
+  font-family: 'Songti SC', 'STSong', serif;
+  font-size: 38rpx;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -0.5rpx;
+  color: var(--ink);
 }
 
 .title {
@@ -71,6 +117,15 @@ button::after {
   color: var(--ink);
   font-size: 32rpx;
   font-weight: 700;
+}
+
+// 分区规则线：section-title 下方的短横线，替代 eyebrow 的分区感
+.section-rule {
+  width: 48rpx;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background: var(--moss);
+  margin: 0 0 22rpx;
 }
 
 .eyebrow {
@@ -105,12 +160,15 @@ button::after {
   color: var(--ink-2);
   font-size: 22rpx;
   line-height: 1.5;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
+// 统一选中规范：柔绿底 + moss 描边（与 Pill 组件一致，唯一 active 语义）
 .pill.active {
-  background: var(--moss);
+  background: var(--moss-soft);
   border-color: var(--moss);
-  color: #ffffff;
+  color: var(--moss);
+  font-weight: 600;
 }
 
 // ---------- 微交互 ----------
@@ -121,6 +179,31 @@ button::after {
 .pressable:active {
   transform: scale(0.985);
   opacity: 0.88;
+}
+
+// ---------- 统一 spinner（全局唯一定义，各处复用） ----------
+.spinner {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 999rpx;
+  border: 3rpx solid var(--moss-soft);
+  border-top-color: var(--moss);
+  animation: zsm-spin 0.9s linear infinite;
+}
+
+.spinner--on-deep {
+  border-color: rgba(244, 239, 230, 0.32);
+  border-top-color: var(--cream);
+}
+
+@keyframes zsm-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 // ---------- 骨架屏 ----------
@@ -189,6 +272,7 @@ button::after {
     opacity: 0;
     transform: translateY(22rpx);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -201,22 +285,36 @@ button::after {
   }
 }
 
+// ---------- 呼吸辉光（hero 卡，4s 循环；参数对齐 motion.ts haloGlow） ----------
+.halo {
+  animation: halo-breathe 4s ease-in-out infinite;
+}
+
+@keyframes halo-breathe {
+  0%,
+  100% {
+    box-shadow: var(--shadow-hero-card);
+  }
+
+  50% {
+    box-shadow: 0 20rpx 56rpx 16rpx rgba(88, 115, 68, 0.18), var(--shadow-hero-card);
+  }
+}
+
 // ---------- reduced motion 全部归零（不许删动画，压时长） ----------
+// !important 兜底：类级 animation 简写（.spinner/.halo 等）特异性高于元素选择器。
 @media (prefers-reduced-motion: reduce) {
-  .fade-up,
-  .fade-up.delay-1,
-  .fade-up.delay-2,
-  .fade-up.delay-3 {
-    animation-duration: 0.01ms;
-    animation-delay: 0ms;
-  }
-
-  .skeleton::after {
-    animation-duration: 0.01ms;
-  }
-
-  .pressable,
-  .pressable:active {
-    transition-duration: 0.01ms;
+  page,
+  page view,
+  page text,
+  page image,
+  page button,
+  page scroll-view,
+  page swiper,
+  page swiper-item,
+  page .skeleton::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

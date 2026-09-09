@@ -94,10 +94,6 @@
     &-spin {
       width: 26rpx;
       height: 26rpx;
-      border-radius: 999rpx;
-      border: 3rpx solid var(--moss-soft);
-      border-top-color: var(--moss);
-      animation: plans-spin 0.9s linear infinite;
     }
 
     &-text {
@@ -161,20 +157,5 @@
       font-size: 20rpx;
       color: var(--ink-3);
     }
-  }
-}
-
-@keyframes plans-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .plans__generating-spin {
-    animation: none;
   }
 }

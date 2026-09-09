@@ -1,119 +1,121 @@
+// 首页重设计样式：hero 锚点 + 分区规则线 + 次级入口降权重。
+// hero 文字一律 cream（card--hero 已设基色），这里只补排版细节。
 .home {
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
 
   &__greeting {
     display: flex;
     flex-direction: column;
-    gap: 8rpx;
-    padding: 24rpx 8rpx 30rpx;
+    gap: 10rpx;
+    padding: 24rpx 8rpx 34rpx;
+
+    &-kicker {
+      color: var(--moss);
+      font-size: 21rpx;
+      font-weight: 600;
+      letter-spacing: 4rpx;
+    }
+
+    &-title {
+      padding: 0;
+      margin: 0;
+    }
   }
 
-  &__greeting-kicker {
-    color: var(--ink-2);
-    font-size: 21rpx;
-    letter-spacing: 2rpx;
-  }
-
-  &__greeting-title {
-    color: var(--ink);
-    font-size: 34rpx;
-    line-height: 1.35;
-    font-weight: 650;
-  }
-
+  // ---------- 分区（density 3：舒展留白） ----------
   &__section {
     display: flex;
     flex-direction: column;
-    padding-top: 42rpx;
+    padding-top: 64rpx;
   }
 
-  &__section .section-title {
-    margin: 0 0 18rpx;
-    padding: 0 5rpx;
-    font-size: 30rpx;
-  }
-
-  &__onboard {
+  &__section-head {
     display: flex;
     flex-direction: column;
-    gap: 16rpx;
-    padding: 36rpx 32rpx 28rpx;
-    border-radius: var(--radius-lg);
-    background: var(--surface-strong);
-    border: 1rpx solid var(--line);
-    box-shadow: var(--shadow-card);
+    padding: 0 5rpx;
+
+    .section-title {
+      margin: 0 0 14rpx;
+      font-size: 32rpx;
+    }
+  }
+
+  // ---------- hero 主卡（每页至多一个视觉锚点） ----------
+  &__hero {
+    display: flex;
+    align-items: center;
+    gap: 24rpx;
+    padding: 40rpx 36rpx;
+    margin-top: 8rpx;
+
+    &-eyebrow {
+      font-size: 21rpx;
+      font-weight: 600;
+      letter-spacing: 4rpx;
+      color: rgba(244, 239, 230, 0.72);
+    }
 
     &-title {
-      color: var(--ink);
-      font-size: 34rpx;
-      line-height: 1.35;
+      margin-top: 10rpx;
+      font-family: 'Songti SC', 'STSong', serif;
+      font-size: 40rpx;
+      line-height: 1.3;
       font-weight: 700;
+      color: var(--cream);
     }
 
     &-desc {
+      margin-top: 12rpx;
       font-size: 23rpx;
       line-height: 1.55;
-      color: var(--ink-2);
+      color: rgba(244, 239, 230, 0.82);
     }
 
-    &-privacy {
-      margin-top: 4rpx;
+    &-link {
+      margin-top: 18rpx;
+      font-size: 23rpx;
+      font-weight: 600;
+      color: var(--cream);
+    }
+
+    &-note {
+      margin-top: 16rpx;
       font-size: 20rpx;
-      color: var(--ink-3);
+      color: rgba(244, 239, 230, 0.6);
       text-align: center;
     }
-  }
-
-  &__today {
-    display: flex;
-    align-items: center;
-    gap: 16rpx;
-    padding: 23rpx 25rpx 21rpx;
-    border-radius: var(--radius-lg);
-    background: var(--surface-strong);
-    border: 1rpx solid var(--line);
-    box-shadow: var(--shadow-card);
 
     &-copy {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 8rpx;
       min-width: 0;
     }
 
-    &-label {
-      font-size: 20rpx;
-      font-weight: 650;
-      color: var(--ink-2);
-    }
-
-    &-title {
-      font-size: 27rpx;
-      line-height: 1.3;
-      font-weight: 700;
-      color: var(--ink);
-    }
-
-    &-summary {
-      font-size: 19rpx;
-      line-height: 1.5;
-      color: var(--ink-2);
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
     &-img {
-      width: 112rpx;
-      height: 132rpx;
+      width: 168rpx;
+      height: 208rpx;
       flex-shrink: 0;
+    }
+
+    // 新用户建档：纵向铺排
+    &--onboard {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+
+      .home__hero-desc {
+        margin-top: 14rpx;
+      }
+
+      .primary-button {
+        margin-top: 32rpx;
+      }
     }
   }
 
+  // ---------- 工具（次级入口：quiet 卡，去描边投影） ----------
   &__tools {
     display: flex;
     gap: 12rpx;
@@ -126,25 +128,24 @@
     display: flex;
     flex-direction: column;
     gap: 8rpx;
-    padding: 24rpx 18rpx 22rpx;
-    border-radius: var(--radius-md);
-    background: var(--surface-strong);
-    border: 1rpx solid var(--line);
+    padding: 26rpx 20rpx 24rpx;
+    border-radius: var(--radius-lg);
+    background: var(--moss-soft);
 
     &-badge {
       position: absolute;
-      top: 10rpx;
-      right: 10rpx;
-      padding: 4rpx 8rpx;
+      top: 12rpx;
+      right: 12rpx;
+      padding: 4rpx 12rpx;
       border-radius: 999rpx;
-      background: var(--moss-soft);
+      background: var(--surface-strong);
       color: var(--moss);
       font-size: 16rpx;
       font-weight: 650;
     }
 
     &-name {
-      font-size: 22rpx;
+      font-size: 23rpx;
       font-weight: 650;
       color: var(--ink);
     }
@@ -156,6 +157,7 @@
     }
   }
 
+  // ---------- 场景（横滑，quiet） ----------
   &__scenes {
     width: calc(100% + 32rpx);
     margin: 0 -16rpx;
@@ -172,15 +174,14 @@
     display: flex;
     flex-direction: column;
     gap: 8rpx;
-    width: 200rpx;
+    width: 204rpx;
     flex-shrink: 0;
-    padding: 24rpx 22rpx;
-    border-radius: var(--radius-md);
-    background: var(--surface-strong);
-    border: 1rpx solid var(--line);
+    padding: 26rpx 24rpx;
+    border-radius: var(--radius-lg);
+    background: var(--moss-soft);
 
     &-label {
-      font-size: 28rpx;
+      font-size: 30rpx;
       font-weight: 700;
       color: var(--ink);
     }
@@ -195,23 +196,22 @@
   }
 
   &__scene-note {
-    margin-top: 16rpx;
+    margin-top: 18rpx;
+    padding: 0 5rpx;
     font-size: 20rpx;
     color: var(--moss);
   }
 
+  // ---------- 最近方案（紧凑行卡） ----------
   &__recent {
     display: flex;
     align-items: center;
     gap: 24rpx;
-    padding: 24rpx;
-    border-radius: var(--radius-lg);
-    background: var(--surface-strong);
-    border: 1rpx solid var(--line);
+    padding: 20rpx 24rpx;
 
     &-img {
-      width: 160rpx;
-      height: 200rpx;
+      width: 120rpx;
+      height: 150rpx;
       flex-shrink: 0;
     }
 
@@ -219,24 +219,31 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 10rpx;
+      gap: 8rpx;
       min-width: 0;
     }
 
     &-name {
-      font-size: 30rpx;
+      font-size: 28rpx;
       font-weight: 600;
       color: var(--ink);
     }
 
     &-why {
-      font-size: 24rpx;
-      line-height: 1.6;
+      font-size: 22rpx;
+      line-height: 1.55;
       color: var(--ink-2);
       display: -webkit-box;
-      -webkit-line-clamp: 3;
+      -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
+    }
+
+    &-arrow {
+      font-size: 36rpx;
+      line-height: 1;
+      color: var(--ink-3);
+      flex-shrink: 0;
     }
   }
 }

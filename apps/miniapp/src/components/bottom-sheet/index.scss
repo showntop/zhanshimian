@@ -15,17 +15,27 @@
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 24rpx 32rpx calc(env(safe-area-inset-bottom) + 40rpx);
+    padding: 20rpx 32rpx calc(env(safe-area-inset-bottom) + 40rpx);
     background: var(--surface-strong);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-sheet);
     animation: bottom-sheet-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    // 松手回弹（拖拽中由内联 transform 接管，无过渡）
+    transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  // 下拉手势热区：grabber + 标题区（高度充足才好拖）
+  &__grab-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8rpx 0 4rpx;
   }
 
   &__grabber {
     width: 72rpx;
     height: 8rpx;
-    margin: 0 auto 20rpx;
+    margin-bottom: 20rpx;
     border-radius: 999rpx;
     background: #d8ddd4;
   }
@@ -50,14 +60,34 @@
   &__body {
     margin-top: 28rpx;
   }
+
+  // 退场：面板更快更重地下滑（§4.3 sheetOut），遮罩同步淡出
+  &--exit &__mask {
+    animation: bottom-sheet-fade 0.2s ease reverse both;
+  }
+
+  &--exit &__panel {
+    animation: bottom-sheet-out 0.24s cubic-bezier(0.33, 0, 0.2, 1) both;
+  }
 }
 
 @keyframes bottom-sheet-in {
   from {
     transform: translateY(100%);
   }
+
   to {
     transform: translateY(0);
+  }
+}
+
+@keyframes bottom-sheet-out {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(100%);
   }
 }
 
@@ -65,6 +95,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }

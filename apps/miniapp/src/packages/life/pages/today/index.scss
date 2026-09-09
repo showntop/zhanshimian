@@ -28,9 +28,9 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16rpx;
     background: rgba(248, 245, 240, 0.72);
     &-spin {
-      width: 44rpx; height: 44rpx; border-radius: 999rpx;
-      border: 4rpx solid var(--moss-soft); border-top-color: var(--moss);
-      animation: today-spin 0.9s linear infinite;
+      width: 44rpx;
+      height: 44rpx;
+      border-width: 4rpx;
     }
     &-text { font-size: 22rpx; color: var(--ink); }
   }
@@ -73,5 +73,3 @@
   }
 }
 
-@keyframes today-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .today__mask-spin { animation: none; } }

@@ -43,10 +43,6 @@
   &__spinner {
     width: 24rpx;
     height: 24rpx;
-    border-radius: 999rpx;
-    border: 3rpx solid var(--moss-soft);
-    border-top-color: var(--moss);
-    animation: task-spin 0.9s linear infinite;
   }
 
   &__title {
@@ -68,24 +64,18 @@
   }
 
   &__progress-fill {
+    width: 100%;
     height: 100%;
     border-radius: 999rpx;
     background: var(--moss);
-    transition: width 0.2s ease;
+    // 只动 transform（合成层），进度用 scaleX 表达；品牌缓动对齐 motion.ts easing
+    transform-origin: left center;
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   &__stage {
     margin-top: 12rpx;
     font-size: 20rpx;
     color: var(--ink-3);
-  }
-}
-
-@keyframes task-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
   }
 }
