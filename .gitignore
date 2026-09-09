@@ -4,6 +4,7 @@ dist/
 dist-export/
 .taro/
 .expo/
+.swc/
 *.tsbuildinfo
 
 # go server 运行时数据（对象存储本地模式）
