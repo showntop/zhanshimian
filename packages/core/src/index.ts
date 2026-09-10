@@ -45,7 +45,7 @@ export {
   type DisplayProgressHandle,
   type DisplayProgressOptions
 } from './hooks/useDisplayProgress.ts'
-export { APP_NAME, ERROR_COPY, EMPTY_COPY, FEEDBACK_WORDS, HOME_TITLE, PRIVACY_NOTE, SCENES, analysisStageText, greetingByHour, greetingForNow, IMAGE_BADGE_COPY, PRIVACY_SECTION_TITLE, ANALYSIS_STAGE_COPY, type SceneCopy } from './copy/zh.ts'
+export { APP_NAME, ERROR_COPY, EMPTY_COPY, FEEDBACK_WORDS, HOME_COPY, HOME_TITLE, PRIVACY_NOTE, PROFILE_SETUP_COPY, REPORT_COPY, SCENES, analysisStageText, greetingByHour, greetingForNow, IMAGE_BADGE_COPY, PRIVACY_SECTION_TITLE, ANALYSIS_STAGE_COPY, type SceneCopy } from './copy/zh.ts'
 export {
   EVENT_NAME_PATTERN,
   MAX_EVENT_PAYLOAD_BYTES,

@@ -1,8 +1,7 @@
-// 数据真实性契约的 UI 默认实现（AGENTS.md 红线 3）：
-// - src 为服务端下发 URL：lookImage 严格校验，无效渲染空态（绝不回退内置图）；
-//   isBundledAsset 命中（/assets/looks|plans|...）时叠「风格参考」角标；
-// - 显式传 slug：exampleImage 渲染内置模特图，必叠角标 + .example-soft 弱化；
-// - user 模式：用户本人照片，无效保持可见的空。
+// 数据真实性契约的 UI 默认实现（AGENTS.md 红线 2 / 3）：
+// - 用户照片用 user 模式，无效保持可见空态；
+// - 服务端图片用 lookImage 严格校验，绝不回退内置图；
+// - 内置素材自动叠角标并弱化；AI 结果即使来自远程 URL 也必须显式叠「AI 风格预览」。
 import { Image, Text, View } from '@tarojs/components'
 import { exampleImage, isBundledAsset, lookImage, userImage } from '@zsm/core'
 import './index.scss'
@@ -30,16 +29,16 @@ export default function ExampleImage({
   className = '',
 }: ExampleImageProps) {
   let url = ''
-  let isExample = false
+  let isBundledExample = false
 
   if (slug) {
     url = exampleImage(slug, variant)
-    isExample = true
+    isBundledExample = true
   } else if (user) {
     url = userImage(src)
   } else {
     url = lookImage(src)
-    isExample = isBundledAsset(src)
+    isBundledExample = isBundledAsset(src)
   }
 
   if (!url) {
@@ -50,12 +49,21 @@ export default function ExampleImage({
     )
   }
 
+  const badge = badgeText || (isBundledExample ? '风格参考' : '')
+  // 效果示例可能是服务端 URL，也可能已被开发中间件下载成本地路径；
+  // 除显式角标外保持弱化，避免示例照片被误读为用户本人效果。
+  const softExample = isBundledExample || badge === '效果示例'
+
   return (
     <View className={`example-image ${className}`}>
-      <Image className={`example-image__img ${isExample ? 'example-soft' : ''}`} src={url} mode={mode} />
-      {isExample ? (
+      <Image
+        className={`example-image__img ${softExample ? 'example-soft' : ''}`}
+        src={url}
+        mode={mode}
+      />
+      {badge ? (
         <View className="example-badge">
-          <Text>{badgeText || '风格参考'}</Text>
+          <Text>{badge}</Text>
         </View>
       ) : null}
     </View>

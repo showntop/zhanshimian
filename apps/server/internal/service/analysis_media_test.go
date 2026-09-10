@@ -55,6 +55,21 @@ func TestAnalysisMediaUsesBundledDemoAsset(t *testing.T) {
 	}
 }
 
+func TestGetAnalysisMarksBundledDemoMedia(t *testing.T) {
+	repo := analysisMediaRepositoryStub{
+		analysis: domain.Analysis{ID: "analysis-1", MediaIDs: []string{"body-1"}},
+		assets:   []domain.MediaAsset{{ID: "body-1", Kind: "body", StorageKey: "demo/body.png"}},
+	}
+	service := &Service{repo: repo, publicBaseURL: "https://api.example.test"}
+	analysis, err := service.GetAnalysis(context.Background(), "user-1", "analysis-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(analysis.Media) != 1 || !analysis.Media[0].Demo {
+		t.Fatalf("demo media provenance was not preserved: %#v", analysis.Media)
+	}
+}
+
 func TestAnalysisPreviewURLPrefersBodyPhoto(t *testing.T) {
 	repo := analysisMediaRepositoryStub{assets: []domain.MediaAsset{
 		{ID: "body-1", Kind: "body", StorageKey: "user/body.jpg"},

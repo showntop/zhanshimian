@@ -16,11 +16,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/storage"
-	"github.com/google/uuid"
 )
 
 var ErrValidation = errors.New("validation error")
@@ -253,10 +253,10 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, profile doma
 		return domain.UserProfile{}, fmt.Errorf("%w: 职业与预算最多 60 字", ErrValidation)
 	}
 	for _, check := range []struct {
-		name   string
-		value  *float64
-		min    float64
-		max    float64
+		name  string
+		value *float64
+		min   float64
+		max   float64
 	}{
 		{"体重", profile.WeightKG, 25, 300},
 		{"胸围", profile.BustCM, 40, 200},
@@ -485,6 +485,7 @@ func (s *Service) CreateDemoMedia(ctx context.Context, userID, kind string) (dom
 	if err != nil {
 		return domain.MediaAsset{}, err
 	}
+	asset.Demo = true
 	asset.URL = s.demoMediaURL(kind)
 	return asset, nil
 }
@@ -542,6 +543,7 @@ func (s *Service) hydrateAnalysisMedia(ctx context.Context, userID string, analy
 		return domain.Analysis{}, err
 	}
 	for index := range assets {
+		assets[index].Demo = strings.HasPrefix(assets[index].StorageKey, "demo/")
 		assets[index].URL = s.mediaAssetURL(assets[index])
 	}
 	if analysis.PreviewImageURL == "" {

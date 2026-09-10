@@ -93,3 +93,62 @@ export function analysisStageText(stage: string | undefined): string {
   }
   return ANALYSIS_STAGE_COPY.fallback
 }
+
+// ---------- 首页工作台 ----------
+export const HOME_COPY = {
+  returningTitle: '继续今天的形象计划',
+  reportReady: '形象档案已就绪',
+  viewReport: '查看报告与建议 ›',
+  startArchive: '开始形象档案',
+  startAnalysis: '开始形象分析',
+  archiveTitle: '三张照片，建立只属于你的形象档案',
+  archiveBody: '正脸、45° 侧脸、正面全身。不用化妆，也不需要刻意摆姿势。',
+  photoPrivacy: '照片与建议只对你可见，可随时删除',
+  processTitle: '建档后会得到什么',
+  process: [
+    { title: '当前形象标签', desc: '先看清现在的整体印象' },
+    { title: '4 个可提升点', desc: '每条都标回来源照片' },
+    { title: '3 套可执行方案', desc: '按场景、预算和现实条件生成' },
+  ],
+  toolsTitle: '直接解决眼前的一件事',
+  scenesTitle: '按场合开始',
+  sceneReadyNote: '已复用你的形象档案，不会再要照片',
+  recentTitle: '最近方案',
+  emptyTodayLink: '先看今天怎么穿 ›'
+} as const
+
+// ---------- 形象档案补充资料 ----------
+export const PROFILE_SETUP_COPY = {
+  eyebrow: '最后一步，少填一点',
+  title: '告诉我你的现实条件',
+  lede: '这些问题都不会强制填写；跳过时我们会只根据照片与场景判断。',
+  photosReady: '三张照片已上传',
+  height: '身高',
+  heightNote: '拖动滑杆，或用按钮微调',
+  role: '日常身份',
+  budget: '置装预算',
+  skip: '暂不填写',
+  primaryAction: '生成形象报告',
+  skipAction: '跳过并生成',
+  privacy: '资料可随时删除；不会用于评分或身材判断',
+  whyTitle: '为什么要问这些？',
+  whyBody: '身份和预算只用来约束建议的可执行性，避免推荐不适合日常场景或超出预算的选择。'
+} as const
+
+// ---------- 形象报告 ----------
+export const REPORT_COPY = {
+  title: '形象报告',
+  currentMark: '当前形象',
+  demoMark: '效果示例',
+  aiMark: 'AI 分析',
+  sourceTitle: '来源照片',
+  tagsTitle: '当前印象',
+  priorityTitle: '最优先建议',
+  findingsTitle: '可提升点',
+  emptyFindings: '这次没有必须调整的项目，可以按方案逐步尝试。',
+  viewPlans: '查看我的 3 套方案',
+  viewPlansNote: '方案基于你的照片与现实条件生成',
+  noReportTitle: '还没有形象报告',
+  noReportBody: '拍三张照片，几分钟拿到你的第一份形象分析。',
+  goArchive: '去建档'
+} as const

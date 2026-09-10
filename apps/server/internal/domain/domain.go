@@ -135,13 +135,13 @@ type Identity struct {
 // PUT, the measurements are optional. A missing row simply means the user has
 // not filled the profile yet (GET returns null).
 type UserProfile struct {
-	HeightCM int      `json:"height_cm"`
-	Role     string   `json:"role"`
-	Budget   string   `json:"budget"`
-	WeightKG *float64 `json:"weight_kg,omitempty"`
-	BustCM   *float64 `json:"bust_cm,omitempty"`
-	WaistCM  *float64 `json:"waist_cm,omitempty"`
-	HipCM    *float64 `json:"hip_cm,omitempty"`
+	HeightCM  int       `json:"height_cm"`
+	Role      string    `json:"role"`
+	Budget    string    `json:"budget"`
+	WeightKG  *float64  `json:"weight_kg,omitempty"`
+	BustCM    *float64  `json:"bust_cm,omitempty"`
+	WaistCM   *float64  `json:"waist_cm,omitempty"`
+	HipCM     *float64  `json:"hip_cm,omitempty"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 }
 
@@ -167,6 +167,7 @@ type MediaAsset struct {
 	ID         string    `json:"id"`
 	Kind       string    `json:"kind"`
 	URL        string    `json:"url"`
+	Demo       bool      `json:"demo,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 	StorageKey string    `json:"-"`
 	MIMEType   string    `json:"-"`
@@ -202,11 +203,11 @@ type Analysis struct {
 }
 
 type Finding struct {
-	ID       string  `json:"id"`
-	Label    string  `json:"label"`
-	Category string  `json:"category"`
-	Severity string  `json:"severity"`
-	Detail   string  `json:"detail"`
+	ID       string `json:"id"`
+	Label    string `json:"label"`
+	Category string `json:"category"`
+	Severity string `json:"severity"`
+	Detail   string `json:"detail"`
 	// Photo marks which analysis photo the observation came from
 	// (face/side/body); anchors are relative to that photo. Empty means a
 	// legacy row that was only ever rendered on the body hero.
@@ -239,27 +240,27 @@ type PlanStep struct {
 }
 
 type Plan struct {
-	ID                string     `json:"id"`
-	ReportID          string     `json:"report_id"`
-	Scene             string     `json:"scene,omitempty"`
-	Name              string     `json:"name"`
-	Slug              string     `json:"slug"`
-	ImageURL          string     `json:"image_url"`
-	CurrentImageURL   string     `json:"current_image_url,omitempty"`
-	GeneratedImageURL string     `json:"generated_image_url,omitempty"`
+	ID                string `json:"id"`
+	ReportID          string `json:"report_id"`
+	Scene             string `json:"scene,omitempty"`
+	Name              string `json:"name"`
+	Slug              string `json:"slug"`
+	ImageURL          string `json:"image_url"`
+	CurrentImageURL   string `json:"current_image_url,omitempty"`
+	GeneratedImageURL string `json:"generated_image_url,omitempty"`
 	// GenerationStatus/GenerationError are API-facing projections of the
 	// plan_look task (the queue state itself lives in tasks).
 	GenerationStatus string     `json:"generation_status,omitempty"`
 	GenerationError  string     `json:"generation_error,omitempty"`
 	LookProvider     string     `json:"look_provider,omitempty"`
-	Recommended       bool       `json:"recommended"`
-	Descriptor        string     `json:"descriptor"`
-	Why               string     `json:"why"`
-	OutcomeTags       []string   `json:"outcome_tags"`
-	DifferenceTags    []string   `json:"difference_tags"`
-	Sort              int        `json:"sort"`
-	Selected          bool       `json:"selected"`
-	Steps             []PlanStep `json:"steps,omitempty"`
+	Recommended      bool       `json:"recommended"`
+	Descriptor       string     `json:"descriptor"`
+	Why              string     `json:"why"`
+	OutcomeTags      []string   `json:"outcome_tags"`
+	DifferenceTags   []string   `json:"difference_tags"`
+	Sort             int        `json:"sort"`
+	Selected         bool       `json:"selected"`
+	Steps            []PlanStep `json:"steps,omitempty"`
 	// LookTask embeds the latest plan_look task so plan lists render image
 	// generation state without a second round of polling endpoints.
 	LookTask *TaskView `json:"look_task,omitempty"`
@@ -349,8 +350,8 @@ type TodayPlan struct {
 	GenerationError   string    `json:"generation_error,omitempty"`
 	LookProvider      string    `json:"look_provider,omitempty"`
 	LookTask          *TaskView `json:"look_task,omitempty"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type TodayPlanInput struct {
@@ -392,10 +393,10 @@ type ShareCard struct {
 // WardrobeOutfitInput is the request body of POST /v1/wardrobe/outfits: the
 // client composes item_ids explicitly and freezes the current context.
 type WardrobeOutfitInput struct {
-	Title    string        `json:"title"`
-	Note     string        `json:"note,omitempty"`
-	Context  *TodayContext `json:"context,omitempty"`
-	ItemIDs  []string      `json:"item_ids"`
+	Title   string        `json:"title"`
+	Note    string        `json:"note,omitempty"`
+	Context *TodayContext `json:"context,omitempty"`
+	ItemIDs []string      `json:"item_ids"`
 }
 
 type WardrobeItemInput struct {
@@ -416,7 +417,7 @@ type WardrobeItem struct {
 	Color     string    `json:"color"`
 	Season    string    `json:"season"`
 	Formality string    `json:"formality"`
-	Scenes    []string   `json:"scenes"`
+	Scenes    []string  `json:"scenes"`
 	ImageURL  string    `json:"image_url"`
 	Favorite  bool      `json:"favorite"`
 	WearCount int       `json:"wear_count"`
@@ -487,10 +488,10 @@ type ChecklistItem struct {
 
 // DiagnosticInput is the request body of POST /v1/diagnostics.
 type DiagnosticInput struct {
-	Kind     string `json:"kind"`
-	MediaID  string `json:"media_id"`
-	Scene    string `json:"scene,omitempty"`
-	ReportID string `json:"report_id,omitempty"`
+	Kind     string       `json:"kind"`
+	MediaID  string       `json:"media_id"`
+	Scene    string       `json:"scene,omitempty"`
+	ReportID string       `json:"report_id,omitempty"`
 	Context  *ToolContext `json:"-"`
 }
 
@@ -551,7 +552,7 @@ type HairPreviewInput struct {
 }
 
 type HairPreview struct {
-	ID              string    `json:"id"`
+	ID string `json:"id"`
 	// Status/Progress/Stage/ErrorMessage project the hair_preview task state.
 	Status          string    `json:"status"`
 	Progress        int       `json:"progress"`

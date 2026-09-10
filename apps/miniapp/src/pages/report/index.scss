@@ -1,16 +1,21 @@
 .report {
   display: flex;
   flex-direction: column;
-  gap: 32rpx;
+  gap: 34rpx;
 
   &__hero {
+    display: flex;
+    flex-direction: column;
+    gap: 18rpx;
+
     &-frame {
       position: relative;
       height: 640rpx;
-      border-radius: var(--radius-lg);
+      border-radius: var(--radius-xl);
       overflow: hidden;
       background: var(--moss-soft);
       border: 1rpx solid var(--line);
+      box-shadow: var(--shadow-card);
     }
 
     &-img {
@@ -22,12 +27,57 @@
       position: absolute;
       top: 20rpx;
       left: 20rpx;
-      padding: 6rpx 18rpx;
+      padding: 9rpx 20rpx;
       border-radius: 999rpx;
-      background: rgba(255, 255, 255, 0.82);
-      backdrop-filter: blur(5px);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(8rpx);
       font-size: 20rpx;
+      font-weight: 650;
       color: var(--ink);
+    }
+  }
+
+  &__provider {
+    position: absolute;
+    top: 20rpx;
+    right: 20rpx;
+    padding: 9rpx 20rpx;
+    border-radius: 999rpx;
+    background: rgba(30, 35, 29, 0.68);
+    color: var(--cream);
+    font-size: 20rpx;
+    font-weight: 650;
+
+    &--demo {
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--moss);
+    }
+  }
+
+  &__tabs {
+    display: flex;
+    gap: 10rpx;
+    padding: 8rpx;
+    border-radius: 999rpx;
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+  }
+
+  &__tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 76rpx;
+    border-radius: 999rpx;
+    color: var(--ink-2);
+    font-size: 24rpx;
+    font-weight: 650;
+    transition: background 0.18s ease, color 0.18s ease;
+
+    &--active {
+      background: var(--moss);
+      color: #ffffff;
     }
   }
 
@@ -36,101 +86,204 @@
     display: flex;
     align-items: center;
     gap: 8rpx;
+    max-width: 72%;
+    padding: 7rpx 14rpx 7rpx 7rpx;
+    border-radius: 999rpx;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 4rpx 14rpx rgba(31, 34, 30, 0.16);
     transform: translate(-50%, -50%);
+    transition: transform 0.18s cubic-bezier(.2,.8,.2,1), background 0.18s ease;
 
-    &-dot {
-      width: 16rpx;
-      height: 16rpx;
-      border-radius: 999rpx;
+    &--active {
       background: var(--moss);
-      box-shadow: 0 0 0 6rpx rgba(88, 115, 68, 0.18);
+      transform: translate(-50%, -50%) scale(1.04);
+
+      .report__anchor-index {
+        background: var(--cream);
+        color: var(--moss-pressed);
+      }
+
+      .report__anchor-chip {
+        color: #ffffff;
+      }
+    }
+
+    &-index {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36rpx;
+      height: 36rpx;
+      flex-shrink: 0;
+      border-radius: 999rpx;
+      background: var(--moss-soft);
+      color: var(--moss-pressed);
+      font-size: 19rpx;
+      font-weight: 750;
     }
 
     &-chip {
-      padding: 6rpx 16rpx;
-      border-radius: 999rpx;
-      background: rgba(255, 255, 255, 0.9);
-      font-size: 20rpx;
-      color: var(--ink);
-      box-shadow: 0 2rpx 8rpx rgba(31, 34, 30, 0.1);
+      max-width: 300rpx;
+      overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
-    }
-  }
-
-  &__tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16rpx;
-  }
-
-  &__tag {
-    padding: 10rpx 28rpx;
-    border-radius: 999rpx;
-    background: var(--moss-soft);
-    color: var(--moss);
-    font-size: 24rpx;
-    font-weight: 600;
-  }
-
-  &__priority {
-    display: flex;
-    flex-direction: column;
-    gap: 12rpx;
-    padding: 32rpx;
-    border-radius: var(--radius-md);
-    background: var(--moss-soft);
-
-    &-title {
-      font-family: 'Songti SC', 'STSong', serif;
-      font-size: 32rpx;
-      font-weight: 700;
+      font-size: 20rpx;
+      font-weight: 650;
       color: var(--ink);
-    }
-
-    &-copy {
-      font-size: 26rpx;
-      line-height: 1.7;
-      color: var(--ink-2);
     }
   }
 
   &__section {
     display: flex;
     flex-direction: column;
-    gap: 16rpx;
+    gap: 18rpx;
+
+    &-head {
+      display: flex;
+      flex-direction: column;
+
+      .section-title {
+        margin: 0 0 14rpx;
+        font-size: 32rpx;
+      }
+    }
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14rpx;
+  }
+
+  &__tag {
+    padding: 12rpx 26rpx;
+    border-radius: 999rpx;
+    background: var(--moss-soft);
+    color: var(--moss-pressed);
+    font-size: 24rpx;
+    font-weight: 650;
+  }
+
+  &__priority {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+    padding: 32rpx;
+    border-radius: var(--radius-lg);
+    background: var(--moss-soft);
+    border: 1rpx solid rgba(88, 115, 68, 0.14);
+
+    &-label {
+      font-size: 20rpx;
+      font-weight: 700;
+      letter-spacing: 3rpx;
+      color: var(--moss);
+    }
+
+    &-title {
+      font-family: 'Songti SC', 'STSong', serif;
+      font-size: 36rpx;
+      line-height: 1.35;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    &-copy {
+      font-size: 25rpx;
+      line-height: 1.7;
+      color: var(--ink-2);
+    }
   }
 
   &__finding {
     display: flex;
     flex-direction: column;
     gap: 10rpx;
-    padding: 24rpx 28rpx;
+    padding: 26rpx 28rpx;
     border-radius: var(--radius-md);
-    background: var(--surface);
+    background: var(--surface-strong);
     border: 1rpx solid var(--line);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+
+    &--active {
+      border-color: rgba(88, 115, 68, 0.48);
+      box-shadow: 0 0 0 6rpx rgba(88, 115, 68, 0.08);
+    }
 
     &-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 16rpx;
+    }
+
+    &-title {
+      display: flex;
+      align-items: center;
+      gap: 12rpx;
+      min-width: 0;
+    }
+
+    &-index {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 34rpx;
+      height: 34rpx;
+      flex-shrink: 0;
+      border-radius: 999rpx;
+      background: var(--moss);
+      color: #ffffff;
+      font-size: 18rpx;
+      font-weight: 700;
     }
 
     &-cat {
       font-size: 22rpx;
-      font-weight: 600;
+      font-weight: 700;
       letter-spacing: 2rpx;
       color: var(--moss);
     }
 
     &-photo {
-      font-size: 20rpx;
-      color: var(--ink-3);
+      flex-shrink: 0;
+      padding: 5rpx 14rpx;
+      border-radius: 999rpx;
+      background: var(--moss-soft);
+      color: var(--ink-2);
+      font-size: 19rpx;
+    }
+
+    &-label {
+      font-family: 'Songti SC', 'STSong', serif;
+      font-size: 30rpx;
+      line-height: 1.35;
+      font-weight: 700;
+      color: var(--ink);
     }
 
     &-detail {
-      font-size: 26rpx;
-      line-height: 1.65;
-      color: var(--ink);
+      font-size: 25rpx;
+      line-height: 1.68;
+      color: var(--ink-2);
+    }
+  }
+
+  &__empty-findings {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 150rpx;
+    padding: 26rpx;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    border: 1rpx dashed var(--line);
+
+    Text {
+      font-size: 23rpx;
+      line-height: 1.6;
+      text-align: center;
+      color: var(--ink-2);
     }
   }
 
@@ -143,6 +296,7 @@
     &-note {
       text-align: center;
       font-size: 20rpx;
+      line-height: 1.5;
       color: var(--ink-3);
     }
   }

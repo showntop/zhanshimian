@@ -103,7 +103,9 @@ export function exampleImage(slug: string = 'natural', variant: string = 'full')
 // 命中时必须按示例图对待（叠「风格参考」角标），不论 URL 是否可渲染。
 export function isBundledAsset(value: unknown): boolean {
   const normalized = shippedAsset(value)
-  return typeof normalized === 'string' && /^\/assets\/(looks|plans|portraits|reports|hair)\//i.test(normalized)
+  if (typeof normalized !== 'string') return false
+  const assetPath = normalized.replace(/^https?:\/\/[^/]+/i, '')
+  return /^\/assets\/(looks|plans|portraits|reports|hair)\//i.test(assetPath)
 }
 
 // 用户本人照片：无效 URL 保持可见的空，绝不静默变成模特图。

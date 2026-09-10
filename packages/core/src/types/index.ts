@@ -73,6 +73,8 @@ export interface MediaAsset {
   id: string
   kind: MediaKind
   url: string
+  /** 服务端内置示例媒体；url 本地化后仍保留来源事实 */
+  demo?: boolean
   created_at: string
 }
 
