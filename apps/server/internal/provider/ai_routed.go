@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -118,8 +119,8 @@ func (a *RoutedAnalyzer) Analyze(ctx context.Context, input domain.CreateAnalysi
 		Instructions: appearanceInstructions, Prompt: analysisPrompt(input), Images: images,
 		SchemaName: CapabilityAppearanceAnalysis, Schema: analysisSchema(), MaxOutputTokens: 6000,
 		Validate: func(data []byte) error {
-			var candidate analysisPayload
-			if err := json.Unmarshal(data, &candidate); err != nil {
+			candidate, _, err := decodeAnalysisPayload(data)
+			if err != nil {
 				return err
 			}
 			return validateAnalysisPayload(candidate)
@@ -129,9 +130,13 @@ func (a *RoutedAnalyzer) Analyze(ctx context.Context, input domain.CreateAnalysi
 	if err != nil {
 		return domain.AnalysisOutput{}, err
 	}
-	var payload analysisPayload
-	if err := json.Unmarshal(result.JSON, &payload); err != nil {
+	payload, normalized, err := decodeAnalysisPayload(result.JSON)
+	if err != nil {
 		return domain.AnalysisOutput{}, fmt.Errorf("decode structured analysis: %w", err)
+	}
+	if normalized {
+		// 归一化命中：模型输出形状偏差被修复而非作废，留日志观测模型行为
+		slog.Default().Warn("analysis payload shape normalized", "provider", result.Meta.ProviderVersion())
 	}
 	if err := validateAnalysisPayload(payload); err != nil {
 		return domain.AnalysisOutput{}, err

@@ -88,6 +88,58 @@ type analysisPayload struct {
 	Plans          []analysisPlan    `json:"plans"`
 }
 
+// decodeAnalysisPayload 是分析输出的唯一解码入口：先做形状归一化再反序列化。
+// json_object 模式只保证合法 JSON，不约束结构（json_schema 才约束）；
+// 模型偶发把字符串数组输出成嵌套数组（如 impression_tags: [["自然亲和"]]，
+// 见 kimi-k3 线上报错），归一化拍平后仍可strict校验通过，避免整次调用作废。
+// 第二个返回值表示是否发生了形状修正（用于日志观测模型行为）。
+func decodeAnalysisPayload(raw []byte) (analysisPayload, bool, error) {
+	var tree any
+	if err := json.Unmarshal(raw, &tree); err != nil {
+		return analysisPayload{}, false, err
+	}
+	normalized := collapseNestedStringArrays(tree)
+	encoded, err := json.Marshal(normalized)
+	if err != nil {
+		return analysisPayload{}, false, err
+	}
+	var payload analysisPayload
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		return analysisPayload{}, false, err
+	}
+	return payload, string(encoded) != string(raw), nil
+}
+
+// collapseNestedStringArrays 把「数组元素是数组」的嵌套拍平成一层
+// （[["a"],["b"]] / [["a","b"]] → ["a","b"]），对整棵 JSON 树递归。
+// 分析 Schema 中所有数组都是字符串/对象数组，不存在合法嵌套，拍平是安全的。
+func collapseNestedStringArrays(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, item := range typed {
+			typed[key] = collapseNestedStringArrays(item)
+		}
+		return typed
+	case []any:
+		items := make([]any, 0, len(typed))
+		nested := false
+		for _, item := range typed {
+			if inner, ok := item.([]any); ok {
+				nested = true
+				items = append(items, inner...)
+				continue
+			}
+			items = append(items, collapseNestedStringArrays(item))
+		}
+		if nested {
+			return collapseNestedStringArrays(items)
+		}
+		return items
+	default:
+		return value
+	}
+}
+
 func analysisPrompt(input domain.CreateAnalysisInput) string {
 	return fmt.Sprintf(`请根据依次提供的正脸、侧脸和全身照，为用户生成中文形象分析。
 场景：%s；职业：%s；身高：%d cm；预算：%s。

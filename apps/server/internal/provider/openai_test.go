@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"strings"
 	"testing"
@@ -30,6 +31,41 @@ func TestValidateAnalysisPayloadRejectsUnknownPhoto(t *testing.T) {
 	err := validateAnalysisPayload(payload)
 	if err == nil || !strings.Contains(err.Error(), "invalid finding") {
 		t.Fatalf("expected invalid finding rejection, got %v", err)
+	}
+}
+
+// 复现线上 kimi-k3 报错：impression_tags 输出成嵌套数组
+// （json: cannot unmarshal array into ... impression_tags of type string）。
+// 归一化应拍平嵌套并让校验通过，而不是整次调用作废。
+func TestDecodeAnalysisPayloadNormalizesNestedTagArrays(t *testing.T) {
+	payload := validAnalysisPayload()
+	payload.ImpressionTags = []string{"自然亲和", "稳重克制", "线条柔和"}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tree map[string]any
+	if err := json.Unmarshal(encoded, &tree); err != nil {
+		t.Fatal(err)
+	}
+	tree["impression_tags"] = []any{[]any{"自然亲和"}, []any{"稳重克制", "线条柔和"}}
+	nested, err := json.Marshal(tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decoded, normalized, err := decodeAnalysisPayload(nested)
+	if err != nil {
+		t.Fatalf("nested tags should decode after normalization: %v", err)
+	}
+	if !normalized {
+		t.Fatal("normalization should be reported")
+	}
+	if len(decoded.ImpressionTags) != 3 || decoded.ImpressionTags[0] != "自然亲和" || decoded.ImpressionTags[2] != "线条柔和" {
+		t.Fatalf("unexpected normalized tags: %#v", decoded.ImpressionTags)
+	}
+	if err := validateAnalysisPayload(decoded); err != nil {
+		t.Fatalf("normalized payload should pass validation: %v", err)
 	}
 }
 
