@@ -164,6 +164,23 @@ test('createDisplayProgress：maxRatePerSecond 限制大跳变的追平速度', 
   }
 })
 
+test('createDisplayProgress：pace 时间推期在真实进度停滞时接管显示', async () => {
+  const handle = createDisplayProgress({ tickMs: 20, pace: { ceiling: 90, tauMs: 200 } })
+  try {
+    handle.set(20)
+    await sleep(100)
+    handle.set(20) // 真实进度停滞（模拟服务端长时间不上报）
+    await sleep(400)
+    const displayed = handle.get()
+    // tau=200ms：500ms 后推期目标 ≈ 82，追逐（tau=500ms）滞后后显示仍应
+    // 明显领先停滞的 20（实测 ~39），且绝不超过封顶
+    assert.ok(displayed > 30, `displayed=${displayed} 应被时间推期接管`)
+    assert.ok(displayed <= 90, `displayed=${displayed} 不得超过封顶`)
+  } finally {
+    handle.stop()
+  }
+})
+
 test('事件名校验：^[a-z][a-z0-9_]{1,63}$', () => {
   assert.equal(isValidEventName('plan_selected'), true)
   assert.equal(isValidEventName('ab'), true)

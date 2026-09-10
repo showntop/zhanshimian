@@ -37,8 +37,14 @@ export default function Analysis() {
   const [shown, setShown] = useState(0)
   const displayRef = useRef<DisplayProgressHandle | null>(null)
   if (displayRef.current === null) {
-    // maxRatePerSecond：真实进度大跳变时（重进页面等）按 ~9%/s 平滑爬升，不瞬移
-    displayRef.current = createDisplayProgress({ onUpdate: setShown, maxRatePerSecond: 9 })
+    // maxRatePerSecond：真实进度大跳变时按 ~9%/s 平滑爬升，不瞬移。
+    // pace：大模型分析调用可长达数分钟且服务端进度会长时间停滞（72% 档），
+    // 时间推期让显示目标持续缓慢推进（封顶 92%，不碰 100%），终态由真实值接管收尾。
+    displayRef.current = createDisplayProgress({
+      onUpdate: setShown,
+      maxRatePerSecond: 9,
+      pace: { ceiling: 92, tauMs: 40_000 },
+    })
   }
   const display = displayRef.current
   const failedRef = useRef(false)
