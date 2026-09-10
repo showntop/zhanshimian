@@ -531,6 +531,31 @@ func (s *Service) GetAnalysis(ctx context.Context, userID, id string) (domain.An
 	if err != nil {
 		return domain.Analysis{}, err
 	}
+	// 读路径兜底：所有自愈机制（僵尸回收、重试上限、failContext）都活在
+	// worker 进程里；worker 整体死亡时 processing/queued 行永远无人触碰，
+	// 客户端会无限轮询且拿不到任何报错。worker 活着时每次认领/重排/进度
+	// 上报都会刷新 updated_at（任务最长 5 分钟 × 3 次重试也在刷新），
+	// 因此长时间零更新只可能是孤儿行：在读路径直接落失败终态。
+	staleAfter := time.Duration(0)
+	switch analysis.Status {
+	case "processing":
+		staleAfter = staleAnalysisProcessingTimeout
+	case "queued":
+		staleAfter = staleAnalysisQueuedTimeout
+	}
+	if staleAfter > 0 && time.Since(analysis.UpdatedAt) > staleAfter {
+		message := "分析时间过长，请重新发起"
+		failCtx, cancel := failContext()
+		defer cancel()
+		if failErr := s.repo.FailAnalysisPresentation(failCtx, id, "分析未完成", message); failErr != nil {
+			s.loggerOrDefault().Error("fail stale analysis", "analysis_id", id, "error", failErr)
+		} else {
+			s.loggerOrDefault().Warn("failed stale orphan analysis", "analysis_id", id, "status", analysis.Status, "idle", time.Since(analysis.UpdatedAt).String())
+			analysis.Status = "failed"
+			analysis.Stage = "分析未完成"
+			analysis.ErrorMessage = message
+		}
+	}
 	return s.hydrateAnalysisMedia(ctx, userID, analysis)
 }
 

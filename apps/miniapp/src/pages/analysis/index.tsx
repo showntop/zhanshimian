@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Taro, { useLoad } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import {
+  ANALYSIS_FAIL_COPY,
   POLL_INTERVALS,
   analysisTimelineText,
   createDisplayProgress,
@@ -18,14 +19,22 @@ import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
 import './index.scss'
 
+/** 分析行零变化超过该时长视为服务端孤儿（进度动画/心跳/重试都会刷新行，正常不会触发） */
+const STUCK_ROW_TIMEOUT_MS = 6 * 60 * 1000
+
 function failureReasons(analysis: Analysis): string[] {
   const message = analysis.error_message || ''
-  if (!message) return ['请按拍摄指引重新提交']
+  if (!message) return [ANALYSIS_FAIL_COPY.photoFallback]
   // 后端照片拒绝文案形如「正脸照片：…；侧脸照片：…」
   return message
     .split(/[；;]/)
     .map((part) => part.trim())
     .filter(Boolean)
+}
+
+/** 超时类失败（服务端兜底/客户端守卫都打 stage='分析未完成'）：与照片被拒分开呈现 */
+function isTimeoutFailure(analysis: Analysis): boolean {
+  return analysis.stage === '分析未完成'
 }
 
 export default function Analysis() {
@@ -98,6 +107,25 @@ export default function Analysis() {
     if (analysis) display.set(analysis.progress)
   }, [analysis, display])
 
+  // 客户端卡死守卫：分析行 6 分钟零变化（updated_at/progress/stage 全静止）
+  // 且未到终态，视为服务端孤儿（worker 死亡时服务端兜底也不会执行），
+  // 本地直接进超时失败态，给出下一步动作，绝不无限等待。
+  // 正常流程不受影响：重试认领、进度动画、心跳都会刷新行签名。
+  const rowSigRef = useRef({ sig: '', at: Date.now() })
+  useEffect(() => {
+    if (!analysis || failed || isTimeoutFailure(analysis)) return
+    if (analysis.status === 'completed' || analysis.status === 'failed') return
+    const sig = `${analysis.updated_at}|${analysis.progress}|${analysis.stage}`
+    const now = Date.now()
+    if (sig !== rowSigRef.current.sig) {
+      rowSigRef.current = { sig, at: now }
+      return
+    }
+    if (now - rowSigRef.current.at > STUCK_ROW_TIMEOUT_MS) {
+      setFailed({ ...analysis, status: 'failed', stage: '分析未完成', error_message: ANALYSIS_FAIL_COPY.timeoutBody })
+    }
+  }, [analysis, failed])
+
   // 阶段文案：细粒度时间线随补间进度推进（覆盖服务端 15/22/32/42/48/56/64/72/82/95 上报点）
   const stageText = analysisTimelineText(shown)
   // 扫描对象：刚上传的三张照片。COS 私有桶每次轮询都会重签 URL（签名参数随时间变化），
@@ -127,12 +155,15 @@ export default function Analysis() {
   const currentStep = shown < 30 ? 0 : shown < 70 ? 1 : 2
 
   if (failed) {
-    const reasons = failureReasons(failed)
+    const timeout = isTimeoutFailure(failed)
+    const reasons = timeout ? [ANALYSIS_FAIL_COPY.timeoutBody] : failureReasons(failed)
     return (
       <View className="page">
         <AppHeader title="正在分析" back />
         <View className="analysis-fail fade-up">
-          <Text className="analysis-fail__title">照片没有通过检查</Text>
+          <Text className="analysis-fail__title">
+            {timeout ? ANALYSIS_FAIL_COPY.timeoutTitle : ANALYSIS_FAIL_COPY.photoTitle}
+          </Text>
           {reasons.map((reason) => (
             <Text key={reason} className="analysis-fail__reason">
               {reason}
@@ -140,7 +171,7 @@ export default function Analysis() {
           ))}
           <View className="analysis-fail__action">
             <PrimaryButton
-              text="重新拍摄"
+              text={timeout ? '重新发起' : '重新拍摄'}
               onClick={() => Taro.redirectTo({ url: '/pages/capture/index' })}
             />
           </View>

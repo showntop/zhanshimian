@@ -123,6 +123,14 @@ export function analysisTimelineText(progress: number): string {
   return text
 }
 
+// ---------- 分析失败态（照片被拒 vs 超时未完成，标题与安抚文案分开） ----------
+export const ANALYSIS_FAIL_COPY = {
+  photoTitle: '照片没有通过检查',
+  timeoutTitle: '分析时间有点长',
+  timeoutBody: '这次分析没有完成，重新发起通常就能解决。',
+  photoFallback: '请按拍摄指引重新提交'
+} as const
+
 // ---------- 首页工作台 ----------
 export const HOME_COPY = {
   returningTitle: '继续今天的形象计划',

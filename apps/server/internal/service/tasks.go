@@ -60,6 +60,15 @@ var taskTimeouts = map[domain.TaskType]time.Duration{
 	domain.TaskTypeTodayLook:   5 * time.Minute,
 }
 
+// staleAnalysisTimeout 是 GetAnalysis 读路径兜底的孤儿判定阈：
+// worker 活着时僵尸回收（10 分钟窗口）与重试（每次认领/重排都刷新
+// updated_at）保证行不会静默超过该时长；超过即视为 worker 死亡遗留。
+// queued 用更宽的阈（20 分钟），避免多任务占满并发池时排队等待被误杀。
+const (
+	staleAnalysisProcessingTimeout = 11 * time.Minute
+	staleAnalysisQueuedTimeout     = 20 * time.Minute
+)
+
 // taskTypeOrder is the claiming order of the single worker loop.
 var taskTypeOrder = []domain.TaskType{
 	domain.TaskTypeAnalysis,
