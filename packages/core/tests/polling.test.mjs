@@ -6,8 +6,10 @@ import {
   MAX_POLL_FAILURES,
   shouldStopPolling,
   useTaskPolling,
+  createTaskPolling,
   advanceDisplayProgress,
   useDisplayProgress,
+  createDisplayProgress,
   isValidEventName,
   eventPayloadBytes,
   createEventTracker,
@@ -146,6 +148,19 @@ test('useDisplayProgress 控制器：set(real) 后 onUpdate 单调递增到追�
     for (let i = 1; i < values.length; i += 1) assert.ok(values[i] >= values[i - 1])
   } finally {
     handle.stop() // 断言失败也必须清理定时器，避免泄漏悬挂进程
+  }
+})
+
+test('createDisplayProgress：maxRatePerSecond 限制大跳变的追平速度', async () => {
+  const handle = createDisplayProgress({ tickMs: 20, maxRatePerSecond: 5 })
+  try {
+    handle.set(100)
+    // 不限速率时 ~300ms 已能追到 45%+；限 5%/s 时 300ms 最多 1.5%
+    await sleep(300)
+    const displayed = handle.get()
+    assert.ok(displayed < 5, `displayed=${displayed} 应受速率上限约束`)
+  } finally {
+    handle.stop()
   }
 })
 

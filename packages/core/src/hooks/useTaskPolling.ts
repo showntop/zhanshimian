@@ -62,7 +62,7 @@ function defaultIsSettled<T>(result: T): boolean {
   return !!task && typeof task === 'object' && typeof task.status === 'string' && shouldStopPolling(task.status)
 }
 
-export function useTaskPolling<T>(options: TaskPollingOptions<T>): TaskPollingHandle {
+export function createTaskPolling<T>(options: TaskPollingOptions<T>): TaskPollingHandle {
   const { fetcher, intervalMs, enabled = true, isSettled = defaultIsSettled, onDone, onFailed, subscribeVisibility } = options
 
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -156,3 +156,6 @@ export function useTaskPolling<T>(options: TaskPollingOptions<T>): TaskPollingHa
   if (enabled) start()
   return { start, stop, refresh: run }
 }
+
+/** 兼容旧名：等同 createTaskPolling（框架中立控制器，非 React hook）。 */
+export const useTaskPolling = createTaskPolling

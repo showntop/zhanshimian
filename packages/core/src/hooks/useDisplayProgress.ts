@@ -10,6 +10,11 @@ export interface DisplayProgressOptions {
   catchUpMs?: number
   /** 补间 tick 间隔，默认 100ms */
   tickMs?: number
+  /**
+   * 追平速率上限（百分比/秒，0 = 不限）。真实进度大幅跳变时（如重进页面追到 72%），
+   * 显示值按该速率平滑爬升而不是 2 秒内瞬移到位。
+   */
+  maxRatePerSecond?: number
   /** 每次显示值更新回调（值恒在 [displayed, real] 区间内单调不减） */
   onUpdate?: (value: number) => void
   /** 定时器注入（测试用），默认 setTimeout */
@@ -51,8 +56,19 @@ const defaultSchedule = (callback: () => void, ms: number): (() => void) => {
   return () => clearTimeout(timer)
 }
 
-export function useDisplayProgress(options: DisplayProgressOptions = {}): DisplayProgressHandle {
-  const { catchUpMs = PROGRESS_CATCH_UP_MS, tickMs = 100, onUpdate, schedule = defaultSchedule } = options
+/**
+ * 框架中立控制器（**不是 React hook**，名字不带 use）：
+ * 组件里直接每次 render 调用会重建闭包、进度归零。
+ * React 页面必须整页生命周期只创建一个实例，并把 onUpdate 接到 setState。
+ */
+export function createDisplayProgress(options: DisplayProgressOptions = {}): DisplayProgressHandle {
+  const {
+    catchUpMs = PROGRESS_CATCH_UP_MS,
+    tickMs = 100,
+    maxRatePerSecond = 0,
+    onUpdate,
+    schedule = defaultSchedule,
+  } = options
   let displayed = 0
   let real = 0
   let cancelTick: (() => void) | null = null
@@ -63,7 +79,12 @@ export function useDisplayProgress(options: DisplayProgressOptions = {}): Displa
   const tick = () => {
     cancelTick = null
     const now = Date.now()
-    const next = advanceDisplayProgress(displayed, real, now - lastTickAt, catchUpMs)
+    const elapsed = now - lastTickAt
+    let next = advanceDisplayProgress(displayed, real, elapsed, catchUpMs)
+    if (maxRatePerSecond > 0) {
+      // 速率上限：大跳变时平滑爬升（不改变「只追不跳、不回退」契约）
+      next = Math.min(next, displayed + (maxRatePerSecond * elapsed) / 1000)
+    }
     lastTickAt = now
     if (next !== displayed) {
       displayed = next
@@ -93,3 +114,6 @@ export function useDisplayProgress(options: DisplayProgressOptions = {}): Displa
     }
   }
 }
+
+/** 兼容旧名：等同 createDisplayProgress（框架中立控制器，非 React hook）。 */
+export const useDisplayProgress = createDisplayProgress

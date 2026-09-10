@@ -1,11 +1,19 @@
-// 分析进度页：轮询分析行(700ms) + 显示进度补间(只追不跳) + 扫描线动效。
+// 分析进度页：轮询分析行(700ms) + 显示进度补间(只追不跳)。
 // 失败态：照片被拒时逐图展示中文原因（error_message 按分号拆分为逐图原因）。
-import { useEffect, useRef, useState } from 'react'
-import Taro, { useDidHide, useLoad } from '@tarojs/taro'
-import { Text, View } from '@tarojs/components'
-import { POLL_INTERVALS, useDisplayProgress, useTaskPolling, type Analysis } from '@zsm/core'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import Taro, { useLoad } from '@tarojs/taro'
+import { Image, Text, View } from '@tarojs/components'
+import {
+  POLL_INTERVALS,
+  analysisTimelineText,
+  createDisplayProgress,
+  userImage,
+  type Analysis,
+  type DisplayProgressHandle,
+} from '@zsm/core'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
+import { useStablePolling } from '../../hooks/use-stable-polling'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
 import './index.scss'
@@ -24,7 +32,15 @@ export default function Analysis() {
   const [analysisId, setAnalysisId] = useState('')
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [failed, setFailed] = useState<Analysis | null>(null)
-  const display = useDisplayProgress()
+  // 显示进度补间：createDisplayProgress 是框架中立控制器（非 hook），
+  // 整页只建一个实例，onUpdate 接 setState 驱动渲染（此前裸调导致 displayed 恒为 0）。
+  const [shown, setShown] = useState(0)
+  const displayRef = useRef<DisplayProgressHandle | null>(null)
+  if (displayRef.current === null) {
+    // maxRatePerSecond：真实进度大跳变时（重进页面等）按 ~9%/s 平滑爬升，不瞬移
+    displayRef.current = createDisplayProgress({ onUpdate: setShown, maxRatePerSecond: 9 })
+  }
+  const display = displayRef.current
   const failedRef = useRef(false)
 
   useLoad((options) => {
@@ -35,10 +51,13 @@ export default function Analysis() {
     }
   })
 
-  const { stop } = useTaskPolling({
+  // 轮询走稳定包装：单实例，页面不可见自动暂停、恢复可见补拉，卸载即停
+  useStablePolling({
     fetcher: async () => {
       if (!analysisId) throw new Error('missing id')
       const item = await api.getAnalysis(analysisId)
+      // 中间态也要落 state：照片层/进度都依赖完整分析行
+      setAnalysis(item)
       // 适配统一任务形状：分析行的 status/progress/stage 即任务投影
       return {
         id: item.id,
@@ -69,14 +88,37 @@ export default function Analysis() {
     },
   })
 
-  useDidHide(() => stop())
-
   useEffect(() => {
     if (analysis) display.set(analysis.progress)
   }, [analysis, display])
 
-  const shown = display.get()
-  const stageText = analysis?.stage || '正在安全上传照片'
+  // 阶段文案：细粒度时间线随补间进度推进（覆盖服务端 15/22/32/42/48/56/64/72/82/95 上报点）
+  const stageText = analysisTimelineText(shown)
+  // 扫描对象：刚上传的三张照片。COS 私有桶每次轮询都会重签 URL（签名参数随时间变化），
+  // 若直接使用会导致 <Image> 每 700ms 重载一次（表现为照片反复闪烁/轮播）。
+  // 按 kind 锁定首次解析成功的 URL（签名 TTL 15min ≫ 分析时长 1-2min），消除签名抖动。
+  const photoUrlCache = useRef<Record<string, string>>({})
+  const photos = useMemo(() => {
+    const order: Record<string, number> = { face: 0, side: 1, body: 2 }
+    return (analysis?.media ?? [])
+      .map((m) => {
+        const resolved = userImage(m.url)
+        if (resolved && !photoUrlCache.current[m.kind]) photoUrlCache.current[m.kind] = resolved
+        return { kind: m.kind, url: photoUrlCache.current[m.kind] || resolved, demo: m.demo === true }
+      })
+      .filter((p) => p.url)
+      .sort((a, b) => (order[a.kind] ?? 9) - (order[b.kind] ?? 9))
+      .slice(0, 3)
+  }, [analysis?.media])
+  // 阶段细节交给时间线；提示行固定为隐私安抚，避免与阶段文案双重跳变
+  const tipText = '照片全程加密，只有你能看到'
+  // 三步指示器：与进度联动，点亮当前阶段
+  const STEPS = [
+    { label: '整理照片' },
+    { label: '深度分析' },
+    { label: '生成方案' },
+  ]
+  const currentStep = shown < 30 ? 0 : shown < 70 ? 1 : 2
 
   if (failed) {
     const reasons = failureReasons(failed)
@@ -107,28 +149,63 @@ export default function Analysis() {
       <View className="analysis">
         <View className="analysis__portrait fade-up">
           <View className="analysis__portrait-frame">
-            <View className="analysis__scan" />
-            <View className="analysis__focus analysis__focus--1" />
-            <View className="analysis__focus analysis__focus--2" />
-            <View className="analysis__focus analysis__focus--3" />
+            {photos[0] ? (
+              <Image
+                key={photos[0].kind}
+                className={`analysis__hero ${photos[0].demo ? 'example-soft' : ''}`}
+                src={photos[0].url}
+                mode="aspectFill"
+              />
+            ) : null}
+            {photos.slice(1).map((photo, i) => (
+              <View
+                key={photo.kind}
+                className={`analysis__mini analysis__mini--${i} ${photo.demo ? 'example-soft' : ''}`}
+              >
+                <Image className="analysis__mini-img" src={photo.url} mode="aspectFill" />
+              </View>
+            ))}
             <Text className="analysis__portrait-mark">AI 分析中</Text>
           </View>
         </View>
 
-        <Text className="analysis__stage fade-up delay-1">{stageText}</Text>
+        <Text key={stageText} className="analysis__stage">
+          {stageText}
+        </Text>
 
         <View className="analysis__progress fade-up delay-2">
           <View className="analysis__progress-track">
             <View className="analysis__progress-fill" style={{ width: `${shown}%` }} />
           </View>
-          <Text className="analysis__progress-num">{Math.round(shown)}%</Text>
+          <View className="analysis__progress-meta">
+            <Text className="analysis__progress-num">{Math.round(shown)}%</Text>
+            <Text className="analysis__progress-eta">通常需要 1-2 分钟</Text>
+          </View>
         </View>
 
-        <View className="analysis__tips fade-up delay-3">
-          <Text className="analysis__tip">正在读取面部与头肩比例</Text>
-          <Text className="analysis__tip">随后匹配场景与预算</Text>
-          <Text className="analysis__tip">三套方案将会准备好</Text>
+        <View className="analysis__steps fade-up delay-2">
+          {STEPS.map((step, i) => (
+            <View key={step.label} className="analysis__step-item">
+              {i > 0 ? (
+                <View className={`analysis__step-line ${currentStep >= i ? 'analysis__step-line--done' : ''}`} />
+              ) : null}
+              <View
+                className={`analysis__step-dot ${i < currentStep ? 'analysis__step-dot--done' : ''} ${i === currentStep ? 'analysis__step-dot--current' : ''}`}
+              >
+                <Text className="analysis__step-dot-text">
+                  {i < currentStep ? '✓' : i + 1}
+                </Text>
+              </View>
+              <Text
+                className={`analysis__step-label ${i === currentStep ? 'analysis__step-label--current' : ''}`}
+              >
+                {step.label}
+              </Text>
+            </View>
+          ))}
         </View>
+
+        <Text className="analysis__tip fade-up delay-3">{tipText}</Text>
 
         {/* 不锁人：后台继续分析，首页任务轨承接进度，完成即提醒 */}
         <Text

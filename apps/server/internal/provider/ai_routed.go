@@ -14,27 +14,51 @@ import (
 type progressStage struct {
 	progress int
 	stage    string
+	// after 是距上一档的等待时长；零值表示默认间隔 3s。
+	// 长调用里逐档拉长间隔，让进度在整段等待期内持续蠕进而非早早打满。
+	after time.Duration
 }
 
 // runProgressAnimation emits timed progress updates while a long-running
 // operation is in flight. Call the returned stop function when the operation
-// finishes so no further updates are emitted.
+// finishes so no further updates are emitted. After the last stage fires, the
+// last stage re-emits on a 15s heartbeat until stopped, keeping the task's
+// updated_at alive during very slow calls.
 func runProgressAnimation(ctx context.Context, stages []progressStage) func() {
 	if ProgressReporter(ctx) == nil || len(stages) == 0 {
 		return func() {}
 	}
 	stop := make(chan struct{})
 	go func() {
-		ticker := time.NewTicker(3 * time.Second)
-		defer ticker.Stop()
 		for _, s := range stages {
+			wait := s.after
+			if wait <= 0 {
+				wait = 3 * time.Second
+			}
+			timer := time.NewTimer(wait)
+			select {
+			case <-stop:
+				timer.Stop()
+				return
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+				reportProgress(ctx, s.progress, s.stage)
+			}
+		}
+		// 尾部心跳：所有档位播完后每 15s 重播最后一档（进度不突破最后档，保持单调）。
+		last := stages[len(stages)-1]
+		tick := time.NewTicker(15 * time.Second)
+		defer tick.Stop()
+		for {
 			select {
 			case <-stop:
 				return
 			case <-ctx.Done():
 				return
-			case <-ticker.C:
-				reportProgress(ctx, s.progress, s.stage)
+			case <-tick.C:
+				reportProgress(ctx, last.progress, last.stage)
 			}
 		}
 	}()
@@ -83,8 +107,12 @@ func (a *RoutedAnalyzer) Analyze(ctx context.Context, input domain.CreateAnalysi
 	reportProgress(ctx, 48, "正在分析五官比例")
 	stopProgress := runProgressAnimation(ctx, []progressStage{
 		{progress: 56, stage: "正在分析侧脸线条"},
-		{progress: 64, stage: "正在分析全身比例"},
-		{progress: 72, stage: "正在整合三张照片的形象特点"},
+		{progress: 62, stage: "正在分析全身比例"},
+		{progress: 68, stage: "正在整合形象特点", after: 4 * time.Second},
+		{progress: 72, stage: "正在提炼色彩与风格倾向", after: 6 * time.Second},
+		{progress: 76, stage: "正在归纳可提升点", after: 9 * time.Second},
+		// 封顶 79：真正的 82 在分析调用返回后上报，动画绝不越过它。
+		{progress: 79, stage: "正在复核分析结果", after: 12 * time.Second},
 	})
 	result, err := a.runtime.Structured(ctx, CapabilityAppearanceAnalysis, StructuredRequest{
 		Instructions: appearanceInstructions, Prompt: analysisPrompt(input), Images: images,

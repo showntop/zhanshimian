@@ -94,6 +94,35 @@ export function analysisStageText(stage: string | undefined): string {
   return ANALYSIS_STAGE_COPY.fallback
 }
 
+// 分析页细粒度阶段时间线：at 为进度百分比，页面按补间进度取「at <= 进度」的最后一条。
+// 覆盖服务端各上报点（15/22/32/42/48/56/64/72/82/95），中间档让文案持续细粒度推进。
+export const ANALYSIS_STAGE_TIMELINE: ReadonlyArray<{ at: number; text: string }> = [
+  { at: 0, text: '正在安全上传照片' },
+  { at: 8, text: '正在核对照片清晰度' },
+  { at: 15, text: '正在排队等待分析' },
+  { at: 22, text: '正在读取三张照片' },
+  { at: 30, text: '正在确认照片是否符合要求' },
+  { at: 38, text: '正在提取面部轮廓' },
+  { at: 46, text: '正在分析正脸比例' },
+  { at: 54, text: '正在分析侧脸线条' },
+  { at: 62, text: '正在分析全身比例' },
+  { at: 70, text: '正在整理你的形象特点' },
+  { at: 78, text: '正在匹配场景与预算' },
+  { at: 86, text: '正在组合发型、妆容与穿搭' },
+  { at: 94, text: '正在保存形象档案' },
+  { at: 100, text: '三套方案已经准备好' }
+] as const
+
+/** 按显示进度取时间线文案；进度越界时取首/末条。 */
+export function analysisTimelineText(progress: number): string {
+  let text = ANALYSIS_STAGE_TIMELINE[0]?.text ?? ''
+  for (const item of ANALYSIS_STAGE_TIMELINE) {
+    if (progress >= item.at) text = item.text
+    else break
+  }
+  return text
+}
+
 // ---------- 首页工作台 ----------
 export const HOME_COPY = {
   returningTitle: '继续今天的形象计划',

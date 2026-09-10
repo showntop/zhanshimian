@@ -1,67 +1,77 @@
+// 分析进度页样式：拱形相框 + 渐变扫描光带 + 进度微光 + 三步指示器。
+// 动效参数对齐 packages/design/src/motion.ts（scan 2000ms / 品牌缓动 cubic-bezier(.2,.8,.2,1)）。
 .analysis {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 36rpx;
-  padding-top: 24rpx;
+  gap: 32rpx;
+  padding-top: 16rpx;
 
   &__portrait {
-    width: 420rpx;
+    width: 600rpx;
 
     &-frame {
       position: relative;
-      height: 520rpx;
-      border-radius: 210rpx 210rpx 32rpx 32rpx;
-      background: linear-gradient(180deg, var(--moss-soft) 0%, #f2f1ea 100%);
+      height: 620rpx;
+      border-radius: 300rpx 300rpx 40rpx 40rpx;
+      background: linear-gradient(180deg, #edf1e6 0%, #f4f3eb 58%, #f1efe6 100%);
       border: 1rpx solid var(--line);
       overflow: hidden;
     }
 
     &-mark {
       position: absolute;
-      bottom: 20rpx;
-      right: 20rpx;
-      padding: 6rpx 18rpx;
+      bottom: 40rpx;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 5;
+      padding: 8rpx 20rpx;
       border-radius: 999rpx;
       background: rgba(30, 35, 29, 0.55);
       color: #ffffff;
-      font-size: 18rpx;
+      font-size: 20rpx;
+      letter-spacing: 1rpx;
+      white-space: nowrap;
     }
   }
 
-  &__scan {
+  // 主照片铺满拱形（aspectFill），无中间空白
+  &__hero {
     position: absolute;
-    left: 8%;
-    right: 8%;
-    top: 0;
-    height: 6rpx;
-    border-radius: 999rpx;
-    background: rgba(111, 143, 89, 0.9);
-    box-shadow: 0 0 18px 5px rgba(111, 143, 89, 0.24);
-    animation: analysis-scan 2s ease-in-out infinite alternate;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    animation: analysis-hero-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 
-  &__focus {
+  // 侧脸/全身角卡：拍立得式叠在拱形底部两角
+  &__mini {
     position: absolute;
-    width: 20rpx;
-    height: 20rpx;
-    border-radius: 999rpx;
-    background: var(--moss);
-    animation: analysis-pulse 1.6s ease-in-out infinite;
+    bottom: 30rpx;
+    z-index: 3;
+    width: 148rpx;
+    height: 196rpx;
+    border-radius: 18rpx;
+    border: 5rpx solid rgba(255, 255, 255, 0.95);
+    box-shadow: 0 10rpx 26rpx rgba(37, 39, 37, 0.22);
+    overflow: hidden;
+    animation: analysis-mini-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+    &-img {
+      width: 100%;
+      height: 100%;
+    }
+
+    &--0 {
+      left: 30rpx;
+      transform: rotate(-5deg);
+      animation-delay: 0.16s;
+    }
 
     &--1 {
-      top: 30%;
-      left: 32%;
-    }
-    &--2 {
-      top: 42%;
-      left: 60%;
-      animation-delay: 0.3s;
-    }
-    &--3 {
-      top: 64%;
-      left: 45%;
-      animation-delay: 0.6s;
+      right: 30rpx;
+      transform: rotate(5deg);
+      animation-delay: 0.28s;
     }
   }
 
@@ -71,48 +81,61 @@
     font-weight: 600;
     color: var(--ink);
     text-align: center;
+    // 阶段切换：轻柔淡入上移（key 变更时重放）
+    animation: analysis-stage-swap 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 
   &__progress {
     width: 100%;
 
-    &-ring {
-      display: flex;
-      flex-direction: column;
-      gap: 16rpx;
-      padding: 28rpx;
-      border-radius: var(--radius-md);
-      background: var(--surface);
-      border: 1rpx solid var(--line);
-    }
-
     &-track {
-      height: 10rpx;
+      height: 12rpx;
       border-radius: 999rpx;
-      background: var(--moss-soft);
+      background: rgba(69, 78, 64, 0.1);
       overflow: hidden;
     }
 
     &-fill {
+      position: relative;
       height: 100%;
+      min-width: 24rpx;
       border-radius: 999rpx;
-      background: var(--moss);
-      transition: width 0.2s ease;
+      background: linear-gradient(90deg, var(--moss) 0%, #6e8c57 100%);
+      // 品牌缓动（motion.ts easing）
+      transition: width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+      overflow: hidden;
+
+      // 微光流动：0% 也有生命感，暗示任务在跑（低透明度慢速，不刺眼）
+      &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0) 100%);
+        transform: translateX(-100%);
+        animation: analysis-shimmer 2.6s ease-in-out infinite;
+      }
+    }
+
+    &-meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-top: 14rpx;
+      padding: 0 6rpx;
     }
 
     &-num {
-      text-align: center;
-      font-size: 26rpx;
-      font-weight: 600;
+      font-family: 'Songti SC', 'STSong', serif;
+      font-size: 44rpx;
+      font-weight: 700;
       color: var(--moss);
+      font-variant-numeric: tabular-nums;
     }
-  }
 
-  &__tips {
-    display: flex;
-    flex-direction: column;
-    gap: 12rpx;
-    align-items: center;
+    &-eta {
+      font-size: 20rpx;
+      color: var(--ink-3);
+    }
   }
 
   &__tip {
@@ -148,37 +171,150 @@
   }
 }
 
-@keyframes analysis-scan {
+@keyframes analysis-stage-swap {
   from {
-    transform: translateY(40rpx);
+    opacity: 0;
+    transform: translateY(10rpx);
   }
   to {
-    transform: translateY(460rpx);
-  }
-}
-
-@keyframes analysis-pulse {
-  0%,
-  100% {
-    transform: scale(1);
     opacity: 1;
-  }
-  50% {
-    transform: scale(1.28);
-    opacity: 0.72;
+    transform: translateY(0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .analysis__scan,
-  .analysis__focus {
+  .analysis__progress-fill::after,
+  .analysis__hero,
+  .analysis__mini,
+  .analysis__stage,
+  .analysis__step-dot--current {
     animation: none;
   }
 }
 // 不锁人出口：次级文字链，弱于进度主信息
 .analysis__wander {
-  margin-top: 56rpx;
+  margin-top: 48rpx;
   text-align: center;
   font-size: 23rpx;
   color: var(--ink-3);
+}
+
+@keyframes analysis-hero-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+// 只动 opacity，避免覆盖角卡的 rotate
+@keyframes analysis-mini-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+// ---------- 三步指示器（填充下半屏，随进度点亮） ----------
+.analysis__steps {
+  position: relative;
+  display: flex;
+  width: 100%;
+  padding: 8rpx 24rpx 0;
+}
+
+.analysis__step-item {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14rpx;
+}
+
+// 节点间连接线：从上一个圆心到当前圆心
+.analysis__step-line {
+  position: absolute;
+  top: 24rpx;
+  right: 50%;
+  width: 100%;
+  height: 2rpx;
+  background: var(--line);
+  z-index: 0;
+  transition: background 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  &--done {
+    background: rgba(88, 115, 68, 0.55);
+  }
+}
+
+.analysis__step-dot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 999rpx;
+  background: var(--surface-strong);
+  border: 2rpx solid var(--line);
+  transition:
+    background 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  &-text {
+    font-size: 20rpx;
+    font-weight: 700;
+    color: var(--ink-3);
+    transition: color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  &--done {
+    background: var(--moss);
+    border-color: var(--moss);
+
+    .analysis__step-dot-text {
+      color: #ffffff;
+    }
+  }
+
+  &--current {
+    background: var(--moss-soft);
+    border-color: var(--moss);
+    animation: analysis-step-pulse 1.6s ease-in-out infinite;
+
+    .analysis__step-dot-text {
+      color: var(--moss);
+    }
+  }
+}
+
+.analysis__step-label {
+  font-size: 22rpx;
+  color: var(--ink-2);
+  transition: color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  &--current {
+    color: var(--moss);
+    font-weight: 600;
+  }
+}
+
+@keyframes analysis-step-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(88, 115, 68, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 0 10rpx rgba(88, 115, 68, 0);
+  }
 }
