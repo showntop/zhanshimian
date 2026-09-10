@@ -336,7 +336,7 @@ func (s *Store) GetTasksByIDs(ctx context.Context, userID string, ids []string) 
 }
 
 func (s *Store) ActiveTasks(ctx context.Context, userID string, limit int) ([]domain.Task, error) {
-	rows, err := s.pool.Query(ctx, taskSelect+` WHERE user_id=$1 AND status IN ('queued','running') ORDER BY created_at LIMIT $2`, userID, limit)
+	rows, err := s.pool.Query(ctx, taskSelect+` WHERE user_id=$1 AND status IN ('queued','processing') ORDER BY created_at LIMIT $2`, userID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -513,7 +513,7 @@ func (s *Store) CreateAnalysis(ctx context.Context, userID string, input domain.
 	}
 	var active domain.Analysis
 	err = tx.QueryRow(ctx, `
-		SELECT id::text,status,progress,stage,scene,media_ids::text[],coalesce((SELECT t.id::text FROM tasks t WHERE t.type='analysis' AND t.payload->>'analysis_id'=a.id::text AND t.status IN ('queued','running') ORDER BY t.created_at DESC LIMIT 1),''),created_at,updated_at
+		SELECT id::text,status,progress,stage,scene,media_ids::text[],coalesce((SELECT t.id::text FROM tasks t WHERE t.type='analysis' AND t.payload->>'analysis_id'=a.id::text AND t.status IN ('queued','processing') ORDER BY t.created_at DESC LIMIT 1),''),created_at,updated_at
 		FROM analyses a
 		WHERE user_id=$1 AND status IN ('queued','processing')
 		ORDER BY created_at DESC LIMIT 1`, userID).
@@ -989,10 +989,10 @@ func (s *Store) CreateHairPreview(ctx context.Context, userID string, input doma
 		return domain.HairPreview{}, nil, err
 	}
 	existing, existingErr := scanHairPreview(tx.QueryRow(ctx, hairPreviewSelect+`
-		WHERE user_id=$1 AND id IN (SELECT (payload->>'preview_id')::uuid FROM tasks WHERE type='hair_preview' AND status IN ('queued','running'))
+		WHERE user_id=$1 AND id IN (SELECT (payload->>'preview_id')::uuid FROM tasks WHERE type='hair_preview' AND status IN ('queued','processing'))
 		ORDER BY created_at DESC LIMIT 1`, userID))
 	if existingErr == nil {
-		task, taskErr := scanTask(tx.QueryRow(ctx, taskSelect+` WHERE type='hair_preview' AND payload->>'preview_id'=$1 AND status IN ('queued','running') ORDER BY created_at DESC LIMIT 1`, existing.ID))
+		task, taskErr := scanTask(tx.QueryRow(ctx, taskSelect+` WHERE type='hair_preview' AND payload->>'preview_id'=$1 AND status IN ('queued','processing') ORDER BY created_at DESC LIMIT 1`, existing.ID))
 		if taskErr != nil {
 			return domain.HairPreview{}, nil, taskErr
 		}

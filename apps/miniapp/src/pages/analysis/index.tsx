@@ -63,6 +63,9 @@ export default function Analysis() {
     if (id) {
       setAnalysisId(id)
       writeStorage(STORAGE_KEYS.activeTaskAnalysis, id)
+    } else {
+      // 无任务引用直达本页（任务已完成清理/异常入口）：回首页，避免 0% 假进度死等
+      Taro.switchTab({ url: '/pages/home/index' })
     }
   })
 
