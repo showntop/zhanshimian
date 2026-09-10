@@ -13,7 +13,6 @@ export default defineAppConfig({
     'pages/profile/index',
     'pages/scene/index',
     'pages/capture/index',
-    'pages/profile-setup/index',
     'pages/analysis/index',
     'pages/report/index',
     'pages/plan/index',

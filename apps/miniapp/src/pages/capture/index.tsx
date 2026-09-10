@@ -1,16 +1,16 @@
-// 三图建档：照片槽优先、逐槽上传/失败/重试，批量与示例只作为替代路径。
-// 三张齐 → 进入补充资料（G1），profile 在 createAnalysis 时带上。
-// 交互原则：槽即操作——空槽点按弹系统「拍摄/相册」面板；已传槽点按出
-// 重拍/换图/看大图；每槽一个主操作，底部只留一个批量补齐入口。
-import { useEffect, useState } from 'react'
+// 三图建档（合并补充资料）：三联槽位 + 选填资料一页完成，提交即进入分析。
+// 请求纪律：槽逐个上传；提交 = PUT /v1/me/profile（失败不阻塞）+ createAnalysis。
+import { useState } from 'react'
 import Taro, { useLoad } from '@tarojs/taro'
-import { Image, Text, View } from '@tarojs/components'
+import { Image, Slider, Text, View } from '@tarojs/components'
 import type { MediaAsset } from '@zsm/core'
+import { PROFILE_SETUP_COPY, type UserProfile } from '@zsm/core'
 import { api } from '../../services/api'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
 import ExampleImage from '../../components/example-image'
 import ImageViewer from '../../components/image-viewer'
+import Pill from '../../components/pill'
 import './index.scss'
 
 interface Shot {
@@ -32,6 +32,11 @@ const SHOTS: Shot[] = [
   { kind: 'body', label: '正面全身', desc: '全身入镜，看清头肩与比例', placeholder: '/assets/capture/body.png' },
 ]
 
+const ROLES = ['产品经理', '设计师', '咨询顾问', '学生', PROFILE_SETUP_COPY.skip]
+const BUDGETS = ['500 以内', '500–1500', '1500 以上', PROFILE_SETUP_COPY.skip]
+const HEIGHT_MIN = 145
+const HEIGHT_MAX = 185
+
 type Kind = Shot['kind']
 type FlagMap = Partial<Record<Kind, boolean>>
 type ErrorMap = Partial<Record<Kind, string>>
@@ -42,9 +47,13 @@ export default function Capture() {
   const [uploading, setUploading] = useState<FlagMap>({})
   const [failed, setFailed] = useState<ErrorMap>({})
   const [justDone, setJustDone] = useState<FlagMap>({})
-  const [pulse, setPulse] = useState(false)
   const [viewer, setViewer] = useState<{ url: string; label: string } | null>(null)
   const [demoBusy, setDemoBusy] = useState(false)
+  // 补充资料（选填）
+  const [height, setHeight] = useState(165)
+  const [role, setRole] = useState<string>(PROFILE_SETUP_COPY.skip)
+  const [budget, setBudget] = useState<string>(PROFILE_SETUP_COPY.skip)
+  const [busy, setBusy] = useState(false)
 
   useLoad((options) => {
     if (options?.scene) setScene(options.scene)
@@ -53,14 +62,6 @@ export default function Capture() {
   const done = SHOTS.filter((shot) => slots[shot.kind]).length
   const ready = done === SHOTS.length
   const working = demoBusy || Object.values(uploading).some(Boolean)
-
-  // 三张齐：进度条满格脉冲一次（反馈「完成」时刻）
-  useEffect(() => {
-    if (!ready) return
-    setPulse(true)
-    const t = setTimeout(() => setPulse(false), 900)
-    return () => clearTimeout(t)
-  }, [ready])
 
   const uploadOne = (kind: Kind, filePath: string) => {
     setUploading((prev) => ({ ...prev, [kind]: true }))
@@ -87,7 +88,7 @@ export default function Capture() {
   }
 
   const pickOne = (kind: Kind, source?: 'camera' | 'album') => {
-    if (working) return
+    if (working || busy) return
     Taro.chooseMedia({
       count: 1,
       mediaType: ['image'],
@@ -109,7 +110,7 @@ export default function Capture() {
 
   // 槽即操作：空槽 → 系统面板；失败槽 → 直接重选；已传槽 → 重拍/换图/大图
   const onSlotTap = (kind: Kind, shot: Shot) => {
-    if (uploading[kind]) return
+    if (uploading[kind] || busy) return
     const slot = slots[kind]
     if (!slot || failed[kind]) {
       pickOne(kind)
@@ -130,7 +131,7 @@ export default function Capture() {
 
   const fillMissing = () => {
     const missing = SHOTS.filter((shot) => !slots[shot.kind])
-    if (missing.length === 0 || demoBusy) return
+    if (missing.length === 0 || demoBusy || busy) return
     Taro.showActionSheet({
       itemList: ['连续拍摄', '从相册批量选择'],
       success: (res) => doFillMissing(res.tapIndex === 0 ? 'camera' : 'album', missing),
@@ -168,7 +169,7 @@ export default function Capture() {
   }
 
   const useDemoPhotos = async () => {
-    if (demoBusy) return
+    if (demoBusy || busy) return
     setDemoBusy(true)
     setUploading({ face: true, side: true, body: true })
     setFailed({})
@@ -189,12 +190,30 @@ export default function Capture() {
     }
   }
 
-  const next = () => {
-    if (!ready) return
-    const mediaIds = SHOTS.map((shot) => slots[shot.kind]!.asset.id)
-    Taro.navigateTo({
-      url: `/pages/profile-setup/index?scene=${scene || 'general'}&media_ids=${mediaIds.join(',')}`,
-    })
+  const submit = async () => {
+    if (!ready || busy) return
+    setBusy(true)
+    // 服务端契约要求 role/budget 为非空字符串；跳过时用哨兵值，不显示成默认身份。
+    const profile: UserProfile = {
+      height_cm: height,
+      role: role === PROFILE_SETUP_COPY.skip ? '未填写' : role,
+      budget: budget === PROFILE_SETUP_COPY.skip ? '未填写' : budget,
+    }
+    try {
+      // 持久化失败不阻塞：分析仍带当次快照
+      await api.updateMyProfile(profile).catch(() => undefined)
+      const { data } = await api.createAnalysis({
+        scene: scene || 'general',
+        media_ids: SHOTS.map((shot) => slots[shot.kind]!.asset.id),
+        profile,
+      })
+      // 建档链路是一次正向流程，reLaunch 清栈直达分析页。
+      Taro.reLaunch({ url: `/pages/analysis/index?id=${data.id}` })
+    } catch (e) {
+      Taro.showToast({ title: (e as Error).message || '提交没有成功，请重试', icon: 'none' })
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -207,88 +226,117 @@ export default function Capture() {
           <Text className="capture__lede">不用化妆，也不需要刻意摆姿势；每一张都可以重拍。</Text>
         </View>
 
-        <View className="capture__progress fade-up">
-          <View className="capture__progress-head">
-            <Text className="capture__progress-label">{done} / {SHOTS.length} 张已完成</Text>
-            <Text className="capture__progress-note">{ready ? '可以进入下一步' : `还差 ${SHOTS.length - done} 张`}</Text>
+        <View className="capture__slots fade-up delay-1">
+          {SHOTS.map((shot, index) => {
+            const slot = slots[shot.kind]
+            const isUploading = Boolean(uploading[shot.kind])
+            const isFailed = Boolean(failed[shot.kind])
+            return (
+              <View
+                key={shot.kind}
+                className={`capture__slot pressable ${justDone[shot.kind] ? 'capture__slot--pop' : ''}`}
+                onClick={() => onSlotTap(shot.kind, shot)}
+              >
+                <View className={`capture__photo ${!slot && !isUploading ? 'capture__photo--empty' : ''}`}>
+                  {slot ? (
+                    <ExampleImage
+                      className="capture__photo-img"
+                      src={slot.displayUrl}
+                      user={!slot.demo}
+                      mode="aspectFill"
+                      badgeText={slot.demo ? '效果示例' : ''}
+                    />
+                  ) : (
+                    <Image className="capture__photo-guide" src={shot.placeholder} mode="aspectFill" />
+                  )}
+                  {slot && !isUploading ? (
+                    <Text className="capture__photo-index capture__photo-index--done">✓</Text>
+                  ) : (
+                    <Text className="capture__photo-index">{index + 1}</Text>
+                  )}
+                  {isUploading ? (
+                    <View className="capture__photo-mask">
+                      <View className="spinner spinner--on-deep capture__spinner" />
+                      <Text className="capture__photo-mask-text">上传中</Text>
+                    </View>
+                  ) : null}
+                  {isFailed ? (
+                    <View className="capture__photo-mask capture__photo-mask--error">
+                      <Text className="capture__photo-mask-text">上传失败 · 轻触重试</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text className="capture__slot-label">{shot.label}</Text>
+                {slot ? (
+                  <Text className="capture__slot-state">{slot.demo ? '示例已选' : '已上传'}</Text>
+                ) : (
+                  <Text className="capture__slot-hint">轻触拍摄</Text>
+                )}
+              </View>
+            )
+          })}
+        </View>
+
+        <View className="capture__profile card fade-up delay-2">
+          <View className="capture__profile-head">
+            <Text className="capture__profile-title">{PROFILE_SETUP_COPY.eyebrow}</Text>
+            <Text className="capture__profile-note">全部选填</Text>
           </View>
-          <View className="capture__progress-track">
-            <View
-              className={`capture__progress-fill ${pulse ? 'capture__progress-fill--full' : ''}`}
-              style={{ width: `${(done / SHOTS.length) * 100}%` }}
+
+          <View className="capture__field">
+            <View className="capture__field-head">
+              <Text className="capture__field-name">{PROFILE_SETUP_COPY.height}</Text>
+              <Text className="capture__field-note">{PROFILE_SETUP_COPY.heightNote}</Text>
+            </View>
+            <Text className="capture__height">{height} cm</Text>
+            <Slider
+              className="capture__slider"
+              min={HEIGHT_MIN}
+              max={HEIGHT_MAX}
+              step={1}
+              value={height}
+              activeColor="#587344"
+              backgroundColor="#DDE5D7"
+              blockSize={24}
+              blockColor="#FFFFFF"
+              onChange={(event) => setHeight(Number(event.detail.value))}
             />
+            <View className="capture__stepper">
+              <Text className="capture__step pressable" onClick={() => setHeight((h) => Math.max(HEIGHT_MIN, h - 1))}>
+                −
+              </Text>
+              <Text className="capture__range">{HEIGHT_MIN}–{HEIGHT_MAX} cm</Text>
+              <Text className="capture__step pressable" onClick={() => setHeight((h) => Math.min(HEIGHT_MAX, h + 1))}>
+                ＋
+              </Text>
+            </View>
+          </View>
+
+          <View className="capture__field">
+            <Text className="capture__field-name">{PROFILE_SETUP_COPY.role}</Text>
+            <View className="capture__chips">
+              {ROLES.map((item) => (
+                <Pill key={item} label={item} active={role === item} onClick={() => setRole(item)} />
+              ))}
+            </View>
+          </View>
+
+          <View className="capture__field">
+            <Text className="capture__field-name">{PROFILE_SETUP_COPY.budget}</Text>
+            <View className="capture__chips">
+              {BUDGETS.map((item) => (
+                <Pill key={item} label={item} active={budget === item} onClick={() => setBudget(item)} />
+              ))}
+            </View>
           </View>
         </View>
 
-        {SHOTS.map((shot, index) => {
-          const slot = slots[shot.kind]
-          const isUploading = Boolean(uploading[shot.kind])
-          const isFailed = Boolean(failed[shot.kind])
-          return (
-            <View
-              key={shot.kind}
-              className={`capture__slot-card fade-up delay-${index + 1} pressable`}
-              onClick={() => onSlotTap(shot.kind, shot)}
-            >
-              <View
-                className={`capture__photo ${!slot && !isUploading ? 'capture__photo--empty' : ''} ${justDone[shot.kind] ? 'capture__photo--pop' : ''}`}
-              >
-                {slot ? (
-                  <ExampleImage
-                    className="capture__photo-img"
-                    src={slot.displayUrl}
-                    user={!slot.demo}
-                    mode="aspectFill"
-                    badgeText={slot.demo ? '效果示例' : ''}
-                  />
-                ) : (
-                  <Image className="capture__photo-img capture__photo-guide" src={shot.placeholder} mode="aspectFit" />
-                )}
-                {slot && !isUploading ? (
-                  <Text className="capture__photo-index capture__photo-index--done">✓</Text>
-                ) : (
-                  <Text className="capture__photo-index">{index + 1}</Text>
-                )}
-                {isUploading ? (
-                  <View className="capture__photo-mask">
-                    <View className="spinner spinner--on-deep capture__spinner" />
-                    <Text className="capture__photo-mask-text">上传中</Text>
-                  </View>
-                ) : null}
-                {isFailed ? (
-                  <View className="capture__photo-mask capture__photo-mask--error">
-                    <Text className="capture__photo-mask-text">上传失败 · 轻触重试</Text>
-                  </View>
-                ) : null}
-              </View>
-
-              <View className="capture__info">
-                <View className="capture__info-head">
-                  <Text className="capture__label">{shot.label}</Text>
-                  {slot ? <Text className="capture__state">{slot.demo ? '示例已选' : '已上传'}</Text> : null}
-                </View>
-                <Text className="capture__desc">{shot.desc}</Text>
-                {isFailed ? <Text className="capture__error">{failed[shot.kind]}</Text> : null}
-                <View className="capture__actions">
-                  {slot && !isFailed ? (
-                    <Text className="capture__redo">重拍 / 换一张 ›</Text>
-                  ) : (
-                    <Text className="capture__action capture__action--main">
-                      {isFailed ? '重试这张' : '拍摄这张'}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            </View>
-          )
-        })}
-
         <View className="capture__foot fade-up delay-3">
           <PrimaryButton
-            text={ready ? '下一步：补充资料' : `已选 ${done} / ${SHOTS.length} 张`}
+            text={ready ? '开始形象分析' : `已选 ${done} / ${SHOTS.length} 张`}
             disabled={!ready}
-            loading={working}
-            onClick={next}
+            loading={busy}
+            onClick={submit}
           />
           {!ready ? (
             <Text className="capture__alt-action pressable" onClick={fillMissing}>
@@ -298,7 +346,7 @@ export default function Capture() {
           <Text className="capture__demo pressable" onClick={useDemoPhotos}>
             先用「效果示例」体验完整流程 ›
           </Text>
-          <Text className="capture__privacy">照片与建议只对你可见，可随时删除；示例照片会明确标注。</Text>
+          <Text className="capture__privacy">{PROFILE_SETUP_COPY.privacy}</Text>
         </View>
       </View>
 
