@@ -7,43 +7,10 @@ import (
 	"testing"
 )
 
-func TestLoadAIProviderDefaults(t *testing.T) {
+func TestLoadRejectsMissingAIRouting(t *testing.T) {
 	clearReleaseEnvironment(t)
-	t.Setenv("AI_PROVIDER", "")
-	t.Setenv("AI_FALLBACK_TO_DEMO", "")
-	t.Setenv("AI_REQUEST_TIMEOUT_SECONDS", "")
-	t.Setenv("OPENAI_BASE_URL", "")
-	t.Setenv("OPENAI_VISION_MODEL", "")
-	t.Setenv("HAIR_PREVIEW_PROVIDER", "")
-	t.Setenv("HAIR_PREVIEW_FALLBACK_TO_DEMO", "")
-	t.Setenv("OPENAI_IMAGE_MODEL", "")
-	t.Setenv("OPENAI_IMAGE_QUALITY", "")
-	t.Setenv("OUTFIT_DIAGNOSIS_PROVIDER", "")
-	t.Setenv("OUTFIT_DIAGNOSIS_FALLBACK_TO_DEMO", "")
-	t.Setenv("OPENAI_OUTFIT_MODEL", "")
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.AIProvider != "demo" || !cfg.AIFallbackToDemo || cfg.OpenAIVisionModel != "gpt-5-mini" || cfg.HairPreviewProvider != "demo" || cfg.OpenAIImageModel != "gpt-image-2" || cfg.OutfitDiagnosisProvider != "demo" {
-		t.Fatalf("unexpected AI defaults: %#v", cfg)
-	}
-}
-
-func TestLoadRejectsInvalidImageQuality(t *testing.T) {
-	clearReleaseEnvironment(t)
-	t.Setenv("OPENAI_IMAGE_QUALITY", "ultra")
-	if _, err := Load(); err == nil {
-		t.Fatal("expected invalid image quality to be rejected")
-	}
-}
-
-func TestLoadRejectsUnknownAIProvider(t *testing.T) {
-	clearReleaseEnvironment(t)
-	t.Setenv("AI_PROVIDER", "unknown")
-	if _, err := Load(); err == nil {
-		t.Fatal("expected unknown AI provider to be rejected")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "AI_ROUTING") {
+		t.Fatalf("expected missing AI routing to be rejected, got %v", err)
 	}
 }
 
@@ -186,7 +153,6 @@ func clearReleaseEnvironment(t *testing.T) {
 		"APP_ENV", "DEV_LOGIN_ENABLED", "PUBLIC_BASE_URL", "WECHAT_APP_ID", "WECHAT_APP_SECRET",
 		"STORAGE_PROVIDER", "COS_BUCKET_URL", "COS_SECRET_ID", "COS_SECRET_KEY",
 		"ASSET_BUCKET", "ASSET_S3_ENDPOINT", "ASSET_REGION", "WEATHER_PROVIDER", "AMAP_WEB_SERVICE_KEY",
-		"AI_PROVIDER", "HAIR_PREVIEW_PROVIDER", "OUTFIT_DIAGNOSIS_PROVIDER", "OPENAI_API_KEY",
 		"AI_ROUTING_FILE", "AI_ROUTING_JSON", "ALIYUN_API_KEY", "VOLCENGINE_API_KEY",
 		"BAILIAN_WORKSPACE_ID",
 	} {

@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"fmt"
 	"log/slog"
 	"sort"
 	"time"
@@ -23,9 +24,11 @@ type AIBundle struct {
 	Routes   map[string]string
 }
 
+// BuildAI 一律走能力路由（AGENTS.md 红线：AI 只经 ai-routing.*.json）。
+// 未配置路由表直接报错启动失败，不再回退遗留的 AI_PROVIDER/OPENAI_* 环境变量路径。
 func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStorage, logger *slog.Logger) (AIBundle, error) {
 	if cfg.AIRoutingSource == "" {
-		return buildLegacyAI(cfg, repo, objects)
+		return AIBundle{}, fmt.Errorf("AI_ROUTING_FILE or AI_ROUTING_JSON is required")
 	}
 	models := make([]provider.AIModel, 0, len(cfg.AIRouting.Models))
 	modelIDs := make([]string, 0, len(cfg.AIRouting.Models))
@@ -100,48 +103,3 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 	return bundle, nil
 }
 
-func buildLegacyAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStorage) (AIBundle, error) {
-	loader := service.NewAnalysisMediaLoader(repo, objects, cfg.PublicBaseURL, cfg.MaxUploadBytes, cfg.AssetDir)
-	demoAnalyzer := provider.Analyzer(provider.NewDemoAnalyzer())
-	analyzer := demoAnalyzer
-	if cfg.AIProvider == "openai" {
-		real, err := provider.NewOpenAIAnalyzer(provider.OpenAIConfig{APIKey: cfg.OpenAIAPIKey, BaseURL: cfg.OpenAIBaseURL, Model: cfg.OpenAIVisionModel, Timeout: cfg.AIRequestTimeout}, loader, nil)
-		if err != nil {
-			return AIBundle{}, err
-		}
-		analyzer = real
-		if cfg.AIFallbackToDemo {
-			analyzer = provider.NewFallbackAnalyzer(real, demoAnalyzer)
-		}
-	}
-	demoHair := provider.HairPreviewGenerator(provider.NewDemoHairGenerator())
-	hair := demoHair
-	if cfg.HairPreviewProvider == "openai" {
-		real, err := provider.NewOpenAIHairGenerator(provider.OpenAIHairConfig{APIKey: cfg.OpenAIAPIKey, BaseURL: cfg.OpenAIBaseURL, Model: cfg.OpenAIImageModel, Quality: cfg.OpenAIImageQuality, Timeout: cfg.HairPreviewTimeout}, loader, nil)
-		if err != nil {
-			return AIBundle{}, err
-		}
-		hair = real
-		if cfg.HairPreviewFallbackToDemo {
-			hair = provider.NewFallbackHairGenerator(real, demoHair)
-		}
-	}
-	demoOutfit := provider.OutfitAdvisor(provider.NewDemoOutfitAdvisor())
-	outfit := demoOutfit
-	if cfg.OutfitDiagnosisProvider == "openai" {
-		real, err := provider.NewOpenAIOutfitAdvisor(provider.OpenAIConfig{APIKey: cfg.OpenAIAPIKey, BaseURL: cfg.OpenAIBaseURL, Model: cfg.OpenAIOutfitModel, Timeout: cfg.OutfitDiagnosisTimeout}, loader, nil)
-		if err != nil {
-			return AIBundle{}, err
-		}
-		outfit = real
-		if cfg.OutfitDiagnosisFallbackToDemo {
-			outfit = provider.NewFallbackOutfitAdvisor(real, demoOutfit)
-		}
-	}
-	return AIBundle{Analyzer: analyzer, Hair: hair, Look: provider.NewDemoLookGenerator(loader), Outfit: outfit, Routes: map[string]string{
-		provider.CapabilityAppearanceAnalysis: cfg.AIProvider + "/" + cfg.OpenAIVisionModel,
-		provider.CapabilityHairEdit:           cfg.HairPreviewProvider + "/" + cfg.OpenAIImageModel,
-		provider.CapabilityFullLookEdit:       "demo/free-pass-through",
-		provider.CapabilityOutfitDiagnosis:    cfg.OutfitDiagnosisProvider + "/" + cfg.OpenAIOutfitModel,
-	}}, nil
-}

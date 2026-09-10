@@ -53,22 +53,11 @@ VOLCENGINE_API_KEY=...
 
 路由配置把业务能力与模型解耦。目前支持 `appearance_analysis`、`outfit_diagnosis`、`purchase_diagnosis`、`advisor_chat`、`hair_edit`、`makeup_edit` 和 `full_look_edit`；协议适配器支持 OpenAI Responses、OpenAI Chat Completions、OpenAI Images Edit、阿里万相与火山 Ark 图片生成。主备模型、超时、成本单价和单次预算都在同一个目录内调整，业务 Service 不需要改动。
 
-推荐的默认策略是：三图分析用 Qwen3.7 Plus 严格 JSON Schema；低风险诊断/顾问用 Flash 的 JSON Object 后再做服务端校验；本人发型图优先 Wan2.7 Image Pro，Seedream 4.5 作跨厂商故障回退。万相返回的临时图片会立即下载、校验并写入应用自己的 COS，不直接把供应商临时 URL 返回给小程序。
+推荐的默认策略是：三图分析用 Kimi-K3 严格 JSON Schema，Qwen3.7 Plus/Flash 兜底；低风险诊断/顾问用 Flash 的 JSON Object 后再做服务端校验；本人发型图优先 Wan2.7 Image Pro，Seedream 4.5 作跨厂商故障回退。万相返回的临时图片会立即下载、校验并写入应用自己的 COS，不直接把供应商临时 URL 返回给小程序。
 
-旧版单一 OpenAI 配置仍可用于本地兼容；生产启动门禁要求统一路由，防止购买判断、顾问或故障回退仍落到静态 Demo：
+AI 一律经能力路由：`AI_ROUTING_FILE` 或 `AI_ROUTING_JSON` 必填，未配置路由表启动即失败（不再有旧版 `AI_PROVIDER`/`OPENAI_*` 环境变量路径），防止购买判断、顾问或故障回退静默落到静态 Demo：
 
 ```bash
-export AI_PROVIDER=openai
-export OPENAI_API_KEY='...'
-export OPENAI_VISION_MODEL=gpt-5-mini
-export HAIR_PREVIEW_PROVIDER=openai
-export OPENAI_IMAGE_MODEL=gpt-image-2
-export OPENAI_IMAGE_QUALITY=medium
-export OUTFIT_DIAGNOSIS_PROVIDER=openai
-export OPENAI_OUTFIT_MODEL=gpt-5-mini
-export AI_FALLBACK_TO_DEMO=false
-export HAIR_PREVIEW_FALLBACK_TO_DEMO=false
-export OUTFIT_DIAGNOSIS_FALLBACK_TO_DEMO=false
 go run ./cmd/api
 ```
 

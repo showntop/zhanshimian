@@ -1,15 +1,9 @@
 package provider
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
-	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 )
@@ -37,34 +31,6 @@ func (*DemoOutfitAdvisor) Diagnose(_ context.Context, input domain.DiagnosticInp
 	}, nil
 }
 
-type OpenAIOutfitAdvisor struct {
-	config OpenAIConfig
-	loader MediaLoader
-	client *http.Client
-}
-
-func NewOpenAIOutfitAdvisor(config OpenAIConfig, loader MediaLoader, client *http.Client) (*OpenAIOutfitAdvisor, error) {
-	if strings.TrimSpace(config.APIKey) == "" {
-		return nil, errors.New("OPENAI_API_KEY is required for openai outfit diagnosis provider")
-	}
-	if loader == nil {
-		return nil, errors.New("media loader is required for outfit diagnosis provider")
-	}
-	if config.BaseURL == "" {
-		config.BaseURL = "https://api.openai.com/v1"
-	}
-	if config.Model == "" {
-		config.Model = "gpt-5-mini"
-	}
-	if config.Timeout <= 0 {
-		config.Timeout = 60 * time.Second
-	}
-	if client == nil {
-		client = &http.Client{Timeout: config.Timeout}
-	}
-	return &OpenAIOutfitAdvisor{config: config, loader: loader, client: client}, nil
-}
-
 type outfitPayload struct {
 	Conclusion    string          `json:"conclusion"`
 	PriorityTitle string          `json:"priority_title"`
@@ -81,71 +47,6 @@ type outfitFinding struct {
 	AnchorY  float64 `json:"anchor_y"`
 }
 
-func (a *OpenAIOutfitAdvisor) Diagnose(ctx context.Context, input domain.DiagnosticInput) (domain.ToolResult, error) {
-	images, err := a.loader.Load(ctx, []string{input.MediaID})
-	if err != nil {
-		return domain.ToolResult{}, fmt.Errorf("load outfit photo: %w", err)
-	}
-	if len(images) != 1 {
-		return domain.ToolResult{}, fmt.Errorf("expected one outfit photo")
-	}
-	content := []map[string]any{
-		{"type": "input_text", "text": outfitPrompt(input)},
-		{"type": "input_image", "detail": "high", "image_url": dataURL(images[0].MIMEType, images[0].Data)},
-	}
-	body := map[string]any{
-		"model": a.config.Model, "store": false,
-		"instructions":      "你是审慎、尊重用户的私人穿搭顾问。只分析照片中可见的服装颜色、廓形、比例、材质和搭配关系；不评价身材，不推断年龄、健康、身份或经济状况。优先给出无需购买新衣的调整建议。",
-		"input":             []map[string]any{{"role": "user", "content": content}},
-		"text":              map[string]any{"format": map[string]any{"type": "json_schema", "name": "outfit_diagnosis", "strict": true, "schema": outfitSchema()}},
-		"max_output_tokens": 1800,
-	}
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		return domain.ToolResult{}, err
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(a.config.BaseURL, "/")+"/responses", bytes.NewReader(encoded))
-	if err != nil {
-		return domain.ToolResult{}, err
-	}
-	request.Header.Set("Authorization", "Bearer "+a.config.APIKey)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := a.client.Do(request)
-	if err != nil {
-		return domain.ToolResult{}, fmt.Errorf("outfit diagnosis request: %w", err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
-		return domain.ToolResult{}, fmt.Errorf("outfit diagnosis returned status %d", response.StatusCode)
-	}
-	var apiResponse responsesAPIResponse
-	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&apiResponse); err != nil {
-		return domain.ToolResult{}, fmt.Errorf("decode outfit diagnosis: %w", err)
-	}
-	if apiResponse.Error != nil || (apiResponse.Status != "" && apiResponse.Status != "completed") {
-		return domain.ToolResult{}, fmt.Errorf("outfit diagnosis did not complete")
-	}
-	outputText, refusal := responseText(apiResponse)
-	if refusal != "" || outputText == "" {
-		return domain.ToolResult{}, fmt.Errorf("outfit diagnosis contained no result")
-	}
-	var payload outfitPayload
-	if err := json.Unmarshal([]byte(outputText), &payload); err != nil {
-		return domain.ToolResult{}, fmt.Errorf("decode structured outfit diagnosis: %w", err)
-	}
-	if err := validateOutfitPayload(payload); err != nil {
-		return domain.ToolResult{}, err
-	}
-	result := domain.ToolResult{
-		Kind: "outfit", Scene: input.Scene, Conclusion: payload.Conclusion, PriorityTitle: payload.PriorityTitle,
-		PriorityCopy: payload.PriorityCopy, Tags: payload.Tags, ProviderVersion: "openai-responses-outfit:" + a.config.Model,
-	}
-	for _, finding := range payload.Findings {
-		result.Findings = append(result.Findings, domain.ToolFinding{Label: finding.Label, Category: finding.Category, Tone: finding.Tone, AnchorX: finding.AnchorX, AnchorY: finding.AnchorY})
-	}
-	return result, nil
-}
 
 func validateOutfitPayload(payload outfitPayload) error {
 	return validateDiagnosisPayload(payload, map[string]bool{"improve": true, "positive": true, "optional": true})
@@ -224,18 +125,4 @@ func toolContextPrompt(context *domain.ToolContext) string {
 		return ""
 	}
 	return "\n" + strings.Join(parts, "\n")
-}
-
-type FallbackOutfitAdvisor struct{ primary, fallback OutfitAdvisor }
-
-func NewFallbackOutfitAdvisor(primary, fallback OutfitAdvisor) *FallbackOutfitAdvisor {
-	return &FallbackOutfitAdvisor{primary: primary, fallback: fallback}
-}
-
-func (a *FallbackOutfitAdvisor) Diagnose(ctx context.Context, input domain.DiagnosticInput) (domain.ToolResult, error) {
-	result, err := a.primary.Diagnose(ctx, input)
-	if err == nil {
-		return result, nil
-	}
-	return a.fallback.Diagnose(ctx, input)
 }

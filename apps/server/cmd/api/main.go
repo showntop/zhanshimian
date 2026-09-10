@@ -84,34 +84,25 @@ func main() {
 	root.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(cfg.AssetDir))))
 	root.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadDir))))
 	root.Handle("/", httpapi.New(svc, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
-		Environment:               cfg.Environment,
-		StorageProvider:           cfg.StorageProvider,
-		WeatherProvider:           cfg.WeatherProvider,
-		WeChatLoginConfigured:     wechat != nil,
-		WeChatAppConfigured:       wechatApp != nil,
-		AppleLoginConfigured:      apple != nil,
-		SmsProvider:               cfg.SmsProvider,
-		AnalysisProvider:          cfg.AIProvider,
-		FallbackEnabled:           cfg.AIProvider == "openai" && cfg.AIFallbackToDemo,
-		HairPreviewProvider:       cfg.HairPreviewProvider,
-		OutfitDiagnosisProvider:   cfg.OutfitDiagnosisProvider,
-		AIRoutes:                  ai.Routes,
+		Environment:             cfg.Environment,
+		StorageProvider:         cfg.StorageProvider,
+		WeatherProvider:         cfg.WeatherProvider,
+		WeChatLoginConfigured:   wechat != nil,
+		WeChatAppConfigured:     wechatApp != nil,
+		AppleLoginConfigured:    apple != nil,
+		SmsProvider:             cfg.SmsProvider,
+		AIRoutes:                ai.Routes,
 	}))
+	// 写超时随路由表里最慢的模型走（+10s 余量），保证长生成的响应不被掐断
 	writeTimeout := 30 * time.Second
-	if cfg.AIRoutingSource != "" {
-		writeTimeout = 30 * time.Second
-		for _, model := range cfg.AIRouting.Models {
-			modelTimeout := time.Duration(model.TimeoutSeconds) * time.Second
-			if modelTimeout <= 0 {
-				modelTimeout = 90 * time.Second
-			}
-			if modelTimeout+10*time.Second > writeTimeout {
-				writeTimeout = modelTimeout + 10*time.Second
-			}
+	for _, model := range cfg.AIRouting.Models {
+		modelTimeout := time.Duration(model.TimeoutSeconds) * time.Second
+		if modelTimeout <= 0 {
+			modelTimeout = 90 * time.Second
 		}
-	}
-	if cfg.OutfitDiagnosisProvider == "openai" && cfg.OutfitDiagnosisTimeout+10*time.Second > writeTimeout {
-		writeTimeout = cfg.OutfitDiagnosisTimeout + 10*time.Second
+		if modelTimeout+10*time.Second > writeTimeout {
+			writeTimeout = modelTimeout + 10*time.Second
+		}
 	}
 	server := &http.Server{Addr: cfg.Addr, Handler: root, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: writeTimeout, IdleTimeout: 90 * time.Second}
 	go func() {

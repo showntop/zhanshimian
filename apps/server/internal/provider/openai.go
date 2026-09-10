@@ -1,56 +1,23 @@
 package provider
 
+// 形象分析契约层：提示词、JSON Schema、输出校验与锚点整理。
+// 供能力路由（ai_routed.go）复用；供应商 HTTP 细节在 ai_runtime.go 的协议层实现。
 import (
-	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"math"
-	"net/http"
 	"strings"
-	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 )
 
-type OpenAIConfig struct {
-	APIKey  string
-	BaseURL string
-	Model   string
-	Timeout time.Duration
+type analysisDetail struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
 }
 
-type OpenAIAnalyzer struct {
-	config OpenAIConfig
-	loader MediaLoader
-	client *http.Client
-}
-
-func NewOpenAIAnalyzer(config OpenAIConfig, loader MediaLoader, client *http.Client) (*OpenAIAnalyzer, error) {
-	if strings.TrimSpace(config.APIKey) == "" {
-		return nil, errors.New("OPENAI_API_KEY is required for openai provider")
-	}
-	if loader == nil {
-		return nil, errors.New("media loader is required for openai provider")
-	}
-	if config.BaseURL == "" {
-		config.BaseURL = "https://api.openai.com/v1"
-	}
-	if config.Model == "" {
-		config.Model = "gpt-5-mini"
-	}
-	if config.Timeout <= 0 {
-		config.Timeout = 90 * time.Second
-	}
-	if client == nil {
-		client = &http.Client{Timeout: config.Timeout}
-	}
-	return &OpenAIAnalyzer{config: config, loader: loader, client: client}, nil
-}
-
+// openai_responses 协议的响应形状（ai_runtime.go 协议层与历史 responses 端点共用）
 type responseContent struct {
 	Type    string `json:"type"`
 	Text    string `json:"text"`
@@ -68,9 +35,21 @@ type responsesAPIResponse struct {
 	} `json:"output"`
 }
 
-type analysisDetail struct {
-	Label string `json:"label"`
-	Value string `json:"value"`
+func responseText(response responsesAPIResponse) (string, string) {
+	for _, item := range response.Output {
+		if item.Type != "message" {
+			continue
+		}
+		for _, content := range item.Content {
+			if content.Type == "refusal" && content.Refusal != "" {
+				return "", content.Refusal
+			}
+			if content.Type == "output_text" && content.Text != "" {
+				return content.Text, ""
+			}
+		}
+	}
+	return "", ""
 }
 
 type analysisStep struct {
@@ -107,95 +86,6 @@ type analysisPayload struct {
 	PriorityCopy   string            `json:"priority_copy"`
 	Findings       []analysisFinding `json:"findings"`
 	Plans          []analysisPlan    `json:"plans"`
-}
-
-func (a *OpenAIAnalyzer) Analyze(ctx context.Context, input domain.CreateAnalysisInput) (domain.AnalysisOutput, error) {
-	images, err := a.loader.Load(ctx, input.MediaIDs)
-	if err != nil {
-		return domain.AnalysisOutput{}, fmt.Errorf("load analysis photos: %w", err)
-	}
-	if len(images) != 3 {
-		return domain.AnalysisOutput{}, fmt.Errorf("expected three analysis photos, got %d", len(images))
-	}
-	content := []map[string]any{{"type": "input_text", "text": analysisPrompt(input)}}
-	for _, image := range images {
-		content = append(content,
-			map[string]any{"type": "input_text", "text": "照片类型：" + photoKindName(image.Kind)},
-			map[string]any{"type": "input_image", "detail": "high", "image_url": dataURL(image.MIMEType, image.Data)},
-		)
-	}
-	body := map[string]any{
-		"model":        a.config.Model,
-		"store":        false,
-		"instructions": "你是审慎、尊重用户的私人形象顾问。只分析照片中可见的造型、比例、色彩和轮廓，不评价颜值，不推断健康、族裔、年龄、人格或社会身份。所有建议必须具体、温和、可执行。",
-		"input":        []map[string]any{{"role": "user", "content": content}},
-		"text": map[string]any{"format": map[string]any{
-			"type": "json_schema", "name": "appearance_analysis", "strict": true, "schema": analysisSchema(),
-		}},
-		"max_output_tokens": 6000,
-	}
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		return domain.AnalysisOutput{}, err
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(a.config.BaseURL, "/")+"/responses", bytes.NewReader(encoded))
-	if err != nil {
-		return domain.AnalysisOutput{}, err
-	}
-	request.Header.Set("Authorization", "Bearer "+a.config.APIKey)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := a.client.Do(request)
-	if err != nil {
-		return domain.AnalysisOutput{}, fmt.Errorf("vision request: %w", err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
-		return domain.AnalysisOutput{}, fmt.Errorf("vision request returned status %d", response.StatusCode)
-	}
-	var apiResponse responsesAPIResponse
-	if err := json.NewDecoder(io.LimitReader(response.Body, 2<<20)).Decode(&apiResponse); err != nil {
-		return domain.AnalysisOutput{}, fmt.Errorf("decode vision response: %w", err)
-	}
-	if apiResponse.Error != nil {
-		return domain.AnalysisOutput{}, fmt.Errorf("vision response failed")
-	}
-	if apiResponse.Status != "" && apiResponse.Status != "completed" {
-		return domain.AnalysisOutput{}, fmt.Errorf("vision response did not complete")
-	}
-	outputText, refusal := responseText(apiResponse)
-	if refusal != "" {
-		return domain.AnalysisOutput{}, fmt.Errorf("vision request was refused")
-	}
-	if outputText == "" {
-		return domain.AnalysisOutput{}, fmt.Errorf("vision response contained no structured output")
-	}
-	var payload analysisPayload
-	if err := json.Unmarshal([]byte(outputText), &payload); err != nil {
-		return domain.AnalysisOutput{}, fmt.Errorf("decode structured analysis: %w", err)
-	}
-	if err := validateAnalysisPayload(payload); err != nil {
-		return domain.AnalysisOutput{}, err
-	}
-	separateAnchors(payload.Findings)
-	return payload.toDomain(images, "openai-responses:"+a.config.Model)
-}
-
-func responseText(response responsesAPIResponse) (string, string) {
-	for _, item := range response.Output {
-		if item.Type != "message" {
-			continue
-		}
-		for _, content := range item.Content {
-			if content.Type == "refusal" && content.Refusal != "" {
-				return "", content.Refusal
-			}
-			if content.Type == "output_text" && content.Text != "" {
-				return content.Text, ""
-			}
-		}
-	}
-	return "", ""
 }
 
 func analysisPrompt(input domain.CreateAnalysisInput) string {

@@ -49,30 +49,17 @@ type Config struct {
 	SessionTTL                    time.Duration
 	MaxUploadBytes                int64
 	AnalysisPollTime              time.Duration
-	AIProvider                    string
-	AIFallbackToDemo              bool
-	AIRequestTimeout              time.Duration
-	OpenAIAPIKey                  string
-	OpenAIBaseURL                 string
-	OpenAIVisionModel             string
-	HairPreviewProvider           string
-	HairPreviewFallbackToDemo     bool
-	HairPreviewTimeout            time.Duration
-	OpenAIImageModel              string
-	OpenAIImageQuality            string
-	OutfitDiagnosisProvider       string
-	OutfitDiagnosisFallbackToDemo bool
-	OutfitDiagnosisTimeout        time.Duration
-	OpenAIOutfitModel             string
 	AIRouting                     AIRoutingConfig
 	AIRoutingSource               string
 }
 
 func Load() (Config, error) {
-	aiProvider := env("AI_PROVIDER", "demo")
 	aiRouting, aiRoutingSource, err := loadAIRouting()
 	if err != nil {
 		return Config{}, err
+	}
+	if aiRoutingSource == "" {
+		return Config{}, fmt.Errorf("AI_ROUTING_FILE or AI_ROUTING_JSON is required")
 	}
 	cfg := Config{
 		Environment:                   env("APP_ENV", "development"),
@@ -113,21 +100,6 @@ func Load() (Config, error) {
 		SessionTTL:                    30 * 24 * time.Hour,
 		MaxUploadBytes:                10 << 20,
 		AnalysisPollTime:              time.Duration(envInt("ANALYSIS_POLL_MS", 700)) * time.Millisecond,
-		AIProvider:                    aiProvider,
-		AIFallbackToDemo:              envBool("AI_FALLBACK_TO_DEMO", true),
-		AIRequestTimeout:              time.Duration(envInt("AI_REQUEST_TIMEOUT_SECONDS", 90)) * time.Second,
-		OpenAIAPIKey:                  os.Getenv("OPENAI_API_KEY"),
-		OpenAIBaseURL:                 env("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-		OpenAIVisionModel:             env("OPENAI_VISION_MODEL", "gpt-5-mini"),
-		HairPreviewProvider:           env("HAIR_PREVIEW_PROVIDER", aiProvider),
-		HairPreviewFallbackToDemo:     envBool("HAIR_PREVIEW_FALLBACK_TO_DEMO", true),
-		HairPreviewTimeout:            time.Duration(envInt("HAIR_PREVIEW_TIMEOUT_SECONDS", 150)) * time.Second,
-		OpenAIImageModel:              env("OPENAI_IMAGE_MODEL", "gpt-image-2"),
-		OpenAIImageQuality:            env("OPENAI_IMAGE_QUALITY", "medium"),
-		OutfitDiagnosisProvider:       env("OUTFIT_DIAGNOSIS_PROVIDER", aiProvider),
-		OutfitDiagnosisFallbackToDemo: envBool("OUTFIT_DIAGNOSIS_FALLBACK_TO_DEMO", true),
-		OutfitDiagnosisTimeout:        time.Duration(envInt("OUTFIT_DIAGNOSIS_TIMEOUT_SECONDS", 60)) * time.Second,
-		OpenAIOutfitModel:             env("OPENAI_OUTFIT_MODEL", "gpt-5-mini"),
 		AIRouting:                     aiRouting,
 		AIRoutingSource:               aiRoutingSource,
 	}
@@ -149,9 +121,6 @@ func Load() (Config, error) {
 	if cfg.WeatherProvider == "amap" && cfg.AMapWebServiceKey == "" {
 		return Config{}, fmt.Errorf("AMAP_WEB_SERVICE_KEY is required for AMap weather")
 	}
-	if cfg.AIProvider != "demo" && cfg.AIProvider != "openai" {
-		return Config{}, fmt.Errorf("AI_PROVIDER must be demo or openai")
-	}
 	if cfg.SmsProvider != "console" && cfg.SmsProvider != "aliyun" {
 		return Config{}, fmt.Errorf("SMS_PROVIDER must be console or aliyun")
 	}
@@ -160,15 +129,6 @@ func Load() (Config, error) {
 	}
 	if cfg.SmsProvider == "aliyun" && (cfg.AliyunSmsAccessKeyID == "" || cfg.AliyunSmsAccessKeySecret == "") {
 		return Config{}, fmt.Errorf("ALIYUN_SMS_ACCESS_KEY_ID and ALIYUN_SMS_ACCESS_KEY_SECRET are required for aliyun SMS")
-	}
-	if cfg.HairPreviewProvider != "demo" && cfg.HairPreviewProvider != "openai" {
-		return Config{}, fmt.Errorf("HAIR_PREVIEW_PROVIDER must be demo or openai")
-	}
-	if cfg.OutfitDiagnosisProvider != "demo" && cfg.OutfitDiagnosisProvider != "openai" {
-		return Config{}, fmt.Errorf("OUTFIT_DIAGNOSIS_PROVIDER must be demo or openai")
-	}
-	if cfg.OpenAIImageQuality != "low" && cfg.OpenAIImageQuality != "medium" && cfg.OpenAIImageQuality != "high" {
-		return Config{}, fmt.Errorf("OPENAI_IMAGE_QUALITY must be low, medium or high")
 	}
 	if cfg.Environment == "production" {
 		if cfg.DevLoginEnabled {

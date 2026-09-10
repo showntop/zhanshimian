@@ -2,15 +2,9 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"math"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/zhanshimian/server/internal/domain"
 )
 
 type stubMediaLoader struct {
@@ -22,69 +16,7 @@ func (l stubMediaLoader) Load(_ context.Context, _ []string) ([]AnalysisImage, e
 	return l.images, l.err
 }
 
-type analyzerFunc func(context.Context, domain.CreateAnalysisInput) (domain.AnalysisOutput, error)
-
-func (fn analyzerFunc) Analyze(ctx context.Context, input domain.CreateAnalysisInput) (domain.AnalysisOutput, error) {
-	return fn(ctx, input)
-}
-
-func TestOpenAIAnalyzerUsesPrivateStructuredVisionRequest(t *testing.T) {
-	payload := validAnalysisPayload()
-	structured, _ := json.Marshal(payload)
-	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if request.Header.Get("Authorization") != "Bearer test-key" {
-			t.Errorf("missing bearer token")
-		}
-		var body map[string]any
-		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
-			t.Errorf("decode request: %v", err)
-			response.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		if body["store"] != false {
-			t.Errorf("analysis responses must set store=false")
-		}
-		rawBody, _ := json.Marshal(body)
-		if strings.Count(string(rawBody), "data:image/") != 3 || !strings.Contains(string(rawBody), `"strict":true`) {
-			t.Errorf("request must contain three private image data URLs and a strict schema")
-		}
-		text, _ := json.Marshal(map[string]any{
-			"status": "completed",
-			"output": []map[string]any{{
-				"type":    "message",
-				"content": []map[string]any{{"type": "output_text", "text": string(structured)}},
-			}},
-		})
-		response.Header().Set("content-type", "application/json")
-		_, _ = response.Write(text)
-	}))
-	defer server.Close()
-
-	images := []AnalysisImage{
-		{ID: "face", Kind: "face", MIMEType: "image/png", URL: "https://example.test/face.png", Data: []byte("face")},
-		{ID: "side", Kind: "side", MIMEType: "image/jpeg", URL: "https://example.test/side.jpg", Data: []byte("side")},
-		{ID: "body", Kind: "body", MIMEType: "image/webp", URL: "https://example.test/body.webp", Data: []byte("body")},
-	}
-	analyzer, err := NewOpenAIAnalyzer(OpenAIConfig{APIKey: "test-key", BaseURL: server.URL, Model: "gpt-5-mini"}, stubMediaLoader{images: images}, server.Client())
-	if err != nil {
-		t.Fatal(err)
-	}
-	output, err := analyzer.Analyze(context.Background(), domain.CreateAnalysisInput{
-		Scene: "interview", MediaIDs: []string{"face", "side", "body"},
-		Profile: domain.Profile{HeightCM: 165, Role: "产品经理", Budget: "500-1500"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if output.CurrentImageURL != images[0].URL || output.ProviderVersion != "openai-responses:gpt-5-mini" {
-		t.Fatalf("unexpected provider metadata: %#v", output)
-	}
-	if len(output.Findings) != 4 || len(output.Plans) != 3 || len(output.Plans[0].Steps) != 3 {
-		t.Fatalf("unexpected structured output: %#v", output)
-	}
-}
-
-func TestOpenAIAnalyzerRejectsUnsafeOutput(t *testing.T) {
+func TestValidateAnalysisPayloadRejectsUnsafeCopy(t *testing.T) {
 	payload := validAnalysisPayload()
 	payload.PriorityCopy = "根据颜值给你一个评分"
 	if err := validateAnalysisPayload(payload); err == nil || !strings.Contains(err.Error(), "unsafe") {
@@ -126,19 +58,6 @@ func TestSeparateAnchorsSpreadsCrowdedSamePhotoAnchors(t *testing.T) {
 	// face 锚点 (0.5,0.3) 与 body 锚点互不影响;越界锚点被钳回边界内
 	if findings[2].AnchorX != .5 || findings[2].AnchorY != .3 {
 		t.Fatalf("face anchor should keep its position, got (%.2f,%.2f)", findings[2].AnchorX, findings[2].AnchorY)
-	}
-}
-
-func TestFallbackAnalyzerUsesDemoWhenPrimaryFails(t *testing.T) {
-	primary := analyzerFunc(func(context.Context, domain.CreateAnalysisInput) (domain.AnalysisOutput, error) {
-		return domain.AnalysisOutput{}, errors.New("upstream unavailable")
-	})
-	fallback := analyzerFunc(func(context.Context, domain.CreateAnalysisInput) (domain.AnalysisOutput, error) {
-		return domain.AnalysisOutput{ProviderVersion: "demo-fallback"}, nil
-	})
-	output, err := NewFallbackAnalyzer(primary, fallback).Analyze(context.Background(), domain.CreateAnalysisInput{})
-	if err != nil || output.ProviderVersion != "demo-fallback" {
-		t.Fatalf("fallback failed: output=%#v err=%v", output, err)
 	}
 }
 

@@ -3252,14 +3252,6 @@ components:
           type: string
         wechat_login_configured:
           type: boolean
-        analysis_provider:
-          type: string
-        fallback_enabled:
-          type: boolean
-        hair_preview_provider:
-          type: string
-        outfit_diagnosis_provider:
-          type: string
         ai_routes:
           type: object
           additionalProperties:

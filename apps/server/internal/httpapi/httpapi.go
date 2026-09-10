@@ -35,10 +35,6 @@ type RuntimeInfo struct {
 	WeChatAppConfigured     bool
 	AppleLoginConfigured    bool
 	SmsProvider             string
-	AnalysisProvider        string
-	FallbackEnabled         bool
-	HairPreviewProvider     string
-	OutfitDiagnosisProvider string
 	AIRoutes                map[string]string
 }
 
@@ -167,19 +163,15 @@ func currentToken(r *http.Request) string {
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
 	payload := map[string]any{
-		"status":                    "ok",
-		"environment":               a.runtime.Environment,
-		"storage_provider":          a.runtime.StorageProvider,
-		"weather_provider":          a.runtime.WeatherProvider,
-		"wechat_login_configured":   a.runtime.WeChatLoginConfigured,
+		"status":                      "ok",
+		"environment":                 a.runtime.Environment,
+		"storage_provider":            a.runtime.StorageProvider,
+		"weather_provider":            a.runtime.WeatherProvider,
+		"wechat_login_configured":     a.runtime.WeChatLoginConfigured,
 		"wechat_app_login_configured": a.runtime.WeChatAppConfigured,
-		"apple_login_configured":    a.runtime.AppleLoginConfigured,
-		"sms_provider":              a.runtime.SmsProvider,
-		"analysis_provider":         a.runtime.AnalysisProvider,
-		"fallback_enabled":          a.runtime.FallbackEnabled,
-		"hair_preview_provider":     a.runtime.HairPreviewProvider,
-		"outfit_diagnosis_provider": a.runtime.OutfitDiagnosisProvider,
-		"ai_routes":                 a.runtime.AIRoutes,
+		"apple_login_configured":      a.runtime.AppleLoginConfigured,
+		"sms_provider":                a.runtime.SmsProvider,
+		"ai_routes":                   a.runtime.AIRoutes,
 	}
 	if jobs, err := a.service.HealthJobs(r.Context()); err == nil {
 		payload["jobs"] = jobs
