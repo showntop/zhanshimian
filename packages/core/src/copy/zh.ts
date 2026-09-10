@@ -114,7 +114,12 @@ export const HOME_COPY = {
   scenesTitle: '按场合开始',
   sceneReadyNote: '已复用你的形象档案，不会再要照片',
   recentTitle: '最近方案',
-  emptyTodayLink: '先看今天怎么穿 ›'
+  emptyTodayLink: '先看今天怎么穿 ›',
+  lifeTitle: '顾问与衣橱',
+  advisorEntry: '和顾问聊聊',
+  advisorEntryDesc: '任何穿着上的疑问，直接问',
+  wardrobeEntry: '我的衣橱',
+  wardrobeEntryDesc: '让方案用上你已有的衣服'
 } as const
 
 // ---------- 形象档案补充资料 ----------

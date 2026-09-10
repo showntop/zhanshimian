@@ -175,3 +175,10 @@
     animation: none;
   }
 }
+// 不锁人出口：次级文字链，弱于进度主信息
+.analysis__wander {
+  margin-top: 56rpx;
+  text-align: center;
+  font-size: 23rpx;
+  color: var(--ink-3);
+}

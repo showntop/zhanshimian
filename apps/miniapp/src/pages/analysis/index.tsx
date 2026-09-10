@@ -129,6 +129,14 @@ export default function Analysis() {
           <Text className="analysis__tip">随后匹配场景与预算</Text>
           <Text className="analysis__tip">三套方案将会准备好</Text>
         </View>
+
+        {/* 不锁人：后台继续分析，首页任务轨承接进度，完成即提醒 */}
+        <Text
+          className="analysis__wander fade-up delay-3 pressable"
+          onClick={() => Taro.switchTab({ url: '/pages/home/index' })}
+        >
+          先去逛逛，不用守在这里 ›
+        </Text>
       </View>
     </View>
   )

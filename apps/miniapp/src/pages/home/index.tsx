@@ -5,9 +5,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
 import {
+  APP_NAME,
   HOME_COPY,
   HOME_TITLE,
   POLL_INTERVALS,
+  PRIVACY_NOTE,
   SCENES,
   greetingForNow,
   trackEvent,
@@ -30,6 +32,19 @@ const TOOLS = [
   { key: 'purchase', label: '购买判断', desc: '买之前先看适不适合', path: '/packages/tools/pages/purchase/index', badge: '' },
 ] as const
 
+// 复访闭环入口（life 分包）：顾问对话是产品核心特色，此前全站无入口
+const LIFE = [
+  { key: 'advisor', label: HOME_COPY.advisorEntry, desc: HOME_COPY.advisorEntryDesc, path: '/packages/life/pages/advisor/index' },
+  { key: 'wardrobe', label: HOME_COPY.wardrobeEntry, desc: HOME_COPY.wardrobeEntryDesc, path: '/packages/life/pages/wardrobe/index' },
+] as const
+
+/** 今日语境日期（「今日造型」的时间锚点，非装饰） */
+function todayLabel(): string {
+  const d = new Date()
+  const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()] ?? ''
+  return `${d.getMonth() + 1}月${d.getDate()}日 · 周${week}`
+}
+
 function taskTitle(task: Task): string {
   switch (task.type) {
     case 'analysis':
@@ -42,6 +57,22 @@ function taskTitle(task: Task): string {
       return '正在生成今日搭配图'
     default:
       return '任务进行中'
+  }
+}
+
+/** 任务完成的轻提醒文案（首页轮询到终态时 toast） */
+function taskDoneTitle(task: Task): string {
+  switch (task.type) {
+    case 'analysis':
+      return '形象分析完成，去看看报告'
+    case 'hair_preview':
+      return '发型预览已生成'
+    case 'plan_look':
+      return '方案形象图已生成'
+    case 'today_look':
+      return '今日搭配图已生成'
+    default:
+      return '任务已完成'
   }
 }
 
@@ -110,8 +141,12 @@ export default function Home() {
       try {
         const tasks = await api.getTasks(active.map((t) => t.id))
         setBootstrap((prev) => (prev ? { ...prev, active_tasks: tasks } : prev))
-        // 任一任务到达终态：整页聚合刷新一次
-        if (tasks.some((t) => t.status === 'completed' || t.status === 'failed')) load()
+        // 任一任务到达终态：轻提醒 + 整页聚合刷新一次
+        if (tasks.some((t) => t.status === 'completed' || t.status === 'failed')) {
+          const completed = tasks.find((t) => t.status === 'completed')
+          if (completed) Taro.showToast({ title: taskDoneTitle(completed), icon: 'none' })
+          load()
+        }
       } catch {
         /* 轮询失败静默：下一轮重试 */
       }
@@ -156,7 +191,10 @@ export default function Home() {
       ) : (
         <View className="home">
           <View className="home__greeting fade-up">
-            <Text className="home__greeting-kicker">私人形象顾问</Text>
+            <View className="home__greeting-top">
+              <Text className="home__greeting-kicker">私人形象顾问</Text>
+              <Text className="home__greeting-date">{todayLabel()}</Text>
+            </View>
             <Text className="home__greeting-title display">
               {hasReport ? `${greetingForNow()}，${HOME_COPY.returningTitle}` : HOME_TITLE}
             </Text>
@@ -313,6 +351,34 @@ export default function Home() {
               </View>
             </View>
           ) : null}
+
+          <View className="home__section fade-up delay-3">
+            <View className="home__section-head">
+              <Text className="section-title">{HOME_COPY.lifeTitle}</Text>
+              <View className="section-rule" />
+            </View>
+            <View className="home__life">
+              {LIFE.map((item) => (
+                <View
+                  key={item.key}
+                  className={`home__life-item pressable ${item.key === 'advisor' ? 'home__life-item--advisor' : ''}`}
+                  onClick={() => Taro.navigateTo({ url: item.path })}
+                >
+                  <View className="home__life-item-copy">
+                    <Text className="home__life-item-label">{item.label}</Text>
+                    <Text className="home__life-item-desc">{item.desc}</Text>
+                  </View>
+                  <Text className="home__life-item-arrow">›</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View className="home__foot fade-up delay-3">
+            <View className="home__foot-rule" />
+            <Text className="home__foot-brand">{APP_NAME}</Text>
+            <Text className="home__foot-note">{PRIVACY_NOTE}</Text>
+          </View>
         </View>
       )}
     </View>

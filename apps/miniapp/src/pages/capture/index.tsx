@@ -1,6 +1,8 @@
 // 三图建档：照片槽优先、逐槽上传/失败/重试，批量与示例只作为替代路径。
 // 三张齐 → 进入补充资料（G1），profile 在 createAnalysis 时带上。
-import { useState } from 'react'
+// 交互原则：槽即操作——空槽点按弹系统「拍摄/相册」面板；已传槽点按出
+// 重拍/换图/看大图；每槽一个主操作，底部只留一个批量补齐入口。
+import { useEffect, useState } from 'react'
 import Taro, { useLoad } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import type { MediaAsset } from '@zsm/core'
@@ -8,6 +10,7 @@ import { api } from '../../services/api'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
 import ExampleImage from '../../components/example-image'
+import ImageViewer from '../../components/image-viewer'
 import './index.scss'
 
 interface Shot {
@@ -38,11 +41,26 @@ export default function Capture() {
   const [slots, setSlots] = useState<Partial<Record<Kind, Slot>>>({})
   const [uploading, setUploading] = useState<FlagMap>({})
   const [failed, setFailed] = useState<ErrorMap>({})
+  const [justDone, setJustDone] = useState<FlagMap>({})
+  const [pulse, setPulse] = useState(false)
+  const [viewer, setViewer] = useState<{ url: string; label: string } | null>(null)
   const [demoBusy, setDemoBusy] = useState(false)
 
   useLoad((options) => {
     if (options?.scene) setScene(options.scene)
   })
+
+  const done = SHOTS.filter((shot) => slots[shot.kind]).length
+  const ready = done === SHOTS.length
+  const working = demoBusy || Object.values(uploading).some(Boolean)
+
+  // 三张齐：进度条满格脉冲一次（反馈「完成」时刻）
+  useEffect(() => {
+    if (!ready) return
+    setPulse(true)
+    const t = setTimeout(() => setPulse(false), 900)
+    return () => clearTimeout(t)
+  }, [ready])
 
   const uploadOne = (kind: Kind, filePath: string) => {
     setUploading((prev) => ({ ...prev, [kind]: true }))
@@ -54,6 +72,9 @@ export default function Capture() {
           ...prev,
           [kind]: { asset, displayUrl: filePath || asset.url, demo: false },
         }))
+        // 成功落位 pop（checkPop 250ms 节奏）
+        setJustDone((prev) => ({ ...prev, [kind]: true }))
+        setTimeout(() => setJustDone((prev) => ({ ...prev, [kind]: false })), 700)
         return true
       })
       .catch(() => {
@@ -65,11 +86,13 @@ export default function Capture() {
       })
   }
 
-  const takeOne = (kind: Kind, source: 'camera' | 'album') => {
+  const pickOne = (kind: Kind, source?: 'camera' | 'album') => {
+    if (working) return
     Taro.chooseMedia({
       count: 1,
       mediaType: ['image'],
-      sourceType: [source],
+      // 不指定 source 时由微信系统面板选择「拍摄 / 从相册选择」
+      sourceType: source ? [source] : ['camera', 'album'],
       // 正脸/侧脸自拍更稳；全身照交由系统默认相机，避免强制前置。
       ...(source === 'camera' && kind !== 'body' ? { camera: 'front' as const } : {}),
       success: (res) => {
@@ -84,9 +107,40 @@ export default function Capture() {
     })
   }
 
-  const fillMissing = (source: 'camera' | 'album') => {
+  // 槽即操作：空槽 → 系统面板；失败槽 → 直接重选；已传槽 → 重拍/换图/大图
+  const onSlotTap = (kind: Kind, shot: Shot) => {
+    if (uploading[kind]) return
+    const slot = slots[kind]
+    if (!slot || failed[kind]) {
+      pickOne(kind)
+      return
+    }
+    Taro.showActionSheet({
+      itemList: ['重新拍摄', '从相册换一张', '查看大图'],
+      success: (res) => {
+        if (res.tapIndex === 0) pickOne(kind, 'camera')
+        else if (res.tapIndex === 1) pickOne(kind, 'album')
+        else if (res.tapIndex === 2) setViewer({ url: slot.displayUrl, label: shot.label })
+      },
+      fail: () => {
+        /* 用户取消 */
+      },
+    })
+  }
+
+  const fillMissing = () => {
     const missing = SHOTS.filter((shot) => !slots[shot.kind])
     if (missing.length === 0 || demoBusy) return
+    Taro.showActionSheet({
+      itemList: ['连续拍摄', '从相册批量选择'],
+      success: (res) => doFillMissing(res.tapIndex === 0 ? 'camera' : 'album', missing),
+      fail: () => {
+        /* 用户取消 */
+      },
+    })
+  }
+
+  const doFillMissing = (source: 'camera' | 'album', missing: Shot[]) => {
     Taro.chooseMedia({
       count: missing.length,
       mediaType: ['image'],
@@ -135,9 +189,6 @@ export default function Capture() {
     }
   }
 
-  const done = SHOTS.filter((shot) => slots[shot.kind]).length
-  const ready = done === SHOTS.length
-  const working = demoBusy || Object.values(uploading).some(Boolean)
   const next = () => {
     if (!ready) return
     const mediaIds = SHOTS.map((shot) => slots[shot.kind]!.asset.id)
@@ -162,15 +213,26 @@ export default function Capture() {
             <Text className="capture__progress-note">{ready ? '可以进入下一步' : `还差 ${SHOTS.length - done} 张`}</Text>
           </View>
           <View className="capture__progress-track">
-            <View className="capture__progress-fill" style={{ width: `${(done / SHOTS.length) * 100}%` }} />
+            <View
+              className={`capture__progress-fill ${pulse ? 'capture__progress-fill--full' : ''}`}
+              style={{ width: `${(done / SHOTS.length) * 100}%` }}
+            />
           </View>
         </View>
 
         {SHOTS.map((shot, index) => {
           const slot = slots[shot.kind]
+          const isUploading = Boolean(uploading[shot.kind])
+          const isFailed = Boolean(failed[shot.kind])
           return (
-            <View key={shot.kind} className={`capture__slot-card fade-up delay-${index + 1}`}>
-              <View className="capture__photo">
+            <View
+              key={shot.kind}
+              className={`capture__slot-card fade-up delay-${index + 1} pressable`}
+              onClick={() => onSlotTap(shot.kind, shot)}
+            >
+              <View
+                className={`capture__photo ${!slot && !isUploading ? 'capture__photo--empty' : ''} ${justDone[shot.kind] ? 'capture__photo--pop' : ''}`}
+              >
                 {slot ? (
                   <ExampleImage
                     className="capture__photo-img"
@@ -180,18 +242,22 @@ export default function Capture() {
                     badgeText={slot.demo ? '效果示例' : ''}
                   />
                 ) : (
-                  <Image className="capture__photo-img" src={shot.placeholder} mode="aspectFit" />
+                  <Image className="capture__photo-img capture__photo-guide" src={shot.placeholder} mode="aspectFit" />
                 )}
-                <Text className="capture__photo-index">{index + 1}</Text>
-                {uploading[shot.kind] ? (
+                {slot && !isUploading ? (
+                  <Text className="capture__photo-index capture__photo-index--done">✓</Text>
+                ) : (
+                  <Text className="capture__photo-index">{index + 1}</Text>
+                )}
+                {isUploading ? (
                   <View className="capture__photo-mask">
                     <View className="spinner spinner--on-deep capture__spinner" />
                     <Text className="capture__photo-mask-text">上传中</Text>
                   </View>
                 ) : null}
-                {failed[shot.kind] ? (
+                {isFailed ? (
                   <View className="capture__photo-mask capture__photo-mask--error">
-                    <Text className="capture__photo-mask-text">上传失败</Text>
+                    <Text className="capture__photo-mask-text">上传失败 · 轻触重试</Text>
                   </View>
                 ) : null}
               </View>
@@ -202,14 +268,15 @@ export default function Capture() {
                   {slot ? <Text className="capture__state">{slot.demo ? '示例已选' : '已上传'}</Text> : null}
                 </View>
                 <Text className="capture__desc">{shot.desc}</Text>
-                {failed[shot.kind] ? <Text className="capture__error">{failed[shot.kind]}</Text> : null}
+                {isFailed ? <Text className="capture__error">{failed[shot.kind]}</Text> : null}
                 <View className="capture__actions">
-                  <Text className="capture__action capture__action--main pressable" onClick={() => takeOne(shot.kind, 'camera')}>
-                    {slot ? '重拍' : '拍摄'}
-                  </Text>
-                  <Text className="capture__action pressable" onClick={() => takeOne(shot.kind, 'album')}>
-                    相册
-                  </Text>
+                  {slot && !isFailed ? (
+                    <Text className="capture__redo">重拍 / 换一张 ›</Text>
+                  ) : (
+                    <Text className="capture__action capture__action--main">
+                      {isFailed ? '重试这张' : '拍摄这张'}
+                    </Text>
+                  )}
                 </View>
               </View>
             </View>
@@ -218,25 +285,29 @@ export default function Capture() {
 
         <View className="capture__foot fade-up delay-3">
           <PrimaryButton
-            text={ready ? '下一步：补充资料' : `先补齐缺的 ${SHOTS.length - done} 张`}
+            text={ready ? '下一步：补充资料' : `已选 ${done} / ${SHOTS.length} 张`}
             disabled={!ready}
             loading={working}
             onClick={next}
           />
-          <View className="capture__alt">
-            <Text className="capture__alt-action pressable" onClick={() => fillMissing('camera')}>
-              {ready ? '连续重拍三张' : `连拍缺的 ${SHOTS.length - done} 张`}
+          {!ready ? (
+            <Text className="capture__alt-action pressable" onClick={fillMissing}>
+              补齐剩余 {SHOTS.length - done} 张 ›
             </Text>
-            <Text className="capture__alt-action pressable" onClick={() => fillMissing('album')}>
-              {ready ? '相册换三张' : '从相册批量选择'}
-            </Text>
-          </View>
+          ) : null}
           <Text className="capture__demo pressable" onClick={useDemoPhotos}>
             先用「效果示例」体验完整流程 ›
           </Text>
           <Text className="capture__privacy">照片与建议只对你可见，可随时删除；示例照片会明确标注。</Text>
         </View>
       </View>
+
+      <ImageViewer
+        open={Boolean(viewer)}
+        url={viewer?.url ?? ''}
+        caption={viewer?.label}
+        onClose={() => setViewer(null)}
+      />
     </View>
   )
 }
