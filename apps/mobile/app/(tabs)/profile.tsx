@@ -53,10 +53,10 @@ export default function Profile() {
     <Screen title="我的">
       <View style={styles.card}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{(account?.nickname ?? '扮').slice(0, 1)}</Text>
+          <Text style={styles.avatarText}>{(account?.nickname ?? 'U').slice(0, 1)}</Text>
         </View>
         <View>
-          <Text style={styles.name}>{account?.nickname ?? '怎么打扮用户'}</Text>
+          <Text style={styles.name}>{account?.nickname ?? 'UP一下用户'}</Text>
           <Text style={styles.meta}>
             已绑定：{(account?.identities ?? []).map((i) => i.provider).join('、') || '手机号'}
           </Text>

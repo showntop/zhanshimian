@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "怎么打扮设计系统单源：tokens.data.mjs → dist/{tokens.wxss, theme.ts} + 小程序语义样式",
+  "description": "UP一下设计系统单源：tokens.data.mjs → dist/{tokens.wxss, theme.ts} + 小程序语义样式",
   "exports": {
     ".": "./src/index.ts",
     "./styles/*": "./styles/*",

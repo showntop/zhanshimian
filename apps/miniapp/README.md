@@ -1,4 +1,4 @@
-# @zsm/miniapp · 怎么打扮小程序（Taro 4 + React）
+# @zsm/miniapp · UP一下小程序（Taro 4 + React）
 
 ## 命令
 

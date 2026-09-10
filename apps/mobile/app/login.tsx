@@ -50,7 +50,7 @@ export default function Login() {
     setBusy(true)
     setError('')
     try {
-      const session = await api.loginDev({ nickname: '怎么打扮用户' })
+      const session = await api.loginDev({ nickname: 'UP一下用户' })
       writeStorage(STORAGE_KEYS.token, session.token)
       router.replace('/(tabs)')
     } catch (e) {

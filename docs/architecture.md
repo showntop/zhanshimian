@@ -1,6 +1,6 @@
 # 架构决策记录（ADR 摘要）
 
-> 本文档记录「怎么打扮」monorepo 重实现的的关键架构决策与理由。数值规范（token/动效/接口表）见 `appearance-coach-prototype/docs/implementation-plan.md`（只读参考）；契约见 `contracts/openapi.yaml`。
+> 本文档记录「UP一下」monorepo 重实现的的关键架构决策与理由。数值规范（token/动效/接口表）见 `appearance-coach-prototype/docs/implementation-plan.md`（只读参考）；契约见 `contracts/openapi.yaml`。
 
 ## 1. 总体拓扑
 

@@ -2,7 +2,7 @@
   "name": "@zsm/miniapp",
   "version": "1.0.0",
   "private": true,
-  "description": "怎么打扮 微信小程序（Taro 4 + React）",
+  "description": "UP一下 微信小程序（Taro 4 + React）",
   "scripts": {
     "dev:weapp": "taro build --type weapp --watch",
     "build:weapp": "taro build --type weapp",

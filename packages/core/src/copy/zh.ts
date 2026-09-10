@@ -2,7 +2,10 @@
 // 红线：不出现「通勤」（场景叫「日常」）、不出现「颜值」「评分」；
 // 错误不甩锅，空态/错误态必须给出下一步动作。
 
-export const APP_NAME = '怎么打扮'
+export const APP_NAME = 'UP一下'
+
+/** 品牌标语（与 APP_NAME 配合使用，如分享卡/开屏副标题） */
+export const APP_SLOGAN = '今天最好看'
 
 /** 首页主标题（保留，不许改写） */
 export const HOME_TITLE = '你好，我是你的私人形象顾问'

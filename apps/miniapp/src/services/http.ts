@@ -100,7 +100,7 @@ async function relogin(): Promise<void> {
   const wechat = await Taro.request({
     url: `${baseURL}/v1/auth/wechat`,
     method: 'POST',
-    data: { code, nickname: '怎么打扮用户' },
+    data: { code, nickname: 'UP一下用户' },
     header: { 'content-type': 'application/json' },
     timeout: 15000,
   })
@@ -110,7 +110,7 @@ async function relogin(): Promise<void> {
     const dev = await Taro.request({
       url: `${baseURL}/v1/auth/dev`,
       method: 'POST',
-      data: { nickname: '怎么打扮用户' },
+      data: { nickname: 'UP一下用户' },
       header: { 'content-type': 'application/json' },
       timeout: 15000,
     })

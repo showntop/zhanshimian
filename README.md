@@ -1,4 +1,4 @@
-# 怎么打扮 · Monorepo
+# UP一下 · Monorepo
 
 懂发型、妆容和穿搭的 **AI 形象顾问**。本仓库是全新实现（原型见 `appearance-coach-prototype/`，只读保留作参考）。
 

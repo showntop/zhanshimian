@@ -67,9 +67,9 @@ export default function Profile() {
         ) : (
           <>
             <View className="me__card fade-up">
-              <View className="me__avatar">{(account?.nickname ?? '扮').slice(0, 1)}</View>
+              <View className="me__avatar">{(account?.nickname ?? 'U').slice(0, 1)}</View>
               <View className="me__meta">
-                <Text className="me__nickname">{account?.nickname ?? '怎么打扮用户'}</Text>
+                <Text className="me__nickname">{account?.nickname ?? 'UP一下用户'}</Text>
                 <Text className="me__identities">
                   已绑定：{(account?.identities ?? []).map((i) => (i.provider === 'wechat_miniapp' ? '微信' : i.provider)).join('、') || '微信'}
                 </Text>

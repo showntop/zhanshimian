@@ -1,6 +1,6 @@
 # AGENTS.md — 多 agent / 协作者工程规约
 
-本仓库是「怎么打扮」的全新 monorepo 实现。`appearance-coach-prototype/` 是**只读参考**（原型视觉稿、旧实现、历史文档），任何改动不得进入该目录。
+本仓库是「UP一下」的全新 monorepo 实现。`appearance-coach-prototype/` 是**只读参考**（原型视觉稿、旧实现、历史文档），任何改动不得进入该目录。
 
 ## 目录边界
 
@@ -18,7 +18,7 @@
    - `exampleImage(slug, variant)` 是唯一返回内置模特图的入口，调用点必须叠 `.example-badge` + `.example-soft`；
    - Demo 内容只经服务端（`/v1/media/demo`、Demo Provider）进入，客户端绝不注入。
 4. **错误态与内容不同屏**；空态/错误态必须给出下一步动作（重试/返回/重新拍摄）。
-5. 文案红线：产品名「怎么打扮」；首页保留「你好，我是你的私人形象顾问」；场景叫「日常」不叫「通勤」。文案统一放 `packages/core/src/copy/zh.ts`。
+5. 文案红线：产品名「UP一下」，品牌标语「今天最好看」；首页保留「你好，我是你的私人形象顾问」；场景叫「日常」不叫「通勤」。文案统一放 `packages/core/src/copy/zh.ts`。
 6. 底部导航固定 `首页 / 方案 / 我的`，不加第四个 Tab；实验能力只进「体验实验室」。
 
 ## 小程序硬规则

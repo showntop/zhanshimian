@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro, { useLoad, useShareAppMessage } from '@tarojs/taro'
 import { Button, Text, View } from '@tarojs/components'
-import { lookImage, trackEvent, type Share } from '@zsm/core'
+import { APP_NAME, lookImage, trackEvent, type Share } from '@zsm/core'
 import { api } from '../../../../services/api'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
@@ -128,7 +128,7 @@ export default function SharePage() {
       <AppHeader title="分享卡" back />
       <View className="sh">
         <View className="sh__card fade-up">
-          <Text className="sh__brand">怎么打扮</Text>
+          <Text className="sh__brand">{APP_NAME}</Text>
           {snapshot.label ? <Text className="sh__label">{snapshot.label}</Text> : null}
           <Text className="sh__title">{snapshot.title || '我的形象方案'}</Text>
           {snapshot.summary ? <Text className="sh__summary">{snapshot.summary}</Text> : null}

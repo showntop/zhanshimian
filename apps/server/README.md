@@ -1,4 +1,4 @@
-# 怎么打扮 API
+# UP一下 API
 
 Go 1.24 + PostgreSQL 16。API 启动时自动执行向前迁移，开发模式在 API 进程内运行分析 Worker。
 
