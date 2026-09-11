@@ -1,7 +1,7 @@
 // 形象报告：来源照片可切换，findings 按真实 photo 归位；不展示评分，只给可提升点。
 import { useCallback, useEffect, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
-import { Swiper, SwiperItem, Text, View } from '@tarojs/components'
+import { ScrollView, Swiper, SwiperItem, Text, View } from '@tarojs/components'
 import {
   REPORT_COPY,
   isBundledAsset,
@@ -25,12 +25,12 @@ const PHOTO_LABEL: Record<string, string> = { face: '正脸', side: '侧脸', bo
 
 type PhotoKind = (typeof PHOTO_ORDER)[number]
 
-// hero 全出血宽度（rpx，designWidth 750）。相框固定高度 ~45% 视口：
-// 第一屏同时露出照片锚点与报告内容开头（印象标签/最优先建议），
-// 照片按 aspectFill 铺满全宽，切换来源照片时只有图片滑动。
+// hero 全出血宽度（rpx，designWidth 750）。相框固定高度 ~56% 视口，
+// 照片按 aspectFill 铺满全宽（超出部分上下裁切），切换来源照片时
+// 只有相框内的图片滑动。第一屏空间靠内容板压缩（横排标签+简要建议）腾出。
 const HERO_FULL_W = 750
 const { windowWidth = 375, windowHeight = 667 } = Taro.getSystemInfoSync()
-const HERO_H = Math.round((windowHeight * 0.45 * HERO_FULL_W) / (windowWidth || 375))
+const HERO_H = Math.round((windowHeight * 0.56 * HERO_FULL_W) / (windowWidth || 375))
 
 function findingPhoto(finding: Finding): PhotoKind {
   return finding.photo === 'face' || finding.photo === 'side' ? finding.photo : 'body'
@@ -359,20 +359,29 @@ export default function Report() {
               <Text className="section-title">{REPORT_COPY.tagsTitle}</Text>
               <View className="section-rule" />
             </View>
-            <View className="report__tags">
-              {(report.impression_tags ?? []).map((tag) => (
-                <Text key={tag} className="report__tag">
-                  {tag}
-                </Text>
-              ))}
-            </View>
+            <ScrollView className="report__chips" scrollX enhanced showScrollbar={false}>
+              <View className="report__chips-row">
+                {(report.impression_tags ?? []).map((tag) => (
+                  <Text key={tag} className="report__chip">
+                    {tag}
+                  </Text>
+                ))}
+              </View>
+            </ScrollView>
           </View>
         ) : null}
 
         <View className="report__priority fade-up delay-2">
-          <Text className="report__priority-label">{REPORT_COPY.priorityTitle}</Text>
-          <Text className="report__priority-title">{report.priority_title}</Text>
-          <Text className="report__priority-copy">{report.priority_copy}</Text>
+          <View className="report__section-head">
+            <Text className="section-title">{REPORT_COPY.priorityTitle}</Text>
+            <View className="section-rule" />
+          </View>
+          <Text className="report__priority-copy">
+            {report.priority_title ? (
+              <Text className="report__priority-lead">{report.priority_title}</Text>
+            ) : null}
+            {report.priority_copy}
+          </Text>
         </View>
 
         <View className="report__section">

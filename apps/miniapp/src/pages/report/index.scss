@@ -303,49 +303,46 @@
     }
   }
 
-  &__tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14rpx;
+  // 综合印象：单行横滚 chip 条（与照片注解 tag 类名分离，避免样式互串）
+  &__chips {
+    width: 100%;
+    white-space: nowrap;
   }
-
-  &__tag {
-    padding: 12rpx 26rpx;
+  &__chips-row {
+    display: inline-flex;
+    gap: 12rpx;
+    padding: 4rpx 2rpx 8rpx;
+  }
+  &__chip {
+    flex-shrink: 0;
+    padding: 8rpx 22rpx;
     border-radius: 999rpx;
     background: var(--moss-soft);
     color: var(--moss-pressed);
-    font-size: 24rpx;
+    font-size: 22rpx;
     font-weight: 650;
+    white-space: nowrap;
   }
 
+  // 综合建议：压缩为一段简要文字（标题粗体开头 + 正文）
   &__priority {
     display: flex;
     flex-direction: column;
-    gap: 10rpx;
-    padding: 32rpx;
-    border-radius: var(--radius-lg);
-    background: var(--moss-soft);
-    border: 1rpx solid rgba(88, 115, 68, 0.14);
+    gap: 14rpx;
 
-    &-label {
-      font-size: 20rpx;
-      font-weight: 700;
-      letter-spacing: 3rpx;
-      color: var(--moss);
-    }
-
-    &-title {
-      font-family: 'Songti SC', 'STSong', serif;
-      font-size: 36rpx;
-      line-height: 1.35;
+    &-lead {
       font-weight: 700;
       color: var(--ink);
     }
 
     &-copy {
-      font-size: 25rpx;
-      line-height: 1.7;
+      font-size: 26rpx;
+      line-height: 1.65;
       color: var(--ink-2);
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
   }
 
