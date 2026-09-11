@@ -88,7 +88,27 @@
       animation: plans-frame-in 0.3s ease both;
     }
 
+    // 双层图结构：模糊衬底填满两侧空隙 + 主图 aspectFit 完整显示全身
+    &-stack {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    &-blur {
+      position: absolute;
+      inset: 0;
+
+      // 同照片放大模糊 + 提亮提饱和：环境光氛围，不是灰边
+      .example-image__img {
+        filter: blur(64rpx) saturate(1.35) brightness(1.06);
+        transform: scale(1.6);
+      }
+    }
+
     &-img {
+      position: relative;
+      z-index: 1;
       width: 100%;
       height: 100%;
     }

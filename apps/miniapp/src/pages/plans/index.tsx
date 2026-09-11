@@ -293,14 +293,23 @@ export default function Plans() {
           <View className="plans__hero-frame" style={{ height: `${HERO_PX}px` }} key={plan?.id}>
             <CompareSlider
               single={!currentImage || !planImage || scene !== 'general'}
-              current={<ExampleImage className="plans__hero-img" src={currentImage} user mode="aspectFit" />}
+              current={
+                <View className="plans__hero-stack">
+                  {/* 模糊衬底：同一张照片放大模糊提亮，填满两侧空隙 */}
+                  <ExampleImage className="plans__hero-blur" src={currentImage} user mode="aspectFill" />
+                  <ExampleImage className="plans__hero-img" src={currentImage} user mode="aspectFit" />
+                </View>
+              }
               plan={
-                <ExampleImage
-                  className="plans__hero-img"
-                  src={planImage}
-                  badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
-                  mode="aspectFit"
-                />
+                <View className="plans__hero-stack">
+                  <ExampleImage className="plans__hero-blur" src={planImage} mode="aspectFill" />
+                  <ExampleImage
+                    className="plans__hero-img"
+                    src={planImage}
+                    badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
+                    mode="aspectFit"
+                  />
+                </View>
               }
             />
             {(plan?.outcome_tags ?? []).length > 0 ? (
