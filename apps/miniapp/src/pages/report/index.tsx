@@ -25,12 +25,12 @@ const PHOTO_LABEL: Record<string, string> = { face: '正脸', side: '侧脸', bo
 
 type PhotoKind = (typeof PHOTO_ORDER)[number]
 
-// hero 全出血宽度（rpx，designWidth 750）。相框固定高度 ~56% 视口，
-// 照片按 aspectFill 铺满全宽（超出部分上下裁切），切换来源照片时
-// 只有相框内的图片滑动，下方内容纹丝不动（不会像整页切换）。
+// hero 全出血宽度（rpx，designWidth 750）。相框固定高度 ~45% 视口：
+// 第一屏同时露出照片锚点与报告内容开头（印象标签/最优先建议），
+// 照片按 aspectFill 铺满全宽，切换来源照片时只有图片滑动。
 const HERO_FULL_W = 750
 const { windowWidth = 375, windowHeight = 667 } = Taro.getSystemInfoSync()
-const HERO_H = Math.round((windowHeight * 0.56 * HERO_FULL_W) / (windowWidth || 375))
+const HERO_H = Math.round((windowHeight * 0.45 * HERO_FULL_W) / (windowWidth || 375))
 
 function findingPhoto(finding: Finding): PhotoKind {
   return finding.photo === 'face' || finding.photo === 'side' ? finding.photo : 'body'
@@ -144,14 +144,10 @@ export default function Report() {
   const fallbackBodyPhoto = userImage(report.current_image_url) || (isBundledAsset(report.current_image_url) ? lookImage(report.current_image_url) : '')
   const photoTabs = PHOTO_ORDER.filter((kind) => photoMap[kind] || (kind === 'body' && fallbackBodyPhoto))
   const currentPhotoKind: PhotoKind = photoTabs.includes(activePhoto) ? activePhoto : (photoTabs[0] ?? 'body')
-  // 锚点 ⇄ 卡片联动：点锚点展开标签并滚动定位到对应卡片；再点一次收起。
+  // 锚点 ⇄ 详情条联动：点 tag 在 hero 内就地展开详情（不整页滚动，
+  // 上下文不丢）；再点一次收起。activeFindingId 同时驱动 tag/卡片高亮。
   const tapAnchor = (finding: Finding) => {
-    if (activeFindingId === finding.id) {
-      setActiveFindingId('')
-      return
-    }
-    setActiveFindingId(finding.id)
-    Taro.pageScrollTo({ selector: `#finding-${finding.id}`, duration: 300 })
+    setActiveFindingId(activeFindingId === finding.id ? '' : finding.id)
   }
 
   const providerIsDemo = (report.provider_version ?? '').startsWith('demo')
@@ -302,6 +298,22 @@ export default function Report() {
                     {/* 左右两列常显标签 + 引导线 + 锚点端点 */}
                     {leftLayout.map((item) => renderTag(item, 'left'))}
                     {rightLayout.map((item) => renderTag(item, 'right'))}
+                    {/* 就地详情条：点 tag 后在本张照片内展开，不整页滚动 */}
+                    {(() => {
+                      const active = kindFindings.find((f) => f.id === activeFindingId)
+                      if (!active) return null
+                      return (
+                        <View className="report__detail-drawer" key={active.id}>
+                          <View className="report__detail-head">
+                            <Text className="report__detail-cat">
+                              {CATEGORY_LABEL[active.category] || active.category}
+                            </Text>
+                            <Text className="report__detail-label">{active.label}</Text>
+                          </View>
+                          <Text className="report__detail-copy">{active.detail || active.label}</Text>
+                        </View>
+                      )
+                    })()}
                   </View>
                 </SwiperItem>
               )
@@ -377,7 +389,7 @@ export default function Report() {
                 id={`finding-${finding.id}`}
                 className={`report__finding fade-up pressable ${activeFindingId === finding.id ? 'report__finding--active' : ''}`}
                 style={{ animationDelay: `${0.16 + Math.min(index, 5) * 0.08}s` }}
-                onClick={() => setActiveFindingId(finding.id)}
+                onClick={() => setActiveFindingId(activeFindingId === finding.id ? '' : finding.id)}
               >
                 <View className="report__finding-head">
                   <View className="report__finding-title">

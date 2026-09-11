@@ -217,6 +217,55 @@
     text-overflow: ellipsis;
   }
 
+  // 就地详情条：点 tag 后在本张照片内滑入，不整页滚动（上下文不丢）
+  &__detail-drawer {
+    position: absolute;
+    left: 24rpx;
+    right: 24rpx;
+    bottom: 200rpx;
+    z-index: 6;
+    padding: 20rpx 24rpx;
+    border-radius: 28rpx;
+    background: rgba(24, 28, 22, 0.82);
+    backdrop-filter: blur(20rpx);
+    box-shadow: 0 12rpx 32rpx rgba(24, 28, 22, 0.32);
+    animation: report-detail-in 0.3s cubic-bezier(.2, .8, .2, 1) both;
+  }
+
+  &__detail-head {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+  }
+  &__detail-cat {
+    flex-shrink: 0;
+    padding: 4rpx 14rpx;
+    border-radius: 999rpx;
+    background: var(--moss);
+    color: #ffffff;
+    font-size: 18rpx;
+    font-weight: 650;
+  }
+  &__detail-label {
+    font-size: 24rpx;
+    font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  &__detail-copy {
+    display: block;
+    margin-top: 10rpx;
+    font-size: 20rpx;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.82);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
   // 引导线：从胶囊外缘到 anchor 端点的细线（加粗到 3rpx，长距离下可见）
   &__leader {
     position: absolute;
@@ -404,6 +453,24 @@
       line-height: 1.5;
       color: var(--ink-3);
     }
+  }
+}
+
+@keyframes report-detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(16rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .report__detail-drawer {
+    animation: none;
   }
 }
 
