@@ -76,18 +76,29 @@
   &__hero {
     &-frame {
       position: relative;
-      height: 640rpx;
+      height: 680rpx;
       border-radius: var(--radius-lg);
       overflow: hidden;
       background: var(--moss-soft);
       border: 1rpx solid var(--line);
       // 切换方案时整帧交叉淡入（key 重挂载触发）
       animation: plans-frame-in 0.3s ease both;
+
+      // 对比滑杆两层裁掉溢出（widthFix 内层图高出容器，只裁底部）
+      .cmp__layer {
+        overflow: hidden;
+      }
     }
 
     &-img {
       width: 100%;
       height: 100%;
+
+      // 顶部锚定裁切（widthFix + 高度自然）：竖版图只裁底部，
+      // 人物头部完整（aspectFill 居中裁切会把脸切掉）
+      .example-image__img {
+        height: auto;
+      }
     }
 
     // 收益词叠加：直接回答「选这套能获得什么」，压暗渐变保证可读
@@ -221,11 +232,11 @@
     }
   }
 
-  // 三选一条：常驻上半屏的选择器，兼任翻页指示。
+  // 三选一条：紧凑单行选择器（高度让位给 hero 方案展示），
   // 推荐角标叠缩略图左上角；选中态描边 + 全不透明
   &__choices {
     display: flex;
-    gap: 16rpx;
+    gap: 14rpx;
     width: 100%;
   }
 
@@ -234,7 +245,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 8rpx;
+    gap: 6rpx;
     opacity: 0.62;
     transition: opacity 0.25s ease;
 
@@ -243,7 +254,7 @@
 
       .plans__choice-thumb {
         border-color: var(--moss);
-        box-shadow: 0 0 0 4rpx var(--moss-soft);
+        box-shadow: 0 0 0 3rpx var(--moss-soft);
       }
 
       .plans__choice-name {
@@ -255,8 +266,8 @@
     &-thumb {
       position: relative;
       width: 100%;
-      height: 240rpx;
-      border-radius: 20rpx;
+      height: 156rpx;
+      border-radius: 16rpx;
       overflow: hidden;
       border: 3rpx solid transparent;
       transition: border-color 0.25s ease, box-shadow 0.25s ease;
@@ -269,19 +280,19 @@
 
     &-badge {
       position: absolute;
-      top: 10rpx;
-      left: 10rpx;
+      top: 8rpx;
+      left: 8rpx;
       z-index: 2;
-      padding: 4rpx 14rpx;
+      padding: 3rpx 12rpx;
       border-radius: 999rpx;
       background: var(--moss);
       color: #ffffff;
-      font-size: 19rpx;
+      font-size: 18rpx;
       font-weight: 650;
     }
 
     &-name {
-      font-size: 22rpx;
+      font-size: 20rpx;
       color: var(--ink-2);
       text-align: center;
       white-space: nowrap;

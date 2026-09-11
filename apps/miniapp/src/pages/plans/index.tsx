@@ -280,12 +280,13 @@ export default function Plans() {
           <View className="plans__hero-frame" key={plan?.id}>
             <CompareSlider
               single={!currentImage || !planImage}
-              current={<ExampleImage className="plans__hero-img" src={currentImage} user />}
+              current={<ExampleImage className="plans__hero-img" src={currentImage} user mode="widthFix" />}
               plan={
                 <ExampleImage
                   className="plans__hero-img"
                   src={planImage}
                   badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
+                  mode="widthFix"
                 />
               }
             />

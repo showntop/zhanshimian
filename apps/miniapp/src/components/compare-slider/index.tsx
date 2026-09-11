@@ -33,7 +33,10 @@ export default function CompareSlider({
   const [pos, setPos] = useState(66)
   const startRef = useRef({ x: 0, pos: 66 })
 
-  useEffect(() => {
+  // 量容器尺寸：single 切换会换根节点（单图分支此前没有 id，查询扑空后
+  // rectRef 永远为 null，拖动手柄失效），故依赖里带上 single；
+  // onTouchStart 里再兜底一次，覆盖布局迟于挂载的场景
+  const measure = () => {
     Taro.createSelectorQuery()
       .select(`#${idRef.current}`)
       .boundingClientRect((res) => {
@@ -42,9 +45,14 @@ export default function CompareSlider({
         if (rect && rect.width > 0) rectRef.current = { left: rect.left, width: rect.width }
       })
       .exec()
-  }, [])
+  }
+
+  useEffect(() => {
+    measure()
+  }, [single])
 
   const onTouchStart = (e: CommonEvent) => {
+    if (!rectRef.current) measure()
     const touch = (e as unknown as ITouchEvent).touches[0]
     if (!touch) return
     startRef.current = { x: touch.clientX, pos }
@@ -60,7 +68,12 @@ export default function CompareSlider({
   }
 
   if (single) {
-    return <View className="cmp cmp--single">{plan}</View>
+    // id 必须带上：selector 查询按 id 定位，缺了会让 rectRef 永远为空
+    return (
+      <View id={idRef.current} className="cmp cmp--single">
+        {plan}
+      </View>
+    )
   }
 
   return (
