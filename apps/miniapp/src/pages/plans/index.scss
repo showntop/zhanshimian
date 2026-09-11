@@ -278,11 +278,6 @@
     &-img {
       width: 100%;
       height: 100%;
-
-      // 顶部锚定：竖版图只显示头部区域，不裁脸
-      .example-image__img {
-        height: auto;
-      }
     }
 
     &-badge {

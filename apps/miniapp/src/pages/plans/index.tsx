@@ -29,8 +29,8 @@ const SCENE_TABS = [
 const NAV = getNavMetrics()
 const HEADER_GAP_PX = 24 // spacer margin-bottom 48rpx
 const TABS_PX = 40 // 场景 tab 行 + 容器间距
-const CHOICES_PX = 92 // 三选一条（缩略图 120rpx + 名称 + 间距）
-const CTA_RESERVE_PX = 86 // 吸底 CTA（按钮 + 说明，不含 fixed 定位占用的视觉）
+const CHOICES_PX = 96 // 三选一条（缩略图 120rpx + 名称 + 间距）
+const CTA_RESERVE_PX = 108 // 吸底 CTA（按钮 + 说明 + 安全区余量），防遮挡三选一条
 const HERO_PX = Math.max(
   340,
   Math.round(NAV.windowHeight - NAV.navHeight - HEADER_GAP_PX - TABS_PX - CHOICES_PX - CTA_RESERVE_PX),
@@ -292,7 +292,7 @@ export default function Plans() {
         <View className="plans__hero fade-up">
           <View className="plans__hero-frame" style={{ height: `${HERO_PX}px` }} key={plan?.id}>
             <CompareSlider
-              single={!currentImage || !planImage}
+              single={!currentImage || !planImage || scene !== 'general'}
               current={<ExampleImage className="plans__hero-img" src={currentImage} user mode="widthFix" />}
               plan={
                 <ExampleImage
@@ -326,7 +326,7 @@ export default function Plans() {
                 <ExampleImage
                   className="plans__choice-img"
                   src={item.generated_image_url || item.image_url}
-                  mode="widthFix"
+                  mode="aspectFit"
                 />
                 {item.recommended ? <Text className="plans__choice-badge">推荐</Text> : null}
               </View>
