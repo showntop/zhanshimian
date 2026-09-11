@@ -7,6 +7,9 @@
   &__hero {
     display: flex;
     flex-direction: column;
+    // 抵消 AppHeader spacer 的全局呼吸间距：全出血照片 hero 应顶到导航
+    // 底边，中间露一条背景色横带会像排版断裂（文字类页面保留该 gap）
+    margin-top: calc(-1 * var(--space-xxl));
 
     // 相框 == 照片：无圆角无描边无投影的全出血 hero，高度由 Swiper 内联控制
     &-frame {
