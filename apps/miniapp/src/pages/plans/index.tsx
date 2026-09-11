@@ -323,7 +323,11 @@ export default function Plans() {
               onClick={() => pickPlan(i)}
             >
               <View className="plans__choice-thumb">
-                <ExampleImage className="plans__choice-img" src={item.generated_image_url || item.image_url} />
+                <ExampleImage
+                  className="plans__choice-img"
+                  src={item.generated_image_url || item.image_url}
+                  mode="widthFix"
+                />
                 {item.recommended ? <Text className="plans__choice-badge">推荐</Text> : null}
               </View>
               <Text className="plans__choice-name">{item.name}</Text>
