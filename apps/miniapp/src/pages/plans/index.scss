@@ -49,14 +49,13 @@
     text-align: center;
 
     &-title {
-      font-family: 'Songti SC', 'STSong', serif;
       font-size: 34rpx;
       font-weight: 700;
       color: var(--ink);
     }
 
     &-desc {
-      font-size: 23rpx;
+      font-size: 26rpx;
       line-height: 1.6;
       color: var(--ink-2);
     }
@@ -145,7 +144,6 @@
   }
 
   &__name {
-    font-family: 'Songti SC', 'STSong', serif;
     font-size: 30rpx;
     font-weight: 700;
     color: var(--ink);
@@ -311,7 +309,7 @@
     }
 
     &-name {
-      font-size: 18rpx;
+      font-size: 20rpx;
       color: var(--ink-2);
       text-align: center;
       white-space: nowrap;
@@ -349,7 +347,7 @@
 
   &__cta-note {
     text-align: center;
-    font-size: 20rpx;
+    font-size: 24rpx;
     color: var(--ink-3);
   }
 

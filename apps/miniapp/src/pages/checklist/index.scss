@@ -57,7 +57,6 @@
     }
 
     &-title {
-      font-family: 'Songti SC', 'STSong', serif;
       font-size: 32rpx;
       font-weight: 700;
       color: var(--ink);
@@ -121,14 +120,14 @@
   }
 
   &__cat {
-    font-size: 20rpx;
+    font-size: 22rpx;
     font-weight: 600;
-    letter-spacing: 2rpx;
+    letter-spacing: 0;
     color: var(--moss);
   }
 
   &__meta {
-    font-size: 20rpx;
+    font-size: 22rpx;
     color: var(--ink-3);
   }
 

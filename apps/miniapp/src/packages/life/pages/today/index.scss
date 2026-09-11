@@ -36,14 +36,13 @@
   }
 
   &__copy { display: flex; flex-direction: column; gap: 10rpx; }
-  &__title { font-family: 'Songti SC', 'STSong', serif; font-size: 36rpx; font-weight: 700; color: var(--ink); }
   &__summary { font-size: 24rpx; line-height: 1.65; color: var(--ink-2); }
   &__step {
     display: flex; gap: 16rpx; padding: 14rpx 0;
     border-top: 1rpx solid var(--line);
     &-label {
       flex-shrink: 0; width: 88rpx;
-      font-size: 20rpx; font-weight: 600; letter-spacing: 2rpx; color: var(--moss);
+      font-size: 22rpx; font-weight: 600; letter-spacing: 0; color: var(--moss);
     }
     &-text { font-size: 24rpx; line-height: 1.6; color: var(--ink); }
   }

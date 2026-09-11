@@ -22,7 +22,6 @@
     border-radius: 999rpx;
     background: var(--moss);
     color: #ffffff;
-    font-family: 'Songti SC', 'STSong', serif;
     font-size: 44rpx;
     font-weight: 700;
   }
@@ -49,9 +48,9 @@
   }
 
   &__section {
-    font-size: 22rpx;
+    font-size: 24rpx;
     font-weight: 600;
-    letter-spacing: 3rpx;
+    letter-spacing: 0;
     color: var(--moss);
     margin-bottom: 12rpx;
   }

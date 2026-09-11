@@ -20,14 +20,14 @@
     }
 
     &-kicker {
-      color: var(--moss);
-      font-size: 21rpx;
+      color: var(--ink-2);
+      font-size: 24rpx;
       font-weight: 600;
-      letter-spacing: 4rpx;
+      letter-spacing: 0;
     }
 
     &-date {
-      font-size: 20rpx;
+      font-size: 22rpx;
       color: var(--ink-3);
     }
 
@@ -64,15 +64,14 @@
     margin-top: 8rpx;
 
     &-eyebrow {
-      font-size: 21rpx;
+      font-size: 24rpx;
       font-weight: 600;
-      letter-spacing: 4rpx;
-      color: rgba(238, 240, 236, 0.72);
+      letter-spacing: 0;
+      color: rgba(238, 240, 236, 0.78);
     }
 
     &-title {
       margin-top: 10rpx;
-      font-family: 'Songti SC', 'STSong', serif;
       font-size: 40rpx;
       line-height: 1.3;
       font-weight: 700;
@@ -81,22 +80,22 @@
 
     &-desc {
       margin-top: 12rpx;
-      font-size: 23rpx;
+      font-size: 26rpx;
       line-height: 1.55;
-      color: rgba(238, 240, 236, 0.82);
+      color: rgba(238, 240, 236, 0.86);
     }
 
     &-link {
       margin-top: 18rpx;
-      font-size: 23rpx;
+      font-size: 26rpx;
       font-weight: 600;
       color: var(--cream);
     }
 
     &-note {
       margin-top: 16rpx;
-      font-size: 20rpx;
-      color: rgba(238, 240, 236, 0.6);
+      font-size: 22rpx;
+      color: rgba(238, 240, 236, 0.68);
       text-align: center;
     }
 
@@ -212,16 +211,16 @@
     }
 
     &-title {
-      font-size: 20rpx;
+      font-size: 22rpx;
       line-height: 1.35;
       font-weight: 700;
       color: var(--cream);
     }
 
     &-desc {
-      font-size: 16rpx;
+      font-size: 20rpx;
       line-height: 1.45;
-      color: rgba(238, 240, 236, 0.68);
+      color: rgba(238, 240, 236, 0.72);
     }
   }
 
@@ -332,9 +331,9 @@
   &__report-action-count {
     margin-right: 4rpx;
     color: var(--cream);
-    font-family: 'Songti SC', 'STSong', serif;
     font-size: 32rpx;
     font-weight: 700;
+    font-variant-numeric: tabular-nums;
   }
 
   // ---------- 工具（次级入口：quiet 卡，去描边投影） ----------
@@ -362,7 +361,7 @@
       border-radius: 999rpx;
       background: var(--surface-strong);
       color: var(--moss);
-      font-size: 16rpx;
+      font-size: 20rpx;
       font-weight: 650;
 
       // 实时任务态：moss 实底 + 轻呼吸，区别于静态「推荐」标
@@ -374,13 +373,13 @@
     }
 
     &-name {
-      font-size: 23rpx;
+      font-size: 26rpx;
       font-weight: 650;
       color: var(--ink);
     }
 
     &-desc {
-      font-size: 18rpx;
+      font-size: 22rpx;
       line-height: 1.45;
       color: var(--ink-3);
     }
@@ -437,7 +436,7 @@
     }
 
     &-desc {
-      font-size: 18rpx;
+      font-size: 22rpx;
       line-height: 1.4;
       color: var(--ink-3);
     }
@@ -488,14 +487,13 @@
     }
 
     &--advisor &-label {
-      font-family: 'Songti SC', 'STSong', serif;
       font-size: 36rpx;
       line-height: 1.3;
       color: var(--moss-deep);
     }
 
     &-desc {
-      font-size: 19rpx;
+      font-size: 22rpx;
       line-height: 1.5;
       color: var(--ink-3);
     }
@@ -525,15 +523,14 @@
     }
 
     &-brand {
-      font-family: 'Songti SC', 'STSong', serif;
       font-size: 26rpx;
       font-weight: 700;
-      letter-spacing: 4rpx;
+      letter-spacing: 0;
       color: var(--ink-2);
     }
 
     &-note {
-      font-size: 19rpx;
+      font-size: 22rpx;
       color: var(--ink-3);
     }
   }

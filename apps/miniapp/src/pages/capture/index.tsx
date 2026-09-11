@@ -223,7 +223,7 @@ export default function Capture() {
       <AppHeader title="创建形象档案" back />
       <View className="capture">
         <View className="capture__intro fade-up">
-          <Text className="capture__eyebrow">第 1 步 · 三张自然光照片</Text>
+          <Text className="capture__eyebrow">三张自然光照片</Text>
           <Text className="capture__title">先有真实照片，再有可靠建议</Text>
           <Text className="capture__lede">不用化妆，也不需要刻意摆姿势；每一张都可以重拍。</Text>
         </View>
@@ -245,11 +245,11 @@ export default function Capture() {
                       className="capture__photo-img"
                       src={slot.displayUrl}
                       user={!slot.demo}
-                      mode="aspectFill"
+                      mode="aspectFit"
                       badgeText={slot.demo ? '效果示例' : ''}
                     />
                   ) : (
-                    <Image className="capture__photo-guide" src={shot.placeholder} mode="aspectFill" />
+                    <Image className="capture__photo-guide" src={shot.placeholder} mode="aspectFit" />
                   )}
                   {slot && !isUploading ? (
                     <Text className="capture__photo-index capture__photo-index--done">✓</Text>

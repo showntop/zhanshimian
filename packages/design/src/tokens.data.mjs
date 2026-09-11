@@ -52,16 +52,16 @@ export const sizes = {
   pageGutter: 16     // 页面左右留白（32rpx）
 }
 
-// 排版字号（px；.display 38rpx/.title 50rpx/.section-title 32rpx/.eyebrow 23rpx/.lede 26rpx/正文 28rpx/strong 30rpx/note 20rpx）
+// 排版字号（px；正文 28rpx / 说明 24rpx / 分区 32rpx / hero 38–50rpx）
 export const type = {
   base: 14,
-  lede: 13,
+  lede: 14,
   strong: 15,
   sectionTitle: 16,
   title: 25,
   display: 19,
-  eyebrow: 11.5,
-  note: 10
+  eyebrow: 12,
+  note: 12
 }
 
 // 阴影（px；分层体系：raised 卡 / hero 深绿卡 / 主按钮 / 弹层，其余一律发丝描边）

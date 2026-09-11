@@ -26,12 +26,11 @@ const PHOTO_LABEL: Record<string, string> = { face: '正脸', side: '侧脸', bo
 
 type PhotoKind = (typeof PHOTO_ORDER)[number]
 
-// hero 全出血宽度（rpx，designWidth 750）。相框固定高度 ~56% 视口，
 // 照片按 aspectFill 铺满全宽（超出部分上下裁切），切换来源照片时
-// 只有相框内的图片滑动。第一屏空间靠内容板压缩（横排标签+简要建议）腾出。
+// 只有相框内的图片滑动。hero 高度约 72% 视口，给标注与人物留足空间。
 const HERO_FULL_W = 750
 const { windowWidth = 375, windowHeight = 667 } = Taro.getSystemInfoSync()
-const HERO_H = Math.round((windowHeight * 0.64 * HERO_FULL_W) / (windowWidth || 375))
+const HERO_H = Math.round((windowHeight * 0.72 * HERO_FULL_W) / (windowWidth || 375))
 
 function findingPhoto(finding: Finding): PhotoKind {
   return finding.photo === 'face' || finding.photo === 'side' ? finding.photo : 'body'
