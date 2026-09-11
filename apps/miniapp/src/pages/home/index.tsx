@@ -138,8 +138,9 @@ export default function Home() {
   )
   const analysisActive = activeTasks.some((t) => t.type === 'analysis')
   const hairActive = activeTasks.some((t) => t.type === 'hair_preview')
+  // 方案相关任务（方案组生成 + 每套形象图）都归到方案 Tab badge
   const planTaskCount = activeTasks.filter(
-    (t) => t.type === 'plan_look' || t.type === 'today_look',
+    (t) => t.type === 'plan_group' || t.type === 'plan_look' || t.type === 'today_look',
   ).length
 
   // 方案 Tab badge（A 方案）：方案/今日形象图任务进行中时在底部 Tab 标数，
