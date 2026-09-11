@@ -299,12 +299,6 @@ export default function Report() {
                     <Text className={providerIsDemo ? 'report__provider report__provider--demo' : 'report__provider'}>
                       {providerIsDemo ? REPORT_COPY.demoMark : REPORT_COPY.aiMark}
                     </Text>
-                    {/* 「最优优先级」绿色 tag 移到 hero 底部（胶片条上方），不再遮挡人脸 */}
-                    {report.priority_title ? (
-                      <View className="report__priority-tag">
-                        <Text className="report__priority-tag-text">{REPORT_COPY.priorityBadge}</Text>
-                      </View>
-                    ) : null}
                     {/* 左右两列常显标签 + 引导线 + 锚点端点 */}
                     {leftLayout.map((item) => renderTag(item, 'left'))}
                     {rightLayout.map((item) => renderTag(item, 'right'))}

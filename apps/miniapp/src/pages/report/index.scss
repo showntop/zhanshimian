@@ -179,25 +179,6 @@
     pointer-events: none;
   }
 
-  // 「最优优先级」绿色胶囊：移到 hero 底部（胶片条上方），不再遮挡人脸
-  &__priority-tag {
-    position: absolute;
-    bottom: 110rpx;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 5;
-    padding: 10rpx 24rpx;
-    border-radius: 999rpx;
-    background: var(--moss);
-    color: #ffffff;
-    box-shadow: 0 6rpx 18rpx rgba(31, 34, 30, 0.18);
-  }
-  &__priority-tag-text {
-    font-size: 20rpx;
-    font-weight: 700;
-    letter-spacing: 2rpx;
-  }
-
   // 左右两列常显胶囊：只显示标签一行（副标题在下方卡片），缩小避免遮挡人物
   &__tag {
     position: absolute;
