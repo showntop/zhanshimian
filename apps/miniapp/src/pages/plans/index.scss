@@ -21,11 +21,47 @@
     border: 1rpx solid var(--line);
     margin-right: 12rpx;
 
+    &:last-child {
+      margin-right: 0;
+    }
+
     &--active {
       background: var(--moss-soft);
       border-color: var(--moss);
       color: var(--moss);
       font-weight: 600;
+    }
+  }
+
+  // 场景空态：已建档但该场合无方案时，保留 tab 结构只替换内容区，
+  // 引导生成该场合方案（而不是错误地让用户重新建档）
+  &__scene-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16rpx;
+    padding: 96rpx 48rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    border: 1rpx dashed var(--line);
+    text-align: center;
+
+    &-title {
+      font-family: 'Songti SC', 'STSong', serif;
+      font-size: 34rpx;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    &-desc {
+      font-size: 23rpx;
+      line-height: 1.6;
+      color: var(--ink-2);
+    }
+
+    .primary-button {
+      margin-top: 16rpx;
+      min-width: 320rpx;
     }
   }
 

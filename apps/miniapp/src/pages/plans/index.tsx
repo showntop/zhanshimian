@@ -31,6 +31,9 @@ export default function Plans() {
   const [mode, setMode] = useState<'current' | 'plan'>('plan')
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
+  // 区分「未建档」与「该场景无方案」：两者空态与 CTA 完全不同，
+  // 此前一律按未建档处理，导致已建档用户切场景时被错误引导去重新建档
+  const [hasReport, setHasReport] = useState(true)
   const skipFirstShow = useRef(true)
   const activeLook = plans.find(
     (p, i) =>
@@ -47,11 +50,13 @@ export default function Plans() {
       if (!reportId) {
         const current = await api.getCurrentReport()
         if (!current) {
+          setHasReport(false)
           setPlans([])
           return
         }
         writeStorage(STORAGE_KEYS.reportId, current.id)
       }
+      setHasReport(true)
       const items = await api.listPlans(readStorage(STORAGE_KEYS.reportId)!, targetScene)
       setPlans(items)
     } catch {
@@ -151,7 +156,9 @@ export default function Plans() {
     )
   }
 
-  if (plans.length === 0) {
+  // 空态分两层：未建档 → 全页引导建档；已建档但该场景无方案 → 保留场景 tab，
+  // 引导生成该场合方案（general 走 upsertPlans 直接生成，其余进场景 Brief 页）
+  if (plans.length === 0 && !hasReport) {
     return (
       <View className="page page--tab">
         <AppHeader />
@@ -163,6 +170,22 @@ export default function Plans() {
         />
       </View>
     )
+  }
+
+  const sceneLabel = SCENE_TABS.find((t) => t.key === scene)?.label ?? ''
+  const generateScenePlan = async () => {
+    if (scene === 'general') {
+      const reportId = readStorage(STORAGE_KEYS.reportId)
+      if (!reportId) return
+      try {
+        await api.upsertPlans(reportId, { scene: 'general', answers: {} })
+        load(scene)
+      } catch {
+        Taro.showToast({ title: '方案暂时没有生成，请稍后重试', icon: 'none' })
+      }
+      return
+    }
+    Taro.navigateTo({ url: `/pages/scene/index?scene=${scene}` })
   }
 
   return (
@@ -181,6 +204,19 @@ export default function Plans() {
           ))}
         </ScrollView>
 
+        {plans.length === 0 ? (
+          <View className="plans__scene-empty fade-up">
+            <Text className="plans__scene-empty-title">{scene === 'general' ? '还没有形象方案' : `${sceneLabel}场合还没有方案`}</Text>
+            <Text className="plans__scene-empty-desc">
+              {scene === 'general' ? '基于你的形象档案生成三套方案' : '回答 4 个选择（约 30 秒），复用档案不重复要照片'}
+            </Text>
+            <PrimaryButton
+              text={scene === 'general' ? '生成形象方案' : `生成${sceneLabel}方案`}
+              onClick={generateScenePlan}
+            />
+          </View>
+        ) : (
+          <>
         <View className="plans__hero fade-up">
           <View className="plans__hero-frame">
             {mode === 'plan' && planImage ? (
@@ -261,6 +297,8 @@ export default function Plans() {
             </>
           ) : null}
         </View>
+          </>
+        )}
       </View>
     </View>
   )
