@@ -33,6 +33,10 @@ type hairPreviewTaskHandler struct{ service *Service }
 
 func (hairPreviewTaskHandler) TaskType() domain.TaskType { return domain.TaskTypeHairPreview }
 
+type planGroupTaskHandler struct{ service *Service }
+
+func (planGroupTaskHandler) TaskType() domain.TaskType { return domain.TaskTypePlanGroup }
+
 type planLookTaskHandler struct{ service *Service }
 
 func (planLookTaskHandler) TaskType() domain.TaskType { return domain.TaskTypePlanLook }
@@ -49,6 +53,7 @@ func (todayLookTaskHandler) TaskType() domain.TaskType { return domain.TaskTypeT
 var taskMaxAttempts = map[domain.TaskType]int{
 	domain.TaskTypeAnalysis:    3,
 	domain.TaskTypeHairPreview: 3,
+	domain.TaskTypePlanGroup:   3,
 	domain.TaskTypePlanLook:    2,
 	domain.TaskTypeTodayLook:   2,
 }
@@ -56,6 +61,7 @@ var taskMaxAttempts = map[domain.TaskType]int{
 var taskTimeouts = map[domain.TaskType]time.Duration{
 	domain.TaskTypeAnalysis:    5 * time.Minute,
 	domain.TaskTypeHairPreview: 5 * time.Minute,
+	domain.TaskTypePlanGroup:   5 * time.Minute,
 	domain.TaskTypePlanLook:    5 * time.Minute,
 	domain.TaskTypeTodayLook:   5 * time.Minute,
 }
@@ -73,6 +79,7 @@ const (
 var taskTypeOrder = []domain.TaskType{
 	domain.TaskTypeAnalysis,
 	domain.TaskTypeHairPreview,
+	domain.TaskTypePlanGroup,
 	domain.TaskTypePlanLook,
 	domain.TaskTypeTodayLook,
 }
@@ -142,6 +149,8 @@ func taskUserMessage(taskType domain.TaskType) string {
 		return "分析暂时没有完成，请稍后重试"
 	case domain.TaskTypeHairPreview:
 		return "预览暂时没有生成，请稍后重试"
+	case domain.TaskTypePlanGroup:
+		return "方案暂时没有生成，请稍后重试"
 	default:
 		return "形象图暂时没有生成，请稍后重试"
 	}
@@ -443,6 +452,61 @@ func (s *Service) processHairPreview(ctx context.Context, task domain.Task) (str
 	return payload.PreviewID, nil
 }
 
+// processPlanGroup generates the general plan group from the stored report
+// (analysis no longer authors plans). Idempotent: an existing group completes
+// the task immediately; otherwise AI-authored plans are persisted and their
+// look tasks enqueued.
+func (s *Service) processPlanGroup(ctx context.Context, task domain.Task) (string, error) {
+	var payload domain.PlanGroupTaskPayload
+	if err := decodeTaskPayload(task, &payload); err != nil {
+		return "", err
+	}
+	report, err := s.repo.GetReport(ctx, task.UserID, payload.ReportID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return "", repository.ErrTaskRemoved
+	}
+	if err != nil {
+		return "", err
+	}
+	jobCtx := provider.WithInvocationSource(ctx, "plan_group:"+payload.ReportID)
+	// 幂等兜底：并发触发或重复入队时，已有完整 general 组直接完成。
+	existing, err := s.repo.ListPlans(jobCtx, task.UserID, payload.ReportID, "general")
+	if err != nil {
+		return "", err
+	}
+	if len(existing) == 0 {
+		if s.planGroupGenerator == nil {
+			return "", newPermanentTaskError(errors.New("plan group generator is not configured"))
+		}
+		_ = s.repo.UpdateTaskProgress(jobCtx, task.ID, 32, "正在整理你的形象特点")
+		output, err := s.planGroupGenerator.Generate(jobCtx, provider.PlanGroupInput{
+			ImpressionTags: report.ImpressionTags,
+			PriorityTitle:  report.PriorityTitle,
+			PriorityCopy:   report.PriorityCopy,
+			Findings:       report.Findings,
+		})
+		if err != nil {
+			return "", err
+		}
+		_ = s.repo.UpdateTaskProgress(jobCtx, task.ID, 78, "正在保存三套方案")
+		writeCtx, writeCancel := writeContext()
+		defer writeCancel()
+		plans, err := s.repo.UpsertScenePlans(writeCtx, task.UserID, payload.ReportID, domain.ScenePlanInput{Scene: "general", Answers: map[string]string{}}, output.Plans)
+		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return "", repository.ErrTaskRemoved
+			}
+			s.loggerOrDefault().Error("complete plan group", "report_id", payload.ReportID, "error", err)
+			return "", err
+		}
+		// 方案文字就绪后自动接续形象图任务，与场景方案链路一致。
+		if _, err := s.enqueueMissingPlanLooks(writeCtx, task.UserID, plans); err != nil {
+			s.loggerOrDefault().Error("enqueue plan looks after group", "report_id", payload.ReportID, "error", err)
+		}
+	}
+	return payload.ReportID, nil
+}
+
 func (s *Service) processPlanLook(ctx context.Context, task domain.Task) (string, error) {
 	var payload domain.PlanLookTaskPayload
 	if err := decodeTaskPayload(task, &payload); err != nil {
@@ -539,6 +603,10 @@ func (h analysisTaskHandler) Handle(ctx context.Context, task domain.Task) (stri
 
 func (h hairPreviewTaskHandler) Handle(ctx context.Context, task domain.Task) (string, error) {
 	return h.service.processHairPreview(ctx, task)
+}
+
+func (h planGroupTaskHandler) Handle(ctx context.Context, task domain.Task) (string, error) {
+	return h.service.processPlanGroup(ctx, task)
 }
 
 func (h planLookTaskHandler) Handle(ctx context.Context, task domain.Task) (string, error) {

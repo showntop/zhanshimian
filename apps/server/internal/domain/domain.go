@@ -19,6 +19,7 @@ type TaskType string
 const (
 	TaskTypeAnalysis    TaskType = "analysis"
 	TaskTypeHairPreview TaskType = "hair_preview"
+	TaskTypePlanGroup   TaskType = "plan_group"
 	TaskTypePlanLook    TaskType = "plan_look"
 	TaskTypeTodayLook   TaskType = "today_look"
 )
@@ -91,6 +92,13 @@ type HairPreviewTaskPayload struct {
 
 type PlanLookTaskPayload struct {
 	PlanID string `json:"plan_id"`
+}
+
+// PlanGroupTaskPayload references the report whose general plan group should
+// be (re)generated. Analysis no longer authors plans; this task owns general
+// group creation from the stored report content.
+type PlanGroupTaskPayload struct {
+	ReportID string `json:"report_id"`
 }
 
 type TodayLookTaskPayload struct {

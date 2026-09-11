@@ -40,7 +40,7 @@ export interface UserProfile {
 }
 
 // ---------- 统一任务 ----------
-export type TaskType = 'analysis' | 'plan_look' | 'hair_preview' | 'today_look'
+export type TaskType = 'analysis' | 'plan_group' | 'plan_look' | 'hair_preview' | 'today_look'
 export type TaskStatus = 'queued' | 'processing' | 'completed' | 'failed'
 
 export interface TaskError {

@@ -34,6 +34,8 @@ export default function Plans() {
   // 区分「未建档」与「该场景无方案」：两者空态与 CTA 完全不同，
   // 此前一律按未建档处理，导致已建档用户切场景时被错误引导去重新建档
   const [hasReport, setHasReport] = useState(true)
+  // general 方案组生成任务（报告与方案解耦后由 plan_group 任务产出）
+  const [groupTaskId, setGroupTaskId] = useState('')
   const skipFirstShow = useRef(true)
   const activeLook = plans.find(
     (p, i) =>
@@ -59,6 +61,15 @@ export default function Plans() {
       setHasReport(true)
       const items = await api.listPlans(readStorage(STORAGE_KEYS.reportId)!, targetScene)
       setPlans(items)
+      // 报告与方案解耦：general 空组时接管已在进行的 plan_group 生成任务
+      // （可能由报告页 CTA 或本页触发），直接进入生成中视图。
+      if (targetScene === 'general' && items.length === 0) {
+        const boot = await api.getHomeBootstrap().catch(() => null)
+        const groupTask = (boot?.active_tasks ?? []).find(
+          (t) => t.type === 'plan_group' && (t.status === 'queued' || t.status === 'processing'),
+        )
+        setGroupTaskId(groupTask?.id ?? '')
+      }
     } catch {
       setFailed(true)
     } finally {
@@ -108,6 +119,22 @@ export default function Plans() {
     },
   })
   Taro.useDidHide(() => stop())
+
+  // plan_group 生成任务轮询：完成刷新列表，失败回退到空态引导重试
+  const groupPoll = useTaskPolling({
+    fetcher: () => api.getTask(groupTaskId),
+    intervalMs: POLL_INTERVALS.planLook,
+    enabled: Boolean(groupTaskId),
+    onDone: (result) => {
+      setGroupTaskId('')
+      if (result.status === 'completed') {
+        load(scene)
+      } else {
+        Taro.showToast({ title: '方案暂时没有生成，请重试', icon: 'none' })
+      }
+    },
+  })
+  Taro.useDidHide(() => groupPoll.stop())
 
   const plan = plans[index]
   const planImage = plan?.generated_image_url || plan?.image_url
@@ -178,7 +205,12 @@ export default function Plans() {
       const reportId = readStorage(STORAGE_KEYS.reportId)
       if (!reportId) return
       try {
-        await api.upsertPlans(reportId, { scene: 'general', answers: {} })
+        // 202 + task = 方案组生成已启动（AI 从报告内容派生三套方案）
+        const res = await api.upsertPlans(reportId, { scene: 'general', answers: {} })
+        if (res.task) {
+          setGroupTaskId(res.task.id)
+          return
+        }
         load(scene)
       } catch {
         Taro.showToast({ title: '方案暂时没有生成，请稍后重试', icon: 'none' })
@@ -205,16 +237,25 @@ export default function Plans() {
         </ScrollView>
 
         {plans.length === 0 ? (
-          <View className="plans__scene-empty fade-up">
-            <Text className="plans__scene-empty-title">{scene === 'general' ? '还没有形象方案' : `${sceneLabel}场合还没有方案`}</Text>
-            <Text className="plans__scene-empty-desc">
-              {scene === 'general' ? '基于你的形象档案生成三套方案' : '回答 4 个选择（约 30 秒），复用档案不重复要照片'}
-            </Text>
-            <PrimaryButton
-              text={scene === 'general' ? '生成形象方案' : `生成${sceneLabel}方案`}
-              onClick={generateScenePlan}
-            />
-          </View>
+          groupTaskId ? (
+            <View className="plans__scene-empty fade-up">
+              <View className="plans__generating">
+                <View className="plans__generating-spin spinner" />
+                <Text className="plans__generating-text">正在从你的报告生成三套方案，通常需要 1-2 分钟</Text>
+              </View>
+            </View>
+          ) : (
+            <View className="plans__scene-empty fade-up">
+              <Text className="plans__scene-empty-title">{scene === 'general' ? '还没有形象方案' : `${sceneLabel}场合还没有方案`}</Text>
+              <Text className="plans__scene-empty-desc">
+                {scene === 'general' ? '基于你的形象档案生成三套方案' : '回答 4 个选择（约 30 秒），复用档案不重复要照片'}
+              </Text>
+              <PrimaryButton
+                text={scene === 'general' ? '生成形象方案' : `生成${sceneLabel}方案`}
+                onClick={generateScenePlan}
+              />
+            </View>
+          )
         ) : (
           <>
         <View className="plans__hero fade-up">

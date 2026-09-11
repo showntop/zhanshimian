@@ -127,7 +127,7 @@ func TestRoutedAnalyzerRunsCheckBeforeAnalysis(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if analysisCalls != 1 || len(output.Plans) != 3 {
+	if analysisCalls != 1 || len(output.Findings) != 4 {
 		t.Fatalf("analysis did not run after a passing check: calls=%d output=%#v", analysisCalls, output)
 	}
 }

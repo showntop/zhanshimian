@@ -81,55 +81,75 @@ func (s *Service) GetPlan(ctx context.Context, userID, planID string) (domain.Pl
 // group. It merges the old scene-plans and plan-looks endpoints: text is
 // produced synchronously, image tasks are enqueued (embedded as each plan's
 // look_task), and calling it twice with the same answers creates nothing new.
-func (s *Service) PutReportPlans(ctx context.Context, userID, reportID string, input domain.PlansUpsertInput) ([]domain.Plan, error) {
+// PutReportPlans 幂等确保某场景的方案组存在：general 空组时触发 plan_group
+// 生成任务（返回 task 视图，HTTP 202），已有组只补缺失的形象图任务。
+func (s *Service) PutReportPlans(ctx context.Context, userID, reportID string, input domain.PlansUpsertInput) ([]domain.Plan, *domain.TaskView, error) {
 	if _, err := uuid.Parse(reportID); err != nil {
-		return nil, fmt.Errorf("%w: 无效的形象报告", ErrValidation)
+		return nil, nil, fmt.Errorf("%w: 无效的形象报告", ErrValidation)
 	}
 	if input.Scene == "" {
 		input.Scene = "general"
 	}
 	if !validPlanScenes[input.Scene] {
-		return nil, fmt.Errorf("%w: 不支持的使用场景", ErrValidation)
+		return nil, nil, fmt.Errorf("%w: 不支持的使用场景", ErrValidation)
 	}
 	if _, err := s.repo.GetReport(ctx, userID, reportID); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var plans []domain.Plan
 	if input.Scene == "general" {
-		// The general group is authored by the analysis itself; PUT only
-		// back-fills look tasks for plans that never got an image.
 		var err error
 		if plans, err = s.repo.ListPlans(ctx, userID, reportID, "general"); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if len(plans) == 0 {
-			return nil, repository.ErrNotFound
+			// 报告与方案解耦：general 组由 plan_group 任务从报告内容生成。
+			// 幂等：已有排队/进行中的生成任务直接复用，不重复入队。
+			latest, err := s.repo.LatestTasksByRef(ctx, userID, domain.TaskTypePlanGroup, "report_id", []string{reportID})
+			if err != nil {
+				return nil, nil, err
+			}
+			var task domain.Task
+			if existing, ok := latest[reportID]; ok && (existing.Status == domain.TaskQueued || existing.Status == domain.TaskProcessing) {
+				task = existing
+			} else {
+				task, err = s.repo.CreateTask(ctx, userID, domain.TaskInput{
+					Type:    domain.TaskTypePlanGroup,
+					Payload: domain.PlanGroupTaskPayload{ReportID: reportID},
+					Stage:   "正在准备生成三套方案",
+				})
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+			view := decodeTaskErrorView(taskView(task))
+			return nil, &view, nil
 		}
 	} else {
 		if len(input.Answers) == 0 {
-			return nil, fmt.Errorf("%w: 请先完成%s信息", ErrValidation, sceneLabels[input.Scene])
+			return nil, nil, fmt.Errorf("%w: 请先完成%s信息", ErrValidation, sceneLabels[input.Scene])
 		}
 		sceneInput := domain.ScenePlanInput{Scene: input.Scene, Answers: input.Answers}
 		normalized, err := normalizedSceneAnswers(sceneInput)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sceneInput.Answers = normalized
 		var err2 error
 		if plans, err2 = s.repo.UpsertScenePlans(ctx, userID, reportID, sceneInput, buildScenePlans(sceneInput)); err2 != nil {
-			return nil, err2
+			return nil, nil, err2
 		}
 	}
 	if _, err := s.enqueueMissingPlanLooks(ctx, userID, plans); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := s.attachPlanLookTasks(ctx, userID, plans); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for index := range plans {
 		s.resolvePlanURLs(&plans[index])
 	}
-	return plans, nil
+	return plans, nil, nil
 }
 
 // enqueueMissingPlanLooks adds a plan_look task for every plan without a

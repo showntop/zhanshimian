@@ -154,7 +154,9 @@ export interface ApiEndpoints {
 
   // ---- 方案（7） ----
   listPlans(reportId: string, scene?: string): Promise<Plan[]>
-  upsertPlans(reportId: string, input: UpsertPlansInput): Promise<Plan[]>
+  /** 幂等确保方案组存在：已有组返回 plans（200）；general 空组触发
+   *  plan_group 生成任务（202），信封 task 携带任务引用供轮询。 */
+  upsertPlans(reportId: string, input: UpsertPlansInput): Promise<TaskCreated<Plan[]>>
   regeneratePlanLook(planId: string): Promise<TaskCreated<Plan>>
   getPlan(id: string): Promise<Plan>
   selectPlan(id: string): Promise<Plan>
@@ -245,7 +247,7 @@ export function createApiEndpoints(client: ApiClient, options: EndpointOptions =
 
     // ---------- 方案 ----------
     listPlans: (reportId, scene) => client.request(`${pathId('/v1/reports', reportId)}/plans${query({ scene })}`),
-    upsertPlans: (reportId, input) => client.request(`${pathId('/v1/reports', reportId)}/plans`, { method: 'PUT', data: input }),
+    upsertPlans: (reportId, input) => client.requestEnvelope(`${pathId('/v1/reports', reportId)}/plans`, { method: 'PUT', data: input }),
     regeneratePlanLook: (planId) => client.requestEnvelope(`/v1/plans/${encodeURIComponent(planId)}/look/regenerate`, { method: 'POST' }),
     getPlan: (id) => client.request(pathId('/v1/plans', id)),
     selectPlan: (id) => client.request(`/v1/plans/${encodeURIComponent(id)}/select`, { method: 'POST' }),

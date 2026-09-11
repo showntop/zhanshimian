@@ -12,11 +12,10 @@ func TestDemoAnalyzerReturnsRespectfulCompleteOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(output.Findings) != 4 || len(output.Plans) != 3 {
-		t.Fatalf("unexpected output sizes: findings=%d plans=%d", len(output.Findings), len(output.Plans))
-	}
-	if !output.Plans[0].Recommended || len(output.Plans[0].Steps) != 3 {
-		t.Fatalf("first plan should be recommended and actionable: %#v", output.Plans[0])
+	// 报告与方案解耦：分析只产出 findings/标签/优先建议，方案由
+	// plan_group 生成器负责（见 DemoPlanGroupGenerator 测试）。
+	if len(output.Findings) != 4 || len(output.ImpressionTags) != 3 {
+		t.Fatalf("unexpected output sizes: findings=%d tags=%d", len(output.Findings), len(output.ImpressionTags))
 	}
 	for _, forbidden := range []string{"颜值", "丑", "身材分"} {
 		if contains(output.PriorityCopy, forbidden) {

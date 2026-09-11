@@ -14,14 +14,15 @@ import (
 )
 
 type AIBundle struct {
-	Analyzer provider.Analyzer
-	Hair     provider.HairPreviewGenerator
-	Look     provider.LookGenerator
-	Outfit   provider.OutfitAdvisor
-	Purchase provider.OutfitAdvisor
-	Advisor  provider.AdvisorChat
-	Today    provider.TodayPlanner
-	Routes   map[string]string
+	Analyzer  provider.Analyzer
+	Hair      provider.HairPreviewGenerator
+	PlanGroup provider.PlanGroupGenerator
+	Look      provider.LookGenerator
+	Outfit    provider.OutfitAdvisor
+	Purchase  provider.OutfitAdvisor
+	Advisor   provider.AdvisorChat
+	Today     provider.TodayPlanner
+	Routes    map[string]string
 }
 
 // BuildAI 一律走能力路由（AGENTS.md 红线：AI 只经 ai-routing.*.json）。
@@ -75,6 +76,13 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 		return AIBundle{}, err
 	}
 	bundle := AIBundle{Analyzer: analyzer, Hair: hair, Outfit: outfit, Routes: runtime.RouteSummary()}
+	// 方案组生成与形象分析同用文本结构化能力，报告与方案解耦后由
+	// plan_group 任务调用（报告内容作为输入，保持方案贴合报告）。
+	planGroup, err := provider.NewRoutedPlanGroupGenerator(runtime)
+	if err != nil {
+		return AIBundle{}, err
+	}
+	bundle.PlanGroup = planGroup
 	if runtime.HasRoute(provider.CapabilityFullLookEdit) {
 		look, err := provider.NewRoutedLookGenerator(runtime, loader)
 		if err != nil {

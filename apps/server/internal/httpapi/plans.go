@@ -15,16 +15,22 @@ func (a *API) listPlans(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, items)
 }
 
-// PUT /v1/reports/{id}/plans —— 幂等创建-或-刷新该场景的三方案组（同步产文字 + 入队图片生成）。
+// PUT /v1/reports/{id}/plans —— 幂等确保该场景的三方案组存在：
+// 已有组同步补图任务（200 + plans）；general 空组触发 plan_group
+// 生成任务（202 + task ref），客户端轮询任务直到方案就绪。
 func (a *API) putReportPlans(w http.ResponseWriter, r *http.Request) {
 	var input domain.PlansUpsertInput
 	if err := decodeJSON(r, &input); err != nil {
 		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
 		return
 	}
-	items, err := a.service.PutReportPlans(r.Context(), currentUser(r).ID, r.PathValue("id"), input)
+	items, task, err := a.service.PutReportPlans(r.Context(), currentUser(r).ID, r.PathValue("id"), input)
 	if err != nil {
 		a.writeServiceError(w, r, err)
+		return
+	}
+	if task != nil {
+		writeDataTask(w, http.StatusAccepted, items, viewTaskRef(*task))
 		return
 	}
 	writeData(w, http.StatusOK, items)

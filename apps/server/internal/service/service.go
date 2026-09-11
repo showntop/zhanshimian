@@ -32,6 +32,7 @@ type Service struct {
 	storage                storage.ObjectStorage
 	analyzer               provider.Analyzer
 	hairGenerator          provider.HairPreviewGenerator
+	planGroupGenerator     provider.PlanGroupGenerator
 	lookGenerator          provider.LookGenerator
 	outfitAdvisor          provider.OutfitAdvisor
 	purchaseAdvisor        provider.OutfitAdvisor
@@ -55,6 +56,7 @@ type Service struct {
 type ProviderOptions struct {
 	Hair        provider.HairPreviewGenerator
 	Look        provider.LookGenerator
+	PlanGroup   provider.PlanGroupGenerator
 	Outfit      provider.OutfitAdvisor
 	Purchase    provider.OutfitAdvisor
 	Advisor     provider.AdvisorChat
@@ -70,6 +72,7 @@ type ProviderOptions struct {
 
 func New(repo repository.Repository, objects storage.ObjectStorage, analyzer provider.Analyzer, publicBaseURL string, sessionTTL time.Duration, maxUpload int64, logger *slog.Logger, options ...ProviderOptions) *Service {
 	hairGenerator := provider.HairPreviewGenerator(provider.NewDemoHairGenerator())
+	planGroupGenerator := provider.PlanGroupGenerator(provider.NewDemoPlanGroupGenerator())
 	outfitAdvisor := provider.OutfitAdvisor(provider.NewDemoOutfitAdvisor())
 	var purchaseAdvisor provider.OutfitAdvisor
 	var advisorChat provider.AdvisorChat
@@ -85,6 +88,9 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 	if len(options) > 0 {
 		if options[0].Hair != nil {
 			hairGenerator = options[0].Hair
+		}
+		if options[0].PlanGroup != nil {
+			planGroupGenerator = options[0].PlanGroup
 		}
 		if options[0].Outfit != nil {
 			outfitAdvisor = options[0].Outfit
@@ -113,7 +119,8 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 	}
 	service := &Service{
 		repo: repo, storage: objects, analyzer: analyzer, hairGenerator: hairGenerator,
-		lookGenerator: lookGenerator, outfitAdvisor: outfitAdvisor, purchaseAdvisor: purchaseAdvisor,
+		planGroupGenerator: planGroupGenerator,
+		lookGenerator:      lookGenerator, outfitAdvisor: outfitAdvisor, purchaseAdvisor: purchaseAdvisor,
 		advisorChat: advisorChat, todayPlanner: todayPlanner, weather: weather,
 		wechat: wechat, wechatApp: wechatApp, apple: apple, sms: smsSender,
 		smsRatePerPhonePerHour: smsPerPhone,
@@ -124,6 +131,7 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 	service.handlers = map[domain.TaskType]TaskHandler{
 		domain.TaskTypeAnalysis:    analysisTaskHandler{service},
 		domain.TaskTypeHairPreview: hairPreviewTaskHandler{service},
+		domain.TaskTypePlanGroup:   planGroupTaskHandler{service},
 		domain.TaskTypePlanLook:    planLookTaskHandler{service},
 		domain.TaskTypeTodayLook:   todayLookTaskHandler{service},
 	}

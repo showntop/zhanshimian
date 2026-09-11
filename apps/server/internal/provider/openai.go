@@ -144,8 +144,8 @@ func analysisPrompt(input domain.CreateAnalysisInput) string {
 	return fmt.Sprintf(`请根据依次提供的正脸、侧脸和全身照，为用户生成中文形象分析。
 场景：%s；职业：%s；身高：%d cm；预算：%s。
 	只描述能从照片直接观察到的发型重心、眉眼对比、头肩比例、服装轮廓和配色。不要给出颜值或身材评分，不推断敏感属性。
-	输出 3 个当前印象标签、4 个可提升点、一个最优先建议，以及严格 3 套方案。每套方案必须包含 hair、makeup、outfit 三个步骤和可执行细节。顶层必须输出一个 JSON 对象，不要输出数组、Markdown 或额外解释。
-	每个可提升点必须包含 label、category（只能填 hair、makeup、outfit、color 之一）、severity（只能填 low、medium、high）、photo（只能填 face、side、body 之一，表示该结论来自哪张照片）、anchor_x 和 anchor_y（0 到 1 之间的小数，表示该部位在 photo 指向那张照片上的相对位置，x 向右、y 向下，不要用百分比或像素；发型发顶大约在头部 y 0.02–0.2，正脸的眉眼在 y 0.3–0.5，全身照的肩线在 y 0.2–0.35、服装主体在 y 0.3–0.7，按实际构图微调）、detail（一两句话，说明在照片里看到的依据和值得调整的方向，语气温和具体，不超过 60 字）。不同可提升点的锚点必须落在各自部位的真实位置上，任意两点之间在 x 或 y 方向至少相距 0.1，绝不允许全部集中在画面中心。3 套方案的 slug 必须分别是 sharp、warm、natural，且恰好一套 recommended 为 true。`, input.Scene, input.Profile.Role, input.Profile.HeightCM, input.Profile.Budget)
+	输出 3 个当前印象标签、4 个可提升点、一个最优先建议。顶层必须输出一个 JSON 对象，不要输出数组、Markdown 或额外解释。
+	每个可提升点必须包含 label、category（只能填 hair、makeup、outfit、color 之一）、severity（只能填 low、medium、high）、photo（只能填 face、side、body 之一，表示该结论来自哪张照片）、anchor_x 和 anchor_y（0 到 1 之间的小数，表示该部位在 photo 指向那张照片上的相对位置，x 向右、y 向下，不要用百分比或像素；发型发顶大约在头部 y 0.02–0.2，正脸的眉眼在 y 0.3–0.5，全身照的肩线在 y 0.2–0.35、服装主体在 y 0.3–0.7，按实际构图微调）、detail（一两句话，说明在照片里看到的依据和值得调整的方向，语气温和具体，不超过 60 字）。不同可提升点的锚点必须落在各自部位的真实位置上，任意两点之间在 x 或 y 方向至少相距 0.1，绝不允许全部集中在画面中心。`, input.Scene, input.Profile.Role, input.Profile.HeightCM, input.Profile.Budget)
 }
 
 func photoKindName(kind string) string {
@@ -184,24 +184,6 @@ func (payload analysisPayload) toDomain(images []AnalysisImage, providerVersion 
 			Photo: finding.Photo, AnchorX: finding.AnchorX, AnchorY: finding.AnchorY,
 		})
 	}
-	imageURLs := map[string]string{"sharp": "/assets/looks/sharp.png", "warm": "/assets/looks/warm.png", "natural": "/assets/looks/natural.png"}
-	for index, plan := range payload.Plans {
-		domainPlan := domain.Plan{
-			Name: plan.Name, Slug: plan.Slug, ImageURL: imageURLs[plan.Slug], Recommended: plan.Recommended,
-			Descriptor: plan.Descriptor, Why: plan.Why, OutcomeTags: plan.OutcomeTags,
-			DifferenceTags: plan.DifferenceTags, Sort: index + 1,
-		}
-		for stepIndex, step := range plan.Steps {
-			details, err := json.Marshal(step.Details)
-			if err != nil {
-				return domain.AnalysisOutput{}, err
-			}
-			domainPlan.Steps = append(domainPlan.Steps, domain.PlanStep{
-				Category: step.Category, Title: step.Title, Summary: step.Summary, Details: details, Sort: stepIndex + 1,
-			})
-		}
-		output.Plans = append(output.Plans, domainPlan)
-	}
 	return output, nil
 }
 
@@ -215,8 +197,8 @@ func preview(value string) string {
 }
 
 func validateAnalysisPayload(payload analysisPayload) error {
-	if len(payload.ImpressionTags) != 3 || len(payload.Findings) != 4 || len(payload.Plans) != 3 {
-		return fmt.Errorf("provider output has invalid collection sizes: tags=%d findings=%d plans=%d, want 3/4/3", len(payload.ImpressionTags), len(payload.Findings), len(payload.Plans))
+	if len(payload.ImpressionTags) != 3 || len(payload.Findings) != 4 {
+		return fmt.Errorf("provider output has invalid collection sizes: tags=%d findings=%d, want 3/4", len(payload.ImpressionTags), len(payload.Findings))
 	}
 	if !safeText(payload.PriorityTitle) || !safeText(payload.PriorityCopy) {
 		return fmt.Errorf("provider output contains unsafe or empty priority copy: title=%q copy=%q", preview(payload.PriorityTitle), preview(payload.PriorityCopy))
@@ -228,33 +210,6 @@ func validateAnalysisPayload(payload analysisPayload) error {
 		if !safeText(finding.Label) || !allowedCategories[finding.Category] || !allowedSeverity[finding.Severity] || !safeText(finding.Detail) || !allowedPhotos[finding.Photo] || finding.AnchorX < 0 || finding.AnchorX > 1 || finding.AnchorY < 0 || finding.AnchorY > 1 {
 			return fmt.Errorf("provider output contains invalid finding %d: category=%q severity=%q photo=%q anchor=(%.2f,%.2f) label=%q detail=%q", index+1, finding.Category, finding.Severity, finding.Photo, finding.AnchorX, finding.AnchorY, preview(finding.Label), preview(finding.Detail))
 		}
-	}
-	allowedSlugs := map[string]bool{"sharp": true, "warm": true, "natural": true}
-	recommended := 0
-	seenSlugs := map[string]bool{}
-	for _, plan := range payload.Plans {
-		if !allowedSlugs[plan.Slug] || seenSlugs[plan.Slug] || !safeText(plan.Name) || !safeText(plan.Descriptor) || !safeText(plan.Why) || len(plan.OutcomeTags) != 3 || len(plan.DifferenceTags) != 3 || len(plan.Steps) != 3 {
-			return fmt.Errorf("provider output contains invalid plan %q: name=%q outcome_tags=%d difference_tags=%d steps=%d (want slug sharp/warm/natural unique, 3/3/3)", plan.Slug, preview(plan.Name), len(plan.OutcomeTags), len(plan.DifferenceTags), len(plan.Steps))
-		}
-		seenSlugs[plan.Slug] = true
-		if plan.Recommended {
-			recommended++
-		}
-		seenCategories := map[string]bool{}
-		for _, step := range plan.Steps {
-			if !map[string]bool{"hair": true, "makeup": true, "outfit": true}[step.Category] || seenCategories[step.Category] || !safeText(step.Title) || !safeText(step.Summary) || len(step.Details) < 2 || len(step.Details) > 4 {
-				return fmt.Errorf("provider output contains invalid step in plan %q: category=%q details=%d (want hair/makeup/outfit unique, 2-4) title=%q", plan.Slug, step.Category, len(step.Details), preview(step.Title))
-			}
-			seenCategories[step.Category] = true
-			for _, detail := range step.Details {
-				if !safeText(detail.Label) || !safeText(detail.Value) {
-					return fmt.Errorf("provider output contains unsafe or empty detail in plan %q step %q: label=%q value=%q", plan.Slug, step.Category, preview(detail.Label), preview(detail.Value))
-				}
-			}
-		}
-	}
-	if recommended != 1 {
-		return fmt.Errorf("provider output must recommend exactly one plan, got %d", recommended)
 	}
 	for _, tag := range payload.ImpressionTags {
 		if !safeText(tag) {
@@ -335,20 +290,6 @@ func safeText(value string) bool {
 func analysisSchema() map[string]any {
 	stringSchema := map[string]any{"type": "string", "minLength": 1, "maxLength": 160}
 	stringArray3 := map[string]any{"type": "array", "items": stringSchema, "minItems": 3, "maxItems": 3}
-	detail := objectSchema(map[string]any{"label": stringSchema, "value": stringSchema}, "label", "value")
-	step := objectSchema(map[string]any{
-		"category": map[string]any{"type": "string", "enum": []string{"hair", "makeup", "outfit"}},
-		"title":    stringSchema, "summary": stringSchema,
-		"details": map[string]any{"type": "array", "items": detail, "minItems": 2, "maxItems": 4},
-	}, "category", "title", "summary", "details")
-	plan := objectSchema(map[string]any{
-		"name":        stringSchema,
-		"slug":        map[string]any{"type": "string", "enum": []string{"sharp", "warm", "natural"}},
-		"recommended": map[string]any{"type": "boolean"},
-		"descriptor":  stringSchema, "why": stringSchema,
-		"outcome_tags": stringArray3, "difference_tags": stringArray3,
-		"steps": map[string]any{"type": "array", "items": step, "minItems": 3, "maxItems": 3},
-	}, "name", "slug", "recommended", "descriptor", "why", "outcome_tags", "difference_tags", "steps")
 	finding := objectSchema(map[string]any{
 		"label":    stringSchema,
 		"category": map[string]any{"type": "string", "enum": []string{"hair", "makeup", "outfit", "color"}},
@@ -363,8 +304,7 @@ func analysisSchema() map[string]any {
 		"priority_title":  stringSchema,
 		"priority_copy":   stringSchema,
 		"findings":        map[string]any{"type": "array", "items": finding, "minItems": 4, "maxItems": 4},
-		"plans":           map[string]any{"type": "array", "items": plan, "minItems": 3, "maxItems": 3},
-	}, "impression_tags", "priority_title", "priority_copy", "findings", "plans")
+	}, "impression_tags", "priority_title", "priority_copy", "findings")
 }
 
 func objectSchema(properties map[string]any, required ...string) map[string]any {

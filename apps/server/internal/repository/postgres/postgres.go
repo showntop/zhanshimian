@@ -616,22 +616,9 @@ func (s *Store) CompleteAnalysis(ctx context.Context, userID, analysisID string,
 			return "", err
 		}
 	}
-	for _, plan := range output.Plans {
-		var planID string
-		err = tx.QueryRow(ctx, `
-			INSERT INTO plans(report_id,user_id,scene,name,slug,image_url,recommended,descriptor,why,outcome_tags,difference_tags,sort_order)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id::text`, reportID, userID, "general", plan.Name, plan.Slug, plan.ImageURL, plan.Recommended, plan.Descriptor, plan.Why, plan.OutcomeTags, plan.DifferenceTags, plan.Sort).Scan(&planID)
-		if err != nil {
-			return "", err
-		}
-		for _, step := range plan.Steps {
-			_, err = tx.Exec(ctx, `INSERT INTO plan_steps(plan_id,category,title,summary,details,sort_order) VALUES($1,$2,$3,$4,$5,$6)`, planID, step.Category, step.Title, step.Summary, step.Details, step.Sort)
-			if err != nil {
-				return "", err
-			}
-		}
-	}
-	_, err = tx.Exec(ctx, `UPDATE analyses SET status='completed',progress=100,stage='三套方案已经准备好',updated_at=now() WHERE id=$1::uuid`, analysisID)
+	// 报告与方案解耦：分析只落报告（含 findings），general 方案组由
+	// plan_group 任务从报告内容生成（见 service.processPlanGroup）。
+	_, err = tx.Exec(ctx, `UPDATE analyses SET status='completed',progress=100,stage='形象报告已经准备好',updated_at=now() WHERE id=$1::uuid`, analysisID)
 	if err != nil {
 		return "", err
 	}

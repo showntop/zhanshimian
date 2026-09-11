@@ -63,6 +63,12 @@
       margin-top: 16rpx;
       min-width: 320rpx;
     }
+
+    // 生成中视图：居中呈现，不套 info 卡的排版
+    .plans__generating {
+      margin-top: 0;
+      justify-content: center;
+    }
   }
 
   &__hero {

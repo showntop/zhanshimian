@@ -113,7 +113,7 @@ export const ANALYSIS_STAGE_TIMELINE: ReadonlyArray<{ at: number; text: string }
   { at: 78, text: '正在匹配场景与预算' },
   { at: 86, text: '正在组合发型、妆容与穿搭' },
   { at: 94, text: '正在保存形象档案' },
-  { at: 100, text: '三套方案已经准备好' }
+  { at: 100, text: '形象报告已经准备好' }
 ] as const
 
 /** 按显示进度取时间线文案；进度越界时取首/末条。 */
