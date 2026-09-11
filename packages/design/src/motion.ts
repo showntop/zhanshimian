@@ -27,16 +27,34 @@ export const sheetDismissThreshold = { y: 96, velocity: 0.55 } as const
 export const durations = {
   fadeUp: 520,
   press: 160,
+  select: 200,
   scan: 2000,
   shimmer: 1300,
   checkPop: 250,
   previewFade: 300,
   countUp: 300,
-  archReveal: 600
+  archReveal: 600,
+  drawer: 300,
+  sheetInMs: 320,
+  sheetOutMs: 240,
+  mask: 160,
+  halo: 4000,
+  stepPulse: 1600
 } as const
 
 /** 级联入场步进（报告页 findings chips 等，80ms 递增） */
 export const staggerStep = 80
+
+/** 页面入场结束后再钉住，避免中途切走再回来重播 */
+export const settlePad = 240
+
+/** 动效时间轴：入场 / 浏览 / 操作 / 结果 错峰，不同时抢注意力 */
+export const timelines = {
+  enter: 'fade-up',
+  browse: 'halo / scan / pulse',
+  act: 'press / select / drawer',
+  result: 'checkPop / previewFade / archReveal'
+} as const
 
 /** 标准曲线（品牌缓动）：入场/转场一律用它 */
 export const easing = 'cubic-bezier(.2,.8,.2,1)' as const

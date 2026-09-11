@@ -54,7 +54,9 @@ const SceneTile = memo(function SceneTile({ scene }: { scene: SceneCopy }) {
       className={`home__scene home__scene--${scene.id} pressable`}
       onClick={() => Taro.navigateTo({ url: `/pages/scene/index?scene=${scene.id}` })}
     >
-      <Image className="home__scene-icon" src={SCENE_ICONS[scene.id]} mode="aspectFit" lazyLoad={false} fadeIn={false} />
+      <View className="home__scene-visual">
+        <Image className="home__scene-icon" src={SCENE_ICONS[scene.id]} mode="aspectFit" lazyLoad={false} fadeIn={false} />
+      </View>
       <View className="home__scene-copy">
         <Text className="home__scene-label">{scene.label}</Text>
         <Text className="home__scene-desc">{scene.note}</Text>
@@ -278,7 +280,7 @@ export default function Home() {
 
           {!hasReport ? (
             <View className={enter(1)}>
-              <View className="home__hero home__hero--onboard card--hero">
+              <View className="home__hero home__hero--onboard card--hero halo">
                 <View className="home__hero-top">
                   <View className="home__hero-copy">
                     <Text className="home__hero-eyebrow">{HOME_COPY.startArchive}</Text>
@@ -286,9 +288,36 @@ export default function Home() {
                     <Text className="home__hero-desc">{HOME_COPY.archiveBody}</Text>
                   </View>
                   <View className="home__hero-preview">
-                    <View className="home__preview-slice home__preview-slice--1" />
-                    <View className="home__preview-slice home__preview-slice--2" />
-                    <View className="home__preview-slice home__preview-slice--3" />
+                    <View className="home__preview-slice home__preview-slice--1">
+                      <ExampleImage
+                        className="home__preview-image"
+                        slug="natural"
+                        variant="portrait"
+                        badgeText="风格参考"
+                      />
+                      <Text className="home__preview-caption">照片</Text>
+                    </View>
+                    <View className="home__preview-slice home__preview-slice--2">
+                      <ExampleImage
+                        className="home__preview-image"
+                        slug="natural"
+                        variant="report"
+                        badgeText="风格参考"
+                      />
+                      <View className="home__preview-focus">
+                        <View className="home__preview-focus-dot" />
+                      </View>
+                      <Text className="home__preview-caption">理解</Text>
+                    </View>
+                    <View className="home__preview-slice home__preview-slice--3">
+                      <ExampleImage
+                        className="home__preview-image"
+                        slug="sharp"
+                        variant="plan"
+                        badgeText="风格参考"
+                      />
+                      <Text className="home__preview-caption">方案</Text>
+                    </View>
                   </View>
                 </View>
                 <View className="home__steps">
@@ -317,7 +346,7 @@ export default function Home() {
           ) : todayPlan ? (
             <View>
               <View
-                className="home__hero home__hero--today card--hero pressable"
+                className="home__hero home__hero--today home__hero--photo card--hero pressable halo"
                 onClick={() => Taro.navigateTo({ url: '/packages/life/pages/today/index' })}
               >
                 <View className={`home__hero-copy ${enter(1)}`}>
@@ -389,16 +418,27 @@ export default function Home() {
                 return (
                   <View
                     key={tool.key}
-                    className="home__tool pressable"
+                    className={`home__tool pressable ${tool.key === 'hair' ? 'home__tool--lead' : ''}`}
                     onClick={() => Taro.navigateTo({ url: tool.path })}
                   >
+                    <View className="home__tool-copy">
+                      <Text className="home__tool-name">{tool.label}</Text>
+                      <Text className="home__tool-desc">{tool.desc}</Text>
+                    </View>
+                    {tool.key === 'hair' ? (
+                      <ExampleImage
+                        className="home__tool-visual"
+                        slug="natural"
+                        variant="hair"
+                        badgeText="风格参考"
+                        mode="aspectFit"
+                      />
+                    ) : null}
                     {badge ? (
                       <Text className={`home__tool-badge ${badge === '生成中' || badge === '诊断中' || badge === '判断中' ? 'home__tool-badge--live' : ''}`}>
                         {badge}
                       </Text>
                     ) : null}
-                    <Text className="home__tool-name">{tool.label}</Text>
-                    <Text className="home__tool-desc">{tool.desc}</Text>
                   </View>
                 )
               })}
@@ -411,16 +451,9 @@ export default function Home() {
               <View className="section-rule" />
             </View>
             <View className="home__scenes">
-              <View className="home__scene-row">
-                {SCENES.slice(0, 3).map((scene) => (
-                  <SceneTile key={scene.id} scene={scene} />
-                ))}
-              </View>
-              <View className="home__scene-row">
-                {SCENES.slice(3).map((scene) => (
-                  <SceneTile key={scene.id} scene={scene} />
-                ))}
-              </View>
+              {SCENES.map((scene) => (
+                <SceneTile key={scene.id} scene={scene} />
+              ))}
             </View>
             {hasReport ? <Text className="home__scene-note">{HOME_COPY.sceneReadyNote}</Text> : null}
           </View>

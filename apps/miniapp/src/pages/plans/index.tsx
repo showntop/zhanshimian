@@ -43,6 +43,7 @@ export default function Plans() {
   const [currentImage, setCurrentImage] = useState('')
   const [index, setIndex] = useState(0)
   const [whyOpen, setWhyOpen] = useState(false)
+  const [compareHint, setCompareHint] = useState(() => !readStorage('zsm.compareHint'))
   // 方案图真实宽高（onLoad 采集，决定 hero 高度）
   const [photoDims, setPhotoDims] = useState<Record<string, { w: number; h: number }>>({})
   const [loading, setLoading] = useState(true)
@@ -300,7 +301,16 @@ export default function Plans() {
         {/* 拖动对比 hero：照片满宽完整展示（高度跟随照片比例），
             无侧边区无裁切。key 随方案切换重挂载 → 交叉淡入 */}
         <View className="plans__hero">
-          <View className="plans__hero-frame" style={{ height: `${heroPx}px` }} key={plan?.id}>
+          <View
+            className="plans__hero-frame"
+            style={{ height: `${heroPx}px` }}
+            key={plan?.id}
+            onClick={() => {
+              if (!compareHint) return
+              setCompareHint(false)
+              writeStorage('zsm.compareHint', '1')
+            }}
+          >
             <CompareSlider
               single={!currentImage || !planImage || scene !== 'general'}
               current={<ExampleImage className="plans__hero-img" src={currentImage} user mode="widthFix" />}
@@ -323,6 +333,10 @@ export default function Plans() {
                 />
               }
             />
+            {compareHint && scene === 'general' && currentImage && planImage ? (
+              <Text className="plans__hint">左右拖动，看原本和方案</Text>
+            ) : null}
+            <View className="plans__hero-fade" />
           </View>
         </View>
 
@@ -353,7 +367,7 @@ export default function Plans() {
         {/* 悬浮选择坞：收益词 + 三选一 + CTA 收进毛玻璃坞，浮在照片底部
             上方不占文档流——照片有多高就展示多高，选择要素常驻第一屏 */}
         {plan ? (
-          <View className={`plans__dock ${enter(2)}`}>
+          <View className={`plans__dock dock-glass ${enter(2)}`}>
             {(plan.outcome_tags ?? []).length > 0 ? (
               <View className="plans__outcome">
                 {plan.outcome_tags.slice(0, 3).map((tag) => (

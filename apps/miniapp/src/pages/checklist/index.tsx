@@ -96,6 +96,10 @@ export default function Checklist() {
     <View className={pageClass}>
       <AppHeader title="执行清单" back />
       <View className="cklist">
+        <View className="cklist__anchor fade-up">
+          <Text className="cklist__anchor-label">当前方案</Text>
+          <Text className="cklist__anchor-title">按步骤完成，再回来反馈</Text>
+        </View>
         <View className="cklist__progress fade-up">
           <View className="cklist__progress-track">
             <View className="cklist__progress-fill" style={{ width: `${(done / items.length) * 100}%` }} />

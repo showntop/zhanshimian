@@ -73,6 +73,21 @@
       transform: rotate(5deg);
       animation-delay: 0.28s;
     }
+
+    &--rest {
+      transform: rotate(0deg);
+      opacity: 0.92;
+    }
+  }
+
+  &__portrait-frame--settle {
+    .analysis__hero {
+      filter: none;
+    }
+
+    .analysis__mini {
+      transform: rotate(0deg);
+    }
   }
 
   &__stage {
@@ -111,7 +126,7 @@
         inset: 0;
         background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0) 100%);
         transform: translateX(-100%);
-        animation: analysis-shimmer 2.6s ease-in-out infinite;
+        animation: analysis-shimmer 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
       }
     }
 
@@ -166,6 +181,19 @@
     margin-top: 24rpx;
     width: 60%;
   }
+
+  &__film {
+    display: flex;
+    gap: 16rpx;
+    margin: 8rpx 0 12rpx;
+  }
+
+  &__thumb {
+    width: 120rpx;
+    height: 160rpx;
+    border-radius: var(--radius-md);
+    background: var(--moss-soft);
+  }
 }
 
 @keyframes analysis-stage-swap {
@@ -194,6 +222,12 @@
   text-align: center;
   font-size: 23rpx;
   color: var(--ink-3);
+}
+
+@keyframes analysis-shimmer {
+  to {
+    transform: translateX(100%);
+  }
 }
 
 @keyframes analysis-hero-in {

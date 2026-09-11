@@ -37,7 +37,7 @@
   }
 
   &--disabled {
-    background: #cdd3c8;
+    background: var(--disabled);
     box-shadow: none;
     color: rgba(255, 255, 255, 0.9);
   }

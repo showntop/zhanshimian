@@ -173,6 +173,7 @@ export default function PlanDetail() {
         </View>
 
         <View className="pd__board fade-up">
+          <Text className="pd__hint">上滑看发型、妆容与穿搭细节</Text>
           <View className="pd__head">
             <Text className="pd__series">{plan.name}</Text>
             {tabs.length > 1 ? (

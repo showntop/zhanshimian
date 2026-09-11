@@ -123,7 +123,7 @@
       }
 
       .primary-button {
-        margin-top: 32rpx;
+        margin-top: 24rpx;
       }
     }
   }
@@ -148,6 +148,10 @@
     width: 118rpx;
     height: 164rpx;
     border-radius: 18rpx;
+    display: flex;
+    align-items: flex-end;
+    padding: 12rpx;
+    overflow: hidden;
     border: 2rpx solid rgba(238, 240, 236, 0.42);
     box-shadow: 0 12rpx 28rpx rgba(20, 27, 17, 0.18);
 
@@ -155,29 +159,81 @@
       left: 0;
       top: 18rpx;
       transform: rotate(-8deg);
-      background: linear-gradient(155deg, #e3e8df 0%, #9eb181 100%);
     }
 
     &--2 {
       left: 35rpx;
       top: 0;
       z-index: 2;
-      background: linear-gradient(165deg, #eceeea 0%, #b8c4a8 100%);
     }
 
     &--3 {
       right: 0;
       top: 28rpx;
       transform: rotate(8deg);
-      background: linear-gradient(145deg, #dfe5da 0%, #7c9263 100%);
     }
+  }
+
+  &__preview-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+
+    .example-image__img {
+      transform: scale(1.04);
+    }
+
+    .example-badge {
+      top: 7rpx;
+      right: 7rpx;
+      bottom: auto;
+      left: auto;
+      padding: 2rpx 6rpx;
+      font-size: 12rpx;
+      line-height: 1.2;
+    }
+  }
+
+  &__preview-focus {
+    position: absolute;
+    left: 50%;
+    top: 34%;
+    z-index: 2;
+    width: 54rpx;
+    height: 54rpx;
+    border: 2rpx solid rgba(238, 240, 236, 0.88);
+    border-radius: 999rpx;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 8rpx rgba(88, 115, 68, 0.22);
+
+    &-dot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 10rpx;
+      height: 10rpx;
+      border-radius: 999rpx;
+      background: var(--cream);
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  &__preview-caption {
+    position: relative;
+    z-index: 3;
+    font-size: 18rpx;
+    font-weight: 700;
+    color: var(--cream);
+    text-shadow: 0 2rpx 8rpx rgba(20, 27, 17, 0.46);
   }
 
   &__steps {
     display: flex;
     gap: 12rpx;
-    margin-top: 36rpx;
-    padding-top: 30rpx;
+    margin-top: 24rpx;
+    padding-top: 20rpx;
     border-top: 1rpx solid var(--line-on-deep);
   }
 
@@ -185,9 +241,10 @@
     flex: 1;
     min-width: 0;
     display: flex;
-    flex-direction: column;
-    gap: 10rpx;
-    padding: 16rpx 12rpx;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8rpx;
+    padding: 14rpx 10rpx;
     border-radius: var(--radius-md);
     background: rgba(238, 240, 236, 0.10);
 
@@ -195,19 +252,22 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 34rpx;
-      height: 34rpx;
+      width: 30rpx;
+      height: 30rpx;
+      flex-shrink: 0;
       border-radius: 999rpx;
       background: rgba(238, 240, 236, 0.88);
       color: var(--moss-deep);
-      font-size: 18rpx;
+      font-size: 16rpx;
       font-weight: 750;
     }
 
     &-copy {
+      flex: 1;
+      min-width: 0;
       display: flex;
       flex-direction: column;
-      gap: 5rpx;
+      gap: 3rpx;
     }
 
     &-title {
@@ -221,6 +281,15 @@
       font-size: 20rpx;
       line-height: 1.45;
       color: rgba(238, 240, 236, 0.72);
+    }
+  }
+
+  &__hero--photo {
+    min-height: 280rpx;
+
+    .home__hero-img {
+      width: 200rpx;
+      height: 260rpx;
     }
   }
 
@@ -336,9 +405,10 @@
     font-variant-numeric: tabular-nums;
   }
 
-  // ---------- 工具（次级入口：quiet 卡，去描边投影） ----------
+  // ---------- 工具（1 张照片主卡 + 2 张安静功能卡） ----------
   &__tools {
     display: flex;
+    flex-wrap: wrap;
     gap: 12rpx;
   }
 
@@ -351,12 +421,90 @@
     gap: 8rpx;
     padding: 26rpx 20rpx 24rpx;
     border-radius: var(--radius-lg);
+    overflow: hidden;
     background: var(--moss-soft);
+
+    &-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 8rpx;
+      min-width: 0;
+    }
+
+    &--lead {
+      flex: 1 1 100%;
+      min-height: 210rpx;
+      justify-content: flex-end;
+      padding: 32rpx 46% 30rpx 28rpx;
+      background: var(--moss-deep);
+      isolation: isolate;
+
+      &::after {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        content: '';
+        background: linear-gradient(
+          90deg,
+          rgba(57, 73, 46, 1) 0%,
+          rgba(57, 73, 46, 0.98) 42%,
+          rgba(57, 73, 46, 0.58) 66%,
+          rgba(57, 73, 46, 0.08) 100%
+        );
+        pointer-events: none;
+      }
+
+      .home__tool-copy {
+        position: relative;
+        z-index: 2;
+      }
+
+      .home__tool-name {
+        font-size: 36rpx;
+        color: var(--cream);
+      }
+
+      .home__tool-desc {
+        color: var(--cream-muted);
+      }
+
+      .example-badge {
+        top: auto;
+        right: 12rpx;
+        bottom: 12rpx;
+        left: auto;
+        z-index: 4;
+        padding: 3rpx 8rpx;
+        font-size: 16rpx;
+      }
+    }
+
+    &-visual {
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: -2;
+      width: 54%;
+      height: 100%;
+      border-radius: 0;
+      background-position: center top;
+
+      .example-image__img {
+        transform: scale(1.04);
+      }
+
+      .example-soft {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+    }
 
     &-badge {
       position: absolute;
       top: 12rpx;
       right: 12rpx;
+      z-index: 5;
       padding: 4rpx 12rpx;
       border-radius: 999rpx;
       background: var(--surface-strong);
@@ -385,44 +533,106 @@
     }
   }
 
-  // ---------- 场景（上三下二；横向图标+文案，卡片有底、图标无井） ----------
+  // ---------- 场景（3:2 / 2:3 / 通栏的非对称图形网格） ----------
   &__scenes {
-    display: flex;
-    flex-direction: column;
-    gap: 12rpx;
-  }
-
-  &__scene-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 12rpx;
   }
 
   &__scene {
-    flex: 1;
+    position: relative;
+    grid-column: span 2;
     min-width: 0;
-    min-height: 88rpx;
+    min-height: 168rpx;
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 14rpx;
-    padding: 22rpx 20rpx;
+    align-items: flex-end;
+    padding: 24rpx 22rpx;
+    overflow: hidden;
     border-radius: var(--radius-lg);
     border: 0;
 
-    &--interview { background: var(--surface-strong); border: 1rpx solid var(--line); }
-    &--wedding { background: var(--surface-strong); border: 1rpx solid var(--line); }
-    &--date { background: var(--surface-strong); border: 1rpx solid var(--line); }
-    &--daily { background: var(--surface-strong); border: 1rpx solid var(--line); }
-    &--gathering { background: var(--surface-strong); border: 1rpx solid var(--line); }
+    &--interview {
+      grid-column: span 3;
+      min-height: 196rpx;
+      background: #d7e0d2;
+
+      .home__scene-visual {
+        top: -34rpx;
+        right: -12rpx;
+        width: 178rpx;
+        height: 178rpx;
+        opacity: 0.28;
+        transform: rotate(-10deg);
+      }
+    }
+
+    &--wedding {
+      grid-column: span 2;
+      min-height: 196rpx;
+      background: var(--ink);
+
+      .home__scene-label,
+      .home__scene-desc {
+        color: var(--cream);
+      }
+
+      .home__scene-visual {
+        opacity: 0.24;
+        transform: rotate(10deg) scale(1.08);
+      }
+    }
+
+    &--date {
+      grid-column: span 2;
+      background: #e8e4e6;
+    }
+
+    &--daily {
+      grid-column: span 3;
+      background: #d5dfcf;
+
+      .home__scene-visual {
+        top: -40rpx;
+        right: -28rpx;
+        width: 190rpx;
+        height: 190rpx;
+        opacity: 0.26;
+        transform: rotate(7deg);
+      }
+    }
+
+    &--gathering {
+      grid-column: span 5;
+      min-height: 122rpx;
+      padding-left: 152rpx;
+      background: #e5e9e6;
+
+      .home__scene-visual {
+        right: auto;
+        left: 16rpx;
+        top: -40rpx;
+      }
+    }
+
+    &-visual {
+      position: absolute;
+      top: -26rpx;
+      right: -20rpx;
+      width: 150rpx;
+      height: 150rpx;
+      opacity: 0.18;
+      transform: rotate(-8deg);
+    }
 
     &-icon {
-      width: 44rpx;
-      height: 44rpx;
-      flex-shrink: 0;
+      width: 100%;
+      height: 100%;
     }
 
     &-copy {
-      flex: 1;
+      position: relative;
+      z-index: 2;
       min-width: 0;
       display: flex;
       flex-direction: column;

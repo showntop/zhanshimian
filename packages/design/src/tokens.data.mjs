@@ -22,7 +22,17 @@ export const colors = {
   lineOnDeep: 'rgba(238,240,236,.24)',
   danger: '#9B4B45',
   warn: '#7E5445',
-  badge: 'rgba(30,35,29,.62)'
+  badge: 'rgba(30,35,29,.62)',
+  // overlay 层：照片遮罩 / 毛玻璃坞 / 图上文字。页面禁止再写散落 rgba。
+  scrim: 'rgba(30,35,29,.58)',
+  scrimHeavy: 'rgba(30,35,29,.72)',
+  glass: 'rgba(244,245,242,.92)',
+  glassOnPhoto: 'rgba(24,28,22,.82)',
+  onPhoto: 'rgba(255,255,255,.92)',
+  onPhotoMuted: 'rgba(255,255,255,.72)',
+  dock: 'rgba(244,245,242,.92)',
+  disabled: '#CDD3C8',
+  creamMuted: 'rgba(238,240,236,.72)'
 }
 
 // 圆角（px；胶囊为特殊值，wxss 侧恒为 999rpx，RN 侧给 999 即可近似胶囊）
@@ -49,7 +59,10 @@ export const space = {
 export const sizes = {
   controlHeight: 48, // 主按钮最小高（96rpx）
   touchTarget: 44,   // 触控热区下限（88rpx）
-  pageGutter: 16     // 页面左右留白（32rpx）
+  pageGutter: 16,    // 页面左右留白（32rpx）
+  tagWidth: 90,      // 照片标注胶囊（180rpx）
+  filmThumbW: 48,    // 胶片缩略宽（96rpx）
+  filmThumbH: 64     // 胶片缩略高（128rpx）
 }
 
 // 排版字号（px；正文 28rpx / 说明 24rpx / 分区 32rpx / hero 38–50rpx）
@@ -70,5 +83,7 @@ export const shadows = {
   primaryButton: { y: 6, blur: 14, color: 'rgba(75,100,57,.16)' },
   card: { y: 6, blur: 18, color: 'rgba(52,59,47,.07)' },
   heroCard: { y: 10, blur: 28, color: 'rgba(45,58,35,.24)' },
-  sheet: { y: -16, blur: 48, color: 'rgba(0,0,0,.2)' }
+  sheet: { y: -16, blur: 48, color: 'rgba(0,0,0,.2)' },
+  float: { y: 8, blur: 24, color: 'rgba(31,34,30,.12)' },
+  annotation: { y: 4, blur: 14, color: 'rgba(31,34,30,.18)' }
 }

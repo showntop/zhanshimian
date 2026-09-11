@@ -84,8 +84,51 @@ button::after {
 
   .muted,
   .eyebrow {
-    color: rgba(238, 240, 236, 0.72);
+    color: var(--cream-muted);
   }
+}
+
+// ---------- 三档容器 + 照片 hero（视觉宪法） ----------
+// 内容卡 = .card；浮层卡 = .layer-float；照片信息层 = .layer-on-photo
+.layer-float {
+  background: var(--glass);
+  border: 1rpx solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(24rpx);
+}
+
+.layer-on-photo {
+  background: var(--glass-on-photo);
+  color: var(--on-photo);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-annotation);
+}
+
+.dock-glass {
+  background: var(--dock);
+  border-top: 1rpx solid var(--line);
+  box-shadow: var(--shadow-sheet);
+  backdrop-filter: blur(24rpx);
+}
+
+.photo-hero {
+  position: relative;
+  overflow: hidden;
+  background: var(--moss-soft);
+}
+
+.photo-hero--bleed {
+  margin-left: calc(-1 * var(--page-gutter));
+  margin-right: calc(-1 * var(--page-gutter));
+}
+
+.photo-hero--hinge {
+  margin-bottom: -72rpx;
+}
+
+.photo-scrim {
+  background: var(--scrim);
 }
 
 // ---------- 排版 ----------
@@ -165,16 +208,34 @@ button::after {
 }
 
 // 统一选中规范：柔绿底 + moss 描边（与 Pill 组件一致，唯一 active 语义）
-.pill.active {
+.pill.active,
+.pill--active {
   background: var(--moss-soft);
   border-color: var(--moss);
   color: var(--moss);
   font-weight: 600;
 }
 
+.text-link {
+  color: var(--moss);
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.section-head {
+  display: flex;
+  flex-direction: column;
+  padding: 0 5rpx;
+
+  .section-title {
+    margin: 0 0 14rpx;
+    font-size: 32rpx;
+  }
+}
+
 // ---------- 微交互 ----------
 .pressable {
-  transition: transform 0.16s ease, opacity 0.16s ease;
+  transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .pressable:active {
@@ -301,6 +362,56 @@ button::after {
   }
 }
 
+// 成功落位（checkPop 250ms）
+.check-pop {
+  animation: check-pop 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes check-pop {
+  0% {
+    transform: scale(0.95);
+  }
+  55% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+// 拱形内扫描光带（scan 2000ms，受父级 overflow 约束）
+.scan-sweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -20%;
+  height: 28%;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(111, 143, 89, 0) 0%,
+    rgba(111, 143, 89, 0.22) 50%,
+    rgba(111, 143, 89, 0) 100%
+  );
+  box-shadow: 0 0 18px 5px rgba(111, 143, 89, 0.24);
+  animation: scan-sweep 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+@keyframes scan-sweep {
+  from {
+    transform: translateY(0);
+    opacity: 0.2;
+  }
+  12% {
+    opacity: 0.85;
+  }
+  to {
+    transform: translateY(420%);
+    opacity: 0.15;
+  }
+}
+
 // ---------- 呼吸辉光（hero 卡，4s 循环；参数对齐 motion.ts haloGlow） ----------
 .halo {
   animation: halo-breathe 4s ease-in-out infinite;
@@ -319,6 +430,16 @@ button::after {
 
 // ---------- reduced motion 全部归零（不许删动画，压时长） ----------
 // !important 兜底：类级 animation 简写（.spinner/.halo 等）特异性高于元素选择器。
+// 页面隐藏时暂停无限动效，回页按当前状态继续，不重播完整叙事
+.page--hidden .halo,
+.page--hidden .spinner,
+.page--hidden .scan-sweep,
+.page--hidden .skeleton::after,
+.page--hidden [class*='--live'],
+.page--hidden [class*='shimmer'] {
+  animation-play-state: paused !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   page,
   page view,

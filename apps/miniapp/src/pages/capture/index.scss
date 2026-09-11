@@ -54,6 +54,21 @@
     &--pop {
       animation: capture-slot-pop 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
     }
+
+    &--focus {
+      transform: scale(1.04);
+      z-index: 2;
+      border-color: var(--moss);
+      box-shadow: var(--shadow-float);
+    }
+  }
+
+  &__viewfinder {
+    position: absolute;
+    inset: 16rpx;
+    border: 2rpx solid rgba(88, 115, 68, 0.55);
+    border-radius: 12rpx;
+    pointer-events: none;
   }
 
   &__photo {
@@ -255,6 +270,10 @@
   align-items: center;
   gap: 14rpx;
   margin-top: 8rpx;
+
+  &--ready .primary-button--solid {
+    animation: check-pop 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
 }
 
 .capture__alt-action {

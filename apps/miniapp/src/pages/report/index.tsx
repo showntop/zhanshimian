@@ -10,7 +10,7 @@ import {
   type Finding,
   type Report,
 } from '@zsm/core'
-import { usePageClass, useShowOnce } from '../../hooks/use-page-visibility'
+import { usePageShell, useShowOnce } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
@@ -18,6 +18,7 @@ import PrimaryButton from '../../components/primary-button'
 import ExampleImage from '../../components/example-image'
 import Skeleton from '../../components/skeleton'
 import ErrorState from '../../components/error-state'
+import PhotoAnnotationLayer, { type AnnotationItem } from '../../components/photo-annotation'
 import './index.scss'
 
 const CATEGORY_LABEL: Record<string, string> = { hair: '发型', makeup: '妆容', outfit: '穿搭', color: '色彩' }
@@ -49,7 +50,7 @@ export default function Report() {
   const [plansBusy, setPlansBusy] = useState(false)
   const reportRef = useRef<Report | null>(null)
   reportRef.current = report
-  const pageClass = usePageClass(!loading || Boolean(report))
+  const { pageClass, enter } = usePageShell(!loading || Boolean(report), '', 'report')
 
   const load = useCallback(async () => {
     const cached = Boolean(reportRef.current)
@@ -156,8 +157,20 @@ export default function Report() {
   // 锚点 ⇄ 详情条联动：点 tag 在 hero 内就地展开详情（不整页滚动，
   // 上下文不丢）；再点一次收起。activeFindingId 同时驱动 tag/卡片高亮。
   const tapAnchor = (finding: Finding) => {
+    const nextKind = findingPhoto(finding)
+    if (nextKind !== currentPhotoKind) setActivePhoto(nextKind)
     setActiveFindingId(activeFindingId === finding.id ? '' : finding.id)
   }
+
+  const toAnnotation = (finding: Finding): AnnotationItem => ({
+    id: finding.id,
+    label: finding.label,
+    detail: finding.detail || finding.label,
+    category: finding.category,
+    categoryLabel: CATEGORY_LABEL[finding.category] || finding.category,
+    anchorX: finding.anchor_x ?? 0.5,
+    anchorY: finding.anchor_y ?? 0.5,
+  })
 
   const providerIsDemo = (report.provider_version ?? '').startsWith('demo')
   // 每张照片的 URL 与示例身份：hero 逐张判定（不同照片可能身份不同），缩略图复用
@@ -169,45 +182,11 @@ export default function Report() {
     (kind === 'body' && url === fallbackBodyPhoto && providerIsDemo)
   const visibleFindings = findings.filter((finding) => findingPhoto(finding) === currentPhotoKind)
 
-  // 锚点坐标相对原始照片，aspectFill 会被居中裁切：按缩放 + 裁切偏移
-  // 重映射到固定相框的像素位置（用于引导线端点 + 标签定位）。
-  // 返回 null 表示尚未拿到原图尺寸，回退到按原始比例直接映射。
-  const anchorInFrame = (
-    dims: { w: number; h: number } | undefined,
-    ax: number,
-    ay: number
-  ): { x: number; y: number } => {
-    if (!dims) return { x: ax * HERO_FULL_W, y: ay * HERO_H }
-    const scale = Math.max(HERO_FULL_W / dims.w, HERO_H / dims.h)
-    const scaledW = dims.w * scale
-    const scaledH = dims.h * scale
-    const offX = (HERO_FULL_W - scaledW) / 2
-    const offY = (HERO_H - scaledH) / 2
-    return { x: offX + ax * scaledW, y: offY + ay * scaledH }
-  }
-
-  // 同侧 finding 按 anchor_y 排序后错开，避免上下重叠
-  const layoutSide = (sideFindings: Finding[]) => {
-    const sorted = [...sideFindings].sort(
-      (a, b) => (a.anchor_y ?? 0.5) - (b.anchor_y ?? 0.5)
-    )
-    const out: { finding: Finding; topPct: number }[] = []
-    let last = 0
-    for (const f of sorted) {
-      const y = (f.anchor_y ?? 0.5) * 100
-      let top = Math.min(86, Math.max(12, y))
-      if (top - last < 16) top = Math.min(86, last + 16)
-      out.push({ finding: f, topPct: top })
-      last = top
-    }
-    return out
-  }
-
   return (
     <View className={pageClass}>
       <AppHeader title={REPORT_COPY.title} back />
       <View className="report">
-        <View className="report__hero fade-up">
+        <View className={`report__hero ${enter()}`}>
           <Swiper
             className="report__swiper"
             style={{ height: `${HERO_H}rpx` }}
@@ -224,55 +203,6 @@ export default function Report() {
               const url = photoUrlFor(kind)
               const demo = photoIsDemo(kind, url)
               const kindFindings = findings.filter((finding) => findingPhoto(finding) === kind)
-              const leftLayout = layoutSide(kindFindings.filter((f) => (f.anchor_x ?? 0.5) < 0.5))
-              const rightLayout = layoutSide(kindFindings.filter((f) => (f.anchor_x ?? 0.5) >= 0.5))
-              const dims = photoDims[kind]
-              // 标签几何：胶囊缩小到 180rpx，只显示标签一行（副标题在下方卡片），
-              // 避免大面积遮挡人物；引导线起点加胶囊边距偏移。
-              const CAP_W = 180
-              const CAP_H = 56
-              const EDGE = 16
-              const renderTag = (item: { finding: Finding; topPct: number }, side: 'left' | 'right') => {
-                const f = item.finding
-                const ax = f.anchor_x ?? 0.5
-                const ay = f.anchor_y ?? 0.5
-                const a = anchorInFrame(dims, ax, ay)
-                // 引导线起点：胶囊面向照片那一侧的中点（含边距偏移）
-                const startX = side === 'left' ? EDGE + CAP_W : HERO_FULL_W - EDGE - CAP_W
-                const centerY = (item.topPct / 100) * HERO_H + CAP_H / 2
-                const dx = a.x - startX
-                const dy = a.y - centerY
-                const dist = Math.sqrt(dx * dx + dy * dy)
-                const angle = (Math.atan2(dy, dx) * 180) / Math.PI
-                const active = activeFindingId === f.id
-                return (
-                  <View key={f.id} className="report__annotation">
-                    <View
-                      className="report__leader"
-                      style={{
-                        left: `${(startX / HERO_FULL_W) * 100}%`,
-                        top: `${(centerY / HERO_H) * 100}%`,
-                        width: `${dist}rpx`,
-                        transform: `rotate(${angle}deg)`,
-                      }}
-                    />
-                    <View
-                      className="report__anchor-dot"
-                      style={{
-                        left: `${(a.x / HERO_FULL_W) * 100}%`,
-                        top: `${(a.y / HERO_H) * 100}%`,
-                      }}
-                    />
-                    <View
-                      className={`report__tag report__tag--${side} ${active ? 'report__tag--active' : ''}`}
-                      style={{ top: `${item.topPct}%` }}
-                      onClick={() => tapAnchor(f)}
-                    >
-                      <Text className="report__tag-label">{f.label}</Text>
-                    </View>
-                  </View>
-                )
-              }
               return (
                 <SwiperItem key={kind} className="report__slide">
                   <View className="report__hero-frame">
@@ -293,32 +223,22 @@ export default function Report() {
                         )
                       }}
                     />
-                    {/* 渐变压暗层已删：aspectFit 后照片不满宽，压暗层会把留白区染灰。
-                        角标同步清理，仅在 demo 数据时保留警示角标 */}
                     {providerIsDemo ? (
                       <Text className="report__provider report__provider--demo">
                         {REPORT_COPY.demoMark}
                       </Text>
                     ) : null}
-                    {/* 左右两列常显标签 + 引导线 + 锚点端点 */}
-                    {leftLayout.map((item) => renderTag(item, 'left'))}
-                    {rightLayout.map((item) => renderTag(item, 'right'))}
-                    {/* 就地详情条：点 tag 后在本张照片内展开，不整页滚动 */}
-                    {(() => {
-                      const active = kindFindings.find((f) => f.id === activeFindingId)
-                      if (!active) return null
-                      return (
-                        <View className="report__detail-drawer" key={active.id}>
-                          <View className="report__detail-head">
-                            <Text className="report__detail-cat">
-                              {CATEGORY_LABEL[active.category] || active.category}
-                            </Text>
-                            <Text className="report__detail-label">{active.label}</Text>
-                          </View>
-                          <Text className="report__detail-copy">{active.detail || active.label}</Text>
-                        </View>
-                      )
-                    })()}
+                    <PhotoAnnotationLayer
+                      items={kindFindings.map(toAnnotation)}
+                      activeId={kind === currentPhotoKind ? activeFindingId : ''}
+                      frameW={HERO_FULL_W}
+                      frameH={HERO_H}
+                      photoDims={photoDims[kind]}
+                      onTap={(item) => {
+                        const found = kindFindings.find((f) => f.id === item.id)
+                        if (found) tapAnchor(found)
+                      }}
+                    />
                   </View>
                 </SwiperItem>
               )
@@ -328,7 +248,7 @@ export default function Report() {
         </View>
 
         {/* 内容板：向上叠住照片底边，胶片条骑跨接缝作为照片与报告的铰链 */}
-        <View className="report__sheet fade-up delay-1">
+        <View className={`report__sheet ${enter(1)}`}>
           {photoTabs.length > 1 ? (
             <View className="report__film">
               {photoTabs.map((kind) => {
@@ -359,7 +279,7 @@ export default function Report() {
           ) : null}
 
         {(report.impression_tags ?? []).length > 0 ? (
-          <View className="report__summary-row fade-up delay-1">
+          <View className="report__summary-row">
             <Text className="report__summary-label">{REPORT_COPY.tagsTitle}</Text>
             <View className="report__summary-chips">
               {(report.impression_tags ?? []).slice(0, 3).map((tag) => (
@@ -371,7 +291,7 @@ export default function Report() {
           </View>
         ) : null}
 
-        <View className="report__priority fade-up delay-2">
+        <View className="report__priority">
           <Text className="report__priority-copy">
             {report.priority_title ? (
               <Text className="report__priority-lead">{report.priority_title}</Text>
@@ -381,9 +301,9 @@ export default function Report() {
         </View>
 
         <View className="report__section">
-          <View className="report__section-head fade-up delay-2">
+          <View className="report__section-head">
             <Text className="section-title">
-              {REPORT_COPY.findingsTitle} · {findings.length}
+              {PHOTO_LABEL[currentPhotoKind]} · {visibleFindings.length} 个可提升点
             </Text>
             <View className="section-rule" />
           </View>
@@ -392,9 +312,8 @@ export default function Report() {
               <View
                 key={finding.id}
                 id={`finding-${finding.id}`}
-                className={`report__finding fade-up pressable ${activeFindingId === finding.id ? 'report__finding--active' : ''}`}
-                style={{ animationDelay: `${0.16 + Math.min(index, 5) * 0.08}s` }}
-                onClick={() => setActiveFindingId(activeFindingId === finding.id ? '' : finding.id)}
+                className={`report__finding pressable ${activeFindingId === finding.id ? 'report__finding--active' : ''}`}
+                onClick={() => tapAnchor(finding)}
               >
                 <View className="report__finding-head">
                   <View className="report__finding-title">
@@ -416,7 +335,7 @@ export default function Report() {
         </View>
         </View>
 
-        <View className="report__cta fade-up delay-3">
+        <View className={`report__cta ${enter(2)}`}>
           <PrimaryButton text={REPORT_COPY.viewPlans} loading={plansBusy} onClick={viewPlans} />
           <Text className="report__cta-note">{REPORT_COPY.viewPlansNote}</Text>
         </View>

@@ -295,6 +295,7 @@ export default function Purchase() {
           ) : (
             <View className="pk__upload pressable" onClick={choosePhoto}>
               <ExampleImage className="pk__upload-backdrop" slug="warm" variant="full" />
+              <View className="pk__stage" />
               <ExampleImage className="pk__hero-img" slug="warm" variant="full" mode="aspectFit" />
               <View className="pk__upload-bar">
                 <Text className="pk__upload-bar-plus">＋</Text>

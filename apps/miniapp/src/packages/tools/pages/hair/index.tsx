@@ -169,9 +169,9 @@ export default function Hair() {
         <View className="hair__hero fade-up">
           <View className="hair__hero-frame">
             {mode === 'result' && resultUrl ? (
-              <Image className="hair__hero-img" src={resultUrl} mode="aspectFill" />
+              <Image className="hair__hero-img" src={resultUrl} mode="aspectFit" />
             ) : sourceUrl ? (
-              <Image className="hair__hero-img" src={sourceUrl} mode="aspectFill" />
+              <Image className="hair__hero-img" src={sourceUrl} mode="aspectFit" />
             ) : (
               <ExampleImage
                 className="hair__hero-img"
@@ -187,6 +187,7 @@ export default function Hair() {
             )}
             {preview && (preview.status === 'queued' || preview.status === 'processing') ? (
               <View className="hair__mask">
+                <View className="scan-sweep" />
                 <View className="hair__mask-spin spinner" />
                 <Text className="hair__mask-text">{preview.stage || '正在生成预览'}</Text>
               </View>

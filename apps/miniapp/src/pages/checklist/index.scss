@@ -3,6 +3,27 @@
   flex-direction: column;
   gap: 28rpx;
 
+  &__anchor {
+    display: flex;
+    flex-direction: column;
+    gap: 6rpx;
+    padding: 22rpx 24rpx;
+    border-radius: var(--radius-md);
+    background: var(--moss-soft);
+
+    &-label {
+      font-size: 22rpx;
+      color: var(--moss);
+      font-weight: 600;
+    }
+
+    &-title {
+      font-size: 28rpx;
+      font-weight: 700;
+      color: var(--ink);
+    }
+  }
+
   &__progress {
     display: flex;
     flex-direction: column;

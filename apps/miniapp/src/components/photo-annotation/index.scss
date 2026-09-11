@@ -1,0 +1,146 @@
+.anno-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.anno {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: anno-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.anno__leader {
+  position: absolute;
+  height: 3rpx;
+  background: rgba(255, 255, 255, 0.6);
+  transform-origin: 0 50%;
+  z-index: 3;
+}
+
+.anno__dot {
+  position: absolute;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 999rpx;
+  background: var(--on-photo);
+  border: 3rpx solid var(--moss);
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  box-shadow: var(--shadow-annotation);
+}
+
+.anno__tag {
+  position: absolute;
+  z-index: 4;
+  width: 180rpx;
+  padding: 10rpx 16rpx;
+  border-radius: 20rpx;
+  text-align: center;
+  box-shadow: var(--shadow-annotation);
+  pointer-events: auto;
+  transition:
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 0.18s ease,
+    color 0.18s ease;
+
+  &--left {
+    left: 16rpx;
+    background: var(--on-photo);
+    color: var(--ink);
+  }
+
+  &--right {
+    right: 16rpx;
+    background: var(--scrim-heavy);
+    color: #ffffff;
+  }
+
+  &--active {
+    background: var(--moss);
+    color: #ffffff;
+    transform: scale(1.04);
+  }
+}
+
+.anno__tag-label {
+  display: block;
+  font-size: 20rpx;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.anno__drawer {
+  position: absolute;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 36rpx;
+  z-index: 6;
+  padding: 20rpx 24rpx;
+  border-radius: 28rpx;
+  background: var(--glass-on-photo);
+  backdrop-filter: blur(20rpx);
+  box-shadow: var(--shadow-annotation);
+  pointer-events: auto;
+  animation: anno-drawer-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.anno__drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.anno__drawer-cat {
+  flex-shrink: 0;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  background: var(--moss);
+  color: #ffffff;
+  font-size: 18rpx;
+  font-weight: 650;
+}
+
+.anno__drawer-label {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.anno__drawer-copy {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--on-photo-muted);
+}
+
+@keyframes anno-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes anno-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateY(16rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anno,
+  .anno__drawer {
+    animation: none;
+  }
+}

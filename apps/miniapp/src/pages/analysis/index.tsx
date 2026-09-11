@@ -12,7 +12,7 @@ import {
   type Analysis,
   type DisplayProgressHandle,
 } from '@zsm/core'
-import { usePageClass } from '../../hooks/use-page-visibility'
+import { usePageShell } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import { useStablePolling } from '../../hooks/use-stable-polling'
@@ -58,7 +58,7 @@ export default function Analysis() {
   }
   const display = displayRef.current
   const failedRef = useRef(false)
-  const pageClass = usePageClass(Boolean(analysis) || Boolean(failed))
+  const { pageClass, enter } = usePageShell(Boolean(analysis) || Boolean(failed), '', 'analysis')
 
   useLoad((options) => {
     const id = options?.id || readStorage(STORAGE_KEYS.activeTaskAnalysis)
@@ -165,10 +165,22 @@ export default function Analysis() {
     return (
       <View className={pageClass}>
         <AppHeader title="正在分析" back />
-        <View className="analysis-fail fade-up">
+        <View className={`analysis-fail ${enter()}`}>
           <Text className="analysis-fail__title">
             {timeout ? ANALYSIS_FAIL_COPY.timeoutTitle : ANALYSIS_FAIL_COPY.photoTitle}
           </Text>
+          {failed.media && failed.media.length > 0 ? (
+            <View className="analysis-fail__film">
+              {failed.media.slice(0, 3).map((media) => (
+                <Image
+                  key={media.kind}
+                  className="analysis-fail__thumb"
+                  src={userImage(media.url) || media.url}
+                  mode="aspectFill"
+                />
+              ))}
+            </View>
+          ) : null}
           {reasons.map((reason) => (
             <Text key={reason} className="analysis-fail__reason">
               {reason}
@@ -189,8 +201,8 @@ export default function Analysis() {
     <View className={pageClass}>
       <AppHeader title="正在分析" back />
       <View className="analysis">
-        <View className="analysis__portrait fade-up">
-          <View className="analysis__portrait-frame">
+        <View className={`analysis__portrait ${enter()}`}>
+          <View className={`analysis__portrait-frame ${shown >= 88 ? 'analysis__portrait-frame--settle' : ''}`}>
             {photos[0] ? (
               <Image
                 key={photos[0].kind}
@@ -199,15 +211,16 @@ export default function Analysis() {
                 mode="aspectFill"
               />
             ) : null}
+            {shown < 92 ? <View className="scan-sweep" /> : null}
             {photos.slice(1).map((photo, i) => (
               <View
                 key={photo.kind}
-                className={`analysis__mini analysis__mini--${i} ${photo.demo ? 'example-soft' : ''}`}
+                className={`analysis__mini analysis__mini--${i} ${photo.demo ? 'example-soft' : ''} ${shown >= 70 ? 'analysis__mini--rest' : ''}`}
               >
                 <Image className="analysis__mini-img" src={photo.url} mode="aspectFill" />
               </View>
             ))}
-            <Text className="analysis__portrait-mark">AI 分析中</Text>
+            <Text className="analysis__portrait-mark">{shown >= 88 ? '即将完成' : 'AI 分析中'}</Text>
           </View>
         </View>
 
@@ -215,7 +228,7 @@ export default function Analysis() {
           {stageText}
         </Text>
 
-        <View className="analysis__progress fade-up delay-2">
+        <View className={`analysis__progress ${enter(2)}`}>
           <View className="analysis__progress-track">
             <View className="analysis__progress-fill" style={{ width: `${shown}%` }} />
           </View>
@@ -225,7 +238,7 @@ export default function Analysis() {
           </View>
         </View>
 
-        <View className="analysis__steps fade-up delay-2">
+        <View className={`analysis__steps ${enter(2)}`}>
           {STEPS.map((step, i) => (
             <View key={step.label} className="analysis__step-item">
               {i > 0 ? (
@@ -247,11 +260,11 @@ export default function Analysis() {
           ))}
         </View>
 
-        <Text className="analysis__tip fade-up delay-3">{tipText}</Text>
+        <Text className={`analysis__tip ${enter(3)}`}>{tipText}</Text>
 
         {/* 不锁人：后台继续分析，完成 toast +「我的」任务中心承接，不回首页插进度条 */}
         <Text
-          className="analysis__wander fade-up delay-3 pressable"
+          className={`analysis__wander ${enter(3)} pressable`}
           onClick={() => Taro.switchTab({ url: '/pages/home/index' })}
         >
           先去逛逛，不用守在这里 ›

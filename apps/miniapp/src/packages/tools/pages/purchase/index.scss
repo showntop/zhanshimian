@@ -64,6 +64,18 @@
   }
 
   // ---------- 空态：示范图 hero + 底部上传条 ----------
+  &__stage {
+    position: absolute;
+    left: 48rpx;
+    right: 48rpx;
+    top: 64rpx;
+    bottom: 120rpx;
+    z-index: 1;
+    border: 2rpx dashed rgba(88, 115, 68, 0.45);
+    border-radius: var(--radius-md);
+    pointer-events: none;
+  }
+
   &__upload {
     position: relative;
     height: 100%;

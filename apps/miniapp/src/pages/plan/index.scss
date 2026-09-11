@@ -90,6 +90,12 @@
     );
   }
 
+  &__hint {
+    align-self: center;
+    font-size: 20rpx;
+    color: var(--ink-3);
+  }
+
   &__head {
     display: flex;
     align-items: baseline;

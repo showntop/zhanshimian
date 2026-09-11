@@ -48,6 +48,8 @@ export default function Capture() {
   const [uploading, setUploading] = useState<FlagMap>({})
   const [failed, setFailed] = useState<ErrorMap>({})
   const [justDone, setJustDone] = useState<FlagMap>({})
+  const [focusKind, setFocusKind] = useState<Kind>('face')
+  const [profileOpen, setProfileOpen] = useState(false)
   const [viewer, setViewer] = useState<{ url: string; label: string } | null>(null)
   const [demoBusy, setDemoBusy] = useState(false)
   // 补充资料（选填）
@@ -113,6 +115,7 @@ export default function Capture() {
   // 槽即操作：空槽 → 系统面板；失败槽 → 直接重选；已传槽 → 重拍/换图/大图
   const onSlotTap = (kind: Kind, shot: Shot) => {
     if (uploading[kind] || busy) return
+    setFocusKind(kind)
     const slot = slots[kind]
     if (!slot || failed[kind]) {
       pickOne(kind)
@@ -236,7 +239,7 @@ export default function Capture() {
             return (
               <View
                 key={shot.kind}
-                className={`capture__slot pressable ${justDone[shot.kind] ? 'capture__slot--pop' : ''}`}
+                className={`capture__slot pressable ${focusKind === shot.kind ? 'capture__slot--focus' : ''} ${justDone[shot.kind] ? 'capture__slot--pop' : ''}`}
                 onClick={() => onSlotTap(shot.kind, shot)}
               >
                 <View className={`capture__photo ${!slot && !isUploading ? 'capture__photo--empty' : ''}`}>
@@ -251,6 +254,7 @@ export default function Capture() {
                   ) : (
                     <Image className="capture__photo-guide" src={shot.placeholder} mode="aspectFit" />
                   )}
+                  {!slot ? <View className="capture__viewfinder" /> : null}
                   {slot && !isUploading ? (
                     <Text className="capture__photo-index capture__photo-index--done">✓</Text>
                   ) : (
@@ -280,11 +284,12 @@ export default function Capture() {
         </View>
 
         <View className="capture__profile card fade-up delay-2">
-          <View className="capture__profile-head">
+          <View className="capture__profile-head pressable" onClick={() => setProfileOpen((open) => !open)}>
             <Text className="capture__profile-title">{PROFILE_SETUP_COPY.eyebrow}</Text>
-            <Text className="capture__profile-note">全部选填</Text>
+            <Text className="capture__profile-note">{profileOpen ? '收起' : '可选：身高 / 身份 / 预算 ›'}</Text>
           </View>
-
+          {profileOpen ? (
+            <View className="capture__profile-body">
           <View className="capture__field">
             <View className="capture__field-head">
               <Text className="capture__field-name">{PROFILE_SETUP_COPY.height}</Text>
@@ -331,9 +336,11 @@ export default function Capture() {
               ))}
             </View>
           </View>
+            </View>
+          ) : null}
         </View>
 
-        <View className="capture__foot fade-up delay-3">
+        <View className={`capture__foot fade-up delay-3 ${ready ? 'capture__foot--ready' : ''}`}>
           <PrimaryButton
             text={ready ? '开始形象分析' : `已选 ${done} / ${SHOTS.length} 张`}
             disabled={!ready}

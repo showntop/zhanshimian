@@ -5,10 +5,10 @@
 import { useDidHide, useDidShow } from '@tarojs/taro'
 import { useEffect, useRef, useState } from 'react'
 import type { SubscribeVisibility } from '@zsm/core'
-import { durations } from '@zsm/design'
+import { durations, settlePad } from '@zsm/design'
 
 /** fade-up 520ms + delay-3 240ms，入场结束后才钉住，避免中途切走再回来重播。 */
-const SETTLE_MS = durations.fadeUp + 240
+const SETTLE_MS = durations.fadeUp + settlePad
 
 export function usePageVisibility(): SubscribeVisibility {
   const listenersRef = useRef(new Set<(visible: boolean) => void>())
@@ -79,10 +79,15 @@ export function usePageClass(ready: boolean, extra = '', persistKey = extra || '
  */
 export function usePageShell(ready: boolean, extra = '', persistKey = extra || 'page') {
   const settled = usePageSettled(ready, persistKey)
-  const pageClass = ['page', extra, settled ? 'page--settled' : ''].filter(Boolean).join(' ')
+  const [visible, setVisible] = useState(true)
+  useDidShow(() => setVisible(true))
+  useDidHide(() => setVisible(false))
+  const pageClass = ['page', extra, settled ? 'page--settled' : '', visible ? '' : 'page--hidden']
+    .filter(Boolean)
+    .join(' ')
   const enter = (delay?: 1 | 2 | 3) => {
     if (settled) return ''
     return delay ? `fade-up delay-${delay}` : 'fade-up'
   }
-  return { pageClass, enter, settled }
+  return { pageClass, enter, settled, visible }
 }

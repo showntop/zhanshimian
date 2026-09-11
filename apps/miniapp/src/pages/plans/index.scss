@@ -83,7 +83,17 @@
       background: var(--moss-soft);
       border: 1rpx solid var(--line);
       // 切换方案时整帧交叉淡入（key 重挂载触发）
-      animation: plans-frame-in 0.3s ease both;
+      animation: plans-frame-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    &-fade {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 120rpx;
+      background: linear-gradient(180deg, rgba(244, 245, 242, 0) 0%, var(--bg) 100%);
+      pointer-events: none;
     }
 
     // 满宽照片（widthFix）：内层图高度自然、顶部锚定，
@@ -108,19 +118,20 @@
     gap: 10rpx;
     padding: 8rpx 22rpx;
     border-radius: 999rpx;
-    background: var(--moss);
-    box-shadow: var(--shadow-primary-button);
+    background: transparent;
+    border: 1rpx solid rgba(88, 115, 68, 0.45);
+    box-shadow: none;
     max-width: 100%;
 
     &-tag {
       font-size: 21rpx;
       font-weight: 650;
-      color: #ffffff;
+      color: var(--moss);
       white-space: nowrap;
 
       & + & {
         padding-left: 10rpx;
-        border-left: 1rpx solid rgba(255, 255, 255, 0.4);
+        border-left: 1rpx solid rgba(88, 115, 68, 0.28);
       }
     }
   }
@@ -331,10 +342,7 @@
     flex-direction: column;
     gap: 14rpx;
     padding: 18rpx var(--page-gutter) 12rpx;
-    background: rgba(244, 245, 242, 0.92);
-    backdrop-filter: blur(24rpx);
-    border-top: 1rpx solid var(--line);
-    box-shadow: 0 -12rpx 32rpx rgba(31, 34, 30, 0.08);
+    background: var(--dock);
 
     // 坞内选择面板卡去边框阴影，与毛玻璃底融合
     .plans__chooser {
@@ -343,6 +351,21 @@
       box-shadow: none;
       padding: 0;
     }
+  }
+
+  &__hint {
+    position: absolute;
+    left: 50%;
+    bottom: 148rpx;
+    z-index: 6;
+    transform: translateX(-50%);
+    padding: 8rpx 20rpx;
+    border-radius: 999rpx;
+    background: var(--scrim);
+    color: #ffffff;
+    font-size: 22rpx;
+    white-space: nowrap;
+    animation: plans-frame-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 
   &__cta-note {

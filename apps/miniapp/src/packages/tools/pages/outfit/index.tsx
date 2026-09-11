@@ -21,6 +21,7 @@ import { STORAGE_KEYS, readStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
 import ExampleImage from '../../../../components/example-image'
+import PhotoAnnotationLayer from '../../../../components/photo-annotation'
 import Pill from '../../../../components/pill'
 import ErrorState from '../../../../components/error-state'
 import './index.scss'
@@ -275,29 +276,6 @@ export default function Outfit() {
   const renderedH = photoDims ? Math.round((HERO_W * photoDims.h) / photoDims.w) : 0
   const nativeFill = Boolean(photoDims) && renderedH >= NATIVE_MIN_H && renderedH <= NATIVE_MAX_H
 
-  // 锚点坐标相对原始照片；aspectFit 两侧/上下留白后按缩放 + 偏移重映射到相框。
-  // widthFix 铺满时相框即图框，直接百分比；未拿到原图尺寸时回退到比例映射。
-  const markerStyle = (ax: number, ay: number) => {
-    if (nativeFill) {
-      return {
-        left: `${Math.min(92, Math.max(4, ax * 100))}%`,
-        top: `${Math.min(90, Math.max(6, ay * 100))}%`,
-      }
-    }
-    if (!photoDims) {
-      return {
-        left: `${Math.min(90, Math.max(8, ax * 100))}%`,
-        top: `${Math.min(88, Math.max(8, ay * 100))}%`,
-      }
-    }
-    const scale = Math.min(HERO_W / photoDims.w, HERO_H / photoDims.h)
-    const mappedW = photoDims.w * scale
-    const mappedH = photoDims.h * scale
-    const x = (((HERO_W - mappedW) / 2 + ax * mappedW) / HERO_W) * 100
-    const y = (((HERO_H - mappedH) / 2 + ay * mappedH) / HERO_H) * 100
-    return { left: `${Math.min(92, Math.max(4, x))}%`, top: `${Math.min(90, Math.max(6, y))}%` }
-  }
-
   return (
     <View className={pageClass}>
       <AppHeader title="穿搭诊断" back />
@@ -365,19 +343,26 @@ export default function Outfit() {
               <Text className="od__mask-text">{OUTFIT_COPY.busyHint}</Text>
             </View>
           ) : null}
-          {/* 诊断标注：锚点归位 */}
-          {result?.findings?.slice(0, 3).map((finding) =>
-            finding.anchor_x != null && finding.anchor_y != null ? (
-              <View
-                key={`${finding.category}-${finding.label}`}
-                className="od__marker"
-                style={markerStyle(finding.anchor_x, finding.anchor_y)}
-              >
-                <View className="od__marker-dot" />
-                <Text className="od__marker-chip">{finding.label}</Text>
-              </View>
-            ) : null,
-          )}
+          {!busy && result?.findings ? (
+            <PhotoAnnotationLayer
+              items={result.findings
+                .filter((finding) => finding.anchor_x != null && finding.anchor_y != null)
+                .slice(0, 1)
+                .map((finding) => ({
+                  id: `${finding.category}-${finding.label}`,
+                  label: finding.label,
+                  detail: finding.label,
+                  anchorX: finding.anchor_x ?? 0.5,
+                  anchorY: finding.anchor_y ?? 0.5,
+                }))}
+              activeId=""
+              frameW={HERO_W}
+              frameH={nativeFill && renderedH ? renderedH : HERO_H}
+              photoDims={photoDims ?? undefined}
+              onTap={() => {}}
+              showDrawer={false}
+            />
+          ) : null}
           {isDemo && !busy ? (
             <View className="od__badge">
               <Text>效果示例</Text>
