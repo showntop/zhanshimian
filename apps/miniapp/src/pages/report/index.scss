@@ -1,26 +1,63 @@
 .report {
   display: flex;
   flex-direction: column;
-  gap: 34rpx;
+  // 底部固定 CTA 的占位（按钮 96 + 说明文字 + 上下留白 + 安全区上限）
+  padding-bottom: 260rpx;
 
   &__hero {
     display: flex;
     flex-direction: column;
-    gap: 18rpx;
 
+    // 相框 == 照片：无圆角无描边无投影的全出血 hero，高度由 Swiper 内联控制
     &-frame {
       position: relative;
-      height: 640rpx;
-      border-radius: var(--radius-xl);
+      width: 100%;
+      height: 100%;
       overflow: hidden;
       background: var(--moss-soft);
-      border: 1rpx solid var(--line);
-      box-shadow: var(--shadow-card);
     }
 
     &-img {
+      position: relative;
+      z-index: 1;
       width: 100%;
       height: 100%;
+      // 切换来源照片时的轻淡入（时长对齐 motion.ts durations.previewFade）
+      animation: report-photo-in 0.3s ease both;
+    }
+
+    // 氛围模糊衬底：只在超高照片 aspectFit 出两侧时露出；
+    // 加暗 + 提饱和，是环境光不是灰边
+    &-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+
+      .example-image__img {
+        filter: blur(64rpx) saturate(1.35) brightness(0.82);
+        transform: scale(1.5);
+      }
+    }
+
+    // 渐变压暗层（不拦截锚点点击）
+    &-scrim {
+      position: absolute;
+      left: 0;
+      right: 0;
+      pointer-events: none;
+
+      &--top {
+        top: 0;
+        height: 200rpx;
+        background: linear-gradient(180deg, rgba(24, 28, 22, 0.32) 0%, rgba(24, 28, 22, 0) 100%);
+      }
+
+      &--bottom {
+        bottom: 0;
+        height: 240rpx;
+        background: linear-gradient(0deg, rgba(24, 28, 22, 0.26) 0%, rgba(24, 28, 22, 0) 100%);
+      }
     }
 
     &-mark {
@@ -54,42 +91,96 @@
     }
   }
 
-  &__tabs {
-    display: flex;
-    gap: 10rpx;
-    padding: 8rpx;
-    border-radius: 999rpx;
-    background: var(--surface);
-    border: 1rpx solid var(--line);
+  // 全出血：冲破 page gutter，照片贴齐屏幕边缘；高度内联随照片比例，过渡平滑
+  &__swiper {
+    margin: 0 calc(-1 * var(--page-gutter));
+    overflow: hidden;
+    transition: height 0.3s cubic-bezier(.2,.8,.2,1);
   }
 
-  &__tab {
-    flex: 1;
+  &__slide {
+    height: 100%;
+  }
+
+  // 内容板：全出血、大圆角叠上照片底边，缝合处软投影。
+  // 照片与报告内容由此「衔接」而不是上下堆叠。
+  &__sheet {
+    position: relative;
+    z-index: 2;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 34rpx;
+    margin: -72rpx calc(-1 * var(--page-gutter)) 0;
+    padding: 44rpx var(--page-gutter) 8rpx;
+    border-radius: 40rpx 40rpx 0 0;
+    background: var(--bg);
+    box-shadow: 0 -16rpx 40rpx rgba(24, 28, 22, 0.1);
+  }
+
+  // 胶片缩略图条：骑跨照片与内容板的接缝（thumb 高 128，负 margin 拉上一半）。
+  // 它是两个区域之间的视觉铰链。
+  &__film {
+    position: relative;
+    z-index: 3;
+    display: flex;
     justify-content: center;
-    min-height: 76rpx;
-    border-radius: 999rpx;
-    color: var(--ink-2);
-    font-size: 24rpx;
-    font-weight: 650;
-    transition: background 0.18s ease, color 0.18s ease;
-
-    &--active {
-      background: var(--moss);
-      color: #ffffff;
-    }
+    gap: 24rpx;
+    margin-top: -108rpx;
   }
 
+  &__film-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10rpx;
+  }
+
+  &__film-thumb {
+    width: 96rpx;
+    height: 128rpx;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 3rpx solid rgba(255, 255, 255, 0.78);
+    box-shadow: 0 8rpx 24rpx rgba(24, 28, 22, 0.18);
+    opacity: 0.72;
+    transform: scale(0.95);
+    transition:
+      transform 0.2s cubic-bezier(.2,.8,.2,1),
+      border-color 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  &__film-img {
+    width: 100%;
+    height: 100%;
+  }
+
+  &__film-item--active &__film-thumb {
+    border-color: var(--moss);
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  &__film-label {
+    font-size: 20rpx;
+    color: var(--ink-3);
+    transition: color 0.2s ease;
+  }
+
+  &__film-item--active &__film-label {
+    color: var(--moss);
+    font-weight: 700;
+  }
+
+  // 锚点默认收成数字圆点（不遮人物、互不压叠）；点按才展开标签。
   &__anchor {
     position: absolute;
     display: flex;
     align-items: center;
-    gap: 8rpx;
     max-width: 72%;
-    padding: 7rpx 14rpx 7rpx 7rpx;
+    padding: 6rpx;
     border-radius: 999rpx;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.92);
     box-shadow: 0 4rpx 14rpx rgba(31, 34, 30, 0.16);
     transform: translate(-50%, -50%);
     transition: transform 0.18s cubic-bezier(.2,.8,.2,1), background 0.18s ease;
@@ -104,6 +195,9 @@
       }
 
       .report__anchor-chip {
+        max-width: 320rpx;
+        margin: 0 12rpx 0 10rpx;
+        opacity: 1;
         color: #ffffff;
       }
     }
@@ -112,24 +206,30 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 36rpx;
-      height: 36rpx;
+      width: 40rpx;
+      height: 40rpx;
       flex-shrink: 0;
       border-radius: 999rpx;
       background: var(--moss-soft);
       color: var(--moss-pressed);
-      font-size: 19rpx;
+      font-size: 20rpx;
       font-weight: 750;
     }
 
     &-chip {
-      max-width: 300rpx;
+      max-width: 0;
+      margin: 0;
+      opacity: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       font-size: 20rpx;
       font-weight: 650;
       color: var(--ink);
+      transition:
+        max-width 0.24s cubic-bezier(.2,.8,.2,1),
+        margin 0.24s cubic-bezier(.2,.8,.2,1),
+        opacity 0.18s ease;
     }
   }
 
@@ -245,15 +345,6 @@
       color: var(--moss);
     }
 
-    &-photo {
-      flex-shrink: 0;
-      padding: 5rpx 14rpx;
-      border-radius: 999rpx;
-      background: var(--moss-soft);
-      color: var(--ink-2);
-      font-size: 19rpx;
-    }
-
     &-label {
       font-family: 'Songti SC', 'STSong', serif;
       font-size: 30rpx;
@@ -287,11 +378,20 @@
     }
   }
 
-  &__foot {
+  // 固定底部主行动：实底 + 发丝顶线，内容不会从按钮后面透出来。
+  &__cta {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
     display: flex;
     flex-direction: column;
-    gap: 16rpx;
-    margin-top: 8rpx;
+    gap: 10rpx;
+    padding: 18rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 18rpx);
+    background: var(--bg);
+    border-top: 1rpx solid var(--line);
+    box-shadow: 0 -12rpx 32rpx rgba(52, 59, 47, 0.08);
 
     &-note {
       text-align: center;
@@ -299,5 +399,15 @@
       line-height: 1.5;
       color: var(--ink-3);
     }
+  }
+}
+
+@keyframes report-photo-in {
+  from {
+    opacity: 0.3;
+  }
+
+  to {
+    opacity: 1;
   }
 }

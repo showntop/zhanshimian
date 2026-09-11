@@ -6,6 +6,7 @@ import Taro, { useDidShow } from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
 import {
   APP_NAME,
+  APP_SLOGAN,
   HOME_COPY,
   HOME_TITLE,
   POLL_INTERVALS,
@@ -192,7 +193,7 @@ export default function Home() {
         <View className="home">
           <View className="home__greeting fade-up">
             <View className="home__greeting-top">
-              <Text className="home__greeting-kicker">私人形象顾问</Text>
+              <Text className="home__greeting-kicker">{APP_SLOGAN}</Text>
               <Text className="home__greeting-date">{todayLabel()}</Text>
             </View>
             <Text className="home__greeting-title display">
@@ -210,7 +211,7 @@ export default function Home() {
             <View className="fade-up delay-1">
               <View className="home__hero home__hero--onboard card--hero halo">
                 <View className="home__hero-top">
-                  <View>
+                  <View className="home__hero-copy">
                     <Text className="home__hero-eyebrow">{HOME_COPY.startArchive}</Text>
                     <Text className="home__hero-title">{HOME_COPY.archiveTitle}</Text>
                     <Text className="home__hero-desc">{HOME_COPY.archiveBody}</Text>

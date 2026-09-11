@@ -19,6 +19,12 @@
     background: rgba(155, 109, 88, 0.06);
   }
 
+  // 单卡通栏：不横滑，宽度撑满内容区（750 - 两侧 page gutter）
+  &--solo {
+    width: calc(750rpx - 2 * var(--page-gutter));
+    margin-right: 0;
+  }
+
   &__head {
     display: flex;
     align-items: center;

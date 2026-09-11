@@ -18,12 +18,34 @@ const TYPE_LABEL: Record<string, string> = {
 
 export default function TaskRail({ items }: TaskRailProps) {
   if (items.length === 0) return null
+  // 只有一张卡时不走横滑，通栏呈现（单卡 320rpx 悬在半空像渲染事故）。
+  const first = items[0]
+  if (items.length === 1 && first) {
+    const { task, title, open } = first
+    const failed = task.status === 'failed'
+    return (
+      <View className={`task-card task-card--solo ${failed ? 'task-card--failed' : ''} pressable`} onClick={open}>
+        <TaskCardBody task={task} title={title} failed={failed} />
+      </View>
+    )
+  }
   return (
     <ScrollView className="task-rail" scrollX enhanced showScrollbar={false}>
       {items.map(({ task, title, open }) => {
         const failed = task.status === 'failed'
         return (
           <View key={task.id} className={`task-card ${failed ? 'task-card--failed' : ''} pressable`} onClick={open}>
+            <TaskCardBody task={task} title={title} failed={failed} />
+          </View>
+        )
+      })}
+    </ScrollView>
+  )
+}
+
+function TaskCardBody({ task, title, failed }: TaskCardBodyProps) {
+  return (
+    <>
             <View className="task-card__head">
               <Text className="task-card__type">{TYPE_LABEL[task.type] || '任务'}</Text>
               {failed ? (
@@ -42,11 +64,14 @@ export default function TaskRail({ items }: TaskRailProps) {
               </View>
             ) : null}
             <Text className="task-card__stage">{task.stage || (failed ? '点击查看原因' : '进行中')}</Text>
-          </View>
-        )
-      })}
-    </ScrollView>
+    </>
   )
+}
+
+interface TaskCardBodyProps {
+  task: TaskRailItem['task']
+  title: string
+  failed: boolean
 }
 
 interface TaskRailProps {

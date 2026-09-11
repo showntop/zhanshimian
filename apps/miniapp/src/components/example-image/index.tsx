@@ -17,6 +17,9 @@ interface ExampleImageProps {
   badgeText?: string
   mode?: 'aspectFill' | 'aspectFit' | 'widthFix'
   className?: string
+  /** 透传 Image onLoad：报告页用它拿照片真实宽高，换算 aspectFit 后的可视区来定位锚点。
+   *  注意微信平台宽高可能是 string，消费侧自行 Number() 归一。 */
+  onLoad?: (event: { detail: { width: number | string; height: number | string } }) => void
 }
 
 export default function ExampleImage({
@@ -27,6 +30,7 @@ export default function ExampleImage({
   badgeText,
   mode = 'aspectFill',
   className = '',
+  onLoad,
 }: ExampleImageProps) {
   let url = ''
   let isBundledExample = false
@@ -60,6 +64,7 @@ export default function ExampleImage({
         className={`example-image__img ${softExample ? 'example-soft' : ''}`}
         src={url}
         mode={mode}
+        onLoad={onLoad}
       />
       {badge ? (
         <View className="example-badge">
