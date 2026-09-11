@@ -142,7 +142,7 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 
 func defaultNickname(nickname string) string {
 	if strings.TrimSpace(nickname) == "" {
-		return "UP一下用户"
+		return "uplook用户"
 	}
 	return strings.TrimSpace(nickname)
 }

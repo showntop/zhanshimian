@@ -27,6 +27,8 @@ export default defineConfig(async (merge) => {
     copy: {
       patterns: [
         { from: 'src/assets/', to: 'dist/assets/' },
+        // 微信开发者工具打开本目录时，tabBar 图标有时按项目根解析，不走 miniprogramRoot。
+        { from: 'src/assets/tabbar/', to: 'assets/tabbar/' },
         { from: 'src/sitemap.json', to: 'dist/sitemap.json' },
       ],
       options: {},

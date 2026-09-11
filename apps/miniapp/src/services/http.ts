@@ -2,6 +2,7 @@
 // 业务代码只允许 import 本文件的 client，不得直接调 Taro.request。
 import Taro from '@tarojs/taro'
 import {
+  DEFAULT_NICKNAME,
   createApiClient,
   localizeDevImages,
   rewriteLoopbackAssetURLs,
@@ -100,7 +101,7 @@ async function relogin(): Promise<void> {
   const wechat = await Taro.request({
     url: `${baseURL}/v1/auth/wechat`,
     method: 'POST',
-    data: { code, nickname: 'UP一下用户' },
+    data: { code, nickname: DEFAULT_NICKNAME },
     header: { 'content-type': 'application/json' },
     timeout: 15000,
   })
@@ -110,7 +111,7 @@ async function relogin(): Promise<void> {
     const dev = await Taro.request({
       url: `${baseURL}/v1/auth/dev`,
       method: 'POST',
-      data: { nickname: 'UP一下用户' },
+      data: { nickname: DEFAULT_NICKNAME },
       header: { 'content-type': 'application/json' },
       timeout: 15000,
     })

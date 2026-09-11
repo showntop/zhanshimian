@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Taro, { useLoad } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import { SCENES } from '@zsm/core'
+import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
@@ -55,6 +56,7 @@ export default function Scene() {
   const [scene, setScene] = useState('interview')
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
+  const pageClass = usePageClass(true)
 
   useLoad((options) => {
     if (options?.scene && options.scene in FIELDS) setScene(options.scene)
@@ -90,7 +92,7 @@ export default function Scene() {
   }
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title="场合需求" back />
       <View className="scene">
         <View className="scene__intro fade-up">

@@ -1,7 +1,7 @@
 // 首页工作台：新用户/回访双状态。
 // 请求纪律：单次 /v1/home/bootstrap 聚合；仅当有活跃任务且页面可见时批量轮询(1.5s)。
 // 重设计 IA：问候 → 任务轨 → 今日造型/档案 hero → 工具 → 场景 → 最近方案。
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import {
@@ -20,6 +20,7 @@ import {
   type HomeBootstrap,
   type SceneCopy,
 } from '@zsm/core'
+import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { hasOutfitResult, isOutfitPending } from '../../services/outfit-session'
 import { hasPurchaseResult, isPurchasePending } from '../../services/purchase-session'
@@ -47,20 +48,44 @@ const SCENE_ICONS: Record<SceneCopy['id'], string> = {
   gathering: '/assets/icons/scene-gathering.png',
 }
 
-function SceneTile({ scene }: { scene: SceneCopy }) {
+const SceneTile = memo(function SceneTile({ scene }: { scene: SceneCopy }) {
   return (
     <View
       className={`home__scene home__scene--${scene.id} pressable`}
       onClick={() => Taro.navigateTo({ url: `/pages/scene/index?scene=${scene.id}` })}
     >
-      <Image className="home__scene-icon" src={SCENE_ICONS[scene.id]} mode="aspectFit" />
+      <Image className="home__scene-icon" src={SCENE_ICONS[scene.id]} mode="aspectFit" lazyLoad={false} />
       <View className="home__scene-copy">
         <Text className="home__scene-label">{scene.label}</Text>
         <Text className="home__scene-desc">{scene.note}</Text>
       </View>
     </View>
   )
+})
+
+/** 切 tab 回来若视图没变，禁止 setState，否则 Taro 会重写 <image src> 导致闪一下。 */
+function homeViewKey(data: HomeBootstrap): string {
+  const tasks = (data.active_tasks ?? []).map((t) => `${t.id}:${t.status}:${t.progress}:${t.stage}`)
+  return [
+    data.report?.id,
+    data.report?.current_image_url,
+    data.report?.priority_title,
+    data.report?.priority_copy,
+    data.today_plan?.id,
+    data.today_plan?.generated_image_url,
+    data.today_plan?.image_url,
+    data.today_plan?.title,
+    data.today_plan?.summary,
+    data.recent_plan?.id,
+    data.recent_plan?.generated_image_url,
+    data.recent_plan?.image_url,
+    data.recent_plan?.name,
+    data.recent_plan?.why,
+    tasks.join(','),
+  ].join('|')
 }
+
+let cachedBootstrap: HomeBootstrap | null = null
 
 // 复访闭环入口（life 分包）：顾问对话是产品核心特色，此前全站无入口
 const LIFE = [
@@ -82,8 +107,8 @@ function lookBadge(lookProvider: string | undefined, generatedUrl: string | unde
 }
 
 export default function Home() {
-  const [bootstrap, setBootstrap] = useState<HomeBootstrap | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [bootstrap, setBootstrap] = useState<HomeBootstrap | null>(cachedBootstrap)
+  const [loading, setLoading] = useState(!cachedBootstrap)
   const [failed, setFailed] = useState(false)
   const [outfitActive, setOutfitActive] = useState(false)
   const [outfitReady, setOutfitReady] = useState(false)
@@ -91,17 +116,22 @@ export default function Home() {
   const [purchaseReady, setPurchaseReady] = useState(false)
   const recoveredRef = useRef(false)
   const visibleRef = useRef(true)
+  const bootstrapRef = useRef<HomeBootstrap | null>(cachedBootstrap)
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  bootstrapRef.current = bootstrap
+  const pageClass = usePageClass(!loading, 'page--tab', 'home')
 
   const load = useCallback(async () => {
     try {
       const data = await api.getHomeBootstrap()
-      setBootstrap(data)
+      cachedBootstrap = data
+      setBootstrap((prev) => (prev && homeViewKey(prev) === homeViewKey(data) ? prev : data))
       setFailed(false)
       // 聚合返回的最新报告落本地，供方案/清单等页复用
       if (data.report?.id) writeStorage(STORAGE_KEYS.reportId, data.report.id)
     } catch {
-      setFailed(true)
+      // 已有内容时后台刷新失败不拆页，避免切 tab 闪到错误态
+      if (!bootstrapRef.current) setFailed(true)
     } finally {
       setLoading(false)
     }
@@ -126,7 +156,11 @@ export default function Home() {
     pollTimer.current = setTimeout(async () => {
       try {
         const tasks = await api.getTasks(active.map((t) => t.id))
-        setBootstrap((prev) => (prev ? { ...prev, active_tasks: tasks } : prev))
+        setBootstrap((prev) => {
+          if (!prev) return prev
+          const next = { ...prev, active_tasks: tasks }
+          return homeViewKey(prev) === homeViewKey(next) ? prev : next
+        })
         // 任一任务到达终态：轻提醒 + 整页聚合刷新一次
         if (tasks.some((t) => t.status === 'completed' || t.status === 'failed')) {
           const completed = tasks.find((t) => t.status === 'completed')
@@ -178,10 +212,14 @@ export default function Home() {
   useDidShow(() => {
     visibleRef.current = true
     trackEvent('page_view', { page: 'home' })
-    setOutfitActive(isOutfitPending())
-    setOutfitReady(hasOutfitResult())
-    setPurchaseActive(isPurchasePending())
-    setPurchaseReady(hasPurchaseResult())
+    const nextOutfitActive = isOutfitPending()
+    const nextOutfitReady = hasOutfitResult()
+    const nextPurchaseActive = isPurchasePending()
+    const nextPurchaseReady = hasPurchaseResult()
+    setOutfitActive((prev) => (prev === nextOutfitActive ? prev : nextOutfitActive))
+    setOutfitReady((prev) => (prev === nextOutfitReady ? prev : nextOutfitReady))
+    setPurchaseActive((prev) => (prev === nextPurchaseActive ? prev : nextPurchaseActive))
+    setPurchaseReady((prev) => (prev === nextPurchaseReady ? prev : nextPurchaseReady))
     recoverReport().then(load)
     scheduleTaskPoll()
   })
@@ -219,7 +257,7 @@ export default function Home() {
   }, [planTaskCount])
 
   return (
-    <View className="page page--tab">
+    <View className={pageClass}>
       <AppHeader transparent />
       {failed ? (
         <ErrorState onRetry={load} />

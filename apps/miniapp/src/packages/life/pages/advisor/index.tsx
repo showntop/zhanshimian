@@ -1,8 +1,9 @@
 // 形象助手：会话恢复 + 快捷问 + 乐观发送（失败回滚）+ 动作应用。
-import { useCallback, useEffect, useRef, useState } from 'react'
-import Taro, { useDidShow } from '@tarojs/taro'
+import { useCallback, useEffect, useState } from 'react'
+import Taro from '@tarojs/taro'
 import { Input, ScrollView, Text, View } from '@tarojs/components'
 import { ADVISOR_COPY, trackEvent, type AdvisorMessage } from '@zsm/core'
+import { usePageClass, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
@@ -16,7 +17,7 @@ export default function Advisor() {
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [scrollKey, setScrollKey] = useState('')
-  const skipFirstShow = useRef(true)
+  const pageClass = usePageClass(loaded, 'page--advisor')
 
   const restore = useCallback(async () => {
     const conversationId = readStorage(STORAGE_KEYS.advisorConversationId)
@@ -37,11 +38,7 @@ export default function Advisor() {
     restore()
   }, [restore])
 
-  useDidShow(() => {
-    if (skipFirstShow.current) {
-      skipFirstShow.current = false
-      return
-    }
+  useShowOnce(() => {
     restore()
   })
 
@@ -104,7 +101,7 @@ export default function Advisor() {
   }
 
   return (
-    <View className="page page--advisor">
+    <View className={pageClass}>
       <AppHeader title={ADVISOR_COPY.title} back />
       <View className="adv">
         <ScrollView className="adv__list" scrollY scrollIntoView={scrollKey || undefined} enhanced showScrollbar={false}>

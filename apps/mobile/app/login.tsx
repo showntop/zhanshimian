@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { StyleSheet, Text, TextInput } from 'react-native'
 import { useRouter } from 'expo-router'
-import { HOME_TITLE, PRIVACY_NOTE } from '@zsm/core'
+import { DEFAULT_NICKNAME, HOME_TITLE, PRIVACY_NOTE } from '@zsm/core'
 import { api } from '../src/api'
 import { STORAGE_KEYS, writeStorage } from '../src/storage'
 import { PrimaryButton, Screen } from '../src/ui/Screen'
@@ -50,7 +50,7 @@ export default function Login() {
     setBusy(true)
     setError('')
     try {
-      const session = await api.loginDev({ nickname: 'UP一下用户' })
+      const session = await api.loginDev({ nickname: DEFAULT_NICKNAME })
       writeStorage(STORAGE_KEYS.token, session.token)
       router.replace('/(tabs)')
     } catch (e) {

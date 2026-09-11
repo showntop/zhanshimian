@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Taro, { useLoad, useShareAppMessage } from '@tarojs/taro'
 import { Button, Text, View } from '@tarojs/components'
 import { APP_NAME, lookImage, trackEvent, type Share } from '@zsm/core'
+import { usePageClass } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
@@ -23,6 +24,7 @@ export default function SharePage() {
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [isOwner, setIsOwner] = useState(false)
+  const pageClass = usePageClass(!loading || Boolean(share))
 
   const loadByToken = useCallback(async (token: string) => {
     setLoading(true)
@@ -100,7 +102,7 @@ export default function SharePage() {
 
   if (loading) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title="分享卡" back />
         <Skeleton rows={4} />
       </View>
@@ -109,7 +111,7 @@ export default function SharePage() {
 
   if (failed || !share) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title="分享卡" back />
         <ErrorState
           message={failed ? undefined : '分享内容不存在或已被撤销'}
@@ -124,7 +126,7 @@ export default function SharePage() {
   const imageUrl = lookImage(snapshot.image_url)
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title="分享卡" back />
       <View className="sh">
         <View className="sh__card fade-up">

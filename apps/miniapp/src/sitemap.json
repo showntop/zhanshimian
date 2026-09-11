@@ -1,4 +1,4 @@
 {
-  "desc": "UP一下小程序页面索引",
+  "desc": "uplook 小程序页面索引",
   "rules": [{ "action": "allow", "page": "*" }]
 }

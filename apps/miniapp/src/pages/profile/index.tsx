@@ -1,10 +1,11 @@
 // 我的（Tab）：账户与身份、档案摘要（me/profile 持久化展示）、
 // 任务中心（进行中任务的聚合列表，无任务不占位）、
 // 报告/方案入口、体验实验室、删除我的数据。
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
-import type { Account, Task, UserProfile } from '@zsm/core'
+import { DEFAULT_NICKNAME, type Account, type Task, type UserProfile } from '@zsm/core'
+import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { groupTasksByType, openTask, taskTitle } from '../../services/task-utils'
 import { clearAllLocalState, STORAGE_KEYS, readStorage } from '../../services/storage'
@@ -18,9 +19,11 @@ export default function Profile() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
+  const hasCacheRef = useRef(false)
+  const pageClass = usePageClass(!loading, 'page--tab', 'profile')
 
   const load = useCallback(async () => {
-    setLoading(true)
+    if (!hasCacheRef.current) setLoading(true)
     try {
       const [me, myProfile, bootstrap] = await Promise.all([
         api.getMe().catch(() => null),
@@ -30,6 +33,7 @@ export default function Profile() {
       setAccount(me)
       setProfile(myProfile)
       setTasks(bootstrap?.active_tasks ?? [])
+      hasCacheRef.current = true
     } finally {
       setLoading(false)
     }
@@ -70,7 +74,7 @@ export default function Profile() {
   }
 
   return (
-    <View className="page page--tab">
+    <View className={pageClass}>
       <AppHeader />
       <View className="me">
         {loading ? (
@@ -80,7 +84,7 @@ export default function Profile() {
             <View className="me__card fade-up">
               <View className="me__avatar">{(account?.nickname ?? 'U').slice(0, 1)}</View>
               <View className="me__meta">
-                <Text className="me__nickname">{account?.nickname ?? 'UP一下用户'}</Text>
+                <Text className="me__nickname">{account?.nickname ?? DEFAULT_NICKNAME}</Text>
                 <Text className="me__identities">
                   已绑定：{(account?.identities ?? []).map((i) => (i.provider === 'wechat_miniapp' ? '微信' : i.provider)).join('、') || '微信'}
                 </Text>

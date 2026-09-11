@@ -5,6 +5,7 @@ import Taro, { useLoad } from '@tarojs/taro'
 import { Image, Slider, Text, View } from '@tarojs/components'
 import type { MediaAsset } from '@zsm/core'
 import { PROFILE_SETUP_COPY, type UserProfile } from '@zsm/core'
+import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
@@ -59,6 +60,7 @@ export default function Capture() {
     if (options?.scene) setScene(options.scene)
   })
 
+  const pageClass = usePageClass(true)
   const done = SHOTS.filter((shot) => slots[shot.kind]).length
   const ready = done === SHOTS.length
   const working = demoBusy || Object.values(uploading).some(Boolean)
@@ -217,7 +219,7 @@ export default function Capture() {
   }
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title="创建形象档案" back />
       <View className="capture">
         <View className="capture__intro fade-up">

@@ -5,6 +5,7 @@ import Taro, { useLoad } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import { FEEDBACK_WORDS, lookImage } from '@zsm/core'
 import type { Plan } from '@zsm/core'
+import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
@@ -18,6 +19,7 @@ export default function Feedback() {
   const [selected, setSelected] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [doneMessage, setDoneMessage] = useState('')
+  const pageClass = usePageClass(true)
 
   useLoad(async (options) => {
     const id = options?.plan_id
@@ -73,7 +75,7 @@ export default function Feedback() {
 
   if (doneMessage) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title="实际反馈" back />
         <View className="fb-success fade-up">
           <View className="fb-success__ring">
@@ -93,7 +95,7 @@ export default function Feedback() {
   }
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title="实际反馈" back />
       <View className="fb">
         <View className="fb__hero fade-up">

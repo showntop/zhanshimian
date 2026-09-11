@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Taro, { useLoad } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import { PLAN_DETAIL_COPY, type Plan } from '@zsm/core'
+import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader, { getNavMetrics } from '../../components/app-header'
@@ -47,6 +48,7 @@ export default function PlanDetail() {
   const [failed, setFailed] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const pageClass = usePageClass(!loading || Boolean(plan), !loading && plan && !failed ? 'page--plan' : '')
 
   useLoad((options) => {
     if (options?.id) setPlanId(options.id)
@@ -133,7 +135,7 @@ export default function PlanDetail() {
 
   if (loading) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title={PLAN_DETAIL_COPY.title} back />
         <Skeleton rows={5} />
       </View>
@@ -142,7 +144,7 @@ export default function PlanDetail() {
 
   if (failed || !plan) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title={PLAN_DETAIL_COPY.title} back />
         <ErrorState onRetry={load} />
       </View>
@@ -150,7 +152,7 @@ export default function PlanDetail() {
   }
 
   return (
-    <View className="page page--plan">
+    <View className={pageClass}>
       <AppHeader title={PLAN_DETAIL_COPY.title} back transparent />
       <View className="pd" style={{ ['--pd-nav' as string]: `${NAV.navHeight}px` }}>
         <View className="pd__hero">

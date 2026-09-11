@@ -12,6 +12,7 @@ import {
   type Analysis,
   type DisplayProgressHandle,
 } from '@zsm/core'
+import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import { useStablePolling } from '../../hooks/use-stable-polling'
@@ -57,6 +58,7 @@ export default function Analysis() {
   }
   const display = displayRef.current
   const failedRef = useRef(false)
+  const pageClass = usePageClass(Boolean(analysis) || Boolean(failed))
 
   useLoad((options) => {
     const id = options?.id || readStorage(STORAGE_KEYS.activeTaskAnalysis)
@@ -161,7 +163,7 @@ export default function Analysis() {
     const timeout = isTimeoutFailure(failed)
     const reasons = timeout ? [ANALYSIS_FAIL_COPY.timeoutBody] : failureReasons(failed)
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title="正在分析" back />
         <View className="analysis-fail fade-up">
           <Text className="analysis-fail__title">
@@ -184,7 +186,7 @@ export default function Analysis() {
   }
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title="正在分析" back />
       <View className="analysis">
         <View className="analysis__portrait fade-up">

@@ -279,6 +279,18 @@ button::after {
   }
 }
 
+// 入场只播一次：切 tab / 回页时微信会重播 CSS animation，both + from 透明
+// 会把已渲染图片再藏 0.52s。page--settled 由 usePageClass 在首次入场后加上。
+.page--settled .fade-up,
+.page--settled .fade-up.delay-1,
+.page--settled .fade-up.delay-2,
+.page--settled .fade-up.delay-3 {
+  animation: none !important;
+  animation-name: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
 @keyframes shimmer {
   to {
     transform: translateX(100%);

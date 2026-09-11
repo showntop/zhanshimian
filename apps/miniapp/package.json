@@ -2,7 +2,7 @@
   "name": "@zsm/miniapp",
   "version": "1.0.0",
   "private": true,
-  "description": "UP一下 微信小程序（Taro 4 + React）",
+  "description": "uplook 微信小程序（Taro 4 + React）",
   "scripts": {
     "dev:weapp": "taro build --type weapp --watch",
     "build:weapp": "taro build --type weapp",

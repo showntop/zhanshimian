@@ -2,7 +2,10 @@
 // 红线：不出现「通勤」（场景叫「日常」）、不出现「颜值」「评分」；
 // 错误不甩锅，空态/错误态必须给出下一步动作。
 
-export const APP_NAME = 'UP一下'
+export const APP_NAME = 'uplook'
+
+/** 默认昵称（空昵称 / 开发登录兜底，与 users.nickname 默认值一致） */
+export const DEFAULT_NICKNAME = 'uplook用户'
 
 /** 品牌标语（与 APP_NAME 配合使用，如分享卡/开屏副标题） */
 export const APP_SLOGAN = '今天最好看'

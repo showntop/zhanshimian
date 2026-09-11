@@ -1,4 +1,4 @@
-# 「UP一下」API v1 契约（OpenAPI 3.1）
+# 「uplook」API v1 契约（OpenAPI 3.1）
 #
 # 唯一权威：重实施计划 §一「API v1 端点总表」（49 端点）。
 # 字段命名/类型/枚举以 apps/server/internal/domain/domain.go 为准（snake_case JSON）；
@@ -19,9 +19,9 @@
 openapi: 3.1.0
 
 info:
-  title: UP一下 API
+  title: uplook API
   version: 1.0.0
-  summary: 「UP一下」小程序 / 手机端 v1 接口契约
+  summary: 「uplook」小程序 / 手机端 v1 接口契约
   description: |
     面向屏幕（BFF 聚合）而非面向表设计的 v1 契约：统一异步任务模型、幂等创建、
     资源化命名。全站仅 4 个动词子资源（/select、/activate、/wear、/apply），

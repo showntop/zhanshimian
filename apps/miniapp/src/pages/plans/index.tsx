@@ -1,9 +1,10 @@
 // 方案 Tab：选择页重设计——上半屏回答「有几个选项、选它能得到什么、怎么选」。
 // 拖动对比 hero（收益词叠加）+ 三选一条常驻 + 吸底 CTA；细节文案在折叠线下。
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
 import { POLL_INTERVALS, useTaskPolling, type Plan } from '@zsm/core'
+import { usePageClass, useShowOnce } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader, { getNavMetrics } from '../../components/app-header'
@@ -51,7 +52,9 @@ export default function Plans() {
   const [hasReport, setHasReport] = useState(true)
   // general 方案组生成任务（报告与方案解耦后由 plan_group 任务产出）
   const [groupTaskId, setGroupTaskId] = useState('')
-  const skipFirstShow = useRef(true)
+  const plansRef = useRef<Plan[]>([])
+  plansRef.current = plans
+  const pageClass = usePageClass(!loading || plans.length > 0, 'page--tab', 'plans')
   const activeLook = plans.find(
     (p, i) =>
       i === index &&
@@ -60,8 +63,11 @@ export default function Plans() {
   )
 
   const load = useCallback(async (targetScene: string) => {
-    setLoading(true)
-    setFailed(false)
+    // 已有方案时后台校验，不清空、不进骨架，避免切 tab 卸掉已渲染图
+    if (plansRef.current.length === 0) {
+      setLoading(true)
+      setFailed(false)
+    }
     try {
       const reportId = readStorage(STORAGE_KEYS.reportId)
       if (!reportId) {
@@ -86,7 +92,7 @@ export default function Plans() {
         setGroupTaskId(groupTask?.id ?? '')
       }
     } catch {
-      setFailed(true)
+      if (plansRef.current.length === 0) setFailed(true)
     } finally {
       setLoading(false)
     }
@@ -113,11 +119,7 @@ export default function Plans() {
     loadCurrent()
   }, [scene, load, loadCurrent])
 
-  useDidShow(() => {
-    if (skipFirstShow.current) {
-      skipFirstShow.current = false
-      return
-    }
+  useShowOnce(() => {
     load(scene)
   })
 
@@ -204,7 +206,7 @@ export default function Plans() {
 
   if (loading && plans.length === 0) {
     return (
-      <View className="page page--tab">
+      <View className={pageClass}>
         <AppHeader />
         <Skeleton rows={5} />
       </View>
@@ -213,7 +215,7 @@ export default function Plans() {
 
   if (failed) {
     return (
-      <View className="page page--tab">
+      <View className={pageClass}>
         <AppHeader />
         <ErrorState onRetry={() => load(scene)} />
       </View>
@@ -224,7 +226,7 @@ export default function Plans() {
   // 引导生成该场合方案（general 走 upsertPlans 直接生成，其余进场景 Brief 页）
   if (plans.length === 0 && !hasReport) {
     return (
-      <View className="page page--tab">
+      <View className={pageClass}>
         <AppHeader />
         <EmptyState
           title="还没有方案"
@@ -258,7 +260,7 @@ export default function Plans() {
   }
 
   return (
-    <View className="page page--tab">
+    <View className={pageClass}>
       <AppHeader />
       <View className="plans">
         <ScrollView className="plans__tabs" scrollX enhanced showScrollbar={false}>

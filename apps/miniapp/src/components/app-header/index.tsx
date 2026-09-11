@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
+import { APP_NAME } from '@zsm/core'
 import './index.scss'
 
 interface AppHeaderProps {
@@ -79,9 +80,7 @@ export default function AppHeader({ title, back, transparent, onBack, right }: A
                 <Text className="app-header__back-icon">‹</Text>
               </View>
             ) : (
-              <Text className="app-header__wordmark">
-                怎么打<Text className="app-header__wordmark-accent">扮</Text>
-              </Text>
+              <Text className="app-header__wordmark">{APP_NAME}</Text>
             )}
           </View>
           {title ? <Text className="app-header__title">{title}</Text> : <View />}

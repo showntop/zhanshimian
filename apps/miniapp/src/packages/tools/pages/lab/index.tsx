@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
+import { usePageClass } from '../../../../hooks/use-page-visibility'
 import AppHeader from '../../../../components/app-header'
 import ExampleImage from '../../../../components/example-image'
 import './index.scss'
@@ -14,6 +15,7 @@ const FEATURES = [
 
 export default function Lab() {
   const [waitlisted, setWaitlisted] = useState<string[]>([])
+  const pageClass = usePageClass(true)
 
   const act = (feature: (typeof FEATURES)[number]) => {
     if (feature.status === '内测') {
@@ -34,7 +36,7 @@ export default function Lab() {
   }
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title="体验实验室" back />
       <View className="lab">
         <View className="lab__intro fade-up">

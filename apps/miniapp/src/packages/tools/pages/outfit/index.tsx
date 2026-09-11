@@ -2,9 +2,10 @@
 // 空态：照片 hero → 导语 → 场景。结果：照片 → 一句建议 → 观察清单，不套报告卡。
 // 同步请求会跨页存活：模块级 Promise + 本地草稿，退回首页再进入可恢复进行中/结论。
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import { OUTFIT_COPY, userImage, type Diagnosis } from '@zsm/core'
+import { usePageClass, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import {
   clearOutfitResult,
@@ -55,6 +56,7 @@ export default function Outfit() {
   const resumingRef = useRef(false)
   // 本页点了「再诊断一次」或重选照片：不要立刻用服务端旧结论盖回去
   const freshStartRef = useRef(false)
+  const pageClass = usePageClass(true)
 
   const applySession = useCallback((item: Diagnosis) => {
     setResult(item)
@@ -147,7 +149,7 @@ export default function Outfit() {
     resume()
   }, [resume])
 
-  useDidShow(() => {
+  useShowOnce(() => {
     resume()
   })
 
@@ -297,7 +299,7 @@ export default function Outfit() {
   }
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title="穿搭诊断" back />
       <View className={`od${result ? ' od--done' : ''}`}>
         <View className="od__hero fade-up" style={nativeFill ? { height: 'auto' } : undefined}>

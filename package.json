@@ -2,7 +2,7 @@
   "name": "zhanshimian",
   "version": "1.0.0",
   "private": true,
-  "description": "UP一下 —— AI 形象顾问：Taro 小程序 + Go 服务端 + Expo 手机端 monorepo",
+  "description": "uplook —— AI 形象顾问：Taro 小程序 + Go 服务端 + Expo 手机端 monorepo",
   "packageManager": "pnpm@10.34.5",
   "engines": {
     "node": ">=22"

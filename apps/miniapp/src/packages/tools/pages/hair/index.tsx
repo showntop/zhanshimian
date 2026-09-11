@@ -1,8 +1,9 @@
 // 发型预览：推荐列表 + 三种照片来源 + 异步生成（900ms 轮询）+ 原图/效果对比 + 保存。
 import { useCallback, useEffect, useState } from 'react'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro from '@tarojs/taro'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import { LOCAL_LOOK_SLUGS, POLL_INTERVALS, useTaskPolling, lookImage, userImage, type HairPreview, type HairstyleOption, type LookSlug } from '@zsm/core'
+import { usePageClass, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
@@ -28,6 +29,7 @@ export default function Hair() {
   const [mode, setMode] = useState<'source' | 'result'>('source')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const pageClass = usePageClass(!loading || Boolean(preview) || Boolean(photoPath))
 
   const loadOptions = useCallback(async () => {
     setLoading(true)
@@ -71,7 +73,7 @@ export default function Hair() {
     resume()
   }, [loadOptions, resume])
 
-  useDidShow(() => {
+  useShowOnce(() => {
     resume()
   })
 
@@ -161,7 +163,7 @@ export default function Hair() {
   const isDemo = (preview?.provider_version ?? '').startsWith('demo')
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title="发型预览" back />
       <View className="hair">
         <View className="hair__hero fade-up">

@@ -2,6 +2,8 @@
 // - 用户照片用 user 模式，无效保持可见空态；
 // - 服务端图片用 lookImage 严格校验，绝不回退内置图；
 // - 内置素材自动叠角标并弱化；AI 结果即使来自远程 URL 也必须显式叠「AI 风格预览」。
+// 钉住 src：Taro 每次把相同 src 再写进原生 <image> 都会让微信重新解码，切 tab 闪一下。
+import { memo, useRef } from 'react'
 import { Image, Text, View } from '@tarojs/components'
 import { exampleImage, isBundledAsset, lookImage, userImage } from '@zsm/core'
 import './index.scss'
@@ -22,7 +24,21 @@ interface ExampleImageProps {
   onLoad?: (event: { detail: { width: number | string; height: number | string } }) => void
 }
 
-export default function ExampleImage({
+const PinnedImage = memo(function PinnedImage({
+  src,
+  className,
+  mode,
+  onLoad,
+}: {
+  src: string
+  className: string
+  mode: NonNullable<ExampleImageProps['mode']>
+  onLoad?: ExampleImageProps['onLoad']
+}) {
+  return <Image className={className} src={src} mode={mode} lazyLoad={false} onLoad={onLoad} />
+})
+
+function ExampleImage({
   src,
   slug,
   variant = 'full',
@@ -32,6 +48,7 @@ export default function ExampleImage({
   className = '',
   onLoad,
 }: ExampleImageProps) {
+  const pinnedUrl = useRef('')
   let url = ''
   let isBundledExample = false
 
@@ -44,6 +61,9 @@ export default function ExampleImage({
     url = lookImage(src)
     isBundledExample = isBundledAsset(src)
   }
+
+  if (url) pinnedUrl.current = url
+  else if (pinnedUrl.current) url = pinnedUrl.current
 
   if (!url) {
     return (
@@ -60,7 +80,7 @@ export default function ExampleImage({
 
   return (
     <View className={`example-image ${className}`}>
-      <Image
+      <PinnedImage
         className={`example-image__img ${softExample ? 'example-soft' : ''}`}
         src={url}
         mode={mode}
@@ -74,3 +94,14 @@ export default function ExampleImage({
     </View>
   )
 }
+
+export default memo(ExampleImage, (prev, next) => (
+  prev.src === next.src &&
+  prev.slug === next.slug &&
+  prev.variant === next.variant &&
+  prev.user === next.user &&
+  prev.badgeText === next.badgeText &&
+  prev.mode === next.mode &&
+  prev.className === next.className &&
+  prev.onLoad === next.onLoad
+))

@@ -1,4 +1,4 @@
-# 「UP一下」monorepo 唯一构建/验证入口
+# 「uplook」monorepo 唯一构建/验证入口
 # Go 与容器操作统一走 Make；TS 侧由 pnpm workspace 编排。
 
 .PHONY: bootstrap up down logs e2e server-test server-vet server-build server-tidy \

@@ -94,6 +94,13 @@ if (existsSync(dist)) {
       problems.push(`dist 缺资产（检查 copy.patterns 与 assetsInlineLimit:0）: ${ref}`)
     }
   }
+  // 微信打开 apps/miniapp（miniprogramRoot=dist/）时，tabBar 图标可能按项目根查找。
+  for (const m of configText.matchAll(/(?:iconPath|selectedIconPath):\s*'([^']+)'/g)) {
+    const rel = m[1].replace(/^\//, '')
+    if (!existsSync(join(appRoot, rel))) {
+      problems.push(`项目根缺 tabBar 图标（微信会报 dist/app.json iconPath 未找到）: ${rel}`)
+    }
+  }
 } else {
   notes.push('dist 不存在：跳过 3/4 的 dist 侧检查（先执行 build:weapp）')
 }

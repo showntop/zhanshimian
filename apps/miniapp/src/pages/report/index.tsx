@@ -1,6 +1,6 @@
 // 形象报告：来源照片可切换，findings 按真实 photo 归位；不展示评分，只给可提升点。
-import { useCallback, useEffect, useState } from 'react'
-import Taro, { useDidShow } from '@tarojs/taro'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Taro from '@tarojs/taro'
 import { Swiper, SwiperItem, Text, View } from '@tarojs/components'
 import {
   REPORT_COPY,
@@ -10,6 +10,7 @@ import {
   type Finding,
   type Report,
 } from '@zsm/core'
+import { usePageClass, useShowOnce } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
@@ -47,19 +48,26 @@ export default function Report() {
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [plansBusy, setPlansBusy] = useState(false)
-  const [shownRef, setShownRef] = useState(false)
+  const reportRef = useRef<Report | null>(null)
+  reportRef.current = report
+  const pageClass = usePageClass(!loading || Boolean(report))
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setFailed(false)
+    const cached = Boolean(reportRef.current)
+    if (!cached) {
+      setLoading(true)
+      setFailed(false)
+    }
     try {
       let id = readStorage(STORAGE_KEYS.reportId)
       if (!id) {
         const current = await api.getCurrentReport()
         if (!current) {
-          setReport(null)
-          setPhotoMap({})
-          setPhotoDemoMap({})
+          if (!cached) {
+            setReport(null)
+            setPhotoMap({})
+            setPhotoDemoMap({})
+          }
           return
         }
         id = current.id
@@ -81,23 +89,25 @@ export default function Report() {
       })
       setPhotoMap(map)
       setPhotoDemoMap(demoMap)
-      const preferred = PHOTO_ORDER.find((kind) => map[kind]) ?? 'body'
-      setActivePhoto(preferred)
-      setActiveFindingId('')
+      if (!cached) {
+        const preferred = PHOTO_ORDER.find((kind) => map[kind]) ?? 'body'
+        setActivePhoto(preferred)
+        setActiveFindingId('')
+      }
     } catch {
-      setFailed(true)
+      if (!reportRef.current) setFailed(true)
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    load().then(() => setShownRef(true))
+    load()
   }, [load])
 
-  useDidShow(() => {
-    // 首次加载由 useEffect 负责；之后回到本页才静默刷新。
-    if (shownRef) load()
+  // 首次由 useEffect 拉取；回页只后台校验，不清空已渲染照片
+  useShowOnce(() => {
+    load()
   })
 
   const viewPlans = async () => {
@@ -116,7 +126,7 @@ export default function Report() {
 
   if (loading) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title={REPORT_COPY.title} back />
         <Skeleton rows={5} />
       </View>
@@ -125,7 +135,7 @@ export default function Report() {
 
   if (failed || !report) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title={REPORT_COPY.title} back />
         <ErrorState
           title={failed ? undefined : REPORT_COPY.noReportTitle}
@@ -195,7 +205,7 @@ export default function Report() {
   }
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title={REPORT_COPY.title} back />
       <View className="report">
         <View className="report__hero fade-up">

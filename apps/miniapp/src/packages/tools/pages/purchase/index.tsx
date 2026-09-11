@@ -1,9 +1,10 @@
 // 购买判断：单品图上传 + 同步诊断。空态不堆预览卡；结果是一句判断，不套报告卡。
 // 同步请求会跨页存活：模块级 Promise + 本地草稿，退回首页再进入可恢复进行中/结论。
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import { PURCHASE_COPY, userImage, type Diagnosis } from '@zsm/core'
+import { usePageClass, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import {
   clearPurchaseResult,
@@ -37,6 +38,7 @@ export default function Purchase() {
 
   const resumingRef = useRef(false)
   const freshStartRef = useRef(false)
+  const pageClass = usePageClass(true)
 
   const applySession = useCallback((item: Diagnosis) => {
     setResult(item)
@@ -124,7 +126,7 @@ export default function Purchase() {
     resume()
   }, [resume])
 
-  useDidShow(() => {
+  useShowOnce(() => {
     resume()
   })
 
@@ -245,7 +247,7 @@ export default function Purchase() {
   const nativeFill = Boolean(photoDims) && renderedH >= NATIVE_MIN_H && renderedH <= NATIVE_MAX_H
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title="购买判断" back />
       <View className={`pk${result ? ' pk--done' : ''}`}>
         <View className="pk__hero fade-up" style={nativeFill ? { height: 'auto' } : undefined}>

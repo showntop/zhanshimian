@@ -1,7 +1,7 @@
 // 文案红线测试：不出现「通勤」「颜值」「评分」；场景四席；空态必带下一步动作
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ERROR_COPY, EMPTY_COPY, SCENES, greetingByHour, FEEDBACK_WORDS, HOME_TITLE, PRIVACY_NOTE } from '../src/index.ts'
+import { APP_NAME, DEFAULT_NICKNAME, ERROR_COPY, EMPTY_COPY, SCENES, greetingByHour, FEEDBACK_WORDS, HOME_TITLE, PRIVACY_NOTE } from '../src/index.ts'
 
 const FORBIDDEN = ['通勤', '颜值', '评分']
 
@@ -41,4 +41,9 @@ test('问候语分时段 + 首页标题保留', () => {
   assert.equal(greetingByHour(15), '下午好')
   assert.equal(greetingByHour(22), '晚上好')
   assert.equal(HOME_TITLE, '你好，我是你的私人形象顾问')
+})
+
+test('产品名为 uplook，默认昵称与之对齐', () => {
+  assert.equal(APP_NAME, 'uplook')
+  assert.equal(DEFAULT_NICKNAME, 'uplook用户')
 })

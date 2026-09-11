@@ -1,8 +1,9 @@
 // 今日造型：天气上下文 + 当日方案（生成/换一个/加入清单/反馈）+ 生成图轮询。
-import { useCallback, useEffect, useState } from 'react'
-import Taro, { useDidShow } from '@tarojs/taro'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Taro from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import { POLL_INTERVALS, lookImage, shouldStopPolling, useTaskPolling, trackEvent, type TodayContext, type TodayPlan } from '@zsm/core'
+import { usePageClass, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
@@ -21,10 +22,16 @@ export default function Today() {
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const planRef = useRef<TodayPlan | null>(null)
+  planRef.current = plan
+  const pageClass = usePageClass(!loading || Boolean(plan))
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setFailed(false)
+    const cached = Boolean(planRef.current)
+    if (!cached) {
+      setLoading(true)
+      setFailed(false)
+    }
     try {
       const city = readStorage(STORAGE_KEYS.city) || undefined
       const [ctx, current] = await Promise.all([
@@ -35,7 +42,7 @@ export default function Today() {
       setPlan(current)
       if (!current) await generate(false)
     } catch {
-      setFailed(true)
+      if (!planRef.current) setFailed(true)
     } finally {
       setLoading(false)
     }
@@ -60,8 +67,8 @@ export default function Today() {
     load()
   }, [load])
 
-  useDidShow(() => {
-    if (plan) load()
+  useShowOnce(() => {
+    if (planRef.current) load()
   })
 
   const generating = plan && plan.look_task && (plan.look_task.status === 'queued' || plan.look_task.status === 'processing')
@@ -130,7 +137,7 @@ export default function Today() {
 
   if (loading && !plan) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title="今日造型" back />
         <Skeleton rows={4} />
       </View>
@@ -139,7 +146,7 @@ export default function Today() {
 
   if (failed) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title="今日造型" back />
         <ErrorState onRetry={load} />
       </View>
@@ -147,7 +154,7 @@ export default function Today() {
   }
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title="今日造型" back />
       <View className="today">
         <View className="today__ctx fade-up" onClick={editCity}>

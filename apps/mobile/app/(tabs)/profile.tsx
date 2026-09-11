@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import type { Account, UserProfile } from '@zsm/core'
+import { DEFAULT_NICKNAME, type Account, type UserProfile } from '@zsm/core'
 import { api } from '../../src/api'
 import { STORAGE_KEYS, clearAllLocalState, readStorage, writeStorage } from '../../src/storage'
 import { PrimaryButton, Screen } from '../../src/ui/Screen'
@@ -56,7 +56,7 @@ export default function Profile() {
           <Text style={styles.avatarText}>{(account?.nickname ?? 'U').slice(0, 1)}</Text>
         </View>
         <View>
-          <Text style={styles.name}>{account?.nickname ?? 'UP一下用户'}</Text>
+          <Text style={styles.name}>{account?.nickname ?? DEFAULT_NICKNAME}</Text>
           <Text style={styles.meta}>
             已绑定：{(account?.identities ?? []).map((i) => i.provider).join('、') || '手机号'}
           </Text>

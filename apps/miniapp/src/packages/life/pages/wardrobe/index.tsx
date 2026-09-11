@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import { lookImage, trackEvent, userImage, type WardrobeItem, type WardrobeOutfit } from '@zsm/core'
+import { usePageClass } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
@@ -31,6 +32,7 @@ export default function Wardrobe() {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ name: '', category: 'top', color: '' })
   const [formPhoto, setFormPhoto] = useState('')
+  const pageClass = usePageClass(!loading || items.length > 0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -127,7 +129,7 @@ export default function Wardrobe() {
 
   if (loading) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title="衣橱" back />
         <Skeleton rows={4} />
       </View>
@@ -135,7 +137,7 @@ export default function Wardrobe() {
   }
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title="衣橱" back />
       <View className="wd">
         <View className="wd__progress fade-up">

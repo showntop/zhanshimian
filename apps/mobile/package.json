@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "main": "expo-router/entry",
-  "description": "UP一下 手机端（Expo SDK 54 + Expo Router）",
+  "description": "uplook 手机端（Expo SDK 54 + Expo Router）",
   "scripts": {
     "start": "expo start",
     "typecheck": "tsc --noEmit",

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Taro, { useLoad } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import type { ChecklistItem } from '@zsm/core'
+import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
@@ -19,6 +20,7 @@ export default function Checklist() {
   const [items, setItems] = useState<ChecklistItem[]>([])
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
+  const pageClass = usePageClass(!loading || items.length > 0)
 
   useLoad((options) => {
     setPlanId(options?.id || readStorage(STORAGE_KEYS.planId))
@@ -60,7 +62,7 @@ export default function Checklist() {
 
   if (loading) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title="执行清单" back />
         <Skeleton rows={4} />
       </View>
@@ -69,7 +71,7 @@ export default function Checklist() {
 
   if (failed) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title="执行清单" back />
         <ErrorState onRetry={load} />
       </View>
@@ -78,7 +80,7 @@ export default function Checklist() {
 
   if (items.length === 0) {
     return (
-      <View className="page">
+      <View className={pageClass}>
         <AppHeader title="执行清单" back />
         <EmptyState
           title="清单还是空的"
@@ -91,7 +93,7 @@ export default function Checklist() {
   }
 
   return (
-    <View className="page">
+    <View className={pageClass}>
       <AppHeader title="执行清单" back />
       <View className="cklist">
         <View className="cklist__progress fade-up">
