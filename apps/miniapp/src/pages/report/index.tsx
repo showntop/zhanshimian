@@ -30,7 +30,7 @@ type PhotoKind = (typeof PHOTO_ORDER)[number]
 // 只有相框内的图片滑动。第一屏空间靠内容板压缩（横排标签+简要建议）腾出。
 const HERO_FULL_W = 750
 const { windowWidth = 375, windowHeight = 667 } = Taro.getSystemInfoSync()
-const HERO_H = Math.round((windowHeight * 0.56 * HERO_FULL_W) / (windowWidth || 375))
+const HERO_H = Math.round((windowHeight * 0.64 * HERO_FULL_W) / (windowWidth || 375))
 
 function findingPhoto(finding: Finding): PhotoKind {
   return finding.photo === 'face' || finding.photo === 'side' ? finding.photo : 'body'
