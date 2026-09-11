@@ -1,15 +1,38 @@
 // 穿搭诊断：场景 3 选 + 单图上传 + 同步诊断（锚点标注）+ 最值得先改的一处。
-import { useState } from 'react'
-import Taro from '@tarojs/taro'
+// 视觉向发型预览页看齐：照片 hero 先行 → 图下 serif 导语 → 场景 → 单张白卡装结论。
+// 同步请求会跨页存活：模块级 Promise + 本地草稿，退回首页再进入可恢复进行中/结论。
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
-import { userImage, type Diagnosis } from '@zsm/core'
+import { FINDING_TONE_COPY, OUTFIT_COPY, userImage, type Diagnosis } from '@zsm/core'
 import { api } from '../../../../services/api'
+import {
+  clearOutfitResult,
+  getOutfitInflight,
+  markOutfitDone,
+  markOutfitPending,
+  readOutfitSession,
+  runOutfitDiagnose,
+  writeOutfitDraft,
+} from '../../../../services/outfit-session'
+import { STORAGE_KEYS, readStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
 import ExampleImage from '../../../../components/example-image'
 import Pill from '../../../../components/pill'
 import ErrorState from '../../../../components/error-state'
 import './index.scss'
+
+// 空态 hero 的拍照示范图（包内资产，JPEG；人物为内置模特，叠「拍照示范」角标）
+const OUTFIT_GUIDE_IMAGE = '/assets/capture/outfit-guide.jpg'
+
+// hero 相框比例（rpx，与 index.scss 一致）：锚点按 aspectFit 可视区重映射。
+// 照片渲染高落在 [NATIVE_MIN_H, NATIVE_MAX_H] 时改用 widthFix 原生铺满
+// （相框高度跟随照片，零裁切），超范围才回落定框 + 模糊衬底。
+const HERO_W = 686
+const HERO_H = 640
+const NATIVE_MIN_H = 480
+const NATIVE_MAX_H = 1080
 
 const CONTEXTS = [
   { key: 'daily', label: '日常' },
@@ -25,6 +48,107 @@ export default function Outfit() {
   const [result, setResult] = useState<Diagnosis | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // 所选照片真实宽高（onLoad 采集）：aspectFit 可视区锚点换算
+  const [photoDims, setPhotoDims] = useState<{ w: number; h: number } | null>(null)
+
+  const resumingRef = useRef(false)
+  // 本页点了「再诊断一次」或重选照片：不要立刻用服务端旧结论盖回去
+  const freshStartRef = useRef(false)
+
+  const applySession = useCallback((item: Diagnosis) => {
+    setResult(item)
+    if (item.scene) setScene(item.scene)
+    if (item.image_url) setPhotoUrl(item.image_url)
+    if ((item.provider_version ?? '').startsWith('demo')) setDemoSlug((prev) => prev || 'natural')
+  }, [])
+
+  const hydrateDraft = (stored: ReturnType<typeof readOutfitSession>) => {
+    if (!stored) return
+    if (stored.scene) setScene(stored.scene)
+    if (stored.photoPath) setPhotoPath(stored.photoPath)
+    if (stored.photoUrl) setPhotoUrl(stored.photoUrl)
+    if (stored.demoSlug) setDemoSlug(stored.demoSlug)
+  }
+
+  const resume = useCallback(async () => {
+    if (resumingRef.current) return
+    resumingRef.current = true
+    try {
+      const stored = readOutfitSession()
+      hydrateDraft(stored)
+      if (stored?.result) applySession(stored.result)
+
+      const pending = getOutfitInflight()
+      if (pending) {
+        setBusy(true)
+        setError('')
+        try {
+          applySession(await pending)
+        } catch (e) {
+          setError((e as Error).message || '诊断没有成功，请重试')
+        } finally {
+          setBusy(false)
+        }
+        return
+      }
+
+      if (stored?.pending && stored.mediaId) {
+        setBusy(true)
+        setError('')
+        try {
+          try {
+            const latest = await api.getLatestDiagnosis('outfit')
+            const startedAt = stored.startedAt || 0
+            const recentEnough = new Date(latest.created_at).getTime() >= startedAt - 5000
+            const sameMedia = !stored.mediaId || !latest.media_id || stored.mediaId === latest.media_id
+            if (recentEnough && sameMedia) {
+              markOutfitDone(latest)
+              applySession(latest)
+              return
+            }
+          } catch {
+            /* 服务端还没有这条结论：用同一张照片续跑诊断 */
+          }
+          const item = await runOutfitDiagnose(() =>
+            api.diagnose({
+              kind: 'outfit',
+              media_id: stored.mediaId,
+              scene: stored.scene || scene,
+              report_id: readStorage(STORAGE_KEYS.reportId) || undefined,
+            }),
+          )
+          applySession(item)
+        } catch (e) {
+          setError((e as Error).message || '诊断没有成功，请重试')
+        } finally {
+          setBusy(false)
+        }
+        return
+      }
+
+      // 本地已有结论就不再打 GET /diagnostics/latest。
+      // 线上旧进程只有 PATCH /v1/diagnostics/{id}，GET /latest 会被当成 {id} 回 405。
+      if (stored?.result || freshStartRef.current) return
+
+      try {
+        const latest = await api.getLatestDiagnosis('outfit')
+        markOutfitDone(latest)
+        applySession(latest)
+      } catch {
+        /* 旧服务 405 / 还没有诊断过：保持开始页 */
+      }
+    } finally {
+      resumingRef.current = false
+    }
+  }, [applySession, scene])
+
+  useEffect(() => {
+    resume()
+  }, [resume])
+
+  useDidShow(() => {
+    resume()
+  })
 
   const choosePhoto = () => {
     Taro.chooseMedia({
@@ -34,36 +158,76 @@ export default function Outfit() {
       success: (res) => {
         const file = res.tempFiles[0]
         if (file) {
+          if (file.width && file.height) setPhotoDims({ w: file.width, h: file.height })
           setPhotoPath(file.tempFilePath)
           setPhotoUrl('')
           setDemoSlug('')
           setResult(null)
+          setPhotoDims(null)
+          freshStartRef.current = true
+          writeOutfitDraft({
+            pending: false,
+            scene,
+            photoPath: file.tempFilePath,
+            photoUrl: '',
+            demoSlug: '',
+            mediaId: '',
+            result: null,
+          })
         }
       },
     })
   }
 
   const analyze = async (demo = false) => {
+    if (getOutfitInflight() || busy) return
     setBusy(true)
     setError('')
     try {
       let mediaId: string
+      let nextDemo = ''
+      let nextUrl = photoUrl
+      let nextPath = photoPath
       if (demo) {
-        mediaId = (await api.createDemoMedia('outfit')).id
-        setDemoSlug('natural')
-        setPhotoUrl('')
+        const asset = await api.createDemoMedia('outfit')
+        mediaId = asset.id
+        nextDemo = 'natural'
+        nextUrl = asset.url
+        nextPath = ''
+        setPhotoDims(null)
+        setDemoSlug(nextDemo)
+        setPhotoUrl(nextUrl)
         setPhotoPath('')
       } else {
-        if (!photoPath) {
+        if (!photoPath && !photoUrl) {
           Taro.showToast({ title: '先上传一张全身照', icon: 'none' })
           return
         }
-        const asset = await api.uploadMedia({ kind: 'outfit', filePath: photoPath })
-        mediaId = asset.id
-        setPhotoUrl(asset.url)
+        if (photoPath) {
+          const asset = await api.uploadMedia({ kind: 'outfit', filePath: photoPath })
+          mediaId = asset.id
+          nextUrl = asset.url
+          setPhotoUrl(asset.url)
+        } else {
+          const stored = readOutfitSession()
+          if (!stored?.mediaId) {
+            Taro.showToast({ title: '先上传一张全身照', icon: 'none' })
+            return
+          }
+          mediaId = stored.mediaId
+        }
       }
-      const item = await api.diagnose({ kind: 'outfit', media_id: mediaId, scene, report_id: readReportId() })
-      setResult(item)
+      markOutfitPending({
+        scene,
+        photoPath: nextPath,
+        photoUrl: nextUrl,
+        demoSlug: nextDemo,
+        mediaId,
+      })
+      const item = await runOutfitDiagnose(() =>
+        api.diagnose({ kind: 'outfit', media_id: mediaId, scene, report_id: readReportId() }),
+      )
+      applySession(item)
     } catch (e) {
       setError((e as Error).message || '诊断没有成功，请重试')
     } finally {
@@ -72,18 +236,14 @@ export default function Outfit() {
   }
 
   const readReportId = () => {
-    try {
-      return Taro.getStorageSync('zsm_report_id') || undefined
-    } catch {
-      return undefined
-    }
+    return readStorage(STORAGE_KEYS.reportId) || undefined
   }
 
   const saveResult = async () => {
     if (!result) return
     try {
       await api.updateDiagnosis(result.id, { saved: true })
-      Taro.showToast({ title: '已保存', icon: 'success' })
+      Taro.showToast({ title: OUTFIT_COPY.saved, icon: 'success' })
     } catch (e) {
       Taro.showToast({ title: (e as Error).message || '保存没有成功', icon: 'none' })
     }
@@ -91,27 +251,108 @@ export default function Outfit() {
 
   const toPlans = () => Taro.switchTab({ url: '/pages/plans/index' })
 
+  const retryFresh = () => {
+    freshStartRef.current = true
+    clearOutfitResult()
+    setResult(null)
+    setError('')
+  }
+
   const isDemo = Boolean(demoSlug) || (result?.provider_version ?? '').startsWith('demo')
-  const shownUrl = userImage(photoUrl) || photoPath
+  const shownUrl = userImage(photoUrl) || userImage(result?.image_url) || photoPath
+
+  // widthFix 原生铺满：相框 = 图框，锚点直接百分比；仅比例适中时启用
+  const renderedH = photoDims ? Math.round((HERO_W * photoDims.h) / photoDims.w) : 0
+  const nativeFill = Boolean(photoDims) && renderedH >= NATIVE_MIN_H && renderedH <= NATIVE_MAX_H
+
+  // 锚点坐标相对原始照片；aspectFit 两侧/上下留白后按缩放 + 偏移重映射到相框。
+  // widthFix 铺满时相框即图框，直接百分比；未拿到原图尺寸时回退到比例映射。
+  const markerStyle = (ax: number, ay: number) => {
+    if (nativeFill) {
+      return {
+        left: `${Math.min(92, Math.max(4, ax * 100))}%`,
+        top: `${Math.min(90, Math.max(6, ay * 100))}%`,
+      }
+    }
+    if (!photoDims) {
+      return {
+        left: `${Math.min(90, Math.max(8, ax * 100))}%`,
+        top: `${Math.min(88, Math.max(8, ay * 100))}%`,
+      }
+    }
+    const scale = Math.min(HERO_W / photoDims.w, HERO_H / photoDims.h)
+    const mappedW = photoDims.w * scale
+    const mappedH = photoDims.h * scale
+    const x = (((HERO_W - mappedW) / 2 + ax * mappedW) / HERO_W) * 100
+    const y = (((HERO_H - mappedH) / 2 + ay * mappedH) / HERO_H) * 100
+    return { left: `${Math.min(92, Math.max(4, x))}%`, top: `${Math.min(90, Math.max(6, y))}%` }
+  }
 
   return (
     <View className="page">
       <AppHeader title="穿搭诊断" back />
       <View className="od">
-        <View className="od__hero fade-up">
+        <View className="od__hero fade-up" style={nativeFill ? { height: 'auto' } : undefined}>
           {demoSlug ? (
-            <ExampleImage className="od__hero-img" slug="natural" variant="full" badgeText="效果示例" />
+            nativeFill ? (
+              <ExampleImage
+                className="od__hero-img od__hero-img--full"
+                slug="natural"
+                variant="full"
+                badgeText="效果示例"
+                mode="widthFix"
+                onLoad={(e) =>
+                  setPhotoDims({ w: Number(e.detail.width), h: Number(e.detail.height) })
+                }
+              />
+            ) : (
+              <>
+                <ExampleImage className="od__upload-backdrop" slug="natural" variant="full" />
+                <ExampleImage className="od__hero-img od__hero-img--fit" slug="natural" variant="full" badgeText="效果示例" mode="aspectFit" />
+              </>
+            )
           ) : shownUrl ? (
-            <Image className="od__hero-img" src={shownUrl} mode="aspectFill" />
+            nativeFill ? (
+              <Image
+                className="od__hero-img od__hero-img--full"
+                src={shownUrl}
+                mode="widthFix"
+                onLoad={(e) =>
+                  setPhotoDims({ w: Number(e.detail.width), h: Number(e.detail.height) })
+                }
+              />
+            ) : (
+              <>
+                <Image className="od__photo-backdrop" src={shownUrl} mode="aspectFill" />
+                <Image
+                  className="od__hero-img od__hero-img--fit"
+                  src={shownUrl}
+                  mode="aspectFit"
+                  onLoad={(e) =>
+                    setPhotoDims({ w: Number(e.detail.width), h: Number(e.detail.height) })
+                  }
+                />
+              </>
+            )
           ) : (
             <View className="od__upload pressable" onClick={choosePhoto}>
-              <Text className="od__upload-plus">＋</Text>
-              <Text className="od__upload-hint">上传一张全身照</Text>
+              <ExampleImage className="od__upload-backdrop" src={OUTFIT_GUIDE_IMAGE} />
+              <ExampleImage className="od__hero-img" src={OUTFIT_GUIDE_IMAGE} badgeText="拍照示范" mode="aspectFit" />
+              <View className="od__upload-bar">
+                <Text className="od__upload-bar-plus">＋</Text>
+                <Text className="od__upload-bar-text">{OUTFIT_COPY.uploadTitle}</Text>
+              </View>
             </View>
           )}
           {shownUrl || demoSlug ? (
             <View className="od__hero-actions">
-              <Text className="od__hero-alt pressable" onClick={choosePhoto}>重选照片</Text>
+              <Text className="od__hero-alt pressable" onClick={choosePhoto}>{OUTFIT_COPY.reselect}</Text>
+            </View>
+          ) : null}
+          {busy ? (
+            <View className="od__mask">
+              <View className="od__mask-spin spinner" />
+              <Text className="od__mask-text">{OUTFIT_COPY.busyHint}</Text>
             </View>
           ) : null}
           {/* 诊断标注：锚点归位 */}
@@ -120,58 +361,95 @@ export default function Outfit() {
               <View
                 key={`${finding.category}-${finding.label}`}
                 className="od__marker"
-                style={{
-                  left: `${Math.min(90, Math.max(8, finding.anchor_x * 100))}%`,
-                  top: `${Math.min(88, Math.max(8, finding.anchor_y * 100))}%`,
-                }}
+                style={markerStyle(finding.anchor_x, finding.anchor_y)}
               >
                 <View className="od__marker-dot" />
                 <Text className="od__marker-chip">{finding.label}</Text>
               </View>
             ) : null,
           )}
-          {isDemo ? (
+          {isDemo && !busy ? (
             <View className="od__badge">
               <Text>效果示例</Text>
             </View>
           ) : null}
         </View>
 
-        <View className="od__context fade-up delay-1">
-          <Text className="od__context-label">诊断场景</Text>
-          <View className="od__context-pills">
-            {CONTEXTS.map((c) => (
-              <Pill key={c.key} label={c.label} active={scene === c.key} onClick={() => setScene(c.key)} />
-            ))}
-          </View>
+        {/* 图下导语：与发型预览页同一位置/同一字阶 */}
+        <View className="od__hint fade-up delay-1">
+          <Text className="od__hint-title">{OUTFIT_COPY.title}</Text>
+          <Text className="od__hint-desc">{OUTFIT_COPY.desc}</Text>
+          {!shownUrl && !demoSlug ? (
+            <Text className="od__hint-tips">{OUTFIT_COPY.uploadTips.join(' · ')}</Text>
+          ) : null}
         </View>
+
+        {!result ? (
+          <View className="od__context fade-up delay-2">
+            <Text className="od__context-label">{OUTFIT_COPY.sceneLabel}</Text>
+            <View className="od__context-pills">
+              {CONTEXTS.map((c) => (
+                <Pill key={c.key} label={c.label} active={scene === c.key} onClick={() => !busy && setScene(c.key)} />
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         {error ? <ErrorState message={error} onRetry={() => analyze(false)} /> : null}
 
         {result ? (
           <View className="od__result fade-up delay-2">
-            <Text className="od__result-title">{result.priority_title}</Text>
-            <Text className="od__result-copy">{result.priority_copy}</Text>
-            <View className="od__tags">
-              {result.tags.map((tag) => (
-                <Text key={tag} className="od__tag">{tag}</Text>
-              ))}
+            <View className="od__card">
+              <Text className="od__result-kicker">{OUTFIT_COPY.resultKicker}</Text>
+              <Text className="od__conclusion-text display">{result.conclusion}</Text>
+              {result.tags.length > 0 ? (
+                <View className="od__tags">
+                  {result.tags.map((tag) => (
+                    <Text key={tag} className="od__tag">{tag}</Text>
+                  ))}
+                </View>
+              ) : null}
+
+              <View className="od__priority">
+                <Text className="od__priority-kicker">{OUTFIT_COPY.priorityKicker}</Text>
+                <Text className="od__priority-title">{result.priority_title}</Text>
+                <Text className="od__priority-copy">{result.priority_copy}</Text>
+              </View>
+
+              {(result.findings ?? []).length > 0 ? (
+                <View className="od__findings">
+                  <Text className="od__findings-title">{OUTFIT_COPY.findingsTitle}</Text>
+                  {result.findings.map((finding) => (
+                    <View key={`${finding.category}-${finding.label}`} className="od__finding">
+                      <Text className={`od__finding-tone od__finding-tone--${finding.tone || 'optional'}`}>
+                        {FINDING_TONE_COPY[finding.tone] ?? FINDING_TONE_COPY.optional}
+                      </Text>
+                      <Text className="od__finding-label">{finding.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </View>
+
             <View className="od__result-actions">
-              <PrimaryButton text="保存这条建议" onClick={saveResult} />
-              <Text className="od__result-alt pressable" onClick={toPlans}>去看三套方案</Text>
+              <PrimaryButton text={OUTFIT_COPY.save} onClick={saveResult} />
+              <Text className="od__result-alt pressable" onClick={toPlans}>{OUTFIT_COPY.toPlans}</Text>
+              <Text className="od__result-alt pressable" onClick={retryFresh}>{OUTFIT_COPY.again}</Text>
             </View>
           </View>
         ) : null}
 
         {!result ? (
-          <View className="od__foot fade-up delay-2">
-            <PrimaryButton text={busy ? '正在诊断…' : '开始诊断'} loading={busy} disabled={!photoPath} onClick={() => analyze(false)} />
+          <View className="od__foot fade-up delay-3">
+            <PrimaryButton
+              text={busy ? OUTFIT_COPY.busy : OUTFIT_COPY.start}
+              loading={busy}
+              disabled={!photoPath && !photoUrl && !demoSlug}
+              onClick={() => analyze(false)}
+            />
             <View className="od__foot-row">
-              <Text className="od__foot-alt pressable" onClick={choosePhoto}>选择照片</Text>
-              <Text className="od__foot-alt pressable" onClick={() => analyze(true)}>用示例照片体验</Text>
+              <Text className="od__foot-alt pressable" onClick={() => analyze(true)}>{OUTFIT_COPY.demo}</Text>
             </View>
-            <Text className="od__foot-note">只指出最值得调整的一处</Text>
           </View>
         ) : null}
       </View>

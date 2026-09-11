@@ -42,16 +42,27 @@ export default function Hair() {
     }
   }, [])
 
-  // 恢复进行中的预览任务
+  // 恢复进行中的预览任务：先读本地引用；引用丢失（清缓存/换设备）时
+  // 向服务端找回仍在生成中的预览（GET /v1/hair-previews/active，404 = 无进行中任务）
   const resume = useCallback(async () => {
     const id = readStorage(STORAGE_KEYS.activeTaskHairPreview)
-    if (!id) return
+    if (id) {
+      try {
+        const item = await api.getHairPreview(id)
+        setPreview(item)
+        if (item.style_id) setStyleId(item.style_id)
+      } catch {
+        writeStorage(STORAGE_KEYS.activeTaskHairPreview, '')
+      }
+      return
+    }
     try {
-      const item = await api.getHairPreview(id)
+      const item = await api.getActiveHairPreview()
       setPreview(item)
       if (item.style_id) setStyleId(item.style_id)
+      writeStorage(STORAGE_KEYS.activeTaskHairPreview, item.id)
     } catch {
-      writeStorage(STORAGE_KEYS.activeTaskHairPreview, '')
+      /* 无进行中任务：保持新任务态 */
     }
   }, [])
 

@@ -1287,7 +1287,80 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  '/v1/diagnostics/latest':
+    get:
+      operationId: getLatestDiagnosis
+      summary: 最近一条诊断
+      description: 按 kind 返回当前用户最新一条诊断（outfit / purchase）；客户端离开同步诊断页后据此恢复结论。无记录时 404。
+      tags: [Diagnostics]
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          description: 诊断类型
+          schema:
+            type: string
+            enum: [outfit, purchase]
+      responses:
+        '200':
+          description: 最近一条诊断
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Diagnosis'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   '/v1/diagnostics/{id}':
+    get:
+      operationId: getDiagnosis
+      summary: 单条诊断
+      description: 读取已完成的诊断结论；越权访问一律 404。
+      tags: [Diagnostics]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 诊断结果 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 诊断结论
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Diagnosis'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
     patch:
       operationId: updateDiagnosis
       summary: 保存/取消保存诊断
@@ -1458,6 +1531,35 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/hair-previews/active':
+    get:
+      operationId: getActiveHairPreview
+      summary: 当前进行中的发型预览
+      description: 返回任务仍在 queued/processing 的最新预览（状态/进度投影自 hair_preview 任务）；客户端本地引用丢失（清缓存/换设备）时据此恢复任务展示；无进行中任务时 404。
+      tags: [Hair]
+      responses:
+        '200':
+          description: 进行中的预览
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HairPreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -2802,6 +2904,12 @@ components:
           type: boolean
         provider_version:
           type: string
+        media_id:
+          type: string
+          description: 诊断所用照片的媒体 ID
+        image_url:
+          type: string
+          description: 诊断所用照片的可展示地址
         created_at:
           type: string
           format: date-time

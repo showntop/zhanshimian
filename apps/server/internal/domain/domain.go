@@ -549,6 +549,8 @@ type ToolResult struct {
 	Options         []ToolOption  `json:"options,omitempty"`
 	Saved           bool          `json:"saved"`
 	ProviderVersion string        `json:"provider_version,omitempty"`
+	MediaID         string        `json:"media_id,omitempty"`
+	ImageURL        string        `json:"image_url,omitempty"`
 	CreatedAt       time.Time     `json:"created_at"`
 }
 

@@ -225,6 +225,8 @@ export interface Diagnosis {
   options?: DiagnosisOption[]
   saved: boolean
   provider_version?: string
+  media_id?: string
+  image_url?: string
   created_at: string
 }
 

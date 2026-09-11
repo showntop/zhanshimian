@@ -87,11 +87,14 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("POST /v1/plans/{id}/feedback", api.auth(http.HandlerFunc(api.planFeedback)))
 
 	mux.Handle("POST /v1/diagnostics", api.auth(http.HandlerFunc(api.createDiagnostic)))
+	mux.Handle("GET /v1/diagnostics/latest", api.auth(http.HandlerFunc(api.getLatestDiagnostic)))
+	mux.Handle("GET /v1/diagnostics/{id}", api.auth(http.HandlerFunc(api.getDiagnostic)))
 	mux.Handle("PATCH /v1/diagnostics/{id}", api.auth(http.HandlerFunc(api.patchDiagnostic)))
 	mux.Handle("GET /v1/hairstyles", api.auth(http.HandlerFunc(api.listHairstyles)))
 
 	mux.Handle("POST /v1/hair-previews", api.auth(http.HandlerFunc(api.createHairPreview)))
 	mux.Handle("GET /v1/hair-previews", api.auth(http.HandlerFunc(api.listSavedHairPreviews)))
+	mux.Handle("GET /v1/hair-previews/active", api.auth(http.HandlerFunc(api.getActiveHairPreview)))
 	mux.Handle("GET /v1/hair-previews/{id}", api.auth(http.HandlerFunc(api.getHairPreview)))
 	mux.Handle("POST /v1/hair-previews/{id}/save", api.auth(http.HandlerFunc(api.saveHairPreview)))
 

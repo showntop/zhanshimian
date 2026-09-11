@@ -58,3 +58,23 @@ export function openTask(task: Task) {
       break
   }
 }
+
+/** 任务中心/首页任务轨共用：按类型聚合同类任务（一次方案生成 = 3 个 plan_look），保持先来先排 */
+export function groupTasksByType(tasks: Task[]): Task[][] {
+  const groups: Task[][] = []
+  for (const task of tasks) {
+    const group = groups.find((g) => g[0]?.type === task.type)
+    if (group) group.push(task)
+    else groups.push([task])
+  }
+  return groups
+}
+
+/** 任务轨右侧状态文案：同类多任务给数量，单任务给阶段或进度 */
+export function taskGroupMeta(group: Task[]): string {
+  const first = group[0]
+  if (!first) return ''
+  if (group.length > 1) return `${group.length} 个生成中`
+  if (first.stage) return first.stage
+  return `${Math.min(100, Math.max(0, first.progress ?? 0))}%`
+}

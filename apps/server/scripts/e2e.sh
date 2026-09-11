@@ -88,7 +88,16 @@ preview_json="$(curl -fsS -X POST "$api_base/v1/hair-previews" -H "Authorization
   -d "{\"media_id\":\"$face_media_id\",\"report_id\":\"$report_id\",\"style_id\":\"sharp\",\"scene\":\"daily\"}")"
 preview_id="$(printf '%s' "$preview_json" | jq -r '.data.id')"
 preview_task_id="$(printf '%s' "$preview_json" | jq -r '.task.id')"
+# 进行中预览可被发现（客户端本地引用丢失时的恢复入口）
+active_status="$(curl -sS -o /dev/null -w '%{http_code}' "$api_base/v1/hair-previews/active" -H "Authorization: Bearer $token")"
+if [ "$active_status" = "200" ]; then
+  curl -fsS "$api_base/v1/hair-previews/active" -H "Authorization: Bearer $token" | jq -e ".data.id == \"$preview_id\"" >/dev/null
+else
+  # 任务可能已被 worker 秒级完成；此时 active 404 属合法竞态
+  [ "$active_status" = "404" ]
+fi
 wait_task "$preview_task_id" "hair-preview" >/dev/null
+curl -sS -o /dev/null -w '%{http_code}' "$api_base/v1/hair-previews/active" -H "Authorization: Bearer $token" | grep -qx 404
 preview_final="$(curl -fsS "$api_base/v1/hair-previews/$preview_id" -H "Authorization: Bearer $token")"
 printf '%s' "$preview_final" | jq -e '.data.status == "completed" and (.data.result_image_url | length > 0)' >/dev/null
 curl -fsS -X POST "$api_base/v1/hair-previews/$preview_id/save" -H "Authorization: Bearer $token" | jq -e '.data.saved == true' >/dev/null
@@ -104,6 +113,8 @@ outfit_json="$(curl -fsS -X POST "$api_base/v1/diagnostics" -H "Authorization: B
   -d "{\"kind\":\"outfit\",\"media_id\":\"$outfit_media_id\",\"report_id\":\"$report_id\",\"scene\":\"interview\"}")"
 printf '%s' "$outfit_json" | jq -e '.data.findings | length == 3' >/dev/null
 outfit_result_id="$(printf '%s' "$outfit_json" | jq -r '.data.id')"
+curl -fsS "$api_base/v1/diagnostics/$outfit_result_id" -H "Authorization: Bearer $token" | jq -e ".data.id == \"$outfit_result_id\" and (.data.media_id == \"$outfit_media_id\")" >/dev/null
+curl -fsS "$api_base/v1/diagnostics/latest?kind=outfit" -H "Authorization: Bearer $token" | jq -e ".data.id == \"$outfit_result_id\"" >/dev/null
 curl -fsS -X PATCH "$api_base/v1/diagnostics/$outfit_result_id" -H "Authorization: Bearer $token" -H 'content-type: application/json' -d '{"saved":true}' | jq -e '.data.saved == true' >/dev/null
 product_media_id="$(curl -fsS -X POST "$api_base/v1/media/demo" -H "Authorization: Bearer $token" -H 'content-type: application/json' -d '{"kind":"product"}' | jq -r '.data.id')"
 purchase_json="$(curl -fsS -X POST "$api_base/v1/diagnostics" -H "Authorization: Bearer $token" -H 'content-type: application/json' \

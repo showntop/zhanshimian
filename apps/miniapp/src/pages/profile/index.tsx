@@ -6,7 +6,7 @@ import Taro, { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import type { Account, Task, UserProfile } from '@zsm/core'
 import { api } from '../../services/api'
-import { openTask, taskTitle } from '../../services/task-utils'
+import { groupTasksByType, openTask, taskTitle } from '../../services/task-utils'
 import { clearAllLocalState, STORAGE_KEYS, readStorage } from '../../services/storage'
 import { globalData } from '../../app'
 import AppHeader from '../../components/app-header'
@@ -41,16 +41,11 @@ export default function Profile() {
 
   const hasReport = Boolean(readStorage(STORAGE_KEYS.reportId))
 
-  // 任务中心：按类型聚合同类任务（一次方案生成 = 3 个 plan_look）
+  // 任务中心：按类型聚合同类任务（一次方案生成 = 3 个 plan_look），分组逻辑与首页任务轨单源
   const activeTasks = tasks.filter(
     (t) => t.status === 'queued' || t.status === 'processing' || t.status === 'failed',
   )
-  const taskGroups: Task[][] = []
-  for (const task of activeTasks) {
-    const group = taskGroups.find((g) => g[0]?.type === task.type)
-    if (group) group.push(task)
-    else taskGroups.push([task])
-  }
+  const taskGroups = groupTasksByType(activeTasks)
 
   const deleteData = () => {
     Taro.showModal({

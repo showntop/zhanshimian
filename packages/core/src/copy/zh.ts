@@ -197,3 +197,58 @@ export const REPORT_COPY = {
   noReportBody: '拍三张照片，几分钟拿到你的第一份形象分析。',
   goArchive: '去建档'
 } as const
+
+// ---------- 工具页：穿搭诊断 / 购买判断 ----------
+export const OUTFIT_COPY = {
+  title: '今天这身，先改哪一处',
+  desc: '一张全身照，只指出最值得调整的一处',
+  uploadTitle: '拍一张全身照',
+  uploadTips: ['站远一步，从头到脚都入镜', '自然光下正面站立', '穿今天真实的搭配'],
+  sceneLabel: '诊断场景',
+  start: '开始诊断',
+  busy: '正在诊断…',
+  busyHint: '正在看你这身搭配',
+  choosePhoto: '选择照片',
+  demo: '用示例照片体验',
+  reselect: '重选照片',
+  again: '再诊断一次',
+  lastResult: '查看结果',
+  resultKicker: '诊断结论',
+  priorityKicker: '最值得先改的一处',
+  findingsTitle: '细节观察',
+  save: '保存这条建议',
+  saved: '已保存',
+  toPlans: '去看三套方案'
+} as const
+
+export const PURCHASE_COPY = {
+  title: '这件，适不适合你',
+  desc: '买之前，先看它和你的匹配度',
+  uploadTitle: '上传想买的单品图',
+  uploadTips: ['白底或干净背景更清晰', '正面平铺或上身图', '看得清材质与版型'],
+  start: '这件适合我吗',
+  busy: '正在判断…',
+  choosePhoto: '选择商品图',
+  demo: '用示例图体验',
+  reselect: '重选',
+  note: '买之前，先看它适不适合你',
+  resultKicker: '判断结论',
+  priorityKicker: '怎么搭更合适',
+  findingsTitle: '适合与注意',
+  save: '保存这条判断',
+  saved: '已保存',
+  previewTitle: '判断后你会得到',
+  previewItems: [
+    { title: '适不适合的结论', desc: '结合你的形象档案，直接给答案' },
+    { title: '怎么搭更合适', desc: '给出与现有衣橱组合的具体方向' },
+    { title: '适合与注意清单', desc: '优点与穿着场合提醒，逐条列清' }
+  ]
+} as const
+
+/** 诊断发现语气标签（positive/improve/optional/caution → 尊重表达，无警示红） */
+export const FINDING_TONE_COPY: Record<string, string> = {
+  positive: '适合',
+  improve: '可提升',
+  optional: '可参考',
+  caution: '注意'
+}

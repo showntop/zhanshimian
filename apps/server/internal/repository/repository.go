@@ -106,6 +106,10 @@ type Repository interface {
 
 	// ---- 诊断（同步，tool_results 表承载） ----
 	CreateDiagnostic(ctx context.Context, userID string, input domain.DiagnosticInput, result domain.ToolResult) (domain.ToolResult, error)
+	GetDiagnostic(ctx context.Context, userID, diagnosticID string) (domain.ToolResult, error)
+	// LatestDiagnostic returns the user's newest result for kind (outfit/purchase).
+	// Clients use it to resume after leaving the sync diagnose request.
+	LatestDiagnostic(ctx context.Context, userID, kind string) (domain.ToolResult, error)
 	SetDiagnosticSaved(ctx context.Context, userID, diagnosticID string, saved bool) (domain.ToolResult, error)
 
 	// ---- 发型预览 ----
@@ -113,6 +117,9 @@ type Repository interface {
 	// idempotent per user: an active preview is returned with its live task.
 	CreateHairPreview(ctx context.Context, userID string, input domain.HairPreviewInput, styleName string) (domain.HairPreview, *domain.Task, error)
 	GetHairPreview(ctx context.Context, userID, previewID string) (domain.HairPreview, error)
+	// GetActiveHairPreview returns the user's in-flight preview (its task is
+	// queued/processing) so clients can resume discovery without a local ref.
+	GetActiveHairPreview(ctx context.Context, userID string) (domain.HairPreview, error)
 	GetHairPreviewInput(ctx context.Context, userID, previewID string) (domain.HairPreviewInput, error)
 	ListSavedHairPreviews(ctx context.Context, userID string) ([]domain.HairPreview, error)
 	ApplyHairPreviewResult(ctx context.Context, previewID, resultURL, storageKey, providerVersion string) error

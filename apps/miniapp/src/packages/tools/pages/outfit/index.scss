@@ -1,8 +1,10 @@
+// 穿搭诊断：向发型预览页看齐——照片 hero 先行，图下 serif 导语，结论装进单张白卡。
 .od {
   display: flex;
   flex-direction: column;
-  gap: 28rpx;
+  gap: 24rpx;
 
+  // ---------- 照片 hero ----------
   &__hero {
     position: relative;
     height: 640rpx;
@@ -14,6 +16,17 @@
     &-img {
       width: 100%;
       height: 100%;
+    }
+
+    // 本人/示例照片：aspectFit 完整入镜（不裁头）
+    &-img--fit {
+      position: relative;
+      z-index: 1;
+    }
+
+    // widthFix 原生铺满：相框高度跟随照片（hero 容器 inline height:auto）
+    &-img--full {
+      height: auto;
     }
 
     &-img.example-image,
@@ -29,35 +42,120 @@
     }
 
     &-alt {
-      padding: 8rpx 20rpx;
+      padding: 12rpx 24rpx;
       border-radius: 999rpx;
-      background: rgba(255, 255, 255, 0.85);
-      font-size: 20rpx;
+      background: rgba(255, 255, 255, 0.88);
+      font-size: 22rpx;
       color: var(--ink);
     }
   }
 
-  &__upload {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16rpx;
+  // 本人照片的模糊衬底（铺满宽度，色自图出）
+  &__photo-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
     height: 100%;
-    border: 3rpx dashed var(--moss);
-    border-radius: var(--radius-lg);
+    filter: blur(36rpx) saturate(1.12) brightness(1.05);
+    transform: scale(1.25);
+  }
 
-    &-plus {
-      font-size: 64rpx;
-      color: var(--moss);
+  // ---------- 空态：示范图 hero + 底部上传条 ----------
+  &__upload {
+    position: relative;
+    height: 100%;
+
+    // 模糊衬底铺满宽度（自图衍生的背景色，零新增资产）
+    &-backdrop {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 0;
+      filter: blur(36rpx) saturate(1.12) brightness(1.05);
+      transform: scale(1.25);
+
+      .example-badge {
+        display: none;
+      }
     }
 
-    &-hint {
+    // 前景完整入镜的示范图压过衬底
+    .example-image {
+      background: transparent;
+    }
+
+    // 前景示范图压过衬底层
+    .od__hero-img {
+      position: relative;
+      z-index: 1;
+    }
+
+    // 角标让位底部上传条
+    .example-badge {
+      top: 16rpx;
+      right: 16rpx;
+      bottom: auto;
+    }
+
+    &-bar {
+      position: absolute;
+      left: 24rpx;
+      right: 24rpx;
+      bottom: 24rpx;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10rpx;
+      height: 88rpx;
+      border-radius: 999rpx;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: var(--shadow-card);
+
+      &-plus {
+        font-size: 32rpx;
+        line-height: 1;
+        color: var(--moss);
+      }
+
+      &-text {
+        font-size: 26rpx;
+        font-weight: 600;
+        color: var(--ink);
+      }
+    }
+  }
+
+  // ---------- 图下导语（与发型预览 hair__hint 同字阶同位置） ----------
+  &__hint {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+
+    &-title {
+      font-family: 'Songti SC', 'STSong', serif;
+      font-size: 36rpx;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    &-desc {
       font-size: 24rpx;
+      line-height: 1.65;
+      color: var(--ink-3);
+    }
+    &-tips {
+      font-size: 22rpx;
       color: var(--ink-3);
     }
   }
 
+  // ---------- 锚点标注 ----------
   &__marker {
     position: absolute;
     display: flex;
@@ -89,11 +187,35 @@
     right: 20rpx;
     padding: 8rpx 20rpx;
     border-radius: 999rpx;
-    background: rgba(30, 35, 29, 0.55);
+    background: var(--badge);
     color: #ffffff;
     font-size: 18rpx;
   }
 
+  &__mask {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20rpx;
+    background: rgba(248, 245, 240, 0.72);
+
+    &-spin {
+      width: 48rpx;
+      height: 48rpx;
+      border-width: 4rpx;
+    }
+
+    &-text {
+      font-size: 24rpx;
+      color: var(--ink);
+    }
+  }
+
+  // ---------- 场景选择 ----------
   &__context {
     display: flex;
     flex-direction: column;
@@ -105,46 +227,59 @@
       color: var(--ink-2);
     }
 
+    // 等宽分段：左右边缘与照片框/CTA 对齐，消除左挤右空的失衡
     &-pills {
       display: flex;
       gap: 16rpx;
+
+      .pill {
+        flex: 1;
+        padding: 0 8rpx;
+      }
     }
   }
 
+  // ---------- 结论：单张白卡 ----------
   &__result {
     display: flex;
     flex-direction: column;
-    gap: 16rpx;
-    padding: 32rpx;
-    border-radius: var(--radius-md);
-    background: var(--moss-soft);
+    gap: 28rpx;
 
-    &-title {
-      font-family: 'Songti SC', 'STSong', serif;
-      font-size: 34rpx;
-      font-weight: 700;
-      color: var(--ink);
-    }
-
-    &-copy {
-      font-size: 26rpx;
-      line-height: 1.7;
-      color: var(--ink-2);
+    &-kicker {
+      color: var(--moss);
+      font-size: 21rpx;
+      font-weight: 600;
+      letter-spacing: 4rpx;
     }
 
     &-actions {
       display: flex;
       flex-direction: column;
       gap: 16rpx;
-      margin-top: 8rpx;
     }
 
     &-alt {
+      padding: 16rpx 0;
       text-align: center;
       font-size: 24rpx;
       color: var(--moss);
-      text-decoration: underline;
     }
+  }
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    gap: 18rpx;
+    padding: 32rpx;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+  }
+
+  &__conclusion-text {
+    margin: 0;
+    padding: 0;
+    font-size: 36rpx;
   }
 
   &__tags {
@@ -156,32 +291,121 @@
   &__tag {
     padding: 6rpx 20rpx;
     border-radius: 999rpx;
-    background: var(--surface-strong);
+    background: var(--moss-soft);
     font-size: 20rpx;
     color: var(--ink-2);
   }
 
+  // priority：moss 左边条高亮带（卡内嵌套，全页视觉次锚点）
+  &__priority {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+    margin-top: 6rpx;
+    padding: 28rpx 32rpx;
+    border-radius: var(--radius-md);
+    background: var(--moss-soft);
+    border-left: 6rpx solid var(--moss);
+
+    &-kicker {
+      font-size: 20rpx;
+      font-weight: 600;
+      letter-spacing: 3rpx;
+      color: var(--moss);
+    }
+
+    &-title {
+      font-family: 'Songti SC', 'STSong', serif;
+      font-size: 32rpx;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    &-copy {
+      font-size: 26rpx;
+      line-height: 1.7;
+      color: var(--ink-2);
+    }
+  }
+
+  // ---------- 细节观察（卡内列表，发丝线分隔） ----------
+  &__findings {
+    display: flex;
+    flex-direction: column;
+    margin-top: 6rpx;
+    border-top: 1rpx solid var(--line);
+
+    &-title {
+      padding: 20rpx 0 4rpx;
+      font-size: 22rpx;
+      font-weight: 600;
+      letter-spacing: 3rpx;
+      color: var(--ink-3);
+    }
+  }
+
+  &__finding {
+    display: flex;
+    align-items: center;
+    gap: 18rpx;
+    padding: 20rpx 0;
+    border-bottom: 1rpx solid var(--line);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &-tone {
+      flex: none;
+      padding: 4rpx 16rpx;
+      border-radius: 999rpx;
+      font-size: 20rpx;
+      font-weight: 600;
+
+      &--positive {
+        background: var(--moss);
+        color: #ffffff;
+      }
+
+      &--improve {
+        background: var(--moss-soft);
+        color: var(--moss);
+      }
+
+      &--optional {
+        background: var(--moss-soft);
+        color: var(--ink-2);
+      }
+
+      &--caution {
+        background: rgba(155, 109, 88, 0.12);
+        color: var(--warn);
+      }
+    }
+
+    &-label {
+      font-size: 26rpx;
+      color: var(--ink);
+    }
+  }
+
+
+  // ---------- 底部操作 ----------
   &__foot {
     display: flex;
     flex-direction: column;
-    gap: 20rpx;
+    gap: 12rpx;
 
     &-row {
       display: flex;
       justify-content: center;
-      gap: 40rpx;
+      gap: 48rpx;
     }
 
     &-alt {
+      padding: 20rpx 8rpx;
       font-size: 24rpx;
       color: var(--moss);
-      text-decoration: underline;
-    }
-
-    &-note {
-      text-align: center;
-      font-size: 20rpx;
-      color: var(--ink-3);
     }
   }
 }

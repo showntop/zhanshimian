@@ -15,6 +15,7 @@ import type {
   CreateTodayPlanInput,
   CreateWardrobeOutfitInput,
   Diagnosis,
+  DiagnosisKind,
   EventInput,
   HairPreview,
   HairstyleOption,
@@ -71,9 +72,12 @@ export const API_PATHS = {
   planChecklistItem: 'PATCH /v1/plans/{id}/checklist/{itemId}',
   planFeedback: 'POST /v1/plans/{id}/feedback',
   diagnostics: 'POST /v1/diagnostics',
-  diagnostic: 'PATCH /v1/diagnostics/{id}',
+  diagnosticLatest: 'GET /v1/diagnostics/latest',
+  diagnostic: 'GET /v1/diagnostics/{id}',
+  diagnosticUpdate: 'PATCH /v1/diagnostics/{id}',
   hairstyles: 'GET /v1/hairstyles',
   hairPreviews: 'POST /v1/hair-previews',
+  hairPreviewActive: 'GET /v1/hair-previews/active',
   hairPreview: 'GET /v1/hair-previews/{id}',
   hairPreviewsSaved: 'GET /v1/hair-previews',
   hairPreviewSave: 'POST /v1/hair-previews/{id}/save',
@@ -166,10 +170,14 @@ export interface ApiEndpoints {
 
   // ---- 诊断与发型（7） ----
   diagnose(input: CreateDiagnosisInput): Promise<Diagnosis>
+  getDiagnosis(id: string): Promise<Diagnosis>
+  getLatestDiagnosis(kind: DiagnosisKind): Promise<Diagnosis>
   updateDiagnosis(id: string, patch: { saved: boolean }): Promise<Diagnosis>
   listHairstyles(reportId?: string): Promise<HairstyleOption[]>
   createHairPreview(input: CreateHairPreviewInput): Promise<TaskCreated<HairPreview>>
   getHairPreview(id: string): Promise<HairPreview>
+  /** 当前进行中的预览（404 = 无进行中任务），用于本地引用丢失后的恢复 */
+  getActiveHairPreview(): Promise<HairPreview>
   listSavedHairPreviews(): Promise<HairPreview[]>
   saveHairPreview(id: string): Promise<HairPreview>
 
@@ -279,10 +287,13 @@ export function createApiEndpoints(client: ApiClient, options: EndpointOptions =
         throw error
       }
     },
+    getDiagnosis: (id) => client.request(pathId('/v1/diagnostics', id)),
+    getLatestDiagnosis: (kind) => client.request(`/v1/diagnostics/latest${query({ kind })}`),
     updateDiagnosis: (id, patch) => client.request(pathId('/v1/diagnostics', id), { method: 'PATCH', data: patch }),
     listHairstyles: (reportId) => client.request(`/v1/hairstyles${query({ report_id: reportId })}`),
     createHairPreview: (input) => client.requestEnvelope('/v1/hair-previews', { method: 'POST', data: input }),
     getHairPreview: (id) => client.request(pathId('/v1/hair-previews', id)),
+    getActiveHairPreview: () => client.request('/v1/hair-previews/active'),
     listSavedHairPreviews: () => client.request(`/v1/hair-previews${query({ saved: true })}`),
     saveHairPreview: (id) => client.request(`/v1/hair-previews/${encodeURIComponent(id)}/save`, { method: 'POST' }),
 

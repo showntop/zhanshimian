@@ -648,10 +648,29 @@ func (s *Service) RunDiagnostic(ctx context.Context, userID string, input domain
 	if err != nil {
 		return domain.ToolResult{}, err
 	}
-	for index := range result.Options {
-		result.Options[index].ImageURL = s.absoluteURL(result.Options[index].ImageURL)
+	return s.hydrateDiagnostic(ctx, userID, result)
+}
+
+func (s *Service) GetDiagnostic(ctx context.Context, userID, diagnosticID string) (domain.ToolResult, error) {
+	if _, err := uuid.Parse(diagnosticID); err != nil {
+		return domain.ToolResult{}, repository.ErrNotFound
 	}
-	return result, nil
+	result, err := s.repo.GetDiagnostic(ctx, userID, diagnosticID)
+	if err != nil {
+		return domain.ToolResult{}, err
+	}
+	return s.hydrateDiagnostic(ctx, userID, result)
+}
+
+func (s *Service) LatestDiagnostic(ctx context.Context, userID, kind string) (domain.ToolResult, error) {
+	if !map[string]bool{"outfit": true, "purchase": true}[kind] {
+		return domain.ToolResult{}, fmt.Errorf("%w: 不支持的诊断类型", ErrValidation)
+	}
+	result, err := s.repo.LatestDiagnostic(ctx, userID, kind)
+	if err != nil {
+		return domain.ToolResult{}, err
+	}
+	return s.hydrateDiagnostic(ctx, userID, result)
 }
 
 func (s *Service) SetDiagnosticSaved(ctx context.Context, userID, diagnosticID string, saved bool) (domain.ToolResult, error) {
@@ -662,9 +681,21 @@ func (s *Service) SetDiagnosticSaved(ctx context.Context, userID, diagnosticID s
 	if err != nil {
 		return domain.ToolResult{}, err
 	}
+	return s.hydrateDiagnostic(ctx, userID, result)
+}
+
+func (s *Service) hydrateDiagnostic(ctx context.Context, userID string, result domain.ToolResult) (domain.ToolResult, error) {
 	for index := range result.Options {
 		result.Options[index].ImageURL = s.absoluteURL(result.Options[index].ImageURL)
 	}
+	if result.MediaID == "" {
+		return result, nil
+	}
+	assets, err := s.repo.GetMediaAssetsForUser(ctx, userID, []string{result.MediaID})
+	if err != nil || len(assets) != 1 {
+		return result, nil
+	}
+	result.ImageURL = s.mediaAssetURL(assets[0])
 	return result, nil
 }
 
@@ -742,6 +773,22 @@ func (s *Service) attachHairPreviewTask(ctx context.Context, userID string, prev
 			preview.ErrorMessage = view.Error.Message
 		}
 	}
+}
+
+// GetActiveHairPreview backs GET /v1/hair-previews/active: clients that lost
+// their local preview reference (cache clear, second device) rediscover the
+// in-flight generation here; 404 when nothing is running.
+func (s *Service) GetActiveHairPreview(ctx context.Context, userID string) (domain.HairPreview, error) {
+	preview, err := s.repo.GetActiveHairPreview(ctx, userID)
+	if err != nil {
+		return domain.HairPreview{}, err
+	}
+	preview.SourceImageURL = s.absoluteURL(preview.SourceImageURL)
+	if preview.ResultImageURL != "" {
+		preview.ResultImageURL = s.absoluteURL(preview.ResultImageURL)
+	}
+	s.attachHairPreviewTask(ctx, userID, &preview)
+	return preview, nil
 }
 
 func (s *Service) GetHairPreview(ctx context.Context, userID, previewID string) (domain.HairPreview, error) {

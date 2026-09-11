@@ -9,6 +9,7 @@ import {
   APP_SLOGAN,
   HOME_COPY,
   HOME_TITLE,
+  OUTFIT_COPY,
   POLL_INTERVALS,
   PRIVACY_NOTE,
   SCENES,
@@ -18,12 +19,14 @@ import {
   type HomeBootstrap,
 } from '@zsm/core'
 import { api } from '../../services/api'
+import { hasOutfitResult, isOutfitPending } from '../../services/outfit-session'
 import { taskDoneTitle } from '../../services/task-utils'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
 import ExampleImage from '../../components/example-image'
 import ErrorState from '../../components/error-state'
+import TaskStrip from '../../components/task-strip'
 import Skeleton from '../../components/skeleton'
 import './index.scss'
 
@@ -56,6 +59,8 @@ export default function Home() {
   const [bootstrap, setBootstrap] = useState<HomeBootstrap | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
+  const [outfitActive, setOutfitActive] = useState(false)
+  const [outfitReady, setOutfitReady] = useState(false)
   const recoveredRef = useRef(false)
   const visibleRef = useRef(true)
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -97,7 +102,13 @@ export default function Home() {
         // 任一任务到达终态：轻提醒 + 整页聚合刷新一次
         if (tasks.some((t) => t.status === 'completed' || t.status === 'failed')) {
           const completed = tasks.find((t) => t.status === 'completed')
-          if (completed) Taro.showToast({ title: taskDoneTitle(completed), icon: 'none' })
+          const failedTask = tasks.find((t) => t.status === 'failed')
+          if (completed) {
+            Taro.showToast({ title: taskDoneTitle(completed), icon: 'none' })
+          } else if (failedTask) {
+            // 失败同样轻提醒：此前失败任务静默消失，用户完全不知道生成没完成
+            Taro.showToast({ title: failedTask.error?.message || '生成没有完成，请重试', icon: 'none' })
+          }
           load()
         }
       } catch {
@@ -114,9 +125,22 @@ export default function Home() {
     }
   }, [scheduleTaskPoll])
 
+  useEffect(() => {
+    if (!outfitActive) return
+    const timer = setInterval(() => {
+      if (!visibleRef.current || isOutfitPending()) return
+      setOutfitActive(false)
+      setOutfitReady(hasOutfitResult())
+      Taro.showToast({ title: '穿搭诊断已完成', icon: 'none' })
+    }, POLL_INTERVALS.homeTasks)
+    return () => clearInterval(timer)
+  }, [outfitActive])
+
   useDidShow(() => {
     visibleRef.current = true
     trackEvent('page_view', { page: 'home' })
+    setOutfitActive(isOutfitPending())
+    setOutfitReady(hasOutfitResult())
     recoverReport().then(load)
     scheduleTaskPoll()
   })
@@ -171,6 +195,8 @@ export default function Home() {
               {hasReport ? `${greetingForNow()}，${HOME_COPY.returningTitle}` : HOME_TITLE}
             </Text>
           </View>
+
+          <TaskStrip tasks={activeTasks} />
 
           {!hasReport ? (
             <View className="fade-up delay-1">
@@ -271,7 +297,13 @@ export default function Home() {
             <View className="home__tools">
               {TOOLS.map((tool) => {
                 const badge =
-                  tool.key === 'hair' && hairActive ? '生成中' : (tool.badge || '')
+                  tool.key === 'hair' && hairActive
+                    ? '生成中'
+                    : tool.key === 'outfit' && outfitActive
+                      ? '诊断中'
+                      : tool.key === 'outfit' && outfitReady
+                        ? OUTFIT_COPY.lastResult
+                        : (tool.badge || '')
                 return (
                   <View
                     key={tool.key}
@@ -279,7 +311,7 @@ export default function Home() {
                     onClick={() => Taro.navigateTo({ url: tool.path })}
                   >
                     {badge ? (
-                      <Text className={`home__tool-badge ${badge === '生成中' ? 'home__tool-badge--live' : ''}`}>
+                      <Text className={`home__tool-badge ${badge === '生成中' || badge === '诊断中' ? 'home__tool-badge--live' : ''}`}>
                         {badge}
                       </Text>
                     ) : null}

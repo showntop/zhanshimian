@@ -926,30 +926,50 @@ func (s *Store) CreateDiagnostic(ctx context.Context, userID string, input domai
 	if err != nil {
 		return domain.ToolResult{}, err
 	}
+	result.MediaID = input.MediaID
 	return result, tx.Commit(ctx)
 }
 
-func (s *Store) SetDiagnosticSaved(ctx context.Context, userID, diagnosticID string, saved bool) (domain.ToolResult, error) {
+const diagnosticSelect = `SELECT id::text,kind,scene,payload,saved,created_at,coalesce(media_id::text,'') FROM tool_results`
+
+func scanDiagnostic(row pgx.Row) (domain.ToolResult, error) {
 	var result domain.ToolResult
 	var payload []byte
-	var kind, scene string
+	var id, kind, scene, mediaID string
+	var saved bool
 	var createdAt time.Time
-	err := s.pool.QueryRow(ctx, `
-		UPDATE tool_results SET saved=$3,updated_at=now()
-		WHERE id=$1::uuid AND user_id=$2
-		RETURNING id::text,kind,scene,payload,saved,created_at`, diagnosticID, userID, saved).
-		Scan(&result.ID, &kind, &scene, &payload, &result.Saved, &createdAt)
-	if err != nil {
+	if err := row.Scan(&id, &kind, &scene, &payload, &saved, &createdAt, &mediaID); err != nil {
 		return domain.ToolResult{}, mapNotFound(err)
 	}
 	if err := json.Unmarshal(payload, &result); err != nil {
 		return domain.ToolResult{}, err
 	}
-	result.ID = diagnosticID
+	result.ID = id
 	result.Kind = kind
 	result.Scene = scene
 	result.Saved = saved
 	result.CreatedAt = createdAt
+	result.MediaID = mediaID
+	return result, nil
+}
+
+func (s *Store) GetDiagnostic(ctx context.Context, userID, diagnosticID string) (domain.ToolResult, error) {
+	return scanDiagnostic(s.pool.QueryRow(ctx, diagnosticSelect+` WHERE id=$1::uuid AND user_id=$2`, diagnosticID, userID))
+}
+
+func (s *Store) LatestDiagnostic(ctx context.Context, userID, kind string) (domain.ToolResult, error) {
+	return scanDiagnostic(s.pool.QueryRow(ctx, diagnosticSelect+` WHERE user_id=$1 AND kind=$2 ORDER BY created_at DESC LIMIT 1`, userID, kind))
+}
+
+func (s *Store) SetDiagnosticSaved(ctx context.Context, userID, diagnosticID string, saved bool) (domain.ToolResult, error) {
+	result, err := scanDiagnostic(s.pool.QueryRow(ctx, `
+		UPDATE tool_results SET saved=$3,updated_at=now()
+		WHERE id=$1::uuid AND user_id=$2
+		RETURNING id::text,kind,scene,payload,saved,created_at,coalesce(media_id::text,'')`, diagnosticID, userID, saved))
+	if err != nil {
+		return domain.ToolResult{}, err
+	}
+	result.Saved = saved
 	return result, nil
 }
 
@@ -1029,6 +1049,16 @@ func (s *Store) CreateHairPreview(ctx context.Context, userID string, input doma
 
 func (s *Store) GetHairPreview(ctx context.Context, userID, previewID string) (domain.HairPreview, error) {
 	item, err := scanHairPreview(s.pool.QueryRow(ctx, hairPreviewSelect+` WHERE id=$1::uuid AND user_id=$2`, previewID, userID))
+	return item, mapNotFound(err)
+}
+
+// GetActiveHairPreview mirrors the active-preview lookup inside
+// CreateHairPreview: the preview whose hair_preview task is still queued or
+// processing. No active job maps to repository.ErrNotFound.
+func (s *Store) GetActiveHairPreview(ctx context.Context, userID string) (domain.HairPreview, error) {
+	item, err := scanHairPreview(s.pool.QueryRow(ctx, hairPreviewSelect+`
+		WHERE user_id=$1 AND id IN (SELECT (payload->>'preview_id')::uuid FROM tasks WHERE type='hair_preview' AND status IN ('queued','processing'))
+		ORDER BY created_at DESC LIMIT 1`, userID))
 	return item, mapNotFound(err)
 }
 

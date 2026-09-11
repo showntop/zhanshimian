@@ -21,6 +21,26 @@ func (a *API) createDiagnostic(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusCreated, result)
 }
 
+// GET /v1/diagnostics/latest?kind= —— 该类型最近一条（无则 404）。
+func (a *API) getLatestDiagnostic(w http.ResponseWriter, r *http.Request) {
+	result, err := a.service.LatestDiagnostic(r.Context(), currentUser(r).ID, r.URL.Query().Get("kind"))
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, result)
+}
+
+// GET /v1/diagnostics/{id} —— 单条诊断（越权 404）。
+func (a *API) getDiagnostic(w http.ResponseWriter, r *http.Request) {
+	result, err := a.service.GetDiagnostic(r.Context(), currentUser(r).ID, r.PathValue("id"))
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, result)
+}
+
 // PATCH /v1/diagnostics/{id} —— {saved:bool}。
 func (a *API) patchDiagnostic(w http.ResponseWriter, r *http.Request) {
 	var input struct {
