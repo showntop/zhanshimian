@@ -1,7 +1,7 @@
 // 形象报告：来源照片可切换，findings 按真实 photo 归位；不展示评分，只给可提升点。
 import { useCallback, useEffect, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
-import { ScrollView, Swiper, SwiperItem, Text, View } from '@tarojs/components'
+import { Swiper, SwiperItem, Text, View } from '@tarojs/components'
 import {
   REPORT_COPY,
   isBundledAsset,
@@ -354,28 +354,19 @@ export default function Report() {
           ) : null}
 
         {(report.impression_tags ?? []).length > 0 ? (
-          <View className="report__section">
-            <View className="report__section-head">
-              <Text className="section-title">{REPORT_COPY.tagsTitle}</Text>
-              <View className="section-rule" />
+          <View className="report__summary-row fade-up delay-1">
+            <Text className="report__summary-label">{REPORT_COPY.tagsTitle}</Text>
+            <View className="report__summary-chips">
+              {(report.impression_tags ?? []).slice(0, 3).map((tag) => (
+                <Text key={tag} className="report__chip">
+                  {tag}
+                </Text>
+              ))}
             </View>
-            <ScrollView className="report__chips" scrollX enhanced showScrollbar={false}>
-              <View className="report__chips-row">
-                {(report.impression_tags ?? []).map((tag) => (
-                  <Text key={tag} className="report__chip">
-                    {tag}
-                  </Text>
-                ))}
-              </View>
-            </ScrollView>
           </View>
         ) : null}
 
         <View className="report__priority fade-up delay-2">
-          <View className="report__section-head">
-            <Text className="section-title">{REPORT_COPY.priorityTitle}</Text>
-            <View className="section-rule" />
-          </View>
           <Text className="report__priority-copy">
             {report.priority_title ? (
               <Text className="report__priority-lead">{report.priority_title}</Text>

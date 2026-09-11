@@ -108,7 +108,7 @@
     z-index: 2;
     display: flex;
     flex-direction: column;
-    gap: 34rpx;
+    gap: 24rpx;
     margin: -72rpx calc(-1 * var(--page-gutter)) 0;
     padding: 44rpx var(--page-gutter) 8rpx;
     border-radius: 40rpx 40rpx 0 0;
@@ -303,32 +303,42 @@
     }
   }
 
-  // 综合印象：单行横滚 chip 条（与照片注解 tag 类名分离，避免样式互串）
-  &__chips {
-    width: 100%;
-    white-space: nowrap;
+  // 综合印象：标题内联最多 3 个 tag，单行紧凑（超出的印象词截断）
+  &__summary-row {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
   }
-  &__chips-row {
-    display: inline-flex;
-    gap: 12rpx;
-    padding: 4rpx 2rpx 8rpx;
+  &__summary-label {
+    flex-shrink: 0;
+    font-size: 22rpx;
+    font-weight: 700;
+    letter-spacing: 1rpx;
+    color: var(--ink-3);
+  }
+  &__summary-chips {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    gap: 10rpx;
   }
   &__chip {
-    flex-shrink: 0;
-    padding: 8rpx 22rpx;
+    min-width: 0;
+    padding: 6rpx 18rpx;
     border-radius: 999rpx;
     background: var(--moss-soft);
     color: var(--moss-pressed);
-    font-size: 22rpx;
+    font-size: 20rpx;
     font-weight: 650;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  // 综合建议：压缩为一段简要文字（标题粗体开头 + 正文）
+  // 综合建议：无标题引导段——左侧苔绿竖线 + 首句粗体建立层级
   &__priority {
-    display: flex;
-    flex-direction: column;
-    gap: 14rpx;
+    padding-left: 20rpx;
+    border-left: 6rpx solid var(--moss);
 
     &-lead {
       font-weight: 700;
@@ -336,8 +346,8 @@
     }
 
     &-copy {
-      font-size: 26rpx;
-      line-height: 1.65;
+      font-size: 25rpx;
+      line-height: 1.6;
       color: var(--ink-2);
       display: -webkit-box;
       -webkit-line-clamp: 3;
