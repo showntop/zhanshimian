@@ -25,11 +25,18 @@ function measureNav() {
         navHeight: capsule.bottom + gap,
         rightPad: Math.max(96, win.windowWidth - capsule.left + 8),
         windowHeight: win.windowHeight,
+        windowWidth: win.windowWidth,
       }
     }
-    return { statusBar, navHeight: statusBar + 44, rightPad: 96, windowHeight: win.windowHeight }
+    return {
+      statusBar,
+      navHeight: statusBar + 44,
+      rightPad: 96,
+      windowHeight: win.windowHeight,
+      windowWidth: win.windowWidth,
+    }
   } catch {
-    return { statusBar: 47, navHeight: 100, rightPad: 96, windowHeight: 667 }
+    return { statusBar: 47, navHeight: 100, rightPad: 96, windowHeight: 667, windowWidth: 375 }
   }
 }
 

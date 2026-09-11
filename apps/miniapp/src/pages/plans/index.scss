@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   gap: 20rpx;
-  // 吸底 CTA 让位
-  padding-bottom: 220rpx;
+  // 悬浮选择坞（收益词 + 三选一 + CTA + 安全区）让位
+  padding-bottom: 460rpx;
 
   &__tabs {
     display: flex;
@@ -76,92 +76,42 @@
   &__hero {
     &-frame {
       position: relative;
-      // 高度由页面按视口运行时计算（内联 px）：第一屏 = hero + 三选一 + CTA，
-      // 信息卡推到第 2 屏；340rpx 兜底防极端小屏
-      min-height: 340rpx;
+      // 高度跟随照片比例（内联 px）：满宽完整展示，无侧边区无裁切。
+      // 封顶视口剩余高度，防极端竖图
+      min-height: 320rpx;
       border-radius: var(--radius-lg);
       overflow: hidden;
-      // 展台渐变：暖米 → 苔绿，底部加深让展台有存在感（太浅会读作「没填满」）
-      background: linear-gradient(165deg, #f1ecdd 0%, #e0e8cc 55%, #c9d7b2 100%);
+      background: var(--moss-soft);
       border: 1rpx solid var(--line);
       // 切换方案时整帧交叉淡入（key 重挂载触发）
       animation: plans-frame-in 0.3s ease both;
     }
 
-    // 收益词叠加：直接回答「选这套能获得什么」，亮苔绿胶囊提亮画面
-    // （居中放置，避开滑杆左下/右下的「原本/方案」角标）
-  }
-
-  // 编辑杂志展台：品牌渐变底 + 居中装裱照片卡。
-  // 滑杆两层共用同一展台背景，分界线两侧无缝
-  &__stage {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20rpx 0;
-  }
-
-  // 装裱照片卡：白色卡纸边 + 圆角 + 柔和投影 = 杂志装裱感。
-  // heightFix 按展台高度等比，宽度随照片比例自适应。
-  // 选择器权重需压过 .cmp .example-image
-  .plans__stage .plans__stage-img.example-image {
-    width: auto;
-    height: 100%;
-    box-sizing: border-box;
-    padding: 14rpx;
-    background: #ffffff;
-    border-radius: 26rpx;
-    overflow: visible;
-    box-shadow: 0 24rpx 60rpx rgba(31, 34, 30, 0.24);
-
-    .example-image__img {
-      width: auto;
-      height: 100%;
-      border-radius: 14rpx;
+    // 满宽照片（widthFix）：内层图高度自然、顶部锚定，
+    // 超高时超出部分从底部裁掉（头部完整）
+    .plans__hero-frame .plans__hero-img .example-image__img {
+      height: auto;
     }
 
-    // 角标移到卡内右上，避开底部收益胶囊
-    .example-badge {
-      top: 24rpx;
-      right: 24rpx;
+    // 角标移到右上，避开底部悬浮坞
+    .plans__hero-frame .plans__hero-img .example-badge {
+      top: 16rpx;
+      right: 16rpx;
       bottom: auto;
     }
   }
 
-  // 方案名水印：超大衬线半透明，刻意从照片卡两侧探出
-  &__watermark {
-    position: absolute;
-    top: 20rpx;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-family: 'Songti SC', 'STSong', serif;
-    font-size: 140rpx;
-    font-weight: 700;
-    letter-spacing: 12rpx;
-    color: rgba(88, 115, 68, 0.12);
-    white-space: nowrap;
-    pointer-events: none;
-  }
-
+  // 收益词胶囊（悬浮坞内顶行，居中）：直接回答「选这套能获得什么」
   &__outcome {
-    position: absolute;
-    left: 50%;
-    bottom: 18rpx;
-    transform: translateX(-50%);
-    z-index: 4;
+    align-self: center;
     display: flex;
     align-items: center;
     gap: 10rpx;
-    padding: 9rpx 22rpx;
+    padding: 8rpx 22rpx;
     border-radius: 999rpx;
     background: linear-gradient(90deg, #4e6539 0%, #6d8a52 100%);
     box-shadow: 0 6rpx 18rpx rgba(78, 101, 57, 0.35);
-    max-width: 72%;
+    max-width: 100%;
 
     &-tag {
       font-size: 21rpx;
@@ -370,9 +320,10 @@
     }
   }
 
-  // 吸底 CTA：选择页主操作不进折叠线。tab 页视口在原生 tabBar 之上，
-  // fixed bottom:0 即贴 tabBar 顶；背景模糊 + 安全区适配
-  &__cta {
+  // 悬浮选择坞：收益词 + 三选一 + CTA 收进毛玻璃坞，浮在照片底部
+  // 上方不占文档流——照片有多高就展示多高，选择要素常驻第一屏。
+  // tab 页视口在原生 tabBar 之上，fixed bottom:0 即贴 tabBar 顶
+  &__dock {
     position: fixed;
     left: 0;
     right: 0;
@@ -380,23 +331,32 @@
     z-index: 20;
     display: flex;
     flex-direction: column;
-    gap: 10rpx;
-    padding: 20rpx var(--page-gutter) calc(16rpx + env(safe-area-inset-bottom));
-    background: rgba(250, 249, 245, 0.92);
-    backdrop-filter: blur(20rpx);
+    gap: 14rpx;
+    padding: 18rpx var(--page-gutter) calc(14rpx + env(safe-area-inset-bottom));
+    background: rgba(250, 249, 245, 0.9);
+    backdrop-filter: blur(24rpx);
     border-top: 1rpx solid var(--line);
+    box-shadow: 0 -12rpx 32rpx rgba(31, 34, 30, 0.08);
 
-    &-note {
-      text-align: center;
-      font-size: 20rpx;
-      color: var(--ink-3);
+    // 坞内选择面板卡去边框阴影，与毛玻璃底融合
+    .plans__chooser {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      padding: 0;
     }
+  }
 
-    // 本页 CTA 提亮：苔绿 → 亮绿渐变 + 光晕，年轻时尚感
-    .primary-button--solid {
-      background: linear-gradient(92deg, #47602f 0%, #6d8a52 55%, #7fa35e 100%);
-      box-shadow: 0 10rpx 28rpx rgba(88, 115, 68, 0.38);
-    }
+  &__cta-note {
+    text-align: center;
+    font-size: 20rpx;
+    color: var(--ink-3);
+  }
+
+  // 本页 CTA 提亮：苔绿 → 亮绿渐变 + 光晕，年轻时尚感
+  &__dock .primary-button--solid {
+    background: linear-gradient(92deg, #47602f 0%, #6d8a52 55%, #7fa35e 100%);
+    box-shadow: 0 10rpx 28rpx rgba(88, 115, 68, 0.38);
   }
 }
 

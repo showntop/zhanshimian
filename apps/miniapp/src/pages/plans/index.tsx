@@ -23,17 +23,16 @@ const SCENE_TABS = [
   { key: 'daily', label: '日常' },
 ] as const
 
-// hero 满屏计算（px）：视口 - 导航（含 spacer 48rpx 呼吸间距）- 场景 tab 行
-// - 三选一条 - 吸底 CTA 预留。第一屏 = hero + 三选一 + CTA，
-// 白色信息卡（方案细节）由此被推到第 2 屏。
+// hero 高度跟随照片比例：三套方案图同一管线产出、宽高比一致，
+// 切换不跳动，因此可以让照片自己定高度——满宽 + 完整，无侧边区。
+// 上限 = 视口剩余（防极端竖图），下限 320px。
+// 收益词 + 三选一 + CTA 收进毛玻璃悬浮坞，不占文档流。
 const NAV = getNavMetrics()
 const HEADER_GAP_PX = 24 // spacer margin-bottom 48rpx
 const TABS_PX = 40 // 场景 tab 行 + 容器间距
-const CHOICES_PX = 110 // 选择面板卡（紧凑横排：3:4 缩略图簇 + 右侧名称/chips + 卡内边距）
-const CTA_RESERVE_PX = 108 // 吸底 CTA（按钮 + 说明 + 安全区余量），防遮挡三选一条
-const HERO_PX = Math.max(
-  340,
-  Math.round(NAV.windowHeight - NAV.navHeight - HEADER_GAP_PX - TABS_PX - CHOICES_PX - CTA_RESERVE_PX),
+const MAX_HERO_PX = Math.max(
+  320,
+  Math.round(NAV.windowHeight - NAV.navHeight - HEADER_GAP_PX - TABS_PX),
 )
 
 export default function Plans() {
@@ -42,6 +41,8 @@ export default function Plans() {
   const [currentImage, setCurrentImage] = useState('')
   const [index, setIndex] = useState(0)
   const [whyOpen, setWhyOpen] = useState(false)
+  // 方案图真实宽高（onLoad 采集，决定 hero 高度）
+  const [photoDims, setPhotoDims] = useState<Record<string, { w: number; h: number }>>({})
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   // 区分「未建档」与「该场景无方案」：两者空态与 CTA 完全不同，
@@ -168,6 +169,13 @@ export default function Plans() {
   const planImage = plan?.generated_image_url || plan?.image_url
   const isDemoLook = (plan?.look_provider ?? '').startsWith('demo')
 
+  // hero 高度 = 屏宽 × 照片高宽比（满宽完整展示），封顶视口剩余；
+  // 尺寸未就绪时按 82% 上限预估，onLoad 后校正
+  const planDims = plan ? photoDims[plan.id] : undefined
+  const heroPx = planDims
+    ? Math.min(MAX_HERO_PX, Math.round((NAV.windowWidth * planDims.h) / planDims.w))
+    : Math.round(MAX_HERO_PX * 0.82)
+
   const switchScene = (key: string) => {
     setScene(key)
     setIndex(0)
@@ -286,83 +294,38 @@ export default function Plans() {
           )
         ) : (
           <>
-        {/* 拖动对比 hero：底层原本 + 上层方案，分界线可拖。
-            收益词（outcome_tags）叠加底部，第一眼回答「选它能得到什么」。
-            key 随方案切换重挂载 → 重置手柄位置并触发交叉淡入 */}
+        {/* 拖动对比 hero：照片满宽完整展示（高度跟随照片比例），
+            无侧边区无裁切。key 随方案切换重挂载 → 交叉淡入 */}
         <View className="plans__hero fade-up">
-          <View className="plans__hero-frame" style={{ height: `${HERO_PX}px` }} key={plan?.id}>
-            {/* 编辑杂志展台：相框 = 品牌渐变展台 + 方案名水印；照片为居中
-                装裱竖卡（heightFix 按高度等比，全身完整、卡片贴合照片比例）。
-                滑杆两层共用同一展台背景，拖动分界无接缝 */}
+          <View className="plans__hero-frame" style={{ height: `${heroPx}px` }} key={plan?.id}>
             <CompareSlider
               single={!currentImage || !planImage || scene !== 'general'}
-              current={
-                <View className="plans__stage">
-                  {plan ? <Text className="plans__watermark">{plan.name}</Text> : null}
-                  <ExampleImage className="plans__stage-img" src={currentImage} user mode="heightFix" />
-                </View>
-              }
+              current={<ExampleImage className="plans__hero-img" src={currentImage} user mode="widthFix" />}
               plan={
-                <View className="plans__stage">
-                  {plan ? <Text className="plans__watermark">{plan.name}</Text> : null}
-                  <ExampleImage
-                    className="plans__stage-img"
-                    src={planImage}
-                    badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
-                    mode="heightFix"
-                  />
-                </View>
+                <ExampleImage
+                  className="plans__hero-img"
+                  src={planImage}
+                  badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
+                  mode="widthFix"
+                  onLoad={(e) => {
+                    const w = Number(e.detail.width)
+                    const h = Number(e.detail.height)
+                    if (!w || !h || !plan) return
+                    setPhotoDims((prev) =>
+                      prev[plan.id]?.w === w && prev[plan.id]?.h === h
+                        ? prev
+                        : { ...prev, [plan.id]: { w, h } },
+                    )
+                  }}
+                />
               }
             />
-            {(plan?.outcome_tags ?? []).length > 0 ? (
-              <View className="plans__outcome">
-                {plan!.outcome_tags.slice(0, 3).map((tag) => (
-                  <Text key={tag} className="plans__outcome-tag">{tag}</Text>
-                ))}
-              </View>
-            ) : null}
           </View>
         </View>
 
-        {/* 选择面板卡（紧凑横排）：左侧三张 3:4 缩略图（aspectFit 全照），
-            右侧当前方案名 + 变化点 chips。高度压缩一半，空间让位给 hero */}
-        <View className="plans__chooser fade-up delay-1">
-          <View className="plans__choices">
-            {plans.map((item, i) => (
-              <View
-                key={item.id}
-                className={`plans__choice ${i === index ? 'plans__choice--active' : ''} pressable`}
-                onClick={() => pickPlan(i)}
-              >
-                <View className="plans__choice-thumb">
-                  <ExampleImage
-                    className="plans__choice-img"
-                    src={item.generated_image_url || item.image_url}
-                    mode="aspectFit"
-                  />
-                  {item.recommended ? <Text className="plans__choice-badge">推荐</Text> : null}
-                </View>
-                <Text className="plans__choice-name">{item.name}</Text>
-              </View>
-            ))}
-          </View>
-          {plan ? (
-            <View className="plans__chooser-info">
-              <Text className="plans__name">{plan.name}</Text>
-              {(plan.difference_tags ?? []).length > 0 ? (
-                <View className="plans__diffs">
-                  {plan.difference_tags.slice(0, 3).map((tag) => (
-                    <Text key={tag} className="plans__diff">{tag}</Text>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-
-        {/* 细节区（第 2 屏）：descriptor + 折叠的 why + 生成/重试状态 */}
+        {/* 细节区（第 2 屏起）：descriptor + 折叠的 why + 生成/重试状态 */}
         {plan ? (
-          <View className="plans__info fade-up delay-2">
+          <View className="plans__info fade-up delay-1">
             <Text className="plans__summary">{plan.descriptor}</Text>
             {plan.why ? (
               <View className="plans__why-wrap" onClick={() => setWhyOpen(!whyOpen)}>
@@ -384,9 +347,48 @@ export default function Plans() {
           </View>
         ) : null}
 
-        {/* 吸底 CTA：任何滚动位置都能选，不与细节区争空间 */}
+        {/* 悬浮选择坞：收益词 + 三选一 + CTA 收进毛玻璃坞，浮在照片底部
+            上方不占文档流——照片有多高就展示多高，选择要素常驻第一屏 */}
         {plan ? (
-          <View className="plans__cta fade-up delay-3">
+          <View className="plans__dock fade-up delay-2">
+            {(plan.outcome_tags ?? []).length > 0 ? (
+              <View className="plans__outcome">
+                {plan.outcome_tags.slice(0, 3).map((tag) => (
+                  <Text key={tag} className="plans__outcome-tag">{tag}</Text>
+                ))}
+              </View>
+            ) : null}
+            <View className="plans__chooser">
+              <View className="plans__choices">
+                {plans.map((item, i) => (
+                  <View
+                    key={item.id}
+                    className={`plans__choice ${i === index ? 'plans__choice--active' : ''} pressable`}
+                    onClick={() => pickPlan(i)}
+                  >
+                    <View className="plans__choice-thumb">
+                      <ExampleImage
+                        className="plans__choice-img"
+                        src={item.generated_image_url || item.image_url}
+                        mode="aspectFit"
+                      />
+                      {item.recommended ? <Text className="plans__choice-badge">推荐</Text> : null}
+                    </View>
+                    <Text className="plans__choice-name">{item.name}</Text>
+                  </View>
+                ))}
+              </View>
+              <View className="plans__chooser-info">
+                <Text className="plans__name">{plan.name}</Text>
+                {(plan.difference_tags ?? []).length > 0 ? (
+                  <View className="plans__diffs">
+                    {plan.difference_tags.slice(0, 3).map((tag) => (
+                      <Text key={tag} className="plans__diff">{tag}</Text>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            </View>
             <PrimaryButton
               text="选这套 · 查看执行清单"
               onClick={() => Taro.navigateTo({ url: `/pages/plan/index?id=${plan.id}` })}
