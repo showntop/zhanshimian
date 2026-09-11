@@ -13,6 +13,7 @@ import {
   PRIVACY_NOTE,
   SCENES,
   greetingForNow,
+  isBundledAsset,
   trackEvent,
   type HomeBootstrap,
   type Task,
@@ -176,6 +177,9 @@ export default function Home() {
 
   const report = bootstrap?.report
   const hasReport = Boolean(report?.id)
+  const reportImage = report?.current_image_url ?? ''
+  const reportImageIsDemo =
+    Boolean(report?.provider_version?.startsWith('demo')) || isBundledAsset(reportImage)
   const recentPlan = bootstrap?.recent_plan
   const todayPlan = bootstrap?.today_plan
   const railItems: TaskRailItem[] = (bootstrap?.active_tasks ?? [])
@@ -201,11 +205,7 @@ export default function Home() {
             </Text>
           </View>
 
-          {railItems.length > 0 ? (
-            <View className="home__section fade-up delay-1">
-              <TaskRail items={railItems} />
-            </View>
-          ) : null}
+          <TaskRail items={railItems} />
 
           {!hasReport ? (
             <View className="fade-up delay-1">
@@ -266,22 +266,29 @@ export default function Home() {
                 className="home__hero home__hero--report card--hero halo pressable"
                 onClick={() => Taro.navigateTo({ url: '/pages/report/index' })}
               >
-                <View className="home__hero-copy">
-                  <Text className="home__hero-eyebrow">{HOME_COPY.reportReady}</Text>
-                  <Text className="home__hero-title">{report?.priority_title}</Text>
-                  <Text className="home__hero-desc">{report?.priority_copy}</Text>
-                  <View className="home__hero-tags">
-                    {(report?.impression_tags ?? []).slice(0, 3).map((tag) => (
-                      <Text key={tag} className="home__hero-tag">
-                        {tag}
-                      </Text>
-                    ))}
+                <View className="home__report-main">
+                  <View className="home__hero-copy">
+                    <Text className="home__hero-eyebrow">{HOME_COPY.reportReady}</Text>
+                    <Text className="home__hero-title">{report?.priority_title}</Text>
+                    <Text className="home__hero-desc">{report?.priority_copy}</Text>
                   </View>
-                  <Text className="home__hero-link">{HOME_COPY.viewReport}</Text>
+                  <View className="home__report-visual">
+                    <ExampleImage
+                      className="home__report-image"
+                      src={reportImage}
+                      user={!reportImageIsDemo}
+                      mode="aspectFill"
+                      badgeText={reportImageIsDemo ? '效果示例' : ''}
+                    />
+                    <View className="home__report-shade" />
+                  </View>
                 </View>
-                <View className="home__report-mark">
-                  <Text className="home__report-mark-num">{(report?.findings ?? []).length}</Text>
-                  <Text className="home__report-mark-label">可提升点</Text>
+                <View className="home__report-action">
+                  <Text className="home__report-action-label">{HOME_COPY.viewReport}</Text>
+                  <Text className="home__report-action-meta">
+                    <Text className="home__report-action-count">{(report?.findings ?? []).length}</Text>
+                    个可提升点
+                  </Text>
                 </View>
               </View>
             </View>

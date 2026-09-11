@@ -1,87 +1,54 @@
-.task-rail {
-  display: flex;
-  white-space: nowrap;
-  width: 100%;
-}
-
-.task-card {
+// 任务状态条：胶囊形、内容自适应宽度（不通栏），作为环境状态而非内容卡
+.task-strip {
   display: inline-flex;
-  flex-direction: column;
-  width: 320rpx;
-  margin-right: 20rpx;
-  padding: 24rpx;
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  border: 1rpx solid var(--line);
-  box-shadow: 0 6px 18px rgba(52, 59, 47, 0.05);
+  align-items: center;
+  align-self: flex-start;
+  gap: 10rpx;
+  min-height: 60rpx;
+  margin-top: 4rpx;
+  padding: 8rpx 22rpx 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: var(--moss-soft);
 
   &--failed {
-    background: rgba(155, 109, 88, 0.06);
-  }
+    background: rgba(155, 109, 88, 0.1);
 
-  // 单卡通栏：不横滑，宽度撑满内容区（750 - 两侧 page gutter）
-  &--solo {
-    width: calc(750rpx - 2 * var(--page-gutter));
-    margin-right: 0;
-  }
+    .task-strip__label {
+      color: var(--warn);
+    }
 
-  &__head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  &__type {
-    font-size: 20rpx;
-    font-weight: 600;
-    letter-spacing: 2rpx;
-    color: var(--ink-3);
-  }
-
-  &__status {
-    font-size: 20rpx;
-
-    &--failed {
+    .task-strip__arrow {
       color: var(--warn);
     }
   }
 
   &__spinner {
-    width: 24rpx;
-    height: 24rpx;
+    width: 22rpx;
+    height: 22rpx;
+    flex-shrink: 0;
   }
 
-  &__title {
-    margin-top: 12rpx;
-    font-size: 28rpx;
+  &__dot {
+    width: 12rpx;
+    height: 12rpx;
+    flex-shrink: 0;
+    border-radius: 999rpx;
+    background: var(--warn);
+  }
+
+  &__label {
+    font-size: 21rpx;
     font-weight: 600;
-    color: var(--ink);
+    color: var(--moss-pressed);
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
-  &__progress {
-    margin-top: 16rpx;
-    height: 6rpx;
-    border-radius: 999rpx;
-    background: var(--moss-soft);
-    overflow: hidden;
-  }
-
-  &__progress-fill {
-    width: 100%;
-    height: 100%;
-    border-radius: 999rpx;
-    background: var(--moss);
-    // 只动 transform（合成层），进度用 scaleX 表达；品牌缓动对齐 motion.ts easing
-    transform-origin: left center;
-    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-
-  &__stage {
-    margin-top: 12rpx;
-    font-size: 20rpx;
-    color: var(--ink-3);
+  &__arrow {
+    font-size: 26rpx;
+    line-height: 1;
+    color: var(--moss);
+    flex-shrink: 0;
   }
 }

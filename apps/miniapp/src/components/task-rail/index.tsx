@@ -1,5 +1,7 @@
-// 首页任务横轨：进行中任务横向卡（露出下一张提示可滑动）。
-import { ScrollView, Text, View } from '@tarojs/components'
+// 首页任务状态条：进行中任务是瞬时状态，聚合为一条轻量胶囊横幅，
+// 不与 hero 主卡争夺视觉重量；完成即消失。同类型任务合并计数
+// （一次方案生成 = 3 个 plan_look 任务，平铺三张卡会被误读为 bug）。
+import { Text, View } from '@tarojs/components'
 import type { Task } from '@zsm/core'
 import './index.scss'
 
@@ -18,60 +20,45 @@ const TYPE_LABEL: Record<string, string> = {
 
 export default function TaskRail({ items }: TaskRailProps) {
   if (items.length === 0) return null
-  // 只有一张卡时不走横滑，通栏呈现（单卡 320rpx 悬在半空像渲染事故）。
   const first = items[0]
-  if (items.length === 1 && first) {
-    const { task, title, open } = first
-    const failed = task.status === 'failed'
-    return (
-      <View className={`task-card task-card--solo ${failed ? 'task-card--failed' : ''} pressable`} onClick={open}>
-        <TaskCardBody task={task} title={title} failed={failed} />
-      </View>
-    )
+  if (!first) return null
+
+  // 按类型聚合同类任务
+  const groups: TaskRailItem[][] = []
+  for (const item of items) {
+    const group = groups.find((g) => g[0]?.task.type === item.task.type)
+    if (group) group.push(item)
+    else groups.push([item])
   }
-  return (
-    <ScrollView className="task-rail" scrollX enhanced showScrollbar={false}>
-      {items.map(({ task, title, open }) => {
-        const failed = task.status === 'failed'
-        return (
-          <View key={task.id} className={`task-card ${failed ? 'task-card--failed' : ''} pressable`} onClick={open}>
-            <TaskCardBody task={task} title={title} failed={failed} />
-          </View>
-        )
-      })}
-    </ScrollView>
-  )
-}
+  const failedCount = items.filter((i) => i.task.status === 'failed').length
+  const activeCount = items.length - failedCount
+  const failed = activeCount === 0 && failedCount > 0
 
-function TaskCardBody({ task, title, failed }: TaskCardBodyProps) {
-  return (
-    <>
-            <View className="task-card__head">
-              <Text className="task-card__type">{TYPE_LABEL[task.type] || '任务'}</Text>
-              {failed ? (
-                <Text className="task-card__status task-card__status--failed">未完成</Text>
-              ) : (
-                <View className="task-card__spinner spinner" />
-              )}
-            </View>
-            <Text className="task-card__title">{title}</Text>
-            {!failed ? (
-              <View className="task-card__progress">
-                <View
-                  className="task-card__progress-fill"
-                  style={{ transform: `scaleX(${Math.min(100, Math.max(0, task.progress ?? 0)) / 100})` }}
-                />
-              </View>
-            ) : null}
-            <Text className="task-card__stage">{task.stage || (failed ? '点击查看原因' : '进行中')}</Text>
-    </>
-  )
-}
+  let label: string
+  if (groups.length === 1) {
+    const typeLabel = TYPE_LABEL[first.task.type] || '任务'
+    if (failed) {
+      label = `${typeLabel} · ${failedCount} 个未完成`
+    } else if (items.length === 1) {
+      label = `${typeLabel} · 生成中`
+    } else {
+      label = `${typeLabel} · ${activeCount} 个生成中`
+    }
+  } else {
+    label = failed ? `${failedCount} 个任务未完成` : `${activeCount} 个任务进行中`
+  }
 
-interface TaskCardBodyProps {
-  task: TaskRailItem['task']
-  title: string
-  failed: boolean
+  return (
+    <View className={`task-strip fade-up ${failed ? 'task-strip--failed' : ''} pressable`} onClick={first.open}>
+      {failed ? (
+        <View className="task-strip__dot" />
+      ) : (
+        <View className="task-strip__spinner spinner" />
+      )}
+      <Text className="task-strip__label">{label}</Text>
+      <Text className="task-strip__arrow">›</Text>
+    </View>
+  )
 }
 
 interface TaskRailProps {
