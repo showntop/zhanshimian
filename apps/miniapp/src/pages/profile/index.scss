@@ -79,6 +79,17 @@
     &-value {
       font-size: 24rpx;
       color: var(--ink-3);
+
+      // 任务中心状态：进行中 moss / 未完成 warn
+      &--moss {
+        color: var(--moss);
+        font-weight: 600;
+      }
+
+      &--warn {
+        color: var(--warn);
+        font-weight: 600;
+      }
     }
   }
 

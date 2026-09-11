@@ -1,10 +1,12 @@
 // 我的（Tab）：账户与身份、档案摘要（me/profile 持久化展示）、
+// 任务中心（进行中任务的聚合列表，无任务不占位）、
 // 报告/方案入口、体验实验室、删除我的数据。
 import { useCallback, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
-import type { Account, UserProfile } from '@zsm/core'
+import type { Account, Task, UserProfile } from '@zsm/core'
 import { api } from '../../services/api'
+import { openTask, taskTitle } from '../../services/task-utils'
 import { clearAllLocalState, STORAGE_KEYS, readStorage } from '../../services/storage'
 import { globalData } from '../../app'
 import AppHeader from '../../components/app-header'
@@ -14,17 +16,20 @@ import './index.scss'
 export default function Profile() {
   const [account, setAccount] = useState<Account | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [me, myProfile] = await Promise.all([
+      const [me, myProfile, bootstrap] = await Promise.all([
         api.getMe().catch(() => null),
         api.getMyProfile().catch(() => null),
+        api.getHomeBootstrap().catch(() => null),
       ])
       setAccount(me)
       setProfile(myProfile)
+      setTasks(bootstrap?.active_tasks ?? [])
     } finally {
       setLoading(false)
     }
@@ -35,6 +40,17 @@ export default function Profile() {
   })
 
   const hasReport = Boolean(readStorage(STORAGE_KEYS.reportId))
+
+  // 任务中心：按类型聚合同类任务（一次方案生成 = 3 个 plan_look）
+  const activeTasks = tasks.filter(
+    (t) => t.status === 'queued' || t.status === 'processing' || t.status === 'failed',
+  )
+  const taskGroups: Task[][] = []
+  for (const task of activeTasks) {
+    const group = taskGroups.find((g) => g[0]?.type === task.type)
+    if (group) group.push(task)
+    else taskGroups.push([task])
+  }
 
   const deleteData = () => {
     Taro.showModal({
@@ -75,6 +91,37 @@ export default function Profile() {
                 </Text>
               </View>
             </View>
+
+            {activeTasks.length > 0 ? (
+              <View className="me__card fade-up delay-1">
+                <Text className="me__section">进行中的任务</Text>
+                {taskGroups.map((group) => {
+                  const first = group[0]
+                  if (!first) return null
+                  const activeCount = group.filter(
+                    (t) => t.status === 'queued' || t.status === 'processing',
+                  ).length
+                  const failedCount = group.length - activeCount
+                  const failed = activeCount === 0
+                  return (
+                    <View
+                      key={first.type}
+                      className="me__row pressable"
+                      onClick={() => openTask(first)}
+                    >
+                      <Text className="me__row-label">{taskTitle(first)}</Text>
+                      <Text className={`me__row-value ${failed ? 'me__row-value--warn' : 'me__row-value--moss'}`}>
+                        {failed
+                          ? `${failedCount} 个未完成`
+                          : group.length === 1
+                            ? `${Math.min(100, Math.max(0, first.progress ?? 0))}%`
+                            : `${activeCount} 个生成中`}
+                      </Text>
+                    </View>
+                  )
+                })}
+              </View>
+            ) : null}
 
             <View className="me__card fade-up delay-1">
               <Text className="me__section">形象档案</Text>

@@ -16,13 +16,12 @@ import {
   isBundledAsset,
   trackEvent,
   type HomeBootstrap,
-  type Task,
 } from '@zsm/core'
 import { api } from '../../services/api'
+import { taskDoneTitle } from '../../services/task-utils'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
-import TaskRail, { type TaskRailItem } from '../../components/task-rail'
 import ExampleImage from '../../components/example-image'
 import ErrorState from '../../components/error-state'
 import Skeleton from '../../components/skeleton'
@@ -45,54 +44,6 @@ function todayLabel(): string {
   const d = new Date()
   const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()] ?? ''
   return `${d.getMonth() + 1}月${d.getDate()}日 · 周${week}`
-}
-
-function taskTitle(task: Task): string {
-  switch (task.type) {
-    case 'analysis':
-      return '正在分析你的三张照片'
-    case 'hair_preview':
-      return '正在生成发型预览'
-    case 'plan_look':
-      return '正在生成方案形象图'
-    case 'today_look':
-      return '正在生成今日搭配图'
-    default:
-      return '任务进行中'
-  }
-}
-
-/** 任务完成的轻提醒文案（首页轮询到终态时 toast） */
-function taskDoneTitle(task: Task): string {
-  switch (task.type) {
-    case 'analysis':
-      return '形象分析完成，去看看报告'
-    case 'hair_preview':
-      return '发型预览已生成'
-    case 'plan_look':
-      return '方案形象图已生成'
-    case 'today_look':
-      return '今日搭配图已生成'
-    default:
-      return '任务已完成'
-  }
-}
-
-function openTask(task: Task) {
-  switch (task.type) {
-    case 'analysis':
-      Taro.navigateTo({ url: '/pages/analysis/index' })
-      break
-    case 'hair_preview':
-      Taro.navigateTo({ url: '/packages/tools/pages/hair/index' })
-      break
-    case 'plan_look':
-      Taro.switchTab({ url: '/pages/plans/index' })
-      break
-    case 'today_look':
-      Taro.navigateTo({ url: '/packages/life/pages/today/index' })
-      break
-  }
 }
 
 function lookBadge(lookProvider: string | undefined, generatedUrl: string | undefined): string {
@@ -182,9 +133,24 @@ export default function Home() {
     Boolean(report?.provider_version?.startsWith('demo')) || isBundledAsset(reportImage)
   const recentPlan = bootstrap?.recent_plan
   const todayPlan = bootstrap?.today_plan
-  const railItems: TaskRailItem[] = (bootstrap?.active_tasks ?? [])
-    .filter((t) => t.status === 'queued' || t.status === 'processing' || t.status === 'failed')
-    .map((task) => ({ task, title: taskTitle(task), open: () => openTask(task) }))
+  const activeTasks = (bootstrap?.active_tasks ?? []).filter(
+    (t) => t.status === 'queued' || t.status === 'processing',
+  )
+  const analysisActive = activeTasks.some((t) => t.type === 'analysis')
+  const hairActive = activeTasks.some((t) => t.type === 'hair_preview')
+  const planTaskCount = activeTasks.filter(
+    (t) => t.type === 'plan_look' || t.type === 'today_look',
+  ).length
+
+  // 方案 Tab badge（A 方案）：方案/今日形象图任务进行中时在底部 Tab 标数，
+  // 完成即清除；完整任务列表在「我的」页任务中心（C 方案）
+  useEffect(() => {
+    if (planTaskCount > 0) {
+      Taro.setTabBarBadge({ index: 1, text: String(planTaskCount) }).catch(() => {})
+    } else {
+      Taro.removeTabBarBadge({ index: 1 }).catch(() => {})
+    }
+  }, [planTaskCount])
 
   return (
     <View className="page page--tab">
@@ -204,8 +170,6 @@ export default function Home() {
               {hasReport ? `${greetingForNow()}，${HOME_COPY.returningTitle}` : HOME_TITLE}
             </Text>
           </View>
-
-          <TaskRail items={railItems} />
 
           {!hasReport ? (
             <View className="fade-up delay-1">
@@ -234,9 +198,13 @@ export default function Home() {
                   ))}
                 </View>
                 <PrimaryButton
-                  text={HOME_COPY.startAnalysis}
+                  text={analysisActive ? '正在分析，查看进度' : HOME_COPY.startAnalysis}
                   tone="onDark"
-                  onClick={() => Taro.navigateTo({ url: '/pages/capture/index' })}
+                  onClick={() =>
+                    Taro.navigateTo({
+                      url: analysisActive ? '/pages/analysis/index' : '/pages/capture/index',
+                    })
+                  }
                 />
                 <Text className="home__hero-note">{HOME_COPY.photoPrivacy}</Text>
               </View>
@@ -300,17 +268,25 @@ export default function Home() {
               <View className="section-rule" />
             </View>
             <View className="home__tools">
-              {TOOLS.map((tool) => (
-                <View
-                  key={tool.key}
-                  className="home__tool pressable"
-                  onClick={() => Taro.navigateTo({ url: tool.path })}
-                >
-                  {tool.badge ? <Text className="home__tool-badge">{tool.badge}</Text> : null}
-                  <Text className="home__tool-name">{tool.label}</Text>
-                  <Text className="home__tool-desc">{tool.desc}</Text>
-                </View>
-              ))}
+              {TOOLS.map((tool) => {
+                const badge =
+                  tool.key === 'hair' && hairActive ? '生成中' : (tool.badge || '')
+                return (
+                  <View
+                    key={tool.key}
+                    className="home__tool pressable"
+                    onClick={() => Taro.navigateTo({ url: tool.path })}
+                  >
+                    {badge ? (
+                      <Text className={`home__tool-badge ${badge === '生成中' ? 'home__tool-badge--live' : ''}`}>
+                        {badge}
+                      </Text>
+                    ) : null}
+                    <Text className="home__tool-name">{tool.label}</Text>
+                    <Text className="home__tool-desc">{tool.desc}</Text>
+                  </View>
+                )
+              })}
             </View>
           </View>
 
