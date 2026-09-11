@@ -249,7 +249,7 @@ export default function Analysis() {
 
         <Text className="analysis__tip fade-up delay-3">{tipText}</Text>
 
-        {/* 不锁人：后台继续分析，首页任务轨承接进度，完成即提醒 */}
+        {/* 不锁人：后台继续分析，完成 toast +「我的」任务中心承接，不回首页插进度条 */}
         <Text
           className="analysis__wander fade-up delay-3 pressable"
           onClick={() => Taro.switchTab({ url: '/pages/home/index' })}

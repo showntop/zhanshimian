@@ -45,7 +45,7 @@ export default function Profile() {
 
   const hasReport = Boolean(readStorage(STORAGE_KEYS.reportId))
 
-  // 任务中心：按类型聚合同类任务（一次方案生成 = 3 个 plan_look），分组逻辑与首页任务轨单源
+  // 任务中心：按类型聚合同类任务（一次方案生成 = 3 个 plan_look），分组逻辑与 task-utils 单源
   const activeTasks = tasks.filter(
     (t) => t.status === 'queued' || t.status === 'processing' || t.status === 'failed',
   )

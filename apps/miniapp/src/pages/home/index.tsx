@@ -1,6 +1,7 @@
 // 首页工作台：新用户/回访双状态。
 // 请求纪律：单次 /v1/home/bootstrap 聚合；仅当有活跃任务且页面可见时批量轮询(1.5s)。
-// 重设计 IA：问候 → 任务轨 → 今日造型/档案 hero → 工具 → 场景 → 最近方案。
+// 重设计 IA：问候 → 今日造型/档案 hero → 工具 → 场景 → 最近方案。
+// 进行中任务不占首页内容流：分析走建档按钮、工具卡徽章、方案 Tab badge；完整列表在「我的」。
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
@@ -30,7 +31,6 @@ import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
 import ExampleImage from '../../components/example-image'
 import ErrorState from '../../components/error-state'
-import TaskStrip from '../../components/task-strip'
 import Skeleton from '../../components/skeleton'
 import './index.scss'
 
@@ -274,8 +274,6 @@ export default function Home() {
               {hasReport ? `${greetingForNow()}，${HOME_COPY.returningTitle}` : HOME_TITLE}
             </Text>
           </View>
-
-          <TaskStrip tasks={activeTasks} />
 
           {!hasReport ? (
             <View className="fade-up delay-1">

@@ -1,10 +1,6 @@
-// 任务展示与跳转共享工具：首页（入口状态 / Tab badge）与「我的」（任务中心）复用。
+// 任务展示与跳转共享工具：首页（入口状态 / Tab badge）与「我的」任务中心复用。
 import Taro from '@tarojs/taro'
 import type { Task } from '@zsm/core'
-
-export function isTaskActive(task: Task): boolean {
-  return task.status === 'queued' || task.status === 'processing'
-}
 
 export function taskTitle(task: Task): string {
   switch (task.type) {
@@ -59,7 +55,7 @@ export function openTask(task: Task) {
   }
 }
 
-/** 任务中心/首页任务轨共用：按类型聚合同类任务（一次方案生成 = 3 个 plan_look），保持先来先排 */
+/** 任务中心共用：按类型聚合同类任务（一次方案生成 = 3 个 plan_look），保持先来先排 */
 export function groupTasksByType(tasks: Task[]): Task[][] {
   const groups: Task[][] = []
   for (const task of tasks) {
@@ -68,13 +64,4 @@ export function groupTasksByType(tasks: Task[]): Task[][] {
     else groups.push([task])
   }
   return groups
-}
-
-/** 任务轨右侧状态文案：同类多任务给数量，单任务给阶段或进度 */
-export function taskGroupMeta(group: Task[]): string {
-  const first = group[0]
-  if (!first) return ''
-  if (group.length > 1) return `${group.length} 个生成中`
-  if (first.stage) return first.stage
-  return `${Math.min(100, Math.max(0, first.progress ?? 0))}%`
 }
