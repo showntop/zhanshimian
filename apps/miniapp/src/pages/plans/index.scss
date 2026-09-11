@@ -126,13 +126,16 @@
   }
 
   // 信息卡上叠 hero 底边：消除图片与文字之间的白缝，形成一张连续卡
+  // 细节卡（第 2 屏）：正常文档流跟随选择面板卡。
+  // 此前的 -56rpx 负边距是「上叠 hero 底边」时代的遗留，
+  // 会把卡片拉上去叠住选择面板卡
   &__info {
     position: relative;
     z-index: 2;
     display: flex;
     flex-direction: column;
     gap: 12rpx;
-    margin: -56rpx 20rpx 0;
+    margin: 0 20rpx;
     padding: 28rpx 30rpx;
     border-radius: var(--radius-lg);
     background: var(--surface-strong);
