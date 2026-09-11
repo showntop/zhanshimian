@@ -284,15 +284,13 @@ export default function Report() {
                         )
                       }}
                     />
-                    {/* 渐变压暗层：保证低位标签在深色照片上仍可读 */}
-                    <View className="report__hero-scrim report__hero-scrim--top" />
-                    <View className="report__hero-scrim report__hero-scrim--bottom" />
-                    <Text className="report__hero-mark">
-                      {REPORT_COPY.sourceTitle} · {PHOTO_LABEL[kind]}
-                    </Text>
-                    <Text className={providerIsDemo ? 'report__provider report__provider--demo' : 'report__provider'}>
-                      {providerIsDemo ? REPORT_COPY.demoMark : REPORT_COPY.aiMark}
-                    </Text>
+                    {/* 渐变压暗层已删：aspectFit 后照片不满宽，压暗层会把留白区染灰。
+                        角标同步清理，仅在 demo 数据时保留警示角标 */}
+                    {providerIsDemo ? (
+                      <Text className="report__provider report__provider--demo">
+                        {REPORT_COPY.demoMark}
+                      </Text>
+                    ) : null}
                     {/* 左右两列常显标签 + 引导线 + 锚点端点 */}
                     {leftLayout.map((item) => renderTag(item, 'left'))}
                     {rightLayout.map((item) => renderTag(item, 'right'))}

@@ -30,38 +30,8 @@
       animation: report-photo-in 0.3s ease both;
     }
 
-    // 渐变压暗层（不拦截锚点点击）
-    &-scrim {
-      position: absolute;
-      left: 0;
-      right: 0;
-      pointer-events: none;
-
-      &--top {
-        top: 0;
-        height: 200rpx;
-        background: linear-gradient(180deg, rgba(24, 28, 22, 0.32) 0%, rgba(24, 28, 22, 0) 100%);
-      }
-
-      &--bottom {
-        bottom: 0;
-        height: 240rpx;
-        background: linear-gradient(0deg, rgba(24, 28, 22, 0.26) 0%, rgba(24, 28, 22, 0) 100%);
-      }
-    }
-
-    &-mark {
-      position: absolute;
-      top: 20rpx;
-      left: 20rpx;
-      padding: 9rpx 20rpx;
-      border-radius: 999rpx;
-      background: rgba(255, 255, 255, 0.88);
-      backdrop-filter: blur(8rpx);
-      font-size: 20rpx;
-      font-weight: 650;
-      color: var(--ink);
-    }
+    // 渐变压暗层与左上角标已删：aspectFit 后照片不满宽，
+    // 压暗层会把留白区染灰、白色角标胶囊悬在留白区像多余的「弧角」
   }
 
   &__provider {
@@ -256,11 +226,11 @@
     overflow: hidden;
   }
 
-  // 引导线：从胶囊外缘到 anchor 端点的细线（加粗到 3rpx，长距离下可见）
+  // 引导线：从胶囊外缘到 anchor 端点的细线（苔绿半透明，照片与留白区都可见）
   &__leader {
     position: absolute;
     height: 3rpx;
-    background: rgba(255, 255, 255, 0.6);
+    background: rgba(88, 115, 68, 0.55);
     transform-origin: 0 50%;
     z-index: 3;
   }
