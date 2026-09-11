@@ -273,7 +273,7 @@ export default function Report() {
                       className="report__hero-img"
                       src={url}
                       user={!demo}
-                      mode="aspectFill"
+                      mode="aspectFit"
                       badgeText={demo ? REPORT_COPY.demoMark : ''}
                       onLoad={(e) => {
                         const w = Number(e.detail.width)
