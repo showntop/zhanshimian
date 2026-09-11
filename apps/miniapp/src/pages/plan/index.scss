@@ -11,7 +11,7 @@
   }
 
   .app-header--transparent {
-    background: linear-gradient(180deg, rgba(248, 245, 240, 0.82) 0%, rgba(248, 245, 240, 0) 100%);
+    background: linear-gradient(180deg, rgba(244, 245, 242, 0.82) 0%, rgba(244, 245, 242, 0) 100%);
     border-bottom-color: transparent;
     backdrop-filter: none;
   }
@@ -83,9 +83,9 @@
     padding: 140rpx var(--page-gutter) calc(20rpx + env(safe-area-inset-bottom));
     background: linear-gradient(
       180deg,
-      rgba(248, 245, 240, 0) 0%,
-      rgba(248, 245, 240, 0.42) 28%,
-      rgba(248, 245, 240, 0.88) 62%,
+      rgba(244, 245, 242, 0) 0%,
+      rgba(244, 245, 242, 0.42) 28%,
+      rgba(244, 245, 242, 0.88) 62%,
       var(--bg) 100%
     );
   }

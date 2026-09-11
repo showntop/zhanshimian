@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
 import { POLL_INTERVALS, useTaskPolling, type Plan } from '@zsm/core'
-import { usePageClass, useShowOnce } from '../../hooks/use-page-visibility'
+import { usePageShell, useShowOnce } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader, { getNavMetrics } from '../../components/app-header'
@@ -54,7 +54,7 @@ export default function Plans() {
   const [groupTaskId, setGroupTaskId] = useState('')
   const plansRef = useRef<Plan[]>([])
   plansRef.current = plans
-  const pageClass = usePageClass(!loading || plans.length > 0, 'page--tab', 'plans')
+  const { pageClass, enter } = usePageShell(!loading || plans.length > 0, 'page--tab', 'plans')
   const activeLook = plans.find(
     (p, i) =>
       i === index &&
@@ -277,14 +277,14 @@ export default function Plans() {
 
         {plans.length === 0 ? (
           groupTaskId ? (
-            <View className="plans__scene-empty fade-up">
+            <View className={`plans__scene-empty ${enter()}`}>
               <View className="plans__generating">
                 <View className="plans__generating-spin spinner" />
                 <Text className="plans__generating-text">正在从你的报告生成三套方案，通常需要 1-2 分钟</Text>
               </View>
             </View>
           ) : (
-            <View className="plans__scene-empty fade-up">
+            <View className={`plans__scene-empty ${enter()}`}>
               <Text className="plans__scene-empty-title">{scene === 'general' ? '还没有形象方案' : `${sceneLabel}场合还没有方案`}</Text>
               <Text className="plans__scene-empty-desc">
                 {scene === 'general' ? '基于你的形象档案生成三套方案' : '回答 4 个选择（约 30 秒），复用档案不重复要照片'}
@@ -299,7 +299,7 @@ export default function Plans() {
           <>
         {/* 拖动对比 hero：照片满宽完整展示（高度跟随照片比例），
             无侧边区无裁切。key 随方案切换重挂载 → 交叉淡入 */}
-        <View className="plans__hero fade-up">
+        <View className="plans__hero">
           <View className="plans__hero-frame" style={{ height: `${heroPx}px` }} key={plan?.id}>
             <CompareSlider
               single={!currentImage || !planImage || scene !== 'general'}
@@ -328,7 +328,7 @@ export default function Plans() {
 
         {/* 细节区（第 2 屏起）：descriptor + 折叠的 why + 生成/重试状态 */}
         {plan ? (
-          <View className="plans__info fade-up delay-1">
+          <View className={`plans__info ${enter(1)}`}>
             <Text className="plans__summary">{plan.descriptor}</Text>
             {plan.why ? (
               <View className="plans__why-wrap" onClick={() => setWhyOpen(!whyOpen)}>
@@ -353,7 +353,7 @@ export default function Plans() {
         {/* 悬浮选择坞：收益词 + 三选一 + CTA 收进毛玻璃坞，浮在照片底部
             上方不占文档流——照片有多高就展示多高，选择要素常驻第一屏 */}
         {plan ? (
-          <View className="plans__dock fade-up delay-2">
+          <View className={`plans__dock ${enter(2)}`}>
             {(plan.outcome_tags ?? []).length > 0 ? (
               <View className="plans__outcome">
                 {plan.outcome_tags.slice(0, 3).map((tag) => (

@@ -21,7 +21,7 @@ import {
   type HomeBootstrap,
   type SceneCopy,
 } from '@zsm/core'
-import { usePageClass } from '../../hooks/use-page-visibility'
+import { usePageShell } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { hasOutfitResult, isOutfitPending } from '../../services/outfit-session'
 import { hasPurchaseResult, isPurchasePending } from '../../services/purchase-session'
@@ -54,7 +54,7 @@ const SceneTile = memo(function SceneTile({ scene }: { scene: SceneCopy }) {
       className={`home__scene home__scene--${scene.id} pressable`}
       onClick={() => Taro.navigateTo({ url: `/pages/scene/index?scene=${scene.id}` })}
     >
-      <Image className="home__scene-icon" src={SCENE_ICONS[scene.id]} mode="aspectFit" lazyLoad={false} />
+      <Image className="home__scene-icon" src={SCENE_ICONS[scene.id]} mode="aspectFit" lazyLoad={false} fadeIn={false} />
       <View className="home__scene-copy">
         <Text className="home__scene-label">{scene.label}</Text>
         <Text className="home__scene-desc">{scene.note}</Text>
@@ -119,7 +119,7 @@ export default function Home() {
   const bootstrapRef = useRef<HomeBootstrap | null>(cachedBootstrap)
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   bootstrapRef.current = bootstrap
-  const pageClass = usePageClass(!loading, 'page--tab', 'home')
+  const { pageClass, enter } = usePageShell(!loading, 'page--tab', 'home')
 
   const load = useCallback(async () => {
     try {
@@ -220,7 +220,8 @@ export default function Home() {
     setOutfitReady((prev) => (prev === nextOutfitReady ? prev : nextOutfitReady))
     setPurchaseActive((prev) => (prev === nextPurchaseActive ? prev : nextPurchaseActive))
     setPurchaseReady((prev) => (prev === nextPurchaseReady ? prev : nextPurchaseReady))
-    recoverReport().then(load)
+    // 已有首屏就不要在 onShow 再拉 bootstrap：任何 setState 都可能让原生 image 重解码。
+    if (!bootstrapRef.current) recoverReport().then(load)
     scheduleTaskPoll()
   })
 
@@ -265,7 +266,7 @@ export default function Home() {
         <Skeleton rows={4} />
       ) : (
         <View className="home">
-          <View className="home__greeting fade-up">
+          <View className={`home__greeting ${enter()}`}>
             <View className="home__greeting-top">
               <Text className="home__greeting-kicker">{APP_SLOGAN}</Text>
               <Text className="home__greeting-date">{todayLabel()}</Text>
@@ -276,8 +277,8 @@ export default function Home() {
           </View>
 
           {!hasReport ? (
-            <View className="fade-up delay-1">
-              <View className="home__hero home__hero--onboard card--hero halo">
+            <View className={enter(1)}>
+              <View className="home__hero home__hero--onboard card--hero">
                 <View className="home__hero-top">
                   <View className="home__hero-copy">
                     <Text className="home__hero-eyebrow">{HOME_COPY.startArchive}</Text>
@@ -314,12 +315,12 @@ export default function Home() {
               </View>
             </View>
           ) : todayPlan ? (
-            <View className="fade-up delay-1">
+            <View>
               <View
-                className="home__hero home__hero--today card--hero halo pressable"
+                className="home__hero home__hero--today card--hero pressable"
                 onClick={() => Taro.navigateTo({ url: '/packages/life/pages/today/index' })}
               >
-                <View className="home__hero-copy">
+                <View className={`home__hero-copy ${enter(1)}`}>
                   <Text className="home__hero-eyebrow">今日造型</Text>
                   <Text className="home__hero-title">{todayPlan.title}</Text>
                   <Text className="home__hero-desc">{todayPlan.summary}</Text>
@@ -333,13 +334,13 @@ export default function Home() {
               </View>
             </View>
           ) : (
-            <View className="fade-up delay-1">
+            <View>
               <View
-                className="home__hero home__hero--report card--hero halo pressable"
+                className="home__hero home__hero--report card--hero pressable"
                 onClick={() => Taro.navigateTo({ url: '/pages/report/index' })}
               >
                 <View className="home__report-main">
-                  <View className="home__hero-copy">
+                  <View className={`home__hero-copy ${enter(1)}`}>
                     <Text className="home__hero-eyebrow">{HOME_COPY.reportReady}</Text>
                     <Text className="home__hero-title">{report?.priority_title}</Text>
                     <Text className="home__hero-desc">{report?.priority_copy}</Text>
@@ -366,7 +367,7 @@ export default function Home() {
             </View>
           )}
 
-          <View className="home__section fade-up delay-2">
+          <View className={`home__section ${enter(2)}`}>
             <View className="home__section-head">
               <Text className="section-title">{HOME_COPY.toolsTitle}</Text>
               <View className="section-rule" />
@@ -404,8 +405,8 @@ export default function Home() {
             </View>
           </View>
 
-          <View className="home__section fade-up delay-3">
-            <View className="home__section-head">
+          <View className="home__section">
+            <View className={`home__section-head ${enter(3)}`}>
               <Text className="section-title">{HOME_COPY.scenesTitle}</Text>
               <View className="section-rule" />
             </View>
@@ -425,8 +426,8 @@ export default function Home() {
           </View>
 
           {recentPlan ? (
-            <View className="home__section fade-up delay-3">
-              <View className="home__section-head">
+            <View className="home__section">
+              <View className={`home__section-head ${enter(3)}`}>
                 <Text className="section-title">{HOME_COPY.recentTitle}</Text>
                 <View className="section-rule" />
               </View>
@@ -439,7 +440,7 @@ export default function Home() {
                   src={recentPlan.generated_image_url || recentPlan.image_url}
                   badgeText={lookBadge(recentPlan.look_provider, recentPlan.generated_image_url)}
                 />
-                <View className="home__recent-copy">
+                <View className={`home__recent-copy ${enter(3)}`}>
                   <Text className="home__recent-name">{recentPlan.name}</Text>
                   <Text className="home__recent-why">{recentPlan.why}</Text>
                 </View>
@@ -448,7 +449,7 @@ export default function Home() {
             </View>
           ) : null}
 
-          <View className="home__section fade-up delay-3">
+          <View className={`home__section ${enter(3)}`}>
             <View className="home__section-head">
               <Text className="section-title">{HOME_COPY.lifeTitle}</Text>
               <View className="section-rule" />
@@ -470,7 +471,7 @@ export default function Home() {
             </View>
           </View>
 
-          <View className="home__foot fade-up delay-3">
+          <View className={`home__foot ${enter(3)}`}>
             <View className="home__foot-rule" />
             <Text className="home__foot-brand">{APP_NAME}</Text>
             <Text className="home__foot-note">{PRIVACY_NOTE}</Text>

@@ -84,7 +84,7 @@ button::after {
 
   .muted,
   .eyebrow {
-    color: rgba(244, 239, 230, 0.72);
+    color: rgba(238, 240, 236, 0.72);
   }
 }
 
@@ -192,7 +192,7 @@ button::after {
 }
 
 .spinner--on-deep {
-  border-color: rgba(244, 239, 230, 0.32);
+  border-color: rgba(238, 240, 236, 0.32);
   border-top-color: var(--cream);
 }
 
@@ -247,7 +247,10 @@ button::after {
 .example-soft {
   -webkit-filter: blur(4px) saturate(0.8);
   filter: blur(4px) saturate(0.8);
-  transform: scale(1.1);
+  // 不用 transform：原生 image 的祖先/自身带 transform 时，微信切 tab 会重绘闪一下。
+  width: 110%;
+  height: 110%;
+  margin: -5%;
 }
 
 // ---------- 入场动效 ----------

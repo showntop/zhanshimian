@@ -1,7 +1,7 @@
 export default defineAppConfig({
   window: {
     navigationStyle: 'custom',
-    backgroundColor: '#F8F5F0',
+    backgroundColor: '#F4F5F2',
     backgroundTextStyle: 'dark',
     navigationBarTextStyle: 'black',
   },
@@ -45,9 +45,9 @@ export default defineAppConfig({
     'pages/plans/index': { network: 'wifi', packages: ['packages/life'] },
   },
   tabBar: {
-    color: '#656B64',
+    color: '#626862',
     selectedColor: '#587344',
-    backgroundColor: '#F8F5F0',
+    backgroundColor: '#F4F5F2',
     borderStyle: 'black',
     list: [
       { pagePath: 'pages/home/index', text: '首页', iconPath: 'assets/tabbar/home.png', selectedIconPath: 'assets/tabbar/home-active.png' },

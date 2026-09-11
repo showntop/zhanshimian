@@ -6,21 +6,21 @@ export interface ShadowToken {
 }
 
 export declare const colors: {
-  readonly bg: '#F8F5F0'
-  readonly surface: 'rgba(255,255,255,.78)'
+  readonly bg: '#F4F5F2'
+  readonly surface: 'rgba(255,255,255,.82)'
   readonly surfaceStrong: '#FFFFFF'
-  readonly ink: '#252725'
-  readonly ink2: '#656B64'
-  readonly ink3: '#747A73'
+  readonly ink: '#202320'
+  readonly ink2: '#626862'
+  readonly ink3: '#686D67'
   readonly moss: '#587344'
   readonly mossPressed: '#486238'
-  readonly mossSoft: '#EEF2E9'
+  readonly mossSoft: '#EDF1EA'
   readonly mossDeep: '#39492E'
-  readonly cream: '#F4EFE6'
-  readonly line: 'rgba(69,78,64,.14)'
-  readonly lineOnDeep: 'rgba(244,239,230,.22)'
+  readonly cream: '#EEF0EC'
+  readonly line: 'rgba(55,62,52,.12)'
+  readonly lineOnDeep: 'rgba(238,240,236,.24)'
   readonly danger: '#9B4B45'
-  readonly warn: '#9B6D58'
+  readonly warn: '#7E5445'
   readonly badge: 'rgba(30,35,29,.62)'
 }
 export declare const radius: { readonly sm: 8; readonly md: 10; readonly lg: 12; readonly xl: 14; readonly pill: 999 }

@@ -109,8 +109,8 @@
     gap: 10rpx;
     padding: 8rpx 22rpx;
     border-radius: 999rpx;
-    background: linear-gradient(90deg, #4e6539 0%, #6d8a52 100%);
-    box-shadow: 0 6rpx 18rpx rgba(78, 101, 57, 0.35);
+    background: var(--moss);
+    box-shadow: var(--shadow-primary-button);
     max-width: 100%;
 
     &-tag {
@@ -333,7 +333,7 @@
     flex-direction: column;
     gap: 14rpx;
     padding: 18rpx var(--page-gutter) 12rpx;
-    background: rgba(250, 249, 245, 0.9);
+    background: rgba(244, 245, 242, 0.92);
     backdrop-filter: blur(24rpx);
     border-top: 1rpx solid var(--line);
     box-shadow: 0 -12rpx 32rpx rgba(31, 34, 30, 0.08);
@@ -353,10 +353,10 @@
     color: var(--ink-3);
   }
 
-  // 本页 CTA 提亮：苔绿 → 亮绿渐变 + 光晕，年轻时尚感
+  // 冷调试验：CTA 回纯色苔绿，去掉亮绿渐变光晕
   &__dock .primary-button--solid {
-    background: linear-gradient(92deg, #47602f 0%, #6d8a52 55%, #7fa35e 100%);
-    box-shadow: 0 10rpx 28rpx rgba(88, 115, 68, 0.38);
+    background: var(--moss);
+    box-shadow: var(--shadow-primary-button);
   }
 }
 

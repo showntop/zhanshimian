@@ -70,6 +70,19 @@ export function usePageSettled(ready: boolean, persistKey = ''): boolean {
 
 /** 页面根 class：`page` + 可选修饰 + 入场结束后的 `page--settled`。 */
 export function usePageClass(ready: boolean, extra = '', persistKey = extra || 'page'): string {
+  return usePageShell(ready, extra, persistKey).pageClass
+}
+
+/**
+ * 入场 class 必须在播完后从 DOM 拿掉。微信切 tab 会重播仍挂在节点上的
+ * CSS animation（both + from 透明），只靠覆盖 animation:none 压不住。
+ */
+export function usePageShell(ready: boolean, extra = '', persistKey = extra || 'page') {
   const settled = usePageSettled(ready, persistKey)
-  return ['page', extra, settled ? 'page--settled' : ''].filter(Boolean).join(' ')
+  const pageClass = ['page', extra, settled ? 'page--settled' : ''].filter(Boolean).join(' ')
+  const enter = (delay?: 1 | 2 | 3) => {
+    if (settled) return ''
+    return delay ? `fade-up delay-${delay}` : 'fade-up'
+  }
+  return { pageClass, enter, settled }
 }

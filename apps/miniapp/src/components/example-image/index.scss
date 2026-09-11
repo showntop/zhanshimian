@@ -2,7 +2,10 @@
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-md);
-  background: var(--surface-soft, #f5f4ef);
+  background-color: var(--surface-soft, #edf1ea);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 
   &__img {
     width: 100%;

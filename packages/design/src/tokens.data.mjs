@@ -4,23 +4,24 @@
 // 生成器负责 px×2 → rpx（designWidth: 750）。禁止在此出现 rpx。
 
 // §4.2 品牌色（对齐 brand/README.md，修复 G4 漂移）
-// mossDeep/cream/lineOnDeep：atelier hero 层 —— 深墨绿底 + 柔米文字（重设计新增）。
+// 2026-03 冷调珍珠灰试验：bg 从暖米黄 #F8F5F0 → #F4F5F2，保留苔绿识别，减弱 AI 生活方式暖黄感。
+// mossDeep/cream/lineOnDeep：atelier hero 层 —— 深墨绿底 + 冷调浅文字。
 export const colors = {
-  bg: '#F8F5F0',
-  surface: 'rgba(255,255,255,.78)',
+  bg: '#F4F5F2',
+  surface: 'rgba(255,255,255,.82)',
   surfaceStrong: '#FFFFFF',
-  ink: '#252725',
-  ink2: '#656B64',
-  ink3: '#747A73',
+  ink: '#202320',
+  ink2: '#626862',
+  ink3: '#686D67',
   moss: '#587344',
   mossPressed: '#486238',
-  mossSoft: '#EEF2E9',
+  mossSoft: '#EDF1EA',
   mossDeep: '#39492E',
-  cream: '#F4EFE6',
-  line: 'rgba(69,78,64,.14)',
-  lineOnDeep: 'rgba(244,239,230,.22)',
+  cream: '#EEF0EC',
+  line: 'rgba(55,62,52,.12)',
+  lineOnDeep: 'rgba(238,240,236,.24)',
   danger: '#9B4B45',
-  warn: '#9B6D58',
+  warn: '#7E5445',
   badge: 'rgba(30,35,29,.62)'
 }
 

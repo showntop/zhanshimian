@@ -35,7 +35,7 @@ const PinnedImage = memo(function PinnedImage({
   mode: NonNullable<ExampleImageProps['mode']>
   onLoad?: ExampleImageProps['onLoad']
 }) {
-  return <Image className={className} src={src} mode={mode} lazyLoad={false} onLoad={onLoad} />
+  return <Image className={className} src={src} mode={mode} lazyLoad={false} fadeIn={false} onLoad={onLoad} />
 })
 
 function ExampleImage({
@@ -79,7 +79,10 @@ function ExampleImage({
   const softExample = isBundledExample || badge === '效果示例'
 
   return (
-    <View className={`example-image ${className}`}>
+    <View
+      className={`example-image ${className}`}
+      style={url ? { backgroundImage: `url("${url}")` } : undefined}
+    >
       <PinnedImage
         className={`example-image__img ${softExample ? 'example-soft' : ''}`}
         src={url}
