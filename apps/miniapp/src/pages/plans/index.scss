@@ -81,46 +81,36 @@
       min-height: 340rpx;
       border-radius: var(--radius-lg);
       overflow: hidden;
-      background: var(--moss-soft);
+      // 暖米 → 浅苔绿渐变底：aspectFit 全身展示的留白区有时尚杂志感，不发灰
+      background: linear-gradient(165deg, #f4efe2 0%, #e8edd8 55%, #dfe7cf 100%);
       border: 1rpx solid var(--line);
       // 切换方案时整帧交叉淡入（key 重挂载触发）
       animation: plans-frame-in 0.3s ease both;
-
-      // 对比滑杆两层裁掉溢出（widthFix 内层图高出容器，只裁底部）
-      .cmp__layer {
-        overflow: hidden;
-      }
     }
 
     &-img {
       width: 100%;
       height: 100%;
-
-      // 顶部锚定裁切（widthFix + 高度自然）：竖版图只裁底部，
-      // 人物头部完整（aspectFill 居中裁切会把脸切掉）
-      .example-image__img {
-        height: auto;
-      }
     }
 
-    // 收益词叠加：直接回答「选这套能获得什么」，压暗渐变保证可读
+    // 收益词叠加：直接回答「选这套能获得什么」，亮苔绿胶囊提亮画面
     // （居中放置，避开滑杆左下/右下的「原本/方案」角标）
   }
 
   &__outcome {
     position: absolute;
     left: 50%;
-    bottom: 16rpx;
+    bottom: 18rpx;
     transform: translateX(-50%);
     z-index: 4;
     display: flex;
     align-items: center;
     gap: 10rpx;
-    padding: 8rpx 20rpx;
+    padding: 9rpx 22rpx;
     border-radius: 999rpx;
-    background: rgba(24, 28, 22, 0.72);
-    backdrop-filter: blur(12rpx);
-    max-width: 70%;
+    background: linear-gradient(90deg, #4e6539 0%, #6d8a52 100%);
+    box-shadow: 0 6rpx 18rpx rgba(78, 101, 57, 0.35);
+    max-width: 72%;
 
     &-tag {
       font-size: 21rpx;
@@ -130,7 +120,7 @@
 
       & + & {
         padding-left: 10rpx;
-        border-left: 1rpx solid rgba(255, 255, 255, 0.35);
+        border-left: 1rpx solid rgba(255, 255, 255, 0.4);
       }
     }
   }
@@ -152,7 +142,7 @@
 
   &__name {
     font-family: 'Songti SC', 'STSong', serif;
-    font-size: 32rpx;
+    font-size: 30rpx;
     font-weight: 700;
     color: var(--ink);
   }
@@ -234,52 +224,51 @@
     }
   }
 
-  // 选择面板卡：三选一 + 当前方案名 + 变化点收进同一张卡，
-  // 一张卡一个职责，避免多个白色元素分离漂浮
+  // 选择面板卡（紧凑横排）：左侧三张 3:4 缩略图，右侧方案名 + chips。
+  // 高度约为竖排的一半，空间让位给 hero
   &__chooser {
     display: flex;
-    flex-direction: column;
-    gap: 14rpx;
-    padding: 20rpx;
+    flex-direction: row;
+    align-items: center;
+    gap: 20rpx;
+    padding: 18rpx 20rpx;
     border-radius: var(--radius-lg);
     background: var(--surface-strong);
     border: 1rpx solid var(--line);
     box-shadow: 0 8rpx 24rpx rgba(31, 34, 30, 0.08);
 
-    &-divider {
-      height: 1rpx;
-      background: var(--line);
-    }
-
-    &-foot {
+    &-info {
+      flex: 1;
+      min-width: 0;
       display: flex;
       flex-direction: column;
       gap: 10rpx;
     }
   }
 
-  // 三选一：竖版缩略图（全照 aspectFit 完整显示），苔绿浅底替代白底
-  // 推荐角标叠缩略图左上角；选中态描边 + 全不透明
+  // 缩略图簇：固定 3:4 小卡（aspectFit 全照），苔绿浅底
+  // 推荐角标叠缩略图左上角；选中态描边 + 微放大
   &__choices {
+    flex-shrink: 0;
     display: flex;
-    gap: 14rpx;
-    width: 100%;
+    gap: 10rpx;
   }
 
   &__choice {
-    flex: 1;
-    min-width: 0;
+    width: 104rpx;
     display: flex;
     flex-direction: column;
-    gap: 6rpx;
-    opacity: 0.62;
-    transition: opacity 0.25s ease;
+    gap: 5rpx;
+    opacity: 0.55;
+    transition: opacity 0.25s ease, transform 0.25s ease;
 
     &--active {
       opacity: 1;
+      transform: scale(1.03);
 
       .plans__choice-thumb {
         border-color: var(--moss);
+        box-shadow: 0 4rpx 12rpx rgba(88, 115, 68, 0.25);
       }
 
       .plans__choice-name {
@@ -290,13 +279,13 @@
 
     &-thumb {
       position: relative;
-      width: 100%;
-      height: 176rpx;
-      border-radius: 14rpx;
+      width: 104rpx;
+      height: 140rpx;
+      border-radius: 12rpx;
       overflow: hidden;
       background: var(--moss-soft);
       border: 3rpx solid transparent;
-      transition: border-color 0.25s ease;
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
     }
 
     &-img {
@@ -306,19 +295,19 @@
 
     &-badge {
       position: absolute;
-      top: 6rpx;
-      left: 6rpx;
+      top: 5rpx;
+      left: 5rpx;
       z-index: 2;
-      padding: 2rpx 10rpx;
+      padding: 1rpx 8rpx;
       border-radius: 999rpx;
       background: var(--moss);
       color: #ffffff;
-      font-size: 17rpx;
+      font-size: 16rpx;
       font-weight: 650;
     }
 
     &-name {
-      font-size: 19rpx;
+      font-size: 18rpx;
       color: var(--ink-2);
       text-align: center;
       white-space: nowrap;
@@ -347,6 +336,12 @@
       text-align: center;
       font-size: 20rpx;
       color: var(--ink-3);
+    }
+
+    // 本页 CTA 提亮：苔绿 → 亮绿渐变 + 光晕，年轻时尚感
+    .primary-button--solid {
+      background: linear-gradient(92deg, #47602f 0%, #6d8a52 55%, #7fa35e 100%);
+      box-shadow: 0 10rpx 28rpx rgba(88, 115, 68, 0.38);
     }
   }
 }

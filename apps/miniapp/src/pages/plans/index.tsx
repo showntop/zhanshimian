@@ -29,7 +29,7 @@ const SCENE_TABS = [
 const NAV = getNavMetrics()
 const HEADER_GAP_PX = 24 // spacer margin-bottom 48rpx
 const TABS_PX = 40 // 场景 tab 行 + 容器间距
-const CHOICES_PX = 190 // 选择面板卡（缩略图 176rpx + 名称 + 分隔 + 方案名 + chips + 卡内边距）
+const CHOICES_PX = 110 // 选择面板卡（紧凑横排：3:4 缩略图簇 + 右侧名称/chips + 卡内边距）
 const CTA_RESERVE_PX = 108 // 吸底 CTA（按钮 + 说明 + 安全区余量），防遮挡三选一条
 const HERO_PX = Math.max(
   340,
@@ -293,13 +293,13 @@ export default function Plans() {
           <View className="plans__hero-frame" style={{ height: `${HERO_PX}px` }} key={plan?.id}>
             <CompareSlider
               single={!currentImage || !planImage || scene !== 'general'}
-              current={<ExampleImage className="plans__hero-img" src={currentImage} user mode="widthFix" />}
+              current={<ExampleImage className="plans__hero-img" src={currentImage} user mode="aspectFit" />}
               plan={
                 <ExampleImage
                   className="plans__hero-img"
                   src={planImage}
                   badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
-                  mode="widthFix"
+                  mode="aspectFit"
                 />
               }
             />
@@ -313,9 +313,8 @@ export default function Plans() {
           </View>
         </View>
 
-        {/* 选择面板卡：三选一 + 当前方案名 + 变化点收进同一张卡，
-            避免缩略图/名称/信息卡三个白色元素分离漂浮。
-            缩略图竖版比例 + 苔绿浅底：全照完整展示，无白条感 */}
+        {/* 选择面板卡（紧凑横排）：左侧三张 3:4 缩略图（aspectFit 全照），
+            右侧当前方案名 + 变化点 chips。高度压缩一半，空间让位给 hero */}
         <View className="plans__chooser fade-up delay-1">
           <View className="plans__choices">
             {plans.map((item, i) => (
@@ -337,8 +336,7 @@ export default function Plans() {
             ))}
           </View>
           {plan ? (
-            <View className="plans__chooser-foot">
-              <View className="plans__chooser-divider" />
+            <View className="plans__chooser-info">
               <Text className="plans__name">{plan.name}</Text>
               {(plan.difference_tags ?? []).length > 0 ? (
                 <View className="plans__diffs">
