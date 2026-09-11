@@ -179,45 +179,45 @@
     pointer-events: none;
   }
 
-  // 顶部「最优优先级」绿色胶囊：全局最优先建议，浮在每张图顶部
+  // 「最优优先级」绿色胶囊：移到 hero 底部（胶片条上方），不再遮挡人脸
   &__priority-tag {
     position: absolute;
-    top: 40rpx;
+    bottom: 110rpx;
     left: 50%;
     transform: translateX(-50%);
     z-index: 5;
-    padding: 12rpx 28rpx;
+    padding: 10rpx 24rpx;
     border-radius: 999rpx;
     background: var(--moss);
     color: #ffffff;
     box-shadow: 0 6rpx 18rpx rgba(31, 34, 30, 0.18);
   }
   &__priority-tag-text {
-    font-size: 22rpx;
+    font-size: 20rpx;
     font-weight: 700;
     letter-spacing: 2rpx;
   }
 
-  // 左右两列常显胶囊：标题 + 副标题
+  // 左右两列常显胶囊：只显示标签一行（副标题在下方卡片），缩小避免遮挡人物
   &__tag {
     position: absolute;
     z-index: 4;
-    width: 220rpx;
-    padding: 12rpx 20rpx;
-    border-radius: 24rpx;
+    width: 180rpx;
+    padding: 10rpx 16rpx;
+    border-radius: 20rpx;
     text-align: center;
-    box-shadow: 0 6rpx 18rpx rgba(31, 34, 30, 0.2);
+    box-shadow: 0 4rpx 14rpx rgba(31, 34, 30, 0.18);
     pointer-events: auto;
     transition: transform 0.18s cubic-bezier(.2, .8, .2, 1), background 0.18s ease, color 0.18s ease;
 
     &--left {
-      left: 24rpx;
-      background: rgba(255, 255, 255, 0.95);
+      left: 16rpx;
+      background: rgba(255, 255, 255, 0.92);
       color: var(--ink);
     }
     &--right {
-      right: 24rpx;
-      background: rgba(31, 34, 30, 0.88);
+      right: 16rpx;
+      background: rgba(31, 34, 30, 0.85);
       color: #ffffff;
     }
     &--active {
@@ -228,46 +228,33 @@
   }
   &__tag-label {
     display: block;
-    font-size: 22rpx;
+    font-size: 20rpx;
     font-weight: 700;
-    line-height: 1.25;
+    line-height: 1.3;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  &__tag-detail {
-    display: block;
-    margin-top: 6rpx;
-    font-size: 18rpx;
-    font-weight: 400;
-    line-height: 1.35;
-    opacity: 0.75;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-align: left;
-  }
 
-  // 引导线：从胶囊外缘到 anchor 端点的细线
+  // 引导线：从胶囊外缘到 anchor 端点的细线（加粗到 3rpx，长距离下可见）
   &__leader {
     position: absolute;
-    height: 2rpx;
-    background: rgba(255, 255, 255, 0.55);
+    height: 3rpx;
+    background: rgba(255, 255, 255, 0.6);
     transform-origin: 0 50%;
     z-index: 3;
   }
   // anchor 端点：白色小圆点，苔绿描边
   &__anchor-dot {
     position: absolute;
-    width: 14rpx;
-    height: 14rpx;
+    width: 16rpx;
+    height: 16rpx;
     border-radius: 999rpx;
     background: rgba(255, 255, 255, 0.95);
-    border: 2rpx solid var(--moss);
+    border: 3rpx solid var(--moss);
     transform: translate(-50%, -50%);
     z-index: 4;
-    box-shadow: 0 2rpx 6rpx rgba(31, 34, 30, 0.25);
+    box-shadow: 0 2rpx 8rpx rgba(31, 34, 30, 0.3);
   }
 
   &__section {

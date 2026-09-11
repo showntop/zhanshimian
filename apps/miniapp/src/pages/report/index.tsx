@@ -222,16 +222,18 @@ export default function Report() {
               const leftLayout = layoutSide(kindFindings.filter((f) => (f.anchor_x ?? 0.5) < 0.5))
               const rightLayout = layoutSide(kindFindings.filter((f) => (f.anchor_x ?? 0.5) >= 0.5))
               const dims = photoDims[kind]
-              // 标签几何：左右两列各 220rpx 宽，胶囊高度固定 92rpx（标签 + 副标题两行）
-              const CAP_W = 220
-              const CAP_H = 92
+              // 标签几何：胶囊缩小到 180rpx，只显示标签一行（副标题在下方卡片），
+              // 避免大面积遮挡人物；引导线起点加胶囊边距偏移。
+              const CAP_W = 180
+              const CAP_H = 56
+              const EDGE = 16
               const renderTag = (item: { finding: Finding; topPct: number }, side: 'left' | 'right') => {
                 const f = item.finding
                 const ax = f.anchor_x ?? 0.5
                 const ay = f.anchor_y ?? 0.5
                 const a = anchorInFrame(dims, ax, ay)
-                // 引导线起点：胶囊面向照片那一侧的中点
-                const startX = side === 'left' ? CAP_W : HERO_FULL_W - CAP_W
+                // 引导线起点：胶囊面向照片那一侧的中点（含边距偏移）
+                const startX = side === 'left' ? EDGE + CAP_W : HERO_FULL_W - EDGE - CAP_W
                 const centerY = (item.topPct / 100) * HERO_H + CAP_H / 2
                 const dx = a.x - startX
                 const dy = a.y - centerY
@@ -262,7 +264,6 @@ export default function Report() {
                       onClick={() => tapAnchor(f)}
                     >
                       <Text className="report__tag-label">{f.label}</Text>
-                      {f.detail ? <Text className="report__tag-detail">{f.detail}</Text> : null}
                     </View>
                   </View>
                 )
@@ -298,7 +299,7 @@ export default function Report() {
                     <Text className={providerIsDemo ? 'report__provider report__provider--demo' : 'report__provider'}>
                       {providerIsDemo ? REPORT_COPY.demoMark : REPORT_COPY.aiMark}
                     </Text>
-                    {/* 顶部「最优优先级」绿色 tag：全局建议，浮在每张图顶部 */}
+                    {/* 「最优优先级」绿色 tag 移到 hero 底部（胶片条上方），不再遮挡人脸 */}
                     {report.priority_title ? (
                       <View className="report__priority-tag">
                         <Text className="report__priority-tag-text">{REPORT_COPY.priorityBadge}</Text>
