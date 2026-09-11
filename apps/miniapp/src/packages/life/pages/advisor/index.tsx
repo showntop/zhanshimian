@@ -1,8 +1,8 @@
-// 私人顾问：会话恢复 + 快捷问 + 乐观发送（失败回滚）+ 动作应用。
-import { useCallback, useEffect, useState } from 'react'
+// 形象助手：会话恢复 + 快捷问 + 乐观发送（失败回滚）+ 动作应用。
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Input, ScrollView, Text, View } from '@tarojs/components'
-import { trackEvent, type AdvisorMessage } from '@zsm/core'
+import { ADVISOR_COPY, trackEvent, type AdvisorMessage } from '@zsm/core'
 import { api } from '../../../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
@@ -16,6 +16,7 @@ export default function Advisor() {
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [scrollKey, setScrollKey] = useState('')
+  const skipFirstShow = useRef(true)
 
   const restore = useCallback(async () => {
     const conversationId = readStorage(STORAGE_KEYS.advisorConversationId)
@@ -37,11 +38,14 @@ export default function Advisor() {
   }, [restore])
 
   useDidShow(() => {
+    if (skipFirstShow.current) {
+      skipFirstShow.current = false
+      return
+    }
     restore()
   })
 
   const scrollToEnd = () => {
-    // 值不变不滚动：先清再设
     setScrollKey('')
     setTimeout(() => setScrollKey('advisor-end'), 50)
   }
@@ -51,7 +55,10 @@ export default function Advisor() {
     if (!text || busy) return
     setBusy(true)
     const localId = `local-${Date.now()}`
-    setMessages((prev) => [...prev, { id: localId, conversation_id: '', role: 'user', content: text, actions: [], created_at: new Date().toISOString() }])
+    setMessages((prev) => [
+      ...prev,
+      { id: localId, conversation_id: '', role: 'user', content: text, actions: [], created_at: new Date().toISOString() },
+    ])
     setInput('')
     scrollToEnd()
     try {
@@ -62,11 +69,15 @@ export default function Advisor() {
         report_id: readStorage(STORAGE_KEYS.reportId) || undefined,
       })
       writeStorage(STORAGE_KEYS.advisorConversationId, reply.conversation_id)
-      setMessages((prev) => prev.filter((m) => m.id !== localId).concat(reply))
+      // 接口只回助手一条；本地用户气泡保留，只补上 conversation_id
+      setMessages((prev) =>
+        prev
+          .map((m) => (m.id === localId ? { ...m, conversation_id: reply.conversation_id } : m))
+          .concat(reply),
+      )
       trackEvent('advisor_message_send', {})
       scrollToEnd()
     } catch (e) {
-      // 失败回滚本地乐观消息并还原输入
       setMessages((prev) => prev.filter((m) => m.id !== localId))
       setInput(text)
       Taro.showToast({ title: (e as Error).message || '发送没有成功，请重试', icon: 'none' })
@@ -93,14 +104,14 @@ export default function Advisor() {
   }
 
   return (
-    <View className="page">
-      <AppHeader title="私人顾问" back />
+    <View className="page page--advisor">
+      <AppHeader title={ADVISOR_COPY.title} back />
       <View className="adv">
-        <ScrollView className="adv__list" scrollY scrollIntoView={scrollKey || undefined}>
+        <ScrollView className="adv__list" scrollY scrollIntoView={scrollKey || undefined} enhanced showScrollbar={false}>
           {!loaded ? null : messages.length === 0 ? (
             <View className="adv__empty fade-up">
-              <Text className="adv__empty-title">有什么形象问题，直接问</Text>
-              <Text className="adv__empty-desc">我会结合你的档案、今日方案和衣橱给建议。</Text>
+              <Text className="adv__empty-title">{ADVISOR_COPY.emptyTitle}</Text>
+              <Text className="adv__empty-desc">{ADVISOR_COPY.emptyDesc}</Text>
             </View>
           ) : (
             messages.map((message) => (
@@ -134,29 +145,31 @@ export default function Advisor() {
           <View id="advisor-end" />
         </ScrollView>
 
-        <View className="adv__suggests">
-          <ScrollView scrollX enhanced showScrollbar={false}>
-            <View className="adv__suggest-row">
-              {SUGGESTIONS.map((q) => (
-                <Text key={q} className="adv__suggest pressable" onClick={() => send(q)}>
-                  {q}
-                </Text>
-              ))}
+        <View className="adv__dock">
+          <View className="adv__suggests">
+            <ScrollView scrollX enhanced showScrollbar={false}>
+              <View className="adv__suggest-row">
+                {SUGGESTIONS.map((q) => (
+                  <Text key={q} className="adv__suggest pressable" onClick={() => send(q)}>
+                    {q}
+                  </Text>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+          <View className="adv__inputbar">
+            <Input
+              className="adv__input"
+              placeholder={ADVISOR_COPY.placeholder}
+              value={input}
+              confirmType="send"
+              adjustPosition
+              onInput={(e: { detail: { value: string } }) => setInput(e.detail.value)}
+              onConfirm={() => send(input)}
+            />
+            <View className={`adv__send ${input && !busy ? '' : 'adv__send--off'}`} onClick={() => send(input)}>
+              <Text>{ADVISOR_COPY.send}</Text>
             </View>
-          </ScrollView>
-        </View>
-
-        <View className="adv__inputbar">
-          <Input
-            className="adv__input"
-            placeholder="问点什么…"
-            value={input}
-            confirmType="send"
-            onInput={(e: { detail: { value: string } }) => setInput(e.detail.value)}
-            onConfirm={() => send(input)}
-          />
-          <View className={`adv__send ${input && !busy ? '' : 'adv__send--off'}`} onClick={() => send(input)}>
-            <Text>发送</Text>
           </View>
         </View>
       </View>

@@ -1,12 +1,11 @@
-// 方案详情：步骤 tabs（发型/妆容/穿搭）+ 前后对比 + G2 发型师参考卡 +
-// 选定 → 生成清单。
+// 方案详情：照片铺满整屏，文案从底部奶油渐变融进画面。
 import { useCallback, useEffect, useState } from 'react'
 import Taro, { useLoad } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
-import type { Plan } from '@zsm/core'
+import { PLAN_DETAIL_COPY, type Plan } from '@zsm/core'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
-import AppHeader from '../../components/app-header'
+import AppHeader, { getNavMetrics } from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
 import ExampleImage from '../../components/example-image'
 import CompareSlider from '../../components/compare-slider'
@@ -20,6 +19,8 @@ const CATEGORIES = [
   { key: 'makeup', label: '妆容' },
   { key: 'outfit', label: '穿搭' },
 ] as const
+
+const NAV = getNavMetrics()
 
 /** 发型师参考卡参数（G2）：来自方案步骤 details 的 hair_spec；缺失则隐藏入口。 */
 interface HairSpec {
@@ -58,7 +59,7 @@ export default function PlanDetail() {
     try {
       const item = await api.getPlan(planId)
       setPlan(item)
-      // 对比底图：报告当前形象
+      if (item.current_image_url) setCurrentImage(item.current_image_url)
       const reportId = readStorage(STORAGE_KEYS.reportId)
       if (reportId) {
         const analysis = await api
@@ -79,9 +80,22 @@ export default function PlanDetail() {
     load()
   }, [load])
 
+  useEffect(() => {
+    if (!plan?.steps?.length) return
+    if (plan.steps.some((item) => item.category === active)) return
+    const first = plan.steps[0]
+    if (first) setActive(first.category)
+  }, [plan, active])
+
   const hairSpec = pickHairSpec(plan)
-  const step = plan?.steps?.find((s) => s.category === active)
+  const tabs = CATEGORIES.filter((cat) => (plan?.steps ?? []).some((item) => item.category === cat.key))
+  const step = plan?.steps?.find((item) => item.category === active) ?? plan?.steps?.[0]
   const planImage = plan?.generated_image_url || plan?.image_url
+  const isDemoLook = (plan?.look_provider ?? '').startsWith('demo')
+  const specItems: { key: string; label: string; value: string }[] = []
+  if (hairSpec?.length) specItems.push({ key: 'length', label: PLAN_DETAIL_COPY.specLength, value: hairSpec.length })
+  if (hairSpec?.fringe) specItems.push({ key: 'fringe', label: PLAN_DETAIL_COPY.specFringe, value: hairSpec.fringe })
+  if (hairSpec?.texture) specItems.push({ key: 'texture', label: PLAN_DETAIL_COPY.specTexture, value: hairSpec.texture })
 
   const selectAndContinue = async () => {
     if (!plan) return
@@ -99,7 +113,6 @@ export default function PlanDetail() {
   }
 
   const saveReferenceCard = () => {
-    // 参考卡即方案形象图：保存到相册供发型师查看
     const url = planImage
     if (!url) {
       Taro.showToast({ title: '参考图暂不可用', icon: 'none' })
@@ -121,7 +134,7 @@ export default function PlanDetail() {
   if (loading) {
     return (
       <View className="page">
-        <AppHeader title="方案详情" back />
+        <AppHeader title={PLAN_DETAIL_COPY.title} back />
         <Skeleton rows={5} />
       </View>
     )
@@ -130,68 +143,80 @@ export default function PlanDetail() {
   if (failed || !plan) {
     return (
       <View className="page">
-        <AppHeader title="方案详情" back />
+        <AppHeader title={PLAN_DETAIL_COPY.title} back />
         <ErrorState onRetry={load} />
       </View>
     )
   }
 
   return (
-    <View className="page">
-      <AppHeader title="方案详情" back />
-      <View className="pd">
-        <View className="pd__hero fade-up">
+    <View className="page page--plan">
+      <AppHeader title={PLAN_DETAIL_COPY.title} back transparent />
+      <View className="pd" style={{ ['--pd-nav' as string]: `${NAV.navHeight}px` }}>
+        <View className="pd__hero">
           <View className="pd__hero-frame">
             <CompareSlider
               single={!currentImage}
-              current={<ExampleImage className="pd__hero-img" src={currentImage} user />}
+              current={<ExampleImage className="pd__hero-img" src={currentImage} user mode="aspectFill" />}
               plan={
                 <ExampleImage
                   className="pd__hero-img"
                   src={planImage}
-                  badgeText={(plan.look_provider ?? '').startsWith('demo') ? '效果示例' : 'AI 风格预览'}
+                  badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
+                  mode="aspectFill"
                 />
               }
             />
           </View>
         </View>
 
-        <View className="pd__head fade-up delay-1">
-          <Text className="pd__eyebrow">你选择了</Text>
-          <Text className="pd__name">{plan.name}</Text>
-          <Text className="pd__summary">{plan.descriptor}</Text>
-        </View>
-
-        <View className="pd__tabs fade-up delay-2">
-          {CATEGORIES.map((cat) => (
-            <Text
-              key={cat.key}
-              className={`pd__tab ${active === cat.key ? 'pd__tab--active' : ''}`}
-              onClick={() => setActive(cat.key)}
-            >
-              {cat.label}
-            </Text>
-          ))}
-        </View>
-
-        {step ? (
-          <View className="pd__step fade-up delay-2">
-            <Text className="pd__step-title">{step.title}</Text>
-            <Text className="pd__step-summary">{step.summary}</Text>
+        <View className="pd__board fade-up">
+          <View className="pd__head">
+            <Text className="pd__series">{plan.name}</Text>
+            {tabs.length > 1 ? (
+              <View className="pd__tabs">
+                {tabs.map((cat) => (
+                  <Text
+                    key={cat.key}
+                    className={`pd__tab ${active === cat.key ? 'pd__tab--active' : ''}`}
+                    onClick={() => setActive(cat.key)}
+                  >
+                    {cat.label}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
           </View>
-        ) : (
-          <View className="pd__step pd__step--empty">
-            <Text className="pd__step-summary">这一步暂无内容</Text>
-          </View>
-        )}
 
-        <View className="pd__foot fade-up delay-3">
-          <PrimaryButton text="生成执行清单" loading={busy} onClick={selectAndContinue} />
-          {hairSpec ? (
-            <Text className="pd__salon-link pressable" onClick={() => setSheetOpen(true)}>
-              分享给发型师 · 查看参考卡
-            </Text>
+          {specItems.length > 0 ? (
+            <View className="pd__spec-line">
+              {specItems.map((item, i) => (
+                <View key={item.key} className="pd__spec-item">
+                  {i > 0 ? <Text className="pd__spec-dot">·</Text> : null}
+                  <Text className="pd__spec-k">{item.label}</Text>
+                  <Text className="pd__spec-v">{item.value}</Text>
+                </View>
+              ))}
+            </View>
           ) : null}
+
+          {step ? (
+            <View className="pd__step">
+              <Text className="pd__display">{step.title}</Text>
+              {step.summary ? <Text className="pd__body">{step.summary}</Text> : null}
+            </View>
+          ) : (
+            <Text className="pd__body">{plan.descriptor || PLAN_DETAIL_COPY.emptyStep}</Text>
+          )}
+
+          <View className="pd__foot">
+            <PrimaryButton text={PLAN_DETAIL_COPY.cta} loading={busy} onClick={selectAndContinue} />
+            {hairSpec ? (
+              <Text className="pd__salon-link pressable" onClick={() => setSheetOpen(true)}>
+                {PLAN_DETAIL_COPY.salon}
+              </Text>
+            ) : null}
+          </View>
         </View>
       </View>
 
@@ -205,24 +230,24 @@ export default function PlanDetail() {
           <ExampleImage
             className="pd__sheet-img"
             src={planImage}
-            badgeText={(plan.look_provider ?? '').startsWith('demo') ? '效果示例' : 'AI 风格预览'}
+            badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
           />
           <View className="pd__spec">
             {hairSpec?.length ? (
               <View className="pd__spec-row">
-                <Text className="pd__spec-key">长度</Text>
+                <Text className="pd__spec-key">{PLAN_DETAIL_COPY.specLength}</Text>
                 <Text className="pd__spec-val">{hairSpec.length}</Text>
               </View>
             ) : null}
             {hairSpec?.fringe ? (
               <View className="pd__spec-row">
-                <Text className="pd__spec-key">刘海</Text>
+                <Text className="pd__spec-key">{PLAN_DETAIL_COPY.specFringe}</Text>
                 <Text className="pd__spec-val">{hairSpec.fringe}</Text>
               </View>
             ) : null}
             {hairSpec?.texture ? (
               <View className="pd__spec-row">
-                <Text className="pd__spec-key">卷度</Text>
+                <Text className="pd__spec-key">{PLAN_DETAIL_COPY.specTexture}</Text>
                 <Text className="pd__spec-val">{hairSpec.texture}</Text>
               </View>
             ) : null}

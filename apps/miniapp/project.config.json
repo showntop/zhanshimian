@@ -13,7 +13,7 @@
     "minifyWXSS": true,
     "minifyWXML": true,
     "urlCheck": false,
-    "ignoreUploadUnusedFiles": true,
+    "ignoreUploadUnusedFiles": false,
     "babelSetting": {
       "ignore": [],
       "disablePlugins": [],
@@ -40,7 +40,12 @@
         "type": "file"
       }
     ],
-    "include": []
+    "include": [
+      {
+        "value": "assets/tabbar",
+        "type": "folder"
+      }
+    ]
   },
   "condition": {},
   "simulatorPluginLibVersion": {},

@@ -21,6 +21,7 @@ const SCENE_TABS = [
   { key: 'wedding', label: '婚礼' },
   { key: 'date', label: '约会' },
   { key: 'daily', label: '日常' },
+  { key: 'gathering', label: '聚会' },
 ] as const
 
 // hero 高度跟随照片比例：三套方案图同一管线产出、宽高比一致，

@@ -61,6 +61,13 @@ func TestValidateScenePlanInput(t *testing.T) {
 	if err := validateScenePlanInput(valid); err == nil {
 		t.Fatal("invalid scene answer should be rejected")
 	}
+
+	gathering := domain.ScenePlanInput{Scene: "gathering", Answers: map[string]string{
+		"activity": "friends", "timing": "evening", "preparation": "closet", "impression": "natural",
+	}}
+	if err := validateScenePlanInput(gathering); err != nil {
+		t.Fatalf("valid gathering brief rejected: %v", err)
+	}
 }
 
 // 旧版散字段（time/budget/formality/impression）不再兼容：新契约 PUT 请求体

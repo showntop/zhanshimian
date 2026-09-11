@@ -43,6 +43,12 @@ const FIELDS: Record<string, Field[]> = {
     { key: 'preparation', label: '准备方式', options: [{ value: 'closet', label: '只用现有衣橱' }, { value: 'key-piece', label: '补一件关键单品' }] },
     { key: 'impression', label: '最想呈现', options: [{ value: 'natural', label: '更自然' }, { value: 'energetic', label: '更有精神' }, { value: 'reliable', label: '更可靠' }] },
   ],
+  gathering: [
+    { key: 'activity', label: '聚会类型', options: [{ value: 'friends', label: '朋友局' }, { value: 'dinner', label: '聚餐' }, { value: 'birthday', label: '生日 / 庆祝' }, { value: 'drinks', label: '酒会 / 酒吧' }] },
+    { key: 'timing', label: '什么时候', options: [{ value: 'afternoon', label: '下午' }, { value: 'evening', label: '傍晚' }, { value: 'night', label: '晚上' }, { value: 'unknown', label: '还没确定' }] },
+    { key: 'preparation', label: '准备方式', options: [{ value: 'closet', label: '只用现有衣橱' }, { value: 'key-piece', label: '补一件关键单品' }, { value: 'complete', label: '可完整准备' }] },
+    { key: 'impression', label: '最想呈现', options: [{ value: 'natural', label: '更自然' }, { value: 'memorable', label: '有记忆点' }, { value: 'energetic', label: '更有精神' }] },
+  ],
 }
 
 export default function Scene() {

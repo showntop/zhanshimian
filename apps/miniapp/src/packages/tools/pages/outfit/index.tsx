@@ -1,10 +1,10 @@
-// 穿搭诊断：场景 3 选 + 单图上传 + 同步诊断（锚点标注）+ 最值得先改的一处。
-// 视觉向发型预览页看齐：照片 hero 先行 → 图下 serif 导语 → 场景 → 单张白卡装结论。
+// 穿搭诊断：场景 3 选 + 单图上传 + 同步诊断（锚点标注）+ 先改哪一处。
+// 空态：照片 hero → 导语 → 场景。结果：照片 → 一句建议 → 观察清单，不套报告卡。
 // 同步请求会跨页存活：模块级 Promise + 本地草稿，退回首页再进入可恢复进行中/结论。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
-import { FINDING_TONE_COPY, OUTFIT_COPY, userImage, type Diagnosis } from '@zsm/core'
+import { OUTFIT_COPY, userImage, type Diagnosis } from '@zsm/core'
 import { api } from '../../../../services/api'
 import {
   clearOutfitResult,
@@ -15,6 +15,7 @@ import {
   runOutfitDiagnose,
   writeOutfitDraft,
 } from '../../../../services/outfit-session'
+import { splitAdviceTitle } from '../../../../services/advice-title'
 import { STORAGE_KEYS, readStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
@@ -260,6 +261,13 @@ export default function Outfit() {
 
   const isDemo = Boolean(demoSlug) || (result?.provider_version ?? '').startsWith('demo')
   const shownUrl = userImage(photoUrl) || userImage(result?.image_url) || photoPath
+  const adviceTitle = result?.priority_title || result?.conclusion || OUTFIT_COPY.title
+  const { lead: adviceLead, action: adviceAction } = splitAdviceTitle(adviceTitle)
+  const adviceBody = result
+    ? result.priority_copy || (result.priority_title ? result.conclusion : '')
+    : ''
+  const keepFindings = (result?.findings ?? []).filter((item) => item.tone === 'positive')
+  const liftFindings = (result?.findings ?? []).filter((item) => item.tone !== 'positive')
 
   // widthFix 原生铺满：相框 = 图框，锚点直接百分比；仅比例适中时启用
   const renderedH = photoDims ? Math.round((HERO_W * photoDims.h) / photoDims.w) : 0
@@ -291,7 +299,7 @@ export default function Outfit() {
   return (
     <View className="page">
       <AppHeader title="穿搭诊断" back />
-      <View className="od">
+      <View className={`od${result ? ' od--done' : ''}`}>
         <View className="od__hero fade-up" style={nativeFill ? { height: 'auto' } : undefined}>
           {demoSlug ? (
             nativeFill ? (
@@ -375,69 +383,62 @@ export default function Outfit() {
           ) : null}
         </View>
 
-        {/* 图下导语：与发型预览页同一位置/同一字阶 */}
-        <View className="od__hint fade-up delay-1">
-          <Text className="od__hint-title">{OUTFIT_COPY.title}</Text>
-          <Text className="od__hint-desc">{OUTFIT_COPY.desc}</Text>
-          {!shownUrl && !demoSlug ? (
-            <Text className="od__hint-tips">{OUTFIT_COPY.uploadTips.join(' · ')}</Text>
-          ) : null}
-        </View>
-
-        {!result ? (
-          <View className="od__context fade-up delay-2">
-            <Text className="od__context-label">{OUTFIT_COPY.sceneLabel}</Text>
-            <View className="od__context-pills">
-              {CONTEXTS.map((c) => (
-                <Pill key={c.key} label={c.label} active={scene === c.key} onClick={() => !busy && setScene(c.key)} />
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {error ? <ErrorState message={error} onRetry={() => analyze(false)} /> : null}
-
         {result ? (
-          <View className="od__result fade-up delay-2">
-            <View className="od__card">
-              <Text className="od__result-kicker">{OUTFIT_COPY.resultKicker}</Text>
-              <Text className="od__conclusion-text display">{result.conclusion}</Text>
-              {result.tags.length > 0 ? (
-                <View className="od__tags">
-                  {result.tags.map((tag) => (
-                    <Text key={tag} className="od__tag">{tag}</Text>
-                  ))}
-                </View>
-              ) : null}
-
-              <View className="od__priority">
-                <Text className="od__priority-kicker">{OUTFIT_COPY.priorityKicker}</Text>
-                <Text className="od__priority-title">{result.priority_title}</Text>
-                <Text className="od__priority-copy">{result.priority_copy}</Text>
-              </View>
-
-              {(result.findings ?? []).length > 0 ? (
-                <View className="od__findings">
-                  <Text className="od__findings-title">{OUTFIT_COPY.findingsTitle}</Text>
-                  {result.findings.map((finding) => (
-                    <View key={`${finding.category}-${finding.label}`} className="od__finding">
-                      <Text className={`od__finding-tone od__finding-tone--${finding.tone || 'optional'}`}>
-                        {FINDING_TONE_COPY[finding.tone] ?? FINDING_TONE_COPY.optional}
-                      </Text>
-                      <Text className="od__finding-label">{finding.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
+          <View className="od__sheet fade-up delay-1">
+            <View className="od__advice">
+              {adviceLead ? <Text className="od__advice-lead">{adviceLead}</Text> : null}
+              <Text className="od__advice-title">{adviceAction}</Text>
+              {adviceBody ? <Text className="od__advice-body">{adviceBody}</Text> : null}
             </View>
+
+            {keepFindings.length > 0 ? (
+              <View className="od__keep">
+                <Text className="od__keep-label">{OUTFIT_COPY.findingsKeep}</Text>
+                <Text className="od__keep-text">{keepFindings.map((item) => item.label).join('、')}</Text>
+              </View>
+            ) : null}
+
+            {liftFindings.length > 0 ? (
+              <View className="od__lifts">
+                <Text className="od__lifts-label">{OUTFIT_COPY.findingsLift}</Text>
+                {liftFindings.map((finding) => (
+                  <Text key={`${finding.category}-${finding.label}`} className="od__lift">
+                    {finding.label}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+
+            {error ? <ErrorState message={error} onRetry={() => analyze(false)} /> : null}
 
             <View className="od__result-actions">
-              <PrimaryButton text={OUTFIT_COPY.save} onClick={saveResult} />
-              <Text className="od__result-alt pressable" onClick={toPlans}>{OUTFIT_COPY.toPlans}</Text>
-              <Text className="od__result-alt pressable" onClick={retryFresh}>{OUTFIT_COPY.again}</Text>
+              <PrimaryButton text={OUTFIT_COPY.toPlans} onClick={toPlans} />
+              <View className="od__result-row">
+                <Text className="od__result-alt pressable" onClick={saveResult}>{OUTFIT_COPY.save}</Text>
+                <Text className="od__result-alt pressable" onClick={retryFresh}>{OUTFIT_COPY.again}</Text>
+              </View>
             </View>
           </View>
-        ) : null}
+        ) : (
+          <>
+            <View className="od__hint fade-up delay-1">
+              <Text className="od__hint-title">{OUTFIT_COPY.title}</Text>
+              <Text className="od__hint-desc">{OUTFIT_COPY.desc}</Text>
+              {!shownUrl && !demoSlug ? (
+                <Text className="od__hint-tips">{OUTFIT_COPY.uploadTips.join(' · ')}</Text>
+              ) : null}
+            </View>
+            <View className="od__context fade-up delay-2">
+              <Text className="od__context-label">{OUTFIT_COPY.sceneLabel}</Text>
+              <View className="od__context-pills">
+                {CONTEXTS.map((c) => (
+                  <Pill key={c.key} label={c.label} active={scene === c.key} onClick={() => !busy && setScene(c.key)} />
+                ))}
+              </View>
+            </View>
+            {error ? <ErrorState message={error} onRetry={() => analyze(false)} /> : null}
+          </>
+        )}
 
         {!result ? (
           <View className="od__foot fade-up delay-3">

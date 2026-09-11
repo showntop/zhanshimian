@@ -1,8 +1,8 @@
-// 购买判断：与穿搭诊断同构、向发型预览页看齐——单品 hero 先行，图下 serif 导语，单卡装结论。
+// 购买判断：与穿搭诊断同构——单品 hero 先行，图下 serif 导语；结论不套报告卡。
 .pk {
   display: flex;
   flex-direction: column;
-  gap: 28rpx;
+  gap: 24rpx;
 
   // ---------- 单品 hero ----------
   &__hero {
@@ -155,205 +155,147 @@
     }
   }
 
-  // ---------- 结论：单张白卡 ----------
-  &__result {
-    display: flex;
-    flex-direction: column;
-    gap: 28rpx;
+  &--done {
+    gap: 0;
 
-    &-kicker {
-      color: var(--moss);
-      font-size: 21rpx;
-      font-weight: 600;
-      letter-spacing: 4rpx;
+    .pk__hero {
+      margin: 0 calc(-1 * var(--page-gutter));
+      height: 720rpx;
+      border-radius: 0;
+      border: none;
     }
 
-    &-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 16rpx;
+    .pk__hero-alt-wrap {
+      top: 28rpx;
+      right: calc(var(--page-gutter) + 8rpx);
+      z-index: 4;
+    }
+
+    .pk__badge {
+      bottom: 108rpx;
+      right: calc(var(--page-gutter) + 8rpx);
     }
   }
 
-  &__card {
+  &__sheet {
+    position: relative;
+    z-index: 3;
     display: flex;
     flex-direction: column;
-    gap: 18rpx;
-    padding: 32rpx;
-    border-radius: var(--radius-md);
-    background: var(--surface);
-    border: 1rpx solid var(--line);
+    gap: 40rpx;
+    margin: -88rpx calc(-1 * var(--page-gutter)) 0;
+    padding: 48rpx var(--page-gutter) 8rpx;
+    background: var(--bg);
+    box-shadow: 0 -20rpx 48rpx rgba(24, 28, 22, 0.1);
   }
 
-  &__conclusion-text {
-    margin: 0;
-    padding: 0;
-    font-size: 36rpx;
-  }
-
-  &__tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12rpx;
-  }
-
-  &__tag {
-    padding: 6rpx 20rpx;
-    border-radius: 999rpx;
-    background: var(--moss-soft);
-    font-size: 20rpx;
-    color: var(--ink-2);
-  }
-
-  // 搭配建议：moss 左边条高亮带（卡内嵌套）
-  &__priority {
+  &__advice {
     display: flex;
     flex-direction: column;
-    gap: 10rpx;
-    margin-top: 6rpx;
-    padding: 28rpx 32rpx;
-    border-radius: var(--radius-md);
-    background: var(--moss-soft);
-    border-left: 6rpx solid var(--moss);
+    gap: 16rpx;
 
-    &-kicker {
-      font-size: 20rpx;
-      font-weight: 600;
-      letter-spacing: 3rpx;
-      color: var(--moss);
+    &-lead {
+      font-size: 22rpx;
+      color: var(--ink-3);
     }
 
     &-title {
       font-family: 'Songti SC', 'STSong', serif;
-      font-size: 32rpx;
+      font-size: 48rpx;
       font-weight: 700;
+      line-height: 1.28;
       color: var(--ink);
     }
 
-    &-copy {
+    &-body {
       font-size: 26rpx;
-      line-height: 1.7;
+      line-height: 1.75;
       color: var(--ink-2);
     }
   }
 
-  // ---------- 适合与注意（卡内列表，发丝线分隔） ----------
-  &__findings {
+  &__keep {
     display: flex;
-    flex-direction: column;
-    margin-top: 6rpx;
-    border-top: 1rpx solid var(--line);
-
-    &-title {
-      padding: 20rpx 0 4rpx;
-      font-size: 22rpx;
-      font-weight: 600;
-      letter-spacing: 3rpx;
-      color: var(--ink-3);
-    }
-  }
-
-  &__finding {
-    display: flex;
-    align-items: center;
-    gap: 18rpx;
-    padding: 20rpx 0;
-    border-bottom: 1rpx solid var(--line);
-
-    &:last-child {
-      border-bottom: none;
-    }
-
-    &-tone {
-      flex: none;
-      padding: 4rpx 16rpx;
-      border-radius: 999rpx;
-      font-size: 20rpx;
-      font-weight: 600;
-
-      &--positive {
-        background: var(--moss);
-        color: #ffffff;
-      }
-
-      &--improve {
-        background: var(--moss-soft);
-        color: var(--moss);
-      }
-
-      &--optional {
-        background: var(--moss-soft);
-        color: var(--ink-2);
-      }
-
-      &--caution {
-        background: rgba(155, 109, 88, 0.12);
-        color: var(--warn);
-      }
-    }
+    align-items: baseline;
+    gap: 16rpx;
 
     &-label {
-      font-size: 26rpx;
-      color: var(--ink);
-    }
-  }
-
-
-  // ---------- 结果预览卡（空态/待诊断时填住下半屏） ----------
-  &__preview {
-    display: flex;
-    flex-direction: column;
-    gap: 4rpx;
-    padding: 28rpx 32rpx;
-    border-radius: var(--radius-md);
-    background: var(--surface);
-    border: 1rpx solid var(--line);
-
-    &-title {
-      padding-bottom: 12rpx;
-      font-size: 22rpx;
-      font-weight: 600;
-      letter-spacing: 3rpx;
-      color: var(--ink-3);
-    }
-
-    &-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 20rpx;
-      padding: 18rpx 0;
-      border-top: 1rpx solid var(--line);
-    }
-
-    &-index {
       flex: none;
-      width: 40rpx;
-      padding-top: 2rpx;
-      font-family: 'Songti SC', 'STSong', serif;
-      font-size: 30rpx;
-      font-weight: 700;
+      font-size: 22rpx;
       color: var(--moss);
     }
 
-    &-copy {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 6rpx;
-      min-width: 0;
-    }
-
-    &-name {
+    &-text {
       font-size: 26rpx;
-      font-weight: 600;
-      color: var(--ink);
+      line-height: 1.5;
+      color: var(--ink-2);
     }
+  }
 
-    &-desc {
+  &__lifts {
+    display: flex;
+    flex-direction: column;
+    gap: 20rpx;
+
+    &-label {
       font-size: 22rpx;
-      line-height: 1.6;
       color: var(--ink-3);
     }
+  }
+
+  &__lift {
+    font-size: 32rpx;
+    font-weight: 600;
+    line-height: 1.45;
+    color: var(--ink);
+  }
+
+  &__badge {
+    position: absolute;
+    bottom: 20rpx;
+    right: 20rpx;
+    padding: 8rpx 20rpx;
+    border-radius: 999rpx;
+    background: var(--badge);
+    color: #ffffff;
+    font-size: 18rpx;
+  }
+
+  &__mask {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20rpx;
+    background: rgba(248, 245, 240, 0.72);
+
+    &-spin {
+      width: 48rpx;
+      height: 48rpx;
+      border-width: 4rpx;
+    }
+
+    &-text {
+      font-size: 24rpx;
+      color: var(--ink);
+    }
+  }
+
+  &__result-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    padding-top: 8rpx;
+  }
+
+  &__result-alt {
+    padding: 20rpx 8rpx;
+    text-align: center;
+    font-size: 24rpx;
+    color: var(--moss);
   }
 
   // ---------- 底部操作 ----------
@@ -372,13 +314,6 @@
       padding: 20rpx 8rpx;
       font-size: 24rpx;
       color: var(--moss);
-    }
-
-    &-note {
-      padding-bottom: 16rpx;
-      text-align: center;
-      font-size: 20rpx;
-      color: var(--ink-3);
     }
   }
 }

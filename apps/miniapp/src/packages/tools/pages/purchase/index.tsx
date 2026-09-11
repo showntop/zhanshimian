@@ -1,18 +1,27 @@
-// 购买判断：商品图上传 + 同步诊断（结论/搭配建议/适合与注意）+ 保存。
-// 视觉向发型预览页看齐：单品 hero 先行 → 图下 serif 导语 → 单张白卡装结论。
-import { useState } from 'react'
-import Taro from '@tarojs/taro'
+// 购买判断：单品图上传 + 同步诊断。空态不堆预览卡；结果是一句判断，不套报告卡。
+// 同步请求会跨页存活：模块级 Promise + 本地草稿，退回首页再进入可恢复进行中/结论。
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
-import { FINDING_TONE_COPY, PURCHASE_COPY, userImage, type Diagnosis } from '@zsm/core'
+import { PURCHASE_COPY, userImage, type Diagnosis } from '@zsm/core'
 import { api } from '../../../../services/api'
+import {
+  clearPurchaseResult,
+  getPurchaseInflight,
+  markPurchaseDone,
+  markPurchasePending,
+  readPurchaseSession,
+  runPurchaseDiagnose,
+  writePurchaseDraft,
+} from '../../../../services/purchase-session'
+import { splitAdviceTitle } from '../../../../services/advice-title'
+import { STORAGE_KEYS, readStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
 import ExampleImage from '../../../../components/example-image'
 import ErrorState from '../../../../components/error-state'
 import './index.scss'
 
-// 照片渲染高落在 [NATIVE_MIN_H, NATIVE_MAX_H] 时用 widthFix 原生铺满
-// （相框高度跟随照片，零裁切），超范围回落定框 + 模糊衬底。
 const HERO_W = 686
 const NATIVE_MIN_H = 480
 const NATIVE_MAX_H = 1080
@@ -24,8 +33,100 @@ export default function Purchase() {
   const [result, setResult] = useState<Diagnosis | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  // 所选/示例照片真实宽高：决定是否可 widthFix 原生铺满
   const [photoDims, setPhotoDims] = useState<{ w: number; h: number } | null>(null)
+
+  const resumingRef = useRef(false)
+  const freshStartRef = useRef(false)
+
+  const applySession = useCallback((item: Diagnosis) => {
+    setResult(item)
+    if (item.image_url) setPhotoUrl(item.image_url)
+    if ((item.provider_version ?? '').startsWith('demo')) setDemoSlug((prev) => prev || 'warm')
+  }, [])
+
+  const hydrateDraft = (stored: ReturnType<typeof readPurchaseSession>) => {
+    if (!stored) return
+    if (stored.photoPath) setPhotoPath(stored.photoPath)
+    if (stored.photoUrl) setPhotoUrl(stored.photoUrl)
+    if (stored.demoSlug) setDemoSlug(stored.demoSlug)
+  }
+
+  const resume = useCallback(async () => {
+    if (resumingRef.current) return
+    resumingRef.current = true
+    try {
+      const stored = readPurchaseSession()
+      hydrateDraft(stored)
+      if (stored?.result) applySession(stored.result)
+
+      const pending = getPurchaseInflight()
+      if (pending) {
+        setBusy(true)
+        setError('')
+        try {
+          applySession(await pending)
+        } catch (e) {
+          setError((e as Error).message || '判断没有成功，请重试')
+        } finally {
+          setBusy(false)
+        }
+        return
+      }
+
+      if (stored?.pending && stored.mediaId) {
+        setBusy(true)
+        setError('')
+        try {
+          try {
+            const latest = await api.getLatestDiagnosis('purchase')
+            const startedAt = stored.startedAt || 0
+            const recentEnough = new Date(latest.created_at).getTime() >= startedAt - 5000
+            const sameMedia = !stored.mediaId || !latest.media_id || stored.mediaId === latest.media_id
+            if (recentEnough && sameMedia) {
+              markPurchaseDone(latest)
+              applySession(latest)
+              return
+            }
+          } catch {
+            /* 服务端还没有这条结论：用同一张图续跑判断 */
+          }
+          const item = await runPurchaseDiagnose(() =>
+            api.diagnose({
+              kind: 'purchase',
+              media_id: stored.mediaId,
+              report_id: readStorage(STORAGE_KEYS.reportId) || undefined,
+            }),
+          )
+          applySession(item)
+        } catch (e) {
+          setError((e as Error).message || '判断没有成功，请重试')
+        } finally {
+          setBusy(false)
+        }
+        return
+      }
+
+      if (stored?.result || freshStartRef.current) return
+
+      try {
+        const latest = await api.getLatestDiagnosis('purchase')
+        markPurchaseDone(latest)
+        applySession(latest)
+      } catch {
+        /* 旧服务 405 / 还没有判断过：保持开始页 */
+      }
+    } finally {
+      resumingRef.current = false
+    }
+  }, [applySession])
+
+  useEffect(() => {
+    resume()
+  }, [resume])
+
+  useDidShow(() => {
+    resume()
+  })
 
   const choosePhoto = () => {
     Taro.chooseMedia({
@@ -40,41 +141,73 @@ export default function Purchase() {
           setPhotoUrl('')
           setDemoSlug('')
           setResult(null)
+          setPhotoDims(null)
+          freshStartRef.current = true
+          writePurchaseDraft({
+            pending: false,
+            photoPath: file.tempFilePath,
+            photoUrl: '',
+            demoSlug: '',
+            mediaId: '',
+            result: null,
+          })
         }
       },
     })
   }
 
-  const readReportId = (): string | undefined => {
-    try {
-      return Taro.getStorageSync('zsm_report_id') || undefined
-    } catch {
-      return undefined
-    }
-  }
-
   const analyze = async (demo = false) => {
+    if (getPurchaseInflight() || busy) return
     setBusy(true)
     setError('')
     try {
       let mediaId: string
+      let nextDemo = ''
+      let nextUrl = photoUrl
+      let nextPath = photoPath
       if (demo) {
-        mediaId = (await api.createDemoMedia('product')).id
+        const asset = await api.createDemoMedia('product')
+        mediaId = asset.id
+        nextDemo = 'warm'
+        nextUrl = asset.url
+        nextPath = ''
         setPhotoDims(null)
-        setDemoSlug('warm')
-        setPhotoUrl('')
+        setDemoSlug(nextDemo)
+        setPhotoUrl(nextUrl)
         setPhotoPath('')
       } else {
-        if (!photoPath) {
+        if (!photoPath && !photoUrl) {
           Taro.showToast({ title: '先上传商品图', icon: 'none' })
           return
         }
-        const asset = await api.uploadMedia({ kind: 'product', filePath: photoPath })
-        mediaId = asset.id
-        setPhotoUrl(asset.url)
+        if (photoPath) {
+          const asset = await api.uploadMedia({ kind: 'product', filePath: photoPath })
+          mediaId = asset.id
+          nextUrl = asset.url
+          setPhotoUrl(asset.url)
+        } else {
+          const stored = readPurchaseSession()
+          if (!stored?.mediaId) {
+            Taro.showToast({ title: '先上传商品图', icon: 'none' })
+            return
+          }
+          mediaId = stored.mediaId
+        }
       }
-      const item = await api.diagnose({ kind: 'purchase', media_id: mediaId, report_id: readReportId() })
-      setResult(item)
+      markPurchasePending({
+        photoPath: nextPath,
+        photoUrl: nextUrl,
+        demoSlug: nextDemo,
+        mediaId,
+      })
+      const item = await runPurchaseDiagnose(() =>
+        api.diagnose({
+          kind: 'purchase',
+          media_id: mediaId,
+          report_id: readStorage(STORAGE_KEYS.reportId) || undefined,
+        }),
+      )
+      applySession(item)
     } catch (e) {
       setError((e as Error).message || '判断没有成功，请重试')
     } finally {
@@ -92,14 +225,29 @@ export default function Purchase() {
     }
   }
 
-  const shownUrl = userImage(photoUrl) || photoPath
+  const retryFresh = () => {
+    freshStartRef.current = true
+    clearPurchaseResult()
+    setResult(null)
+    setError('')
+  }
+
+  const isDemo = Boolean(demoSlug) || (result?.provider_version ?? '').startsWith('demo')
+  const shownUrl = userImage(photoUrl) || userImage(result?.image_url) || photoPath
+  const adviceTitle = result?.priority_title || result?.conclusion || PURCHASE_COPY.title
+  const { lead: adviceLead, action: adviceAction } = splitAdviceTitle(adviceTitle)
+  const adviceBody = result
+    ? result.priority_copy || (result.priority_title ? result.conclusion : '')
+    : ''
+  const keepFindings = (result?.findings ?? []).filter((item) => item.tone === 'positive')
+  const liftFindings = (result?.findings ?? []).filter((item) => item.tone !== 'positive')
   const renderedH = photoDims ? Math.round((HERO_W * photoDims.h) / photoDims.w) : 0
   const nativeFill = Boolean(photoDims) && renderedH >= NATIVE_MIN_H && renderedH <= NATIVE_MAX_H
 
   return (
     <View className="page">
       <AppHeader title="购买判断" back />
-      <View className="pk">
+      <View className={`pk${result ? ' pk--done' : ''}`}>
         <View className="pk__hero fade-up" style={nativeFill ? { height: 'auto' } : undefined}>
           {demoSlug ? (
             nativeFill ? (
@@ -157,82 +305,75 @@ export default function Purchase() {
               <Text className="pk__hero-alt pressable" onClick={choosePhoto}>{PURCHASE_COPY.reselect}</Text>
             </View>
           ) : null}
-        </View>
-
-        {/* 图下导语：与发型预览页同一位置/同一字阶 */}
-        <View className="pk__hint fade-up delay-1">
-          <Text className="pk__hint-title">{PURCHASE_COPY.title}</Text>
-          <Text className="pk__hint-desc">{PURCHASE_COPY.desc}</Text>
-          {!shownUrl && !demoSlug ? (
-            <Text className="pk__hint-tips">{PURCHASE_COPY.uploadTips.join(' · ')}</Text>
+          {busy ? (
+            <View className="pk__mask">
+              <View className="pk__mask-spin spinner" />
+              <Text className="pk__mask-text">{PURCHASE_COPY.busyHint}</Text>
+            </View>
+          ) : null}
+          {isDemo && !busy ? (
+            <View className="pk__badge">
+              <Text>效果示例</Text>
+            </View>
           ) : null}
         </View>
 
-        {error ? <ErrorState message={error} onRetry={() => analyze(false)} /> : null}
-
         {result ? (
-          <View className="pk__result fade-up delay-2">
-            <View className="pk__card">
-              <Text className="pk__result-kicker">{PURCHASE_COPY.resultKicker}</Text>
-              <Text className="pk__conclusion-text display">{result.conclusion}</Text>
-              {result.tags.length > 0 ? (
-                <View className="pk__tags">
-                  {result.tags.map((tag) => (
-                    <Text key={tag} className="pk__tag">{tag}</Text>
-                  ))}
-                </View>
-              ) : null}
-
-              <View className="pk__priority">
-                <Text className="pk__priority-kicker">{PURCHASE_COPY.priorityKicker}</Text>
-                <Text className="pk__priority-title">{result.priority_title}</Text>
-                <Text className="pk__priority-copy">{result.priority_copy}</Text>
-              </View>
-
-              {(result.findings ?? []).length > 0 ? (
-                <View className="pk__findings">
-                  <Text className="pk__findings-title">{PURCHASE_COPY.findingsTitle}</Text>
-                  {result.findings.map((finding) => (
-                    <View key={`${finding.category}-${finding.label}`} className="pk__finding">
-                      <Text className={`pk__finding-tone pk__finding-tone--${finding.tone || 'optional'}`}>
-                        {FINDING_TONE_COPY[finding.tone] ?? FINDING_TONE_COPY.optional}
-                      </Text>
-                      <Text className="pk__finding-label">{finding.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
+          <View className="pk__sheet fade-up delay-1">
+            <View className="pk__advice">
+              {adviceLead ? <Text className="pk__advice-lead">{adviceLead}</Text> : null}
+              <Text className="pk__advice-title">{adviceAction}</Text>
+              {adviceBody ? <Text className="pk__advice-body">{adviceBody}</Text> : null}
             </View>
+
+            {keepFindings.length > 0 ? (
+              <View className="pk__keep">
+                <Text className="pk__keep-label">{PURCHASE_COPY.findingsKeep}</Text>
+                <Text className="pk__keep-text">{keepFindings.map((item) => item.label).join('、')}</Text>
+              </View>
+            ) : null}
+
+            {liftFindings.length > 0 ? (
+              <View className="pk__lifts">
+                <Text className="pk__lifts-label">{PURCHASE_COPY.findingsLift}</Text>
+                {liftFindings.map((finding) => (
+                  <Text key={`${finding.category}-${finding.label}`} className="pk__lift">
+                    {finding.label}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+
+            {error ? <ErrorState message={error} onRetry={() => analyze(false)} /> : null}
 
             <View className="pk__result-actions">
               <PrimaryButton text={PURCHASE_COPY.save} onClick={save} />
+              <Text className="pk__result-alt pressable" onClick={retryFresh}>{PURCHASE_COPY.again}</Text>
             </View>
           </View>
         ) : (
-          <View className="pk__foot fade-up delay-2">
-            <PrimaryButton text={busy ? PURCHASE_COPY.busy : PURCHASE_COPY.start} loading={busy} disabled={!photoPath} onClick={() => analyze(false)} />
-            <View className="pk__foot-row">
-              <Text className="pk__foot-alt pressable" onClick={choosePhoto}>{PURCHASE_COPY.choosePhoto}</Text>
-              <Text className="pk__foot-alt pressable" onClick={() => analyze(true)}>{PURCHASE_COPY.demo}</Text>
+          <>
+            <View className="pk__hint fade-up delay-1">
+              <Text className="pk__hint-title">{PURCHASE_COPY.title}</Text>
+              <Text className="pk__hint-desc">{PURCHASE_COPY.desc}</Text>
+              {!shownUrl && !demoSlug ? (
+                <Text className="pk__hint-tips">{PURCHASE_COPY.uploadTips.join(' · ')}</Text>
+              ) : null}
             </View>
-            <Text className="pk__foot-note">{PURCHASE_COPY.note}</Text>
-          </View>
-        )}
-
-        {!result ? (
-          <View className="pk__preview fade-up delay-3">
-            <Text className="pk__preview-title">{PURCHASE_COPY.previewTitle}</Text>
-            {PURCHASE_COPY.previewItems.map((item, index) => (
-              <View key={item.title} className="pk__preview-row">
-                <Text className="pk__preview-index">{index + 1}</Text>
-                <View className="pk__preview-copy">
-                  <Text className="pk__preview-name">{item.title}</Text>
-                  <Text className="pk__preview-desc">{item.desc}</Text>
-                </View>
+            {error ? <ErrorState message={error} onRetry={() => analyze(false)} /> : null}
+            <View className="pk__foot fade-up delay-2">
+              <PrimaryButton
+                text={busy ? PURCHASE_COPY.busy : PURCHASE_COPY.start}
+                loading={busy}
+                disabled={!photoPath && !photoUrl && !demoSlug}
+                onClick={() => analyze(false)}
+              />
+              <View className="pk__foot-row">
+                <Text className="pk__foot-alt pressable" onClick={() => analyze(true)}>{PURCHASE_COPY.demo}</Text>
               </View>
-            ))}
-          </View>
-        ) : null}
+            </View>
+          </>
+        )}
       </View>
     </View>
   )

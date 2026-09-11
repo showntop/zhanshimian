@@ -12,7 +12,7 @@ export const HOME_TITLE = '你好，我是你的私人形象顾问'
 
 // ---------- 场景（固定四席） ----------
 export interface SceneCopy {
-  id: 'interview' | 'wedding' | 'date' | 'daily'
+  id: 'interview' | 'wedding' | 'date' | 'daily' | 'gathering'
   label: string
   note: string
 }
@@ -21,7 +21,8 @@ export const SCENES: readonly SceneCopy[] = [
   { id: 'interview', label: '面试', note: '精神可信' },
   { id: 'wedding', label: '婚礼', note: '得体上镜' },
   { id: 'date', label: '约会', note: '自然有记忆点' },
-  { id: 'daily', label: '日常', note: '省心耐看' }
+  { id: 'daily', label: '日常', note: '省心耐看' },
+  { id: 'gathering', label: '聚会', note: '轻松有型' }
 ] as const
 
 // ---------- 问候语（分时段，纯函数便于测试） ----------
@@ -66,7 +67,7 @@ export const EMPTY_COPY = {
   checklist: { title: '清单已就绪', body: '按步骤准备，完成一项勾一项。', action: '查看方案' },
   today: { title: '今天还没有方案', body: '看看今天适合怎么穿，一分钟生成。', action: '生成今日方案' },
   wardrobe: { title: '衣橱还是空的', body: '拍两张单品照，让方案用上你已有的衣服。', action: '添加单品' },
-  advisor: { title: '和顾问聊聊', body: '任何穿着上的疑问，直接问。', action: '开始提问' },
+  advisor: { title: '形象助手', body: '任何穿着上的疑问，直接问。', action: '开始提问' },
   hair: { title: '还没有发型预览', body: '选一个推荐发型，看看上身效果。', action: '去挑发型' },
   history: { title: '暂无记录', body: '完成后会出现在这里。', action: '' }
 } as const
@@ -213,9 +214,8 @@ export const OUTFIT_COPY = {
   reselect: '重选照片',
   again: '再诊断一次',
   lastResult: '查看结果',
-  resultKicker: '诊断结论',
-  priorityKicker: '最值得先改的一处',
-  findingsTitle: '细节观察',
+  findingsKeep: '已经合适',
+  findingsLift: '还可以改',
   save: '保存这条建议',
   saved: '已保存',
   toPlans: '去看三套方案'
@@ -228,21 +228,34 @@ export const PURCHASE_COPY = {
   uploadTips: ['白底或干净背景更清晰', '正面平铺或上身图', '看得清材质与版型'],
   start: '这件适合我吗',
   busy: '正在判断…',
+  busyHint: '正在看这件和你合不合适',
   choosePhoto: '选择商品图',
   demo: '用示例图体验',
   reselect: '重选',
-  note: '买之前，先看它适不适合你',
-  resultKicker: '判断结论',
-  priorityKicker: '怎么搭更合适',
-  findingsTitle: '适合与注意',
+  again: '再判断一次',
+  lastResult: '查看结果',
+  findingsKeep: '已经合适',
+  findingsLift: '还要注意',
   save: '保存这条判断',
-  saved: '已保存',
-  previewTitle: '判断后你会得到',
-  previewItems: [
-    { title: '适不适合的结论', desc: '结合你的形象档案，直接给答案' },
-    { title: '怎么搭更合适', desc: '给出与现有衣橱组合的具体方向' },
-    { title: '适合与注意清单', desc: '优点与穿着场合提醒，逐条列清' }
-  ]
+  saved: '已保存'
+} as const
+
+export const ADVISOR_COPY = {
+  title: '形象助手',
+  emptyTitle: '有什么形象问题，直接问',
+  emptyDesc: '我会结合你的档案、今日方案和衣橱给建议。',
+  placeholder: '问点什么…',
+  send: '发送'
+} as const
+
+export const PLAN_DETAIL_COPY = {
+  title: '方案详情',
+  cta: '生成清单',
+  salon: '发给发型师',
+  emptyStep: '这一步暂无内容',
+  specLength: '长度',
+  specFringe: '刘海',
+  specTexture: '卷度'
 } as const
 
 /** 诊断发现语气标签（positive/improve/optional/caution → 尊重表达，无警示红） */

@@ -12,6 +12,8 @@ export const STORAGE_KEYS = {
   activeTaskHairPreview: 'zsm_active_task_hair_preview',
   outfitSession: 'zsm_outfit_session',
   lastOutfitDiagnosis: 'zsm_last_outfit_diagnosis',
+  purchaseSession: 'zsm_purchase_session',
+  lastPurchaseDiagnosis: 'zsm_last_purchase_diagnosis',
   scenePending: 'zsm_scene_pending',
   sceneBrief: 'zsm_scene_brief',
   advisorConversationId: 'zsm_advisor_conversation_id',

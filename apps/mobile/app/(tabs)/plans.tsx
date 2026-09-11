@@ -15,6 +15,7 @@ const SCENE_TABS = [
   { key: 'wedding', label: '婚礼' },
   { key: 'date', label: '约会' },
   { key: 'daily', label: '日常' },
+  { key: 'gathering', label: '聚会' },
 ] as const
 
 export default function Plans() {

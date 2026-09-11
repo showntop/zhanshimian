@@ -73,6 +73,9 @@ function scanDir(dir) {
   }
 }
 scanDir(src)
+for (const m of configText.matchAll(/(?:iconPath|selectedIconPath):\s*'([^']+)'/g)) {
+  assetRefs.add(m[1].startsWith('/') ? m[1] : `/${m[1]}`)
+}
 for (const ref of assetRefs) {
   if (ref.endsWith('.webp')) problems.push(`引用 webp 资产（微信渲染空白）: ${ref}`)
   if (!existsSync(join(src, ref.replace(/^\//, '')))) problems.push(`引用的本地资产不存在: ${ref}`)

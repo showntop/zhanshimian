@@ -13,6 +13,7 @@ var sceneLabels = map[string]string{
 	"wedding":   "婚礼",
 	"date":      "约会",
 	"daily":     "日常",
+	"gathering": "聚会",
 }
 
 var sceneImpressions = map[string]string{
@@ -49,6 +50,12 @@ var sceneBriefOptions = map[string]map[string]map[string]string{
 		"preparation": {"closet": "只用现有衣橱", "key-piece": "可添一件单品", "complete": "不设限"},
 		"impression":  sceneImpressions,
 	},
+	"gathering": {
+		"activity":    {"friends": "朋友局", "dinner": "聚餐", "birthday": "生日 / 庆祝", "drinks": "酒会 / 酒吧"},
+		"timing":      {"afternoon": "下午", "evening": "傍晚", "night": "晚上", "unknown": "还没确定"},
+		"preparation": {"closet": "只用现有衣橱", "key-piece": "补一件关键单品", "complete": "可完整准备"},
+		"impression":  sceneImpressions,
+	},
 }
 
 var sceneBriefFields = map[string][]string{
@@ -56,6 +63,7 @@ var sceneBriefFields = map[string][]string{
 	"wedding":   {"role", "timing", "dress-code", "impression"},
 	"date":      {"activity", "timing", "preparation", "impression"},
 	"daily":     {"activity", "weather", "preparation", "impression"},
+	"gathering": {"activity", "timing", "preparation", "impression"},
 }
 
 func validateScenePlanInput(input domain.ScenePlanInput) error {
@@ -101,6 +109,8 @@ func sceneTone(input domain.ScenePlanInput) string {
 		return map[string]string{"relaxed": "轻松不失礼", "elegant": "得体有光泽", "formal": "正式有边界"}[sceneAnswer(input, "dress-code")]
 	case "date":
 		return map[string]string{"coffee": "轻松有呼吸感", "dinner": "精致不刻意", "exhibition": "知性有细节", "outdoor": "舒展有活力"}[sceneAnswer(input, "activity")]
+	case "gathering":
+		return map[string]string{"friends": "轻松有来往感", "dinner": "得体不压场", "birthday": "有一点仪式感", "drinks": "利落有精神"}[sceneAnswer(input, "activity")]
 	default:
 		return map[string]string{"office": "舒适仍利落", "walking": "轻盈好活动", "rain": "方便应对天气", "mild": "自然有层次"}[sceneAnswer(input, "weather")]
 	}
@@ -192,7 +202,7 @@ func makeupSummary(impression string) string {
 }
 
 func outfitTitle(input domain.ScenePlanInput) string {
-	base := map[string]string{"interview": "利落肩线 · 有秩序的内搭", "wedding": "有光泽的面料 · 得体露肤", "date": "轻盈层次 · 保留柔和感", "daily": "舒展版型 · 一点颜色重点"}[input.Scene]
+	base := map[string]string{"interview": "利落肩线 · 有秩序的内搭", "wedding": "有光泽的面料 · 得体露肤", "date": "轻盈层次 · 保留柔和感", "daily": "舒展版型 · 一点颜色重点", "gathering": "轻松层次 · 一处颜色重点"}[input.Scene]
 	return base + " · " + sceneTone(input)
 }
 
@@ -202,6 +212,7 @@ func outfitSummary(input domain.ScenePlanInput) string {
 		"wedding":   "避免过度隆重，用质感和比例保持上镜分寸。",
 		"date":      "保留舒适与亲和力，用一处细节增加记忆点。",
 		"daily":     "以已有衣物为主，优先处理配色、腰线和鞋包。",
+		"gathering": "比日常多一点整理，用一处细节把场合感做出来，不压过聚会本身。",
 	}[input.Scene]
 	return base + " 结合“" + sceneContext(input) + "”调整。"
 }

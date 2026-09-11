@@ -3,13 +3,14 @@
 // 重设计 IA：问候 → 任务轨 → 今日造型/档案 hero → 工具 → 场景 → 最近方案。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
-import { ScrollView, Text, View } from '@tarojs/components'
+import { Image, Text, View } from '@tarojs/components'
 import {
   APP_NAME,
   APP_SLOGAN,
   HOME_COPY,
   HOME_TITLE,
   OUTFIT_COPY,
+  PURCHASE_COPY,
   POLL_INTERVALS,
   PRIVACY_NOTE,
   SCENES,
@@ -17,9 +18,11 @@ import {
   isBundledAsset,
   trackEvent,
   type HomeBootstrap,
+  type SceneCopy,
 } from '@zsm/core'
 import { api } from '../../services/api'
 import { hasOutfitResult, isOutfitPending } from '../../services/outfit-session'
+import { hasPurchaseResult, isPurchasePending } from '../../services/purchase-session'
 import { taskDoneTitle } from '../../services/task-utils'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
@@ -35,6 +38,29 @@ const TOOLS = [
   { key: 'outfit', label: '穿搭诊断', desc: '只指出最值得改的一处', path: '/packages/tools/pages/outfit/index', badge: '' },
   { key: 'purchase', label: '购买判断', desc: '买之前先看适不适合', path: '/packages/tools/pages/purchase/index', badge: '' },
 ] as const
+
+const SCENE_ICONS: Record<SceneCopy['id'], string> = {
+  interview: '/assets/icons/scene-interview.png',
+  wedding: '/assets/icons/scene-wedding.png',
+  date: '/assets/icons/scene-date.png',
+  daily: '/assets/icons/scene-daily.png',
+  gathering: '/assets/icons/scene-gathering.png',
+}
+
+function SceneTile({ scene }: { scene: SceneCopy }) {
+  return (
+    <View
+      className={`home__scene home__scene--${scene.id} pressable`}
+      onClick={() => Taro.navigateTo({ url: `/pages/scene/index?scene=${scene.id}` })}
+    >
+      <Image className="home__scene-icon" src={SCENE_ICONS[scene.id]} mode="aspectFit" />
+      <View className="home__scene-copy">
+        <Text className="home__scene-label">{scene.label}</Text>
+        <Text className="home__scene-desc">{scene.note}</Text>
+      </View>
+    </View>
+  )
+}
 
 // 复访闭环入口（life 分包）：顾问对话是产品核心特色，此前全站无入口
 const LIFE = [
@@ -61,6 +87,8 @@ export default function Home() {
   const [failed, setFailed] = useState(false)
   const [outfitActive, setOutfitActive] = useState(false)
   const [outfitReady, setOutfitReady] = useState(false)
+  const [purchaseActive, setPurchaseActive] = useState(false)
+  const [purchaseReady, setPurchaseReady] = useState(false)
   const recoveredRef = useRef(false)
   const visibleRef = useRef(true)
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -136,11 +164,24 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [outfitActive])
 
+  useEffect(() => {
+    if (!purchaseActive) return
+    const timer = setInterval(() => {
+      if (!visibleRef.current || isPurchasePending()) return
+      setPurchaseActive(false)
+      setPurchaseReady(hasPurchaseResult())
+      Taro.showToast({ title: '购买判断已完成', icon: 'none' })
+    }, POLL_INTERVALS.homeTasks)
+    return () => clearInterval(timer)
+  }, [purchaseActive])
+
   useDidShow(() => {
     visibleRef.current = true
     trackEvent('page_view', { page: 'home' })
     setOutfitActive(isOutfitPending())
     setOutfitReady(hasOutfitResult())
+    setPurchaseActive(isPurchasePending())
+    setPurchaseReady(hasPurchaseResult())
     recoverReport().then(load)
     scheduleTaskPoll()
   })
@@ -303,7 +344,11 @@ export default function Home() {
                       ? '诊断中'
                       : tool.key === 'outfit' && outfitReady
                         ? OUTFIT_COPY.lastResult
-                        : (tool.badge || '')
+                        : tool.key === 'purchase' && purchaseActive
+                          ? '判断中'
+                          : tool.key === 'purchase' && purchaseReady
+                            ? PURCHASE_COPY.lastResult
+                            : (tool.badge || '')
                 return (
                   <View
                     key={tool.key}
@@ -311,7 +356,7 @@ export default function Home() {
                     onClick={() => Taro.navigateTo({ url: tool.path })}
                   >
                     {badge ? (
-                      <Text className={`home__tool-badge ${badge === '生成中' || badge === '诊断中' ? 'home__tool-badge--live' : ''}`}>
+                      <Text className={`home__tool-badge ${badge === '生成中' || badge === '诊断中' || badge === '判断中' ? 'home__tool-badge--live' : ''}`}>
                         {badge}
                       </Text>
                     ) : null}
@@ -328,20 +373,18 @@ export default function Home() {
               <Text className="section-title">{HOME_COPY.scenesTitle}</Text>
               <View className="section-rule" />
             </View>
-            <ScrollView className="home__scenes" scrollX enhanced showScrollbar={false}>
+            <View className="home__scenes">
               <View className="home__scene-row">
-                {SCENES.map((scene) => (
-                  <View
-                    key={scene.id}
-                    className="home__scene pressable"
-                    onClick={() => Taro.navigateTo({ url: `/pages/scene/index?scene=${scene.id}` })}
-                  >
-                    <Text className="home__scene-label">{scene.label}</Text>
-                    <Text className="home__scene-desc">{scene.note}</Text>
-                  </View>
+                {SCENES.slice(0, 3).map((scene) => (
+                  <SceneTile key={scene.id} scene={scene} />
                 ))}
               </View>
-            </ScrollView>
+              <View className="home__scene-row">
+                {SCENES.slice(3).map((scene) => (
+                  <SceneTile key={scene.id} scene={scene} />
+                ))}
+              </View>
+            </View>
             {hasReport ? <Text className="home__scene-note">{HOME_COPY.sceneReadyNote}</Text> : null}
           </View>
 

@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var validPlanScenes = map[string]bool{"general": true, "daily": true, "interview": true, "wedding": true, "date": true}
+var validPlanScenes = map[string]bool{"general": true, "daily": true, "interview": true, "wedding": true, "date": true, "gathering": true}
 
 func (s *Service) resolvePlanURLs(plan *domain.Plan) {
 	plan.ImageURL = s.resolveAssetURL(plan.ImageURL)

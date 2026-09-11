@@ -1,16 +1,68 @@
+// 方案详情：照片铺满整屏，文案从底部奶油渐变融进画面。
+.page--plan {
+  height: 100vh;
+  overflow: hidden;
+  padding: 0;
+  background: var(--ink);
+
+  .app-header-spacer {
+    margin-bottom: 0;
+    height: 0 !important;
+  }
+
+  .app-header--transparent {
+    background: linear-gradient(180deg, rgba(248, 245, 240, 0.82) 0%, rgba(248, 245, 240, 0) 100%);
+    border-bottom-color: transparent;
+    backdrop-filter: none;
+  }
+}
+
 .pd {
-  display: flex;
-  flex-direction: column;
-  gap: 28rpx;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
 
   &__hero {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+
     &-frame {
       position: relative;
-      height: 680rpx;
-      border-radius: var(--radius-lg);
+      width: 100%;
+      height: 100%;
       overflow: hidden;
-      background: var(--moss-soft);
-      border: 1rpx solid var(--line);
+      background: var(--ink);
+
+      .cmp {
+        border-radius: 0;
+      }
+
+      .cmp__label {
+        top: calc(var(--pd-nav) + 12rpx);
+        bottom: auto;
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+        color: #ffffff;
+        font-size: 20rpx;
+        text-shadow: 0 2rpx 10rpx rgba(24, 28, 22, 0.45);
+      }
+
+      .example-image {
+        border-radius: 0;
+      }
+
+      .pd__hero-img .example-badge {
+        top: calc(var(--pd-nav) + 12rpx);
+        right: 24rpx;
+        bottom: auto;
+      }
     }
 
     &-img {
@@ -19,94 +71,130 @@
     }
   }
 
-  &__head {
+  &__board {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 4;
     display: flex;
     flex-direction: column;
-    gap: 10rpx;
+    gap: 16rpx;
+    padding: 140rpx var(--page-gutter) calc(20rpx + env(safe-area-inset-bottom));
+    background: linear-gradient(
+      180deg,
+      rgba(248, 245, 240, 0) 0%,
+      rgba(248, 245, 240, 0.42) 28%,
+      rgba(248, 245, 240, 0.88) 62%,
+      var(--bg) 100%
+    );
   }
 
-  &__eyebrow {
+  &__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 20rpx;
+  }
+
+  &__series {
+    flex-shrink: 0;
     font-size: 22rpx;
     font-weight: 600;
-    letter-spacing: 4rpx;
-    color: var(--moss);
+    color: var(--ink-3);
   }
 
-  &__name {
-    font-family: 'Songti SC', 'STSong', serif;
-    font-size: 44rpx;
-    font-weight: 700;
+  &__spec-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4rpx;
+  }
+
+  &__spec-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8rpx;
+  }
+
+  &__spec-dot {
+    width: 24rpx;
+    text-align: center;
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__spec-k {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__spec-v {
+    font-size: 22rpx;
+    font-weight: 600;
     color: var(--ink);
-  }
-
-  &__summary {
-    font-size: 26rpx;
-    color: var(--ink-2);
   }
 
   &__tabs {
     display: flex;
-    gap: 12rpx;
+    justify-content: flex-end;
+    gap: 28rpx;
   }
 
   &__tab {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    min-height: 76rpx;
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    border: 1rpx solid var(--line);
-    font-size: 26rpx;
-    color: var(--ink-2);
+    padding: 4rpx 0;
+    font-size: 24rpx;
+    color: var(--ink-3);
 
     &--active {
-      background: var(--moss-soft);
-      border-color: var(--moss);
-      color: var(--moss);
+      color: var(--ink);
       font-weight: 600;
+      box-shadow: inset 0 -3rpx 0 var(--moss);
     }
   }
 
   &__step {
     display: flex;
     flex-direction: column;
-    gap: 14rpx;
-    padding: 32rpx;
-    border-radius: var(--radius-md);
-    background: var(--surface);
-    border: 1rpx solid var(--line);
+    gap: 8rpx;
+  }
 
-    &--empty {
-      align-items: center;
-    }
+  &__display {
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 36rpx;
+    font-weight: 700;
+    line-height: 1.32;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
 
-    &-title {
-      font-size: 30rpx;
-      font-weight: 600;
-      color: var(--ink);
-    }
-
-    &-summary {
-      font-size: 26rpx;
-      line-height: 1.7;
-      color: var(--ink-2);
-    }
+  &__body {
+    font-size: 24rpx;
+    line-height: 1.55;
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 
   &__foot {
     display: flex;
     flex-direction: column;
-    gap: 20rpx;
-    margin-top: 8rpx;
+    gap: 4rpx;
+    padding-top: 8rpx;
   }
 
   &__salon-link {
+    padding: 8rpx;
     text-align: center;
-    font-size: 24rpx;
+    font-size: 22rpx;
     color: var(--moss);
-    text-decoration: underline;
   }
 
   &__sheet {
@@ -129,9 +217,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 18rpx 24rpx;
-      border-radius: var(--radius-sm);
-      background: var(--moss-soft);
+      padding: 18rpx 0;
     }
 
     &-key {

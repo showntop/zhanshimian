@@ -835,7 +835,7 @@ func (s *Service) SaveHairPreview(ctx context.Context, userID, previewID string)
 // buildToolResult produces the deterministic template every diagnosis falls
 // back to (demo provider output and purchase defaults).
 func buildToolResult(kind, scene string) domain.ToolResult {
-	sceneNames := map[string]string{"general": "当前场景", "daily": "日常", "interview": "面试", "wedding": "婚礼", "date": "约会"}
+	sceneNames := map[string]string{"general": "当前场景", "daily": "日常", "interview": "面试", "wedding": "婚礼", "date": "约会", "gathering": "聚会"}
 	sceneName := sceneNames[scene]
 	switch kind {
 	case "hair":
