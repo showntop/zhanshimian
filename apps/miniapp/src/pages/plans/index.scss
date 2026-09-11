@@ -86,10 +86,18 @@
       height: 100%;
     }
 
+    // 顶部锚定裁切（widthFix + 高度自然）：竖版生成图只裁底部，
+    // 人物头部完整（aspectFill 居中裁切会把头切掉）
+    &-img--top .example-image__img {
+      height: auto;
+    }
+
     &-toggle {
       position: absolute;
       top: 20rpx;
-      left: 20rpx;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
     }
   }
 
@@ -98,14 +106,19 @@
     height: 100%;
   }
 
+  // 信息卡上叠 hero 底边：消除图片与文字之间的白缝，形成一张连续卡
   &__info {
+    position: relative;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     gap: 12rpx;
-    padding: 28rpx;
-    border-radius: var(--radius-md);
-    background: var(--surface);
+    margin: -56rpx 20rpx 0;
+    padding: 28rpx 30rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface-strong);
     border: 1rpx solid var(--line);
+    box-shadow: 0 12rpx 32rpx rgba(31, 34, 30, 0.1);
   }
 
   &__name {
@@ -125,6 +138,10 @@
     font-size: 26rpx;
     line-height: 1.7;
     color: var(--ink-2);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   &__generating {

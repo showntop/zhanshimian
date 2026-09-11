@@ -110,6 +110,21 @@ export default function Plans() {
   const hasActiveLook = plans.some(
     (p) => p.look_task && (p.look_task.status === 'queued' || p.look_task.status === 'processing'),
   )
+  const activeLookCount = plans.filter(
+    (p) => p.look_task && (p.look_task.status === 'queued' || p.look_task.status === 'processing'),
+  ).length
+
+  // Tab badge 推模型：任务创建点立即标数（此前仅首页拉取驱动，
+  // 首页不可见时红点要等回到首页才出现）；离开本页后由首页拉取模型接管
+  useEffect(() => {
+    const count = groupTaskId ? 1 : activeLookCount
+    if (count > 0) {
+      Taro.setTabBarBadge({ index: 1, text: String(count) }).catch(() => {})
+    } else {
+      Taro.removeTabBarBadge({ index: 1 }).catch(() => {})
+    }
+  }, [groupTaskId, activeLookCount])
+
   const { stop } = useTaskPolling({
     fetcher: () => api.listPlans(readStorage(STORAGE_KEYS.reportId)!, scene),
     intervalMs: POLL_INTERVALS.planLook,
@@ -272,16 +287,16 @@ export default function Plans() {
                 {plans.map((item) => (
                   <SwiperItem key={item.id}>
                     <ExampleImage
-                      className="plans__hero-img"
+                      className="plans__hero-img plans__hero-img--top"
                       src={item.generated_image_url || item.image_url}
                       badgeText={(item.look_provider ?? '').startsWith('demo') ? '效果示例' : 'AI 风格预览'}
-                      mode="aspectFill"
+                      mode="widthFix"
                     />
                   </SwiperItem>
                 ))}
               </Swiper>
             ) : (
-              <ExampleImage className="plans__hero-img" src={currentImage} user mode="aspectFill" />
+              <ExampleImage className="plans__hero-img plans__hero-img--top" src={currentImage} user mode="widthFix" />
             )}
             <View className="plans__hero-toggle">
               <CompareToggle value={mode} onChange={toggleCompare} />
