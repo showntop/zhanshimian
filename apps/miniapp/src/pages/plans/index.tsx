@@ -1,15 +1,15 @@
-// 方案 Tab：场景分组 + swiper 三方案 + 原本/方案对比 + 本人图生成轮询 +
-// 单方案重试（regenerate，旧版只能整组重排的修复）。
+// 方案 Tab：选择页重设计——上半屏回答「有几个选项、选它能得到什么、怎么选」。
+// 拖动对比 hero（收益词叠加）+ 三选一条常驻 + 吸底 CTA；细节文案在折叠线下。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
-import { ScrollView, Swiper, SwiperItem, Text, View } from '@tarojs/components'
+import { ScrollView, Text, View } from '@tarojs/components'
 import { POLL_INTERVALS, useTaskPolling, type Plan } from '@zsm/core'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
 import ExampleImage from '../../components/example-image'
-import CompareToggle from '../../components/compare-toggle'
+import CompareSlider from '../../components/compare-slider'
 import Skeleton from '../../components/skeleton'
 import ErrorState from '../../components/error-state'
 import EmptyState from '../../components/empty-state'
@@ -28,7 +28,7 @@ export default function Plans() {
   const [plans, setPlans] = useState<Plan[]>([])
   const [currentImage, setCurrentImage] = useState('')
   const [index, setIndex] = useState(0)
-  const [mode, setMode] = useState<'current' | 'plan'>('plan')
+  const [whyOpen, setWhyOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   // 区分「未建档」与「该场景无方案」：两者空态与 CTA 完全不同，
@@ -158,15 +158,15 @@ export default function Plans() {
   const switchScene = (key: string) => {
     setScene(key)
     setIndex(0)
-    setMode('plan')
+    setWhyOpen(false)
   }
 
-  const toggleCompare = (next: 'current' | 'plan') => {
-    if (next === 'current' && !currentImage) {
-      Taro.showToast({ title: '当前形象照暂不可用', icon: 'none' })
-      return
-    }
-    setMode(next)
+  // 切换方案：轻震动反馈（沿用原 swiper 手势的触感），收起 why 展开
+  const pickPlan = (i: number) => {
+    if (i === index) return
+    setIndex(i)
+    setWhyOpen(false)
+    Taro.vibrateShort({ type: 'light' })
   }
 
   const retryOne = async () => {
@@ -273,42 +273,68 @@ export default function Plans() {
           )
         ) : (
           <>
+        {/* 拖动对比 hero：底层原本 + 上层方案，分界线可拖。
+            收益词（outcome_tags）叠加底部，第一眼回答「选它能得到什么」。
+            key 随方案切换重挂载 → 重置手柄位置并触发交叉淡入 */}
         <View className="plans__hero fade-up">
-          <View className="plans__hero-frame">
-            {mode === 'plan' && planImage ? (
-              <Swiper
-                className="plans__swiper"
-                current={index}
-                onChange={(e) => {
-                  setIndex(e.detail.current)
-                  Taro.vibrateShort({ type: 'light' })
-                }}
-              >
-                {plans.map((item) => (
-                  <SwiperItem key={item.id}>
-                    <ExampleImage
-                      className="plans__hero-img plans__hero-img--top"
-                      src={item.generated_image_url || item.image_url}
-                      badgeText={(item.look_provider ?? '').startsWith('demo') ? '效果示例' : 'AI 风格预览'}
-                      mode="widthFix"
-                    />
-                  </SwiperItem>
+          <View className="plans__hero-frame" key={plan?.id}>
+            <CompareSlider
+              single={!currentImage || !planImage}
+              current={<ExampleImage className="plans__hero-img" src={currentImage} user />}
+              plan={
+                <ExampleImage
+                  className="plans__hero-img"
+                  src={planImage}
+                  badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
+                />
+              }
+            />
+            {(plan?.outcome_tags ?? []).length > 0 ? (
+              <View className="plans__outcome">
+                {plan!.outcome_tags.slice(0, 3).map((tag) => (
+                  <Text key={tag} className="plans__outcome-tag">{tag}</Text>
                 ))}
-              </Swiper>
-            ) : (
-              <ExampleImage className="plans__hero-img plans__hero-img--top" src={currentImage} user mode="widthFix" />
-            )}
-            <View className="plans__hero-toggle">
-              <CompareToggle value={mode} onChange={toggleCompare} />
-            </View>
+              </View>
+            ) : null}
           </View>
         </View>
 
+        {/* 三选一条：常驻可见的选择器，兼任翻页指示。
+            推荐方案挂角标降低选择成本 */}
+        <View className="plans__choices fade-up delay-1">
+          {plans.map((item, i) => (
+            <View
+              key={item.id}
+              className={`plans__choice ${i === index ? 'plans__choice--active' : ''} pressable`}
+              onClick={() => pickPlan(i)}
+            >
+              <View className="plans__choice-thumb">
+                <ExampleImage className="plans__choice-img" src={item.generated_image_url || item.image_url} />
+                {item.recommended ? <Text className="plans__choice-badge">推荐</Text> : null}
+              </View>
+              <Text className="plans__choice-name">{item.name}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* 细节区（折叠线下）：变化点 chip + 折叠的 why + 生成/重试状态 */}
         {plan ? (
-          <View className="plans__info fade-up delay-1">
+          <View className="plans__info fade-up delay-2">
             <Text className="plans__name">{plan.name}</Text>
+            {(plan.difference_tags ?? []).length > 0 ? (
+              <View className="plans__diffs">
+                {plan.difference_tags.slice(0, 3).map((tag) => (
+                  <Text key={tag} className="plans__diff">{tag}</Text>
+                ))}
+              </View>
+            ) : null}
             <Text className="plans__summary">{plan.descriptor}</Text>
-            <Text className="plans__why">{plan.why}</Text>
+            {plan.why ? (
+              <View className="plans__why-wrap" onClick={() => setWhyOpen(!whyOpen)}>
+                <Text className={`plans__why ${whyOpen ? 'plans__why--open' : ''}`}>{plan.why}</Text>
+                <Text className="plans__why-toggle">{whyOpen ? '收起' : '为什么适合你'}</Text>
+              </View>
+            ) : null}
             {activeLook ? (
               <View className="plans__generating" onClick={retryOne}>
                 <View className="plans__generating-spin spinner" />
@@ -323,36 +349,18 @@ export default function Plans() {
           </View>
         ) : null}
 
-        <ScrollView className="plans__rail fade-up delay-2" scrollX enhanced showScrollbar={false}>
-          {plans.map((item, i) => (
-            <View
-              key={item.id}
-              className={`plans__thumb ${i === index ? 'plans__thumb--active' : ''} pressable`}
-              onClick={() => setIndex(i)}
-            >
-              <ExampleImage
-                className="plans__thumb-img"
-                src={item.generated_image_url || item.image_url}
-                badgeText={(item.look_provider ?? '').startsWith('demo') ? '效果示例' : 'AI 风格预览'}
-              />
-              <Text className="plans__thumb-name">{item.name}</Text>
-            </View>
-          ))}
-        </ScrollView>
-
-        <View className="plans__foot fade-up delay-3">
-          {plan ? (
-            <>
-              <PrimaryButton
-                text="选这套"
-                onClick={() => Taro.navigateTo({ url: `/pages/plan/index?id=${plan.id}` })}
-              />
-              <Text className="plans__foot-note">
-                {isDemoLook ? '当前为效果示例，接入真实图像模型后展示本人效果' : '形象图由 AI 基于你的照片生成'}
-              </Text>
-            </>
-          ) : null}
-        </View>
+        {/* 吸底 CTA：任何滚动位置都能选，不与细节区争空间 */}
+        {plan ? (
+          <View className="plans__cta fade-up delay-3">
+            <PrimaryButton
+              text="选这套 · 查看执行清单"
+              onClick={() => Taro.navigateTo({ url: `/pages/plan/index?id=${plan.id}` })}
+            />
+            <Text className="plans__cta-note">
+              {isDemoLook ? '当前为效果示例，接入真实图像模型后展示本人效果' : '形象图由 AI 基于你的照片生成'}
+            </Text>
+          </View>
+        ) : null}
           </>
         )}
       </View>

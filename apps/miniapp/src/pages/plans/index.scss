@@ -1,7 +1,9 @@
 .plans {
   display: flex;
   flex-direction: column;
-  gap: 28rpx;
+  gap: 20rpx;
+  // 吸底 CTA 让位
+  padding-bottom: 220rpx;
 
   &__tabs {
     display: flex;
@@ -74,11 +76,13 @@
   &__hero {
     &-frame {
       position: relative;
-      height: 720rpx;
+      height: 640rpx;
       border-radius: var(--radius-lg);
       overflow: hidden;
       background: var(--moss-soft);
       border: 1rpx solid var(--line);
+      // 切换方案时整帧交叉淡入（key 重挂载触发）
+      animation: plans-frame-in 0.3s ease both;
     }
 
     &-img {
@@ -86,24 +90,36 @@
       height: 100%;
     }
 
-    // 顶部锚定裁切（widthFix + 高度自然）：竖版生成图只裁底部，
-    // 人物头部完整（aspectFill 居中裁切会把头切掉）
-    &-img--top .example-image__img {
-      height: auto;
-    }
-
-    &-toggle {
-      position: absolute;
-      top: 20rpx;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 2;
-    }
+    // 收益词叠加：直接回答「选这套能获得什么」，压暗渐变保证可读
+    // （居中放置，避开滑杆左下/右下的「原本/方案」角标）
   }
 
-  &__swiper {
-    width: 100%;
-    height: 100%;
+  &__outcome {
+    position: absolute;
+    left: 50%;
+    bottom: 16rpx;
+    transform: translateX(-50%);
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 10rpx;
+    padding: 8rpx 20rpx;
+    border-radius: 999rpx;
+    background: rgba(24, 28, 22, 0.72);
+    backdrop-filter: blur(12rpx);
+    max-width: 70%;
+
+    &-tag {
+      font-size: 21rpx;
+      font-weight: 650;
+      color: #ffffff;
+      white-space: nowrap;
+
+      & + & {
+        padding-left: 10rpx;
+        border-left: 1rpx solid rgba(255, 255, 255, 0.35);
+      }
+    }
   }
 
   // 信息卡上叠 hero 底边：消除图片与文字之间的白缝，形成一张连续卡
@@ -139,9 +155,43 @@
     line-height: 1.7;
     color: var(--ink-2);
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+
+    &--open {
+      -webkit-line-clamp: unset;
+      display: block;
+    }
+  }
+
+  &__why-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+  }
+
+  &__why-toggle {
+    align-self: flex-start;
+    font-size: 22rpx;
+    font-weight: 600;
+    color: var(--moss);
+  }
+
+  // 变化点 chip：与别的方案比较时的差异速览
+  &__diffs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10rpx;
+  }
+
+  &__diff {
+    padding: 6rpx 18rpx;
+    border-radius: 999rpx;
+    background: var(--moss-soft);
+    color: var(--moss-pressed);
+    font-size: 21rpx;
+    font-weight: 600;
   }
 
   &__generating {
@@ -171,50 +221,106 @@
     }
   }
 
-  &__rail {
+  // 三选一条：常驻上半屏的选择器，兼任翻页指示。
+  // 推荐角标叠缩略图左上角；选中态描边 + 全不透明
+  &__choices {
     display: flex;
-    white-space: nowrap;
+    gap: 16rpx;
     width: 100%;
   }
 
-  &__thumb {
-    display: inline-flex;
+  &__choice {
+    flex: 1;
+    min-width: 0;
+    display: flex;
     flex-direction: column;
     gap: 8rpx;
-    width: 176rpx;
-    margin-right: 16rpx;
-    opacity: 0.6;
-    transform: scale(0.92);
-    transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+    opacity: 0.62;
+    transition: opacity 0.25s ease;
 
     &--active {
       opacity: 1;
-      transform: scale(1);
+
+      .plans__choice-thumb {
+        border-color: var(--moss);
+        box-shadow: 0 0 0 4rpx var(--moss-soft);
+      }
+
+      .plans__choice-name {
+        color: var(--ink);
+        font-weight: 700;
+      }
+    }
+
+    &-thumb {
+      position: relative;
+      width: 100%;
+      height: 240rpx;
+      border-radius: 20rpx;
+      overflow: hidden;
+      border: 3rpx solid transparent;
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
     }
 
     &-img {
-      width: 176rpx;
-      height: 220rpx;
+      width: 100%;
+      height: 100%;
+    }
+
+    &-badge {
+      position: absolute;
+      top: 10rpx;
+      left: 10rpx;
+      z-index: 2;
+      padding: 4rpx 14rpx;
+      border-radius: 999rpx;
+      background: var(--moss);
+      color: #ffffff;
+      font-size: 19rpx;
+      font-weight: 650;
     }
 
     &-name {
       font-size: 22rpx;
-      color: var(--ink);
+      color: var(--ink-2);
       text-align: center;
+      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
   }
 
-  &__foot {
+  // 吸底 CTA：选择页主操作不进折叠线。tab 页视口在原生 tabBar 之上，
+  // fixed bottom:0 即贴 tabBar 顶；背景模糊 + 安全区适配
+  &__cta {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
     display: flex;
     flex-direction: column;
-    gap: 16rpx;
+    gap: 10rpx;
+    padding: 20rpx var(--page-gutter) calc(16rpx + env(safe-area-inset-bottom));
+    background: rgba(250, 249, 245, 0.92);
+    backdrop-filter: blur(20rpx);
+    border-top: 1rpx solid var(--line);
 
     &-note {
       text-align: center;
       font-size: 20rpx;
       color: var(--ink-3);
     }
+  }
+}
+
+// 方案切换交叉淡入
+@keyframes plans-frame-in {
+  from {
+    opacity: 0.35;
+  }
+
+  to {
+    opacity: 1;
   }
 }
