@@ -165,28 +165,37 @@ export default function Report() {
   const visibleFindings = findings.filter((finding) => findingPhoto(finding) === currentPhotoKind)
 
   // 锚点坐标相对原始照片，aspectFill 会被居中裁切：按缩放 + 裁切偏移
-  // 重映射到固定相框的百分比位置，保证锚点仍落在正确部位上。
-  const anchorStyle = (kind: PhotoKind, finding: Finding) => {
-    const ax = finding.anchor_x ?? 0.5
-    const ay = finding.anchor_y ?? 0.5
-    const dims = photoDims[kind]
-    if (!dims) {
-      return {
-        left: `${Math.min(91, Math.max(9, ax * 100))}%`,
-        top: `${Math.min(89, Math.max(11, ay * 100))}%`,
-      }
-    }
+  // 重映射到固定相框的像素位置（用于引导线端点 + 标签定位）。
+  // 返回 null 表示尚未拿到原图尺寸，回退到按原始比例直接映射。
+  const anchorInFrame = (
+    dims: { w: number; h: number } | undefined,
+    ax: number,
+    ay: number
+  ): { x: number; y: number } => {
+    if (!dims) return { x: ax * HERO_FULL_W, y: ay * HERO_H }
     const scale = Math.max(HERO_FULL_W / dims.w, HERO_H / dims.h)
     const scaledW = dims.w * scale
     const scaledH = dims.h * scale
     const offX = (HERO_FULL_W - scaledW) / 2
     const offY = (HERO_H - scaledH) / 2
-    const x = ((offX + ax * scaledW) / HERO_FULL_W) * 100
-    const y = ((offY + ay * scaledH) / HERO_H) * 100
-    return {
-      left: `${Math.min(93, Math.max(7, x))}%`,
-      top: `${Math.min(92, Math.max(8, y))}%`,
+    return { x: offX + ax * scaledW, y: offY + ay * scaledH }
+  }
+
+  // 同侧 finding 按 anchor_y 排序后错开，避免上下重叠
+  const layoutSide = (sideFindings: Finding[]) => {
+    const sorted = [...sideFindings].sort(
+      (a, b) => (a.anchor_y ?? 0.5) - (b.anchor_y ?? 0.5)
+    )
+    const out: { finding: Finding; topPct: number }[] = []
+    let last = 0
+    for (const f of sorted) {
+      const y = (f.anchor_y ?? 0.5) * 100
+      let top = Math.min(86, Math.max(12, y))
+      if (top - last < 16) top = Math.min(86, last + 16)
+      out.push({ finding: f, topPct: top })
+      last = top
     }
+    return out
   }
 
   return (
@@ -210,6 +219,54 @@ export default function Report() {
               const url = photoUrlFor(kind)
               const demo = photoIsDemo(kind, url)
               const kindFindings = findings.filter((finding) => findingPhoto(finding) === kind)
+              const leftLayout = layoutSide(kindFindings.filter((f) => (f.anchor_x ?? 0.5) < 0.5))
+              const rightLayout = layoutSide(kindFindings.filter((f) => (f.anchor_x ?? 0.5) >= 0.5))
+              const dims = photoDims[kind]
+              // 标签几何：左右两列各 220rpx 宽，胶囊高度固定 92rpx（标签 + 副标题两行）
+              const CAP_W = 220
+              const CAP_H = 92
+              const renderTag = (item: { finding: Finding; topPct: number }, side: 'left' | 'right') => {
+                const f = item.finding
+                const ax = f.anchor_x ?? 0.5
+                const ay = f.anchor_y ?? 0.5
+                const a = anchorInFrame(dims, ax, ay)
+                // 引导线起点：胶囊面向照片那一侧的中点
+                const startX = side === 'left' ? CAP_W : HERO_FULL_W - CAP_W
+                const centerY = (item.topPct / 100) * HERO_H + CAP_H / 2
+                const dx = a.x - startX
+                const dy = a.y - centerY
+                const dist = Math.sqrt(dx * dx + dy * dy)
+                const angle = (Math.atan2(dy, dx) * 180) / Math.PI
+                const active = activeFindingId === f.id
+                return (
+                  <View key={f.id} className="report__annotation">
+                    <View
+                      className="report__leader"
+                      style={{
+                        left: `${(startX / HERO_FULL_W) * 100}%`,
+                        top: `${(centerY / HERO_H) * 100}%`,
+                        width: `${dist}rpx`,
+                        transform: `rotate(${angle}deg)`,
+                      }}
+                    />
+                    <View
+                      className="report__anchor-dot"
+                      style={{
+                        left: `${(a.x / HERO_FULL_W) * 100}%`,
+                        top: `${(a.y / HERO_H) * 100}%`,
+                      }}
+                    />
+                    <View
+                      className={`report__tag report__tag--${side} ${active ? 'report__tag--active' : ''}`}
+                      style={{ top: `${item.topPct}%` }}
+                      onClick={() => tapAnchor(f)}
+                    >
+                      <Text className="report__tag-label">{f.label}</Text>
+                      {f.detail ? <Text className="report__tag-detail">{f.detail}</Text> : null}
+                    </View>
+                  </View>
+                )
+              }
               return (
                 <SwiperItem key={kind} className="report__slide">
                   <View className="report__hero-frame">
@@ -232,7 +289,7 @@ export default function Report() {
                         )
                       }}
                     />
-                    {/* 渐变压暗层：角标与低位锚点在任何照片上保持可读 */}
+                    {/* 渐变压暗层：保证低位标签在深色照片上仍可读 */}
                     <View className="report__hero-scrim report__hero-scrim--top" />
                     <View className="report__hero-scrim report__hero-scrim--bottom" />
                     <Text className="report__hero-mark">
@@ -241,17 +298,15 @@ export default function Report() {
                     <Text className={providerIsDemo ? 'report__provider report__provider--demo' : 'report__provider'}>
                       {providerIsDemo ? REPORT_COPY.demoMark : REPORT_COPY.aiMark}
                     </Text>
-                    {kindFindings.map((finding, index) => (
-                      <View
-                        key={finding.id}
-                        className={`report__anchor ${activeFindingId === finding.id ? 'report__anchor--active' : ''}`}
-                        style={anchorStyle(kind, finding)}
-                        onClick={() => tapAnchor(finding)}
-                      >
-                        <Text className="report__anchor-index">{index + 1}</Text>
-                        <Text className="report__anchor-chip">{finding.label}</Text>
+                    {/* 顶部「最优优先级」绿色 tag：全局建议，浮在每张图顶部 */}
+                    {report.priority_title ? (
+                      <View className="report__priority-tag">
+                        <Text className="report__priority-tag-text">{REPORT_COPY.priorityBadge}</Text>
                       </View>
-                    ))}
+                    ) : null}
+                    {/* 左右两列常显标签 + 引导线 + 锚点端点 */}
+                    {leftLayout.map((item) => renderTag(item, 'left'))}
+                    {rightLayout.map((item) => renderTag(item, 'right'))}
                   </View>
                 </SwiperItem>
               )

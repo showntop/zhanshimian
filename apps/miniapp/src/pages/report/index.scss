@@ -171,65 +171,103 @@
     font-weight: 700;
   }
 
-  // 锚点默认收成数字圆点（不遮人物、互不压叠）；点按才展开标签。
-  &__anchor {
+  // 注解层：常显 tag + 引导线 + 端点。每个 finding 一个 annotation 块，
+  // 块内 line 绝对定位；胶囊另起一列用 left/right 贴边。
+  &__annotation {
     position: absolute;
-    display: flex;
-    align-items: center;
-    max-width: 72%;
-    padding: 6rpx;
-    border-radius: 999rpx;
-    background: rgba(255, 255, 255, 0.92);
-    box-shadow: 0 4rpx 14rpx rgba(31, 34, 30, 0.16);
-    transform: translate(-50%, -50%);
-    transition: transform 0.18s cubic-bezier(.2,.8,.2,1), background 0.18s ease;
+    inset: 0;
+    pointer-events: none;
+  }
 
+  // 顶部「最优优先级」绿色胶囊：全局最优先建议，浮在每张图顶部
+  &__priority-tag {
+    position: absolute;
+    top: 40rpx;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    padding: 12rpx 28rpx;
+    border-radius: 999rpx;
+    background: var(--moss);
+    color: #ffffff;
+    box-shadow: 0 6rpx 18rpx rgba(31, 34, 30, 0.18);
+  }
+  &__priority-tag-text {
+    font-size: 22rpx;
+    font-weight: 700;
+    letter-spacing: 2rpx;
+  }
+
+  // 左右两列常显胶囊：标题 + 副标题
+  &__tag {
+    position: absolute;
+    z-index: 4;
+    width: 220rpx;
+    padding: 12rpx 20rpx;
+    border-radius: 24rpx;
+    text-align: center;
+    box-shadow: 0 6rpx 18rpx rgba(31, 34, 30, 0.2);
+    pointer-events: auto;
+    transition: transform 0.18s cubic-bezier(.2, .8, .2, 1), background 0.18s ease, color 0.18s ease;
+
+    &--left {
+      left: 24rpx;
+      background: rgba(255, 255, 255, 0.95);
+      color: var(--ink);
+    }
+    &--right {
+      right: 24rpx;
+      background: rgba(31, 34, 30, 0.88);
+      color: #ffffff;
+    }
     &--active {
       background: var(--moss);
-      transform: translate(-50%, -50%) scale(1.04);
-
-      .report__anchor-index {
-        background: var(--cream);
-        color: var(--moss-pressed);
-      }
-
-      .report__anchor-chip {
-        max-width: 320rpx;
-        margin: 0 12rpx 0 10rpx;
-        opacity: 1;
-        color: #ffffff;
-      }
+      color: #ffffff;
+      transform: scale(1.04);
     }
+  }
+  &__tag-label {
+    display: block;
+    font-size: 22rpx;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  &__tag-detail {
+    display: block;
+    margin-top: 6rpx;
+    font-size: 18rpx;
+    font-weight: 400;
+    line-height: 1.35;
+    opacity: 0.75;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-align: left;
+  }
 
-    &-index {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 40rpx;
-      height: 40rpx;
-      flex-shrink: 0;
-      border-radius: 999rpx;
-      background: var(--moss-soft);
-      color: var(--moss-pressed);
-      font-size: 20rpx;
-      font-weight: 750;
-    }
-
-    &-chip {
-      max-width: 0;
-      margin: 0;
-      opacity: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-size: 20rpx;
-      font-weight: 650;
-      color: var(--ink);
-      transition:
-        max-width 0.24s cubic-bezier(.2,.8,.2,1),
-        margin 0.24s cubic-bezier(.2,.8,.2,1),
-        opacity 0.18s ease;
-    }
+  // 引导线：从胶囊外缘到 anchor 端点的细线
+  &__leader {
+    position: absolute;
+    height: 2rpx;
+    background: rgba(255, 255, 255, 0.55);
+    transform-origin: 0 50%;
+    z-index: 3;
+  }
+  // anchor 端点：白色小圆点，苔绿描边
+  &__anchor-dot {
+    position: absolute;
+    width: 14rpx;
+    height: 14rpx;
+    border-radius: 999rpx;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2rpx solid var(--moss);
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    box-shadow: 0 2rpx 6rpx rgba(31, 34, 30, 0.25);
   }
 
   &__section {

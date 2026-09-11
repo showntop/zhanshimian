@@ -189,6 +189,7 @@ export const REPORT_COPY = {
   sourceTitle: '来源照片',
   tagsTitle: '当前印象',
   priorityTitle: '最优先建议',
+  priorityBadge: '最优优先级',
   findingsTitle: '可提升点',
   emptyFindings: '这次没有必须调整的项目，可以按方案逐步尝试。',
   viewPlans: '查看我的 3 套方案',
