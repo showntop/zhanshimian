@@ -80,4 +80,7 @@
 .app-header-spacer {
   width: 100%;
   flex-shrink: 0;
+  /* 导航与页面内容之间的呼吸间距：全部页面共用此占位，一处生效。
+     此前 spacer 高度正好等于导航高度，内容紧贴导航底边没有留白。 */
+  margin-bottom: var(--space-xxl);
 }
