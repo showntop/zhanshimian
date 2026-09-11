@@ -298,11 +298,13 @@ export default function Plans() {
               single={!currentImage || !planImage || scene !== 'general'}
               current={
                 <View className="plans__stage">
+                  {plan ? <Text className="plans__watermark">{plan.name}</Text> : null}
                   <ExampleImage className="plans__stage-img" src={currentImage} user mode="heightFix" />
                 </View>
               }
               plan={
                 <View className="plans__stage">
+                  {plan ? <Text className="plans__watermark">{plan.name}</Text> : null}
                   <ExampleImage
                     className="plans__stage-img"
                     src={planImage}
@@ -312,8 +314,6 @@ export default function Plans() {
                 </View>
               }
             />
-            {/* 水印：超大方案名半透明衬底，强化方案性格差异 */}
-            {plan ? <Text className="plans__watermark">{plan.name}</Text> : null}
             {(plan?.outcome_tags ?? []).length > 0 ? (
               <View className="plans__outcome">
                 {plan!.outcome_tags.slice(0, 3).map((tag) => (

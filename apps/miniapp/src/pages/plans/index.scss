@@ -81,8 +81,8 @@
       min-height: 340rpx;
       border-radius: var(--radius-lg);
       overflow: hidden;
-      // 暖米 → 浅苔绿渐变底：aspectFit 全身展示的留白区有时尚杂志感，不发灰
-      background: linear-gradient(165deg, #f4efe2 0%, #e8edd8 55%, #dfe7cf 100%);
+      // 展台渐变：暖米 → 苔绿，底部加深让展台有存在感（太浅会读作「没填满」）
+      background: linear-gradient(165deg, #f1ecdd 0%, #e0e8cc 55%, #c9d7b2 100%);
       border: 1rpx solid var(--line);
       // 切换方案时整帧交叉淡入（key 重挂载触发）
       animation: plans-frame-in 0.3s ease both;
@@ -102,37 +102,48 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 30rpx 0;
+    padding: 20rpx 0;
   }
 
-  // 装裱照片卡：heightFix 按展台高度等比，宽度随照片比例自适应；
-  // 圆角 + 柔和投影 = 杂志装裱感。选择器权重需压过 .cmp .example-image
+  // 装裱照片卡：白色卡纸边 + 圆角 + 柔和投影 = 杂志装裱感。
+  // heightFix 按展台高度等比，宽度随照片比例自适应。
+  // 选择器权重需压过 .cmp .example-image
   .plans__stage .plans__stage-img.example-image {
     width: auto;
     height: 100%;
-    background: transparent;
-    border-radius: 0;
+    box-sizing: border-box;
+    padding: 14rpx;
+    background: #ffffff;
+    border-radius: 26rpx;
     overflow: visible;
+    box-shadow: 0 24rpx 60rpx rgba(31, 34, 30, 0.24);
 
     .example-image__img {
       width: auto;
       height: 100%;
-      border-radius: 20rpx;
-      box-shadow: 0 24rpx 56rpx rgba(31, 34, 30, 0.28);
+      border-radius: 14rpx;
+    }
+
+    // 角标移到卡内右上，避开底部收益胶囊
+    .example-badge {
+      top: 24rpx;
+      right: 24rpx;
+      bottom: auto;
     }
   }
 
-  // 方案名水印：超大衬线半透明，铺在展台左上角
+  // 方案名水印：超大衬线半透明，刻意从照片卡两侧探出
   &__watermark {
     position: absolute;
-    top: 28rpx;
-    left: 36rpx;
-    z-index: 3;
+    top: 20rpx;
+    left: 0;
+    right: 0;
+    text-align: center;
     font-family: 'Songti SC', 'STSong', serif;
-    font-size: 108rpx;
+    font-size: 140rpx;
     font-weight: 700;
-    letter-spacing: 10rpx;
-    color: rgba(88, 115, 68, 0.1);
+    letter-spacing: 12rpx;
+    color: rgba(88, 115, 68, 0.12);
     white-space: nowrap;
     pointer-events: none;
   }
