@@ -152,7 +152,7 @@
 
   &__name {
     font-family: 'Songti SC', 'STSong', serif;
-    font-size: 38rpx;
+    font-size: 32rpx;
     font-weight: 700;
     color: var(--ink);
   }
@@ -234,7 +234,31 @@
     }
   }
 
-  // 三选一条：紧凑单行选择器（高度让位给 hero 方案展示），
+  // 选择面板卡：三选一 + 当前方案名 + 变化点收进同一张卡，
+  // 一张卡一个职责，避免多个白色元素分离漂浮
+  &__chooser {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+    padding: 20rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface-strong);
+    border: 1rpx solid var(--line);
+    box-shadow: 0 8rpx 24rpx rgba(31, 34, 30, 0.08);
+
+    &-divider {
+      height: 1rpx;
+      background: var(--line);
+    }
+
+    &-foot {
+      display: flex;
+      flex-direction: column;
+      gap: 10rpx;
+    }
+  }
+
+  // 三选一：竖版缩略图（全照 aspectFit 完整显示），苔绿浅底替代白底
   // 推荐角标叠缩略图左上角；选中态描边 + 全不透明
   &__choices {
     display: flex;
@@ -256,7 +280,6 @@
 
       .plans__choice-thumb {
         border-color: var(--moss);
-        box-shadow: 0 0 0 3rpx var(--moss-soft);
       }
 
       .plans__choice-name {
@@ -268,11 +291,12 @@
     &-thumb {
       position: relative;
       width: 100%;
-      height: 120rpx;
+      height: 176rpx;
       border-radius: 14rpx;
       overflow: hidden;
+      background: var(--moss-soft);
       border: 3rpx solid transparent;
-      transition: border-color 0.25s ease, box-shadow 0.25s ease;
+      transition: border-color 0.25s ease;
     }
 
     &-img {

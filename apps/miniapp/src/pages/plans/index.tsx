@@ -29,7 +29,7 @@ const SCENE_TABS = [
 const NAV = getNavMetrics()
 const HEADER_GAP_PX = 24 // spacer margin-bottom 48rpx
 const TABS_PX = 40 // 场景 tab 行 + 容器间距
-const CHOICES_PX = 96 // 三选一条（缩略图 120rpx + 名称 + 间距）
+const CHOICES_PX = 190 // 选择面板卡（缩略图 176rpx + 名称 + 分隔 + 方案名 + chips + 卡内边距）
 const CTA_RESERVE_PX = 108 // 吸底 CTA（按钮 + 说明 + 安全区余量），防遮挡三选一条
 const HERO_PX = Math.max(
   340,
@@ -313,39 +313,47 @@ export default function Plans() {
           </View>
         </View>
 
-        {/* 三选一条：常驻可见的选择器，兼任翻页指示。
-            推荐方案挂角标降低选择成本 */}
-        <View className="plans__choices fade-up delay-1">
-          {plans.map((item, i) => (
-            <View
-              key={item.id}
-              className={`plans__choice ${i === index ? 'plans__choice--active' : ''} pressable`}
-              onClick={() => pickPlan(i)}
-            >
-              <View className="plans__choice-thumb">
-                <ExampleImage
-                  className="plans__choice-img"
-                  src={item.generated_image_url || item.image_url}
-                  mode="aspectFit"
-                />
-                {item.recommended ? <Text className="plans__choice-badge">推荐</Text> : null}
+        {/* 选择面板卡：三选一 + 当前方案名 + 变化点收进同一张卡，
+            避免缩略图/名称/信息卡三个白色元素分离漂浮。
+            缩略图竖版比例 + 苔绿浅底：全照完整展示，无白条感 */}
+        <View className="plans__chooser fade-up delay-1">
+          <View className="plans__choices">
+            {plans.map((item, i) => (
+              <View
+                key={item.id}
+                className={`plans__choice ${i === index ? 'plans__choice--active' : ''} pressable`}
+                onClick={() => pickPlan(i)}
+              >
+                <View className="plans__choice-thumb">
+                  <ExampleImage
+                    className="plans__choice-img"
+                    src={item.generated_image_url || item.image_url}
+                    mode="aspectFit"
+                  />
+                  {item.recommended ? <Text className="plans__choice-badge">推荐</Text> : null}
+                </View>
+                <Text className="plans__choice-name">{item.name}</Text>
               </View>
-              <Text className="plans__choice-name">{item.name}</Text>
+            ))}
+          </View>
+          {plan ? (
+            <View className="plans__chooser-foot">
+              <View className="plans__chooser-divider" />
+              <Text className="plans__name">{plan.name}</Text>
+              {(plan.difference_tags ?? []).length > 0 ? (
+                <View className="plans__diffs">
+                  {plan.difference_tags.slice(0, 3).map((tag) => (
+                    <Text key={tag} className="plans__diff">{tag}</Text>
+                  ))}
+                </View>
+              ) : null}
             </View>
-          ))}
+          ) : null}
         </View>
 
-        {/* 细节区（折叠线下）：变化点 chip + 折叠的 why + 生成/重试状态 */}
+        {/* 细节区（第 2 屏）：descriptor + 折叠的 why + 生成/重试状态 */}
         {plan ? (
           <View className="plans__info fade-up delay-2">
-            <Text className="plans__name">{plan.name}</Text>
-            {(plan.difference_tags ?? []).length > 0 ? (
-              <View className="plans__diffs">
-                {plan.difference_tags.slice(0, 3).map((tag) => (
-                  <Text key={tag} className="plans__diff">{tag}</Text>
-                ))}
-              </View>
-            ) : null}
             <Text className="plans__summary">{plan.descriptor}</Text>
             {plan.why ? (
               <View className="plans__why-wrap" onClick={() => setWhyOpen(!whyOpen)}>
