@@ -267,8 +267,6 @@ export default function Report() {
               return (
                 <SwiperItem key={kind} className="report__slide">
                   <View className="report__hero-frame">
-                    {/* 氛围模糊衬底：极端比例照片加载瞬间的兜底底色 */}
-                    <ExampleImage className="report__hero-bg" src={url} user={!demo} mode="aspectFill" />
                     <ExampleImage
                       className="report__hero-img"
                       src={url}

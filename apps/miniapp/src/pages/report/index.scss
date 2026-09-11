@@ -11,13 +11,14 @@
     // 底边，中间露一条背景色横带会像排版断裂（文字类页面保留该 gap）
     margin-top: calc(-1 * var(--space-xxl));
 
-    // 相框 == 照片：无圆角无描边无投影的全出血 hero，高度由 Swiper 内联控制
+    // 相框 == 照片：无圆角无描边无投影的全出血 hero，高度由 Swiper 内联控制。
+    // aspectFit 留白区与页面背景同色，视觉上自然融入
     &-frame {
       position: relative;
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: var(--moss-soft);
+      background: var(--bg);
     }
 
     &-img {
@@ -27,20 +28,6 @@
       height: 100%;
       // 切换来源照片时的轻淡入（时长对齐 motion.ts durations.previewFade）
       animation: report-photo-in 0.3s ease both;
-    }
-
-    // 氛围模糊衬底：只在超高照片 aspectFit 出两侧时露出；
-    // 加暗 + 提饱和，是环境光不是灰边
-    &-bg {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-
-      .example-image__img {
-        filter: blur(64rpx) saturate(1.35) brightness(0.82);
-        transform: scale(1.5);
-      }
     }
 
     // 渐变压暗层（不拦截锚点点击）
@@ -104,8 +91,9 @@
     height: 100%;
   }
 
-  // 内容板：全出血、大圆角叠上照片底边，缝合处软投影。
-  // 照片与报告内容由此「衔接」而不是上下堆叠。
+  // 内容板：全出血、直接上叠照片底边。aspectFit 时代照片左右留白与页面
+  // 同色，方角衔接无缺口；此前 40rpx 圆角会在缺口处露出衬底，像照片
+  // 顶部多了两个「弧角」
   &__sheet {
     position: relative;
     z-index: 2;
@@ -114,7 +102,6 @@
     gap: 24rpx;
     margin: -72rpx calc(-1 * var(--page-gutter)) 0;
     padding: 44rpx var(--page-gutter) 8rpx;
-    border-radius: 40rpx 40rpx 0 0;
     background: var(--bg);
     box-shadow: 0 -16rpx 40rpx rgba(24, 28, 22, 0.1);
   }
