@@ -98,12 +98,12 @@
     &-blur {
       position: absolute;
       inset: 0;
-
-      // 同照片放大模糊 + 提亮提饱和：环境光氛围，不是灰边
-      .example-image__img {
-        filter: blur(64rpx) saturate(1.35) brightness(1.06);
-        transform: scale(1.6);
-      }
+      // 滤镜必须挂在外层 View：微信小程序里 filter: blur() 作用在
+      // Image 组件上不可靠（近原生渲染），View 上支持稳定。
+      // 放大 1.7 倍把模糊软边推出相框外
+      filter: blur(56rpx) saturate(1.45) brightness(1.02);
+      transform: scale(1.7);
+      transform-origin: center;
     }
 
     &-img {
