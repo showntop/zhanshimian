@@ -111,6 +111,9 @@
       z-index: 1;
       width: 100%;
       height: 100%;
+      // 关键：ExampleImage 根节点自带米色实底，aspectFit 的两侧留白区
+      // 是不透明的——会把底下的模糊衬底完全盖住。必须透明化
+      background: transparent;
     }
 
     // 收益词叠加：直接回答「选这套能获得什么」，亮苔绿胶囊提亮画面
