@@ -353,8 +353,6 @@ func (s *Service) processAnalysis(ctx context.Context, task domain.Task) (string
 	}
 	// 任务标识随 ctx 传入 AI runtime，让每次调用的日志能关联到具体任务。
 	jobCtx := provider.WithInvocationSource(ctx, "analysis:"+payload.AnalysisID)
-	failCtx, failCancel := failContext()
-	defer failCancel()
 	reportProgress := func(progress int, stage string) {
 		_ = s.repo.UpdateTaskProgress(jobCtx, task.ID, progress, stage)
 		_ = s.repo.UpdateAnalysisProgress(jobCtx, payload.AnalysisID, progress, stage)
@@ -363,6 +361,10 @@ func (s *Service) processAnalysis(ctx context.Context, task domain.Task) (string
 	jobCtx = provider.WithProgressReporter(jobCtx, reportProgress)
 	output, err := s.analyzer.Analyze(jobCtx, input)
 	if err != nil {
+		// failContext 必须在 Analyze 返回后现开：photo_check 一轮就要 1–3 分钟，
+		// 开始前开的 10 秒窗口返回时已过期，分析行写不进去。
+		failCtx, failCancel := failContext()
+		defer failCancel()
 		var rejected *provider.PhotoRejectedError
 		if errors.As(err, &rejected) {
 			// photo_rejected 是永久失败：照片不合格重试也不会变化。
@@ -632,8 +634,12 @@ func (s *Service) loggerOrDefault() *slog.Logger {
 // 专供任务失败后的状态回写使用。worker 的 jobCtx 在 provider 调用因 5 分钟
 // 超时取消后已经过期，继续用它调回写会让 SQL 全部因 DeadlineExceeded 失败，
 // 任务永远停在 running。
+// failWriteTimeout 是失败回写窗口。测试里会收短，用来证明长 Analyze 之后
+// 仍必须在回写当下开新的 failContext，而不是复用 Analyze 开始时的那个。
+var failWriteTimeout = 10 * time.Second
+
 func failContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 10*time.Second)
+	return context.WithTimeout(context.Background(), failWriteTimeout)
 }
 
 // writeContext 返回一个独立的 1 分钟超时上下文，供生成完成后的对象存储写入

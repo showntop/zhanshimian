@@ -79,6 +79,24 @@ func (a errAnalyzer) Analyze(context.Context, domain.CreateAnalysisInput) (domai
 	return domain.AnalysisOutput{}, a.err
 }
 
+// delayAnalyzer 先耗过 failWriteTimeout，再返回错误。用来抓住
+// 「Analyze 开始时就开 failContext」导致分析行回写 DeadlineExceeded。
+type delayAnalyzer struct {
+	delay time.Duration
+	err   error
+}
+
+func (a delayAnalyzer) Analyze(ctx context.Context, _ domain.CreateAnalysisInput) (domain.AnalysisOutput, error) {
+	timer := time.NewTimer(a.delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return domain.AnalysisOutput{}, ctx.Err()
+	case <-timer.C:
+		return domain.AnalysisOutput{}, a.err
+	}
+}
+
 func newTaskTestService(repo repository.Repository, analyzer provider.Analyzer, logger *slog.Logger) *Service {
 	svc := &Service{repo: repo, analyzer: analyzer, logger: logger}
 	svc.handlers = map[domain.TaskType]TaskHandler{
@@ -137,6 +155,39 @@ func TestRunClaimedTaskPhotoRejectUsesFreshContext(t *testing.T) {
 		t.Fatalf("永久失败不应设置 retryAt，实际: %v", repo.failRetryAt)
 	}
 	assertFreshFailContext(t, repo.presentationErr, repo.presentationDeadline, repo.presentationHasDeadline)
+}
+
+// 回归：photo_check / 分析调用经常超过 10 秒。分析行失败回写若在
+// Analyze 开始时就开 failContext，返回时 ctx 已过期，SQL 写不进去，
+// 任务已 failed、分析行仍 processing，用户看到读路径兜底的超时文案。
+func TestProcessAnalysisPresentationWriteSurvivesLongAnalyze(t *testing.T) {
+	prev := failWriteTimeout
+	failWriteTimeout = 25 * time.Millisecond
+	t.Cleanup(func() { failWriteTimeout = prev })
+
+	repo := &taskWriteRecorder{}
+	svc := newTaskTestService(repo, delayAnalyzer{delay: 40 * time.Millisecond, err: errRetry}, nil)
+	svc.runClaimedTask(context.Background(), analysisTask(taskMaxAttempts[domain.TaskTypeAnalysis]))
+	assertFreshFailContext(t, repo.presentationErr, repo.presentationDeadline, repo.presentationHasDeadline)
+}
+
+func TestProcessAnalysisPhotoRejectWriteSurvivesLongAnalyze(t *testing.T) {
+	prev := failWriteTimeout
+	failWriteTimeout = 25 * time.Millisecond
+	t.Cleanup(func() { failWriteTimeout = prev })
+
+	repo := &taskWriteRecorder{}
+	svc := newTaskTestService(repo, delayAnalyzer{
+		delay: 40 * time.Millisecond,
+		err: &provider.PhotoRejectedError{Rejections: []provider.PhotoRejection{
+			{Kind: "face", Reason: "光线过暗"},
+		}},
+	}, nil)
+	svc.runClaimedTask(context.Background(), analysisTask(1))
+	assertFreshFailContext(t, repo.presentationErr, repo.presentationDeadline, repo.presentationHasDeadline)
+	if repo.failCode != taskErrorCodePhotoRejected {
+		t.Fatalf("期望 photo_rejected 错误码，实际: %q", repo.failCode)
+	}
 }
 
 // 任务失败必须留下任务级日志：未达重试上限打 WARN（带 attempt 与退避），
