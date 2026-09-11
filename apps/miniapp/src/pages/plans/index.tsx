@@ -291,27 +291,29 @@ export default function Plans() {
             key 随方案切换重挂载 → 重置手柄位置并触发交叉淡入 */}
         <View className="plans__hero fade-up">
           <View className="plans__hero-frame" style={{ height: `${HERO_PX}px` }} key={plan?.id}>
+            {/* 编辑杂志展台：相框 = 品牌渐变展台 + 方案名水印；照片为居中
+                装裱竖卡（heightFix 按高度等比，全身完整、卡片贴合照片比例）。
+                滑杆两层共用同一展台背景，拖动分界无接缝 */}
             <CompareSlider
               single={!currentImage || !planImage || scene !== 'general'}
               current={
-                <View className="plans__hero-stack">
-                  {/* 模糊衬底：同一张照片放大模糊提亮，填满两侧空隙 */}
-                  <ExampleImage className="plans__hero-blur" src={currentImage} user mode="aspectFill" />
-                  <ExampleImage className="plans__hero-img" src={currentImage} user mode="aspectFit" />
+                <View className="plans__stage">
+                  <ExampleImage className="plans__stage-img" src={currentImage} user mode="heightFix" />
                 </View>
               }
               plan={
-                <View className="plans__hero-stack">
-                  <ExampleImage className="plans__hero-blur" src={planImage} mode="aspectFill" />
+                <View className="plans__stage">
                   <ExampleImage
-                    className="plans__hero-img"
+                    className="plans__stage-img"
                     src={planImage}
                     badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
-                    mode="aspectFit"
+                    mode="heightFix"
                   />
                 </View>
               }
             />
+            {/* 水印：超大方案名半透明衬底，强化方案性格差异 */}
+            {plan ? <Text className="plans__watermark">{plan.name}</Text> : null}
             {(plan?.outcome_tags ?? []).length > 0 ? (
               <View className="plans__outcome">
                 {plan!.outcome_tags.slice(0, 3).map((tag) => (

@@ -15,7 +15,7 @@ interface ExampleImageProps {
   /** 用户本人照片模式（无效时渲染可见空态，不回退） */
   user?: boolean
   badgeText?: string
-  mode?: 'aspectFill' | 'aspectFit' | 'widthFix'
+  mode?: 'aspectFill' | 'aspectFit' | 'widthFix' | 'heightFix'
   className?: string
   /** 透传 Image onLoad：报告页用它拿照片真实宽高，换算 aspectFit 后的可视区来定位锚点。
    *  注意微信平台宽高可能是 string，消费侧自行 Number() 归一。 */
