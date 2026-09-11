@@ -12,7 +12,7 @@
     margin-top: calc(-1 * var(--space-xxl));
 
     // 相框 == 照片：无圆角无描边无投影的全出血 hero，高度由 Swiper 内联控制。
-    // aspectFit 留白区与页面背景同色，视觉上自然融入
+    // aspectFill 满宽铺满，上下居中裁切
     &-frame {
       position: relative;
       width: 100%;
@@ -226,11 +226,11 @@
     overflow: hidden;
   }
 
-  // 引导线：从胶囊外缘到 anchor 端点的细线（苔绿半透明，照片与留白区都可见）
+  // 引导线：从胶囊外缘到 anchor 端点的细线（白色半透明，满宽照片上可见）
   &__leader {
     position: absolute;
     height: 3rpx;
-    background: rgba(88, 115, 68, 0.55);
+    background: rgba(255, 255, 255, 0.6);
     transform-origin: 0 50%;
     z-index: 3;
   }
