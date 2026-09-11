@@ -76,7 +76,9 @@
   &__hero {
     &-frame {
       position: relative;
-      height: 680rpx;
+      // 高度由页面按视口运行时计算（内联 px）：第一屏 = hero + 三选一 + CTA，
+      // 信息卡推到第 2 屏；340rpx 兜底防极端小屏
+      min-height: 340rpx;
       border-radius: var(--radius-lg);
       overflow: hidden;
       background: var(--moss-soft);
@@ -266,8 +268,8 @@
     &-thumb {
       position: relative;
       width: 100%;
-      height: 156rpx;
-      border-radius: 16rpx;
+      height: 120rpx;
+      border-radius: 14rpx;
       overflow: hidden;
       border: 3rpx solid transparent;
       transition: border-color 0.25s ease, box-shadow 0.25s ease;
@@ -276,23 +278,28 @@
     &-img {
       width: 100%;
       height: 100%;
+
+      // 顶部锚定：竖版图只显示头部区域，不裁脸
+      .example-image__img {
+        height: auto;
+      }
     }
 
     &-badge {
       position: absolute;
-      top: 8rpx;
-      left: 8rpx;
+      top: 6rpx;
+      left: 6rpx;
       z-index: 2;
-      padding: 3rpx 12rpx;
+      padding: 2rpx 10rpx;
       border-radius: 999rpx;
       background: var(--moss);
       color: #ffffff;
-      font-size: 18rpx;
+      font-size: 17rpx;
       font-weight: 650;
     }
 
     &-name {
-      font-size: 20rpx;
+      font-size: 19rpx;
       color: var(--ink-2);
       text-align: center;
       white-space: nowrap;

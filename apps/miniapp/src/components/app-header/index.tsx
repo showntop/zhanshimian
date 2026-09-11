@@ -24,12 +24,18 @@ function measureNav() {
         statusBar,
         navHeight: capsule.bottom + gap,
         rightPad: Math.max(96, win.windowWidth - capsule.left + 8),
+        windowHeight: win.windowHeight,
       }
     }
-    return { statusBar, navHeight: statusBar + 44, rightPad: 96 }
+    return { statusBar, navHeight: statusBar + 44, rightPad: 96, windowHeight: win.windowHeight }
   } catch {
-    return { statusBar: 47, navHeight: 100, rightPad: 96 }
+    return { statusBar: 47, navHeight: 100, rightPad: 96, windowHeight: 667 }
   }
+}
+
+/** 导航真机测量（含视口高度）：满屏布局的页面（如方案页 hero）据此计算可用高度 */
+export function getNavMetrics() {
+  return measureNav()
 }
 
 export default function AppHeader({ title, back, transparent, onBack, right }: AppHeaderProps) {

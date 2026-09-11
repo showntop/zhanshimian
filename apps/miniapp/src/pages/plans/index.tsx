@@ -6,7 +6,7 @@ import { ScrollView, Text, View } from '@tarojs/components'
 import { POLL_INTERVALS, useTaskPolling, type Plan } from '@zsm/core'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
-import AppHeader from '../../components/app-header'
+import AppHeader, { getNavMetrics } from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
 import ExampleImage from '../../components/example-image'
 import CompareSlider from '../../components/compare-slider'
@@ -22,6 +22,19 @@ const SCENE_TABS = [
   { key: 'date', label: '约会' },
   { key: 'daily', label: '日常' },
 ] as const
+
+// hero 满屏计算（px）：视口 - 导航（含 spacer 48rpx 呼吸间距）- 场景 tab 行
+// - 三选一条 - 吸底 CTA 预留。第一屏 = hero + 三选一 + CTA，
+// 白色信息卡（方案细节）由此被推到第 2 屏。
+const NAV = getNavMetrics()
+const HEADER_GAP_PX = 24 // spacer margin-bottom 48rpx
+const TABS_PX = 40 // 场景 tab 行 + 容器间距
+const CHOICES_PX = 92 // 三选一条（缩略图 120rpx + 名称 + 间距）
+const CTA_RESERVE_PX = 86 // 吸底 CTA（按钮 + 说明，不含 fixed 定位占用的视觉）
+const HERO_PX = Math.max(
+  340,
+  Math.round(NAV.windowHeight - NAV.navHeight - HEADER_GAP_PX - TABS_PX - CHOICES_PX - CTA_RESERVE_PX),
+)
 
 export default function Plans() {
   const [scene, setScene] = useState<string>('general')
@@ -277,7 +290,7 @@ export default function Plans() {
             收益词（outcome_tags）叠加底部，第一眼回答「选它能得到什么」。
             key 随方案切换重挂载 → 重置手柄位置并触发交叉淡入 */}
         <View className="plans__hero fade-up">
-          <View className="plans__hero-frame" key={plan?.id}>
+          <View className="plans__hero-frame" style={{ height: `${HERO_PX}px` }} key={plan?.id}>
             <CompareSlider
               single={!currentImage || !planImage}
               current={<ExampleImage className="plans__hero-img" src={currentImage} user mode="widthFix" />}
