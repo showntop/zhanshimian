@@ -91,11 +91,10 @@
     }
   }
 
-  // 全出血：冲破 page gutter，照片贴齐屏幕边缘；高度内联随照片比例，过渡平滑
+  // 全出血：冲破 page gutter，照片贴齐屏幕边缘；高度固定，切换只有图片滑动
   &__swiper {
     margin: 0 calc(-1 * var(--page-gutter));
     overflow: hidden;
-    transition: height 0.3s cubic-bezier(.2,.8,.2,1);
   }
 
   &__slide {

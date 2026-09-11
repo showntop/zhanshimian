@@ -25,12 +25,12 @@ const PHOTO_LABEL: Record<string, string> = { face: '正脸', side: '侧脸', bo
 
 type PhotoKind = (typeof PHOTO_ORDER)[number]
 
-// hero 全出血宽度（rpx，designWidth 750）。照片区限高 ~54% 视口：
-// 照片按 aspectFit 完整放入，内容板叠上来，第一屏同时露出照片锚点与报告内容。
+// hero 全出血宽度（rpx，designWidth 750）。相框固定高度 ~56% 视口，
+// 照片按 aspectFill 铺满全宽（超出部分上下裁切），切换来源照片时
+// 只有相框内的图片滑动，下方内容纹丝不动（不会像整页切换）。
 const HERO_FULL_W = 750
 const { windowWidth = 375, windowHeight = 667 } = Taro.getSystemInfoSync()
-const HERO_CAP = Math.round((windowHeight * 0.54 * HERO_FULL_W) / (windowWidth || 375))
-const HERO_DEFAULT_H = Math.min(880, HERO_CAP)
+const HERO_H = Math.round((windowHeight * 0.56 * HERO_FULL_W) / (windowWidth || 375))
 
 function findingPhoto(finding: Finding): PhotoKind {
   return finding.photo === 'face' || finding.photo === 'side' ? finding.photo : 'body'
@@ -164,14 +164,8 @@ export default function Report() {
     (kind === 'body' && url === fallbackBodyPhoto && providerIsDemo)
   const visibleFindings = findings.filter((finding) => findingPhoto(finding) === currentPhotoKind)
 
-  // 相框高度 = min(照片铺满全宽的自然高, 视口上限)。超过上限的超高照片按高度
-  // aspectFit，两侧出现氛围模糊衬底；锚点坐标相对照片本身，要换算进框内位置。
-  const frameHeightFor = (kind: PhotoKind): number => {
-    const dims = photoDims[kind]
-    if (!dims) return HERO_DEFAULT_H
-    return Math.min(HERO_CAP, Math.round((HERO_FULL_W * dims.h) / dims.w))
-  }
-
+  // 锚点坐标相对原始照片，aspectFill 会被居中裁切：按缩放 + 裁切偏移
+  // 重映射到固定相框的百分比位置，保证锚点仍落在正确部位上。
   const anchorStyle = (kind: PhotoKind, finding: Finding) => {
     const ax = finding.anchor_x ?? 0.5
     const ay = finding.anchor_y ?? 0.5
@@ -182,14 +176,16 @@ export default function Report() {
         top: `${Math.min(89, Math.max(11, ay * 100))}%`,
       }
     }
-    const photoH = (HERO_FULL_W * dims.h) / dims.w
-    const frameH = Math.min(HERO_CAP, photoH)
-    const scale = frameH / photoH
-    const dispW = HERO_FULL_W * scale
-    const offX = (HERO_FULL_W - dispW) / 2
+    const scale = Math.max(HERO_FULL_W / dims.w, HERO_H / dims.h)
+    const scaledW = dims.w * scale
+    const scaledH = dims.h * scale
+    const offX = (HERO_FULL_W - scaledW) / 2
+    const offY = (HERO_H - scaledH) / 2
+    const x = ((offX + ax * scaledW) / HERO_FULL_W) * 100
+    const y = ((offY + ay * scaledH) / HERO_H) * 100
     return {
-      left: `${Math.min(93, Math.max(7, ((offX + ax * dispW) / HERO_FULL_W) * 100))}%`,
-      top: `${Math.min(92, Math.max(8, ay * 100))}%`,
+      left: `${Math.min(93, Math.max(7, x))}%`,
+      top: `${Math.min(92, Math.max(8, y))}%`,
     }
   }
 
@@ -200,7 +196,7 @@ export default function Report() {
         <View className="report__hero fade-up">
           <Swiper
             className="report__swiper"
-            style={{ height: `${frameHeightFor(currentPhotoKind)}rpx` }}
+            style={{ height: `${HERO_H}rpx` }}
             current={Math.max(0, photoTabs.indexOf(currentPhotoKind))}
             onChange={(e) => {
               const kind = photoTabs[e.detail.current]
@@ -217,13 +213,13 @@ export default function Report() {
               return (
                 <SwiperItem key={kind} className="report__slide">
                   <View className="report__hero-frame">
-                    {/* 氛围模糊衬底：仅超高照片 aspectFit 时露出，收拢两侧视线 */}
+                    {/* 氛围模糊衬底：极端比例照片加载瞬间的兜底底色 */}
                     <ExampleImage className="report__hero-bg" src={url} user={!demo} mode="aspectFill" />
                     <ExampleImage
                       className="report__hero-img"
                       src={url}
                       user={!demo}
-                      mode="aspectFit"
+                      mode="aspectFill"
                       badgeText={demo ? REPORT_COPY.demoMark : ''}
                       onLoad={(e) => {
                         const w = Number(e.detail.width)
