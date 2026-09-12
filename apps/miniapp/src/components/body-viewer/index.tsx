@@ -54,9 +54,10 @@ export default function BodyViewer({ presentation, bodyImageURL, badgeText }: Bo
     if (normalized !== index) setIndex(normalized)
   }
 
+  const isDemo = (presentation.provider_version ?? '').toLowerCase().startsWith('demo')
   const showVideo = mode === 'video' && Boolean(video)
   const showTurntable = !showVideo && frames.length > 0
-  const showCompare = frames.length >= 8
+  const showCompare = !isDemo && frames.length >= 8
   const showNoCompareHint = Boolean(video) && frames.length === 0
   const activeFrame = showTurntable ? frames[index] : null
   const compareFrame = showCompare ? frames[0] : null
@@ -93,6 +94,7 @@ export default function BodyViewer({ presentation, bodyImageURL, badgeText }: Bo
             />
           </View>
         ) : null}
+        {badgeText ? <Text className="example-badge body-viewer__badge">{badgeText}</Text> : null}
       </View>
 
       {showCompare && compareFrame ? (

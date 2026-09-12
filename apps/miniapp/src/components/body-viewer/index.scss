@@ -27,6 +27,12 @@
     height: 100%;
   }
 
+  &__badge {
+    right: 16rpx;
+    top: 16rpx;
+    bottom: auto;
+  }
+
   &__compare {
     margin-top: 24rpx;
     width: 100%;
