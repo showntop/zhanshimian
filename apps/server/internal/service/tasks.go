@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"strings"
 	"time"
@@ -721,45 +720,25 @@ func (s *Service) processBodyOrbit(ctx context.Context, task domain.Task) (strin
 }
 
 func (s *Service) loadOrbitPhotos(ctx context.Context, work domain.BodyPresentationInput) (body, face []byte, bodyMIME, faceMIME string, err error) {
-	assets, err := s.repo.GetMediaAssets(ctx, []string{work.BodyMediaID, work.FaceMediaID})
+	images, err := s.mediaLoader.Load(provider.WithImageBudget(ctx, provider.ImageBudgetEdit), []string{work.BodyMediaID, work.FaceMediaID})
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, nil, "", "", newPermanentTaskError(errors.New("body orbit photos are missing"))
 	}
 	if err != nil {
 		return nil, nil, "", "", err
 	}
-	byID := make(map[string]domain.MediaAsset, len(assets))
-	for _, asset := range assets {
-		byID[asset.ID] = asset
+	for _, img := range images {
+		switch img.Kind {
+		case "body":
+			body, bodyMIME = img.Data, img.MIMEType
+		case "face":
+			face, faceMIME = img.Data, img.MIMEType
+		}
 	}
-	bodyAsset, hasBody := byID[work.BodyMediaID]
-	faceAsset, hasFace := byID[work.FaceMediaID]
-	if !hasBody || !hasFace {
+	if len(body) == 0 || len(face) == 0 {
 		return nil, nil, "", "", newPermanentTaskError(errors.New("body orbit photos are missing"))
 	}
-	body, bodyMIME, err = s.readOrbitPhoto(ctx, bodyAsset)
-	if err != nil {
-		return nil, nil, "", "", err
-	}
-	face, faceMIME, err = s.readOrbitPhoto(ctx, faceAsset)
-	if err != nil {
-		return nil, nil, "", "", err
-	}
 	return body, face, bodyMIME, faceMIME, nil
-}
-
-func (s *Service) readOrbitPhoto(ctx context.Context, asset domain.MediaAsset) ([]byte, string, error) {
-	reader, err := s.storage.Open(ctx, asset.StorageKey)
-	if err != nil {
-		return nil, "", fmt.Errorf("open %s photo: %w", asset.Kind, err)
-	}
-	defer reader.Close()
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, "", fmt.Errorf("read %s photo: %w", asset.Kind, err)
-	}
-	data, mime := constrainEditImage(data, asset.MIMEType)
-	return data, mime, nil
 }
 
 func (h analysisTaskHandler) Handle(ctx context.Context, task domain.Task) (string, error) {

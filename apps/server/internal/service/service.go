@@ -58,6 +58,7 @@ type Service struct {
 	billingSKUs            []domain.BillingSKU
 	virtualPay             provider.VirtualPayer
 	wechatSession          provider.WeChatSessionExchanger
+	mediaLoader            *AnalysisMediaLoader
 }
 
 type ProviderOptions struct {
@@ -79,6 +80,7 @@ type ProviderOptions struct {
 	BillingSKUs   []domain.BillingSKU
 	VirtualPay    provider.VirtualPayer
 	WeChatSession provider.WeChatSessionExchanger
+	AssetDir      string
 }
 
 func New(repo repository.Repository, objects storage.ObjectStorage, analyzer provider.Analyzer, publicBaseURL string, sessionTTL time.Duration, maxUpload int64, logger *slog.Logger, options ...ProviderOptions) *Service {
@@ -100,6 +102,7 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 	billingSKUs := defaultBillingSKUs()
 	var virtualPay provider.VirtualPayer
 	var wechatSession provider.WeChatSessionExchanger
+	var assetDir string
 	if len(options) > 0 {
 		if options[0].Hair != nil {
 			hairGenerator = options[0].Hair
@@ -137,6 +140,7 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 		}
 		virtualPay = options[0].VirtualPay
 		wechatSession = options[0].WeChatSession
+		assetDir = options[0].AssetDir
 	}
 	service := &Service{
 		repo: repo, storage: objects, analyzer: analyzer, hairGenerator: hairGenerator,
@@ -151,6 +155,7 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 		publicBaseURL:          strings.TrimSuffix(publicBaseURL, "/"),
 		assetURLTTL:            assetURLTTL, sessionTTL: sessionTTL, maxUpload: maxUpload, logger: logger,
 		billingSKUs: billingSKUs, virtualPay: virtualPay, wechatSession: wechatSession,
+		mediaLoader: NewAnalysisMediaLoader(repo, objects, publicBaseURL, maxUpload, assetDir),
 	}
 	service.handlers = map[domain.TaskType]TaskHandler{
 		domain.TaskTypeAnalysis:    analysisTaskHandler{service},

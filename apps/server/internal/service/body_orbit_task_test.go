@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,24 @@ type stubOrbitGenerator struct {
 
 func (g stubOrbitGenerator) Generate(context.Context, provider.OrbitInput) (provider.OrbitOutput, error) {
 	return g.output, g.err
+}
+
+type capturingOrbitGenerator struct {
+	got    provider.OrbitInput
+	output provider.OrbitOutput
+}
+
+func (g *capturingOrbitGenerator) Generate(_ context.Context, in provider.OrbitInput) (provider.OrbitOutput, error) {
+	g.got = in
+	return g.output, nil
+}
+
+type openErrorStorage struct {
+	storage.ObjectStorage
+}
+
+func (openErrorStorage) Open(context.Context, string) (io.ReadCloser, error) {
+	return nil, errors.New("storage.Open must not read demo keys")
 }
 
 type bodyOrbitTaskRepo struct {
@@ -194,5 +213,49 @@ func TestProcessBodyOrbitRejectsNonMP4(t *testing.T) {
 	}
 	if repo.applied {
 		t.Fatal("unsupported MIME must not Apply")
+	}
+}
+
+func TestProcessBodyOrbitReadsDemoPhotosFromAssetDir(t *testing.T) {
+	objects, err := storage.NewLocal(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assetDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(assetDir, "looks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(assetDir, "looks", "natural.png"), []byte("demo-orbit-photo"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	repo := &bodyOrbitTaskRepo{
+		work: domain.BodyPresentationInput{
+			BodyMediaID: "11111111-1111-1111-1111-111111111111",
+			FaceMediaID: "22222222-2222-2222-2222-222222222222",
+		},
+		assets: []domain.MediaAsset{
+			{ID: "11111111-1111-1111-1111-111111111111", Kind: "body", StorageKey: "demo/body.png", MIMEType: "image/png"},
+			{ID: "22222222-2222-2222-2222-222222222222", Kind: "face", StorageKey: "demo/face.png", MIMEType: "image/png"},
+		},
+	}
+	gen := &capturingOrbitGenerator{output: provider.OrbitOutput{
+		VideoData: orbitFixtureMP4(t), MIMEType: "video/mp4", Duration: 3 * time.Second, ProviderVersion: "demo-body-orbit-v1",
+	}}
+	svc := New(repo, openErrorStorage{ObjectStorage: objects}, nil, "http://127.0.0.1", time.Hour, 1<<20, nil, ProviderOptions{
+		Orbit: gen, AssetDir: assetDir,
+	})
+	svc.orbitExtractor = stubExtract{frames: stubOrbitFrames(16)}
+
+	if _, err := svc.processBodyOrbit(context.Background(), bodyOrbitTask("pres-1")); err != nil {
+		t.Fatal(err)
+	}
+	if string(gen.got.Body) != "demo-orbit-photo" || string(gen.got.Face) != "demo-orbit-photo" {
+		t.Fatalf("body=%q face=%q", gen.got.Body, gen.got.Face)
+	}
+	if gen.got.BodyMIME != "image/png" || gen.got.FaceMIME != "image/png" {
+		t.Fatalf("bodyMIME=%q faceMIME=%q", gen.got.BodyMIME, gen.got.FaceMIME)
+	}
+	if !repo.applied {
+		t.Fatal("expected ApplyBodyOrbitResult after demo read")
 	}
 }
