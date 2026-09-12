@@ -130,6 +130,7 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		"dashscope_wan":            true,
 		"dashscope_wanx_imageedit": true,
 		"ark_image":                true,
+		"demo_orbit":               true,
 	}
 	structuredCapabilities := map[string]bool{
 		"appearance_analysis": true, "photo_check": true, "outfit_diagnosis": true,
@@ -143,6 +144,9 @@ func validateAIRouting(routing AIRoutingConfig) error {
 	}
 	imageCapabilities := map[string]bool{"hair_edit": true, "makeup_edit": true, "full_look_edit": true}
 	renderingCapabilities := map[string]bool{"full_look_generation": true, "render_quality_evaluation": true}
+	// 实验室 3D 形象 Lite：视频类能力，不经结构化/图像协议校验；Demo 夹具走
+	// demo_orbit 协议（生成器读本地资源目录，不发外部请求）。
+	videoCapabilities := map[string]bool{"body_orbit": true}
 	for id, model := range routing.Models {
 		if strings.TrimSpace(id) == "" || strings.TrimSpace(model.Vendor) == "" || strings.TrimSpace(model.Model) == "" {
 			return fmt.Errorf("AI model %q requires vendor and model", id)
@@ -164,7 +168,7 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		}
 	}
 	for capability, route := range routing.Routes {
-		if !structuredCapabilities[capability] && !imageCapabilities[capability] && !renderingCapabilities[capability] {
+		if !structuredCapabilities[capability] && !imageCapabilities[capability] && !renderingCapabilities[capability] && !videoCapabilities[capability] {
 			return fmt.Errorf("AI route %q is not a supported capability", capability)
 		}
 		if strings.TrimSpace(capability) == "" || route.Primary == "" {

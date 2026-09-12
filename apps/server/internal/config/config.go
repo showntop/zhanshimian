@@ -203,6 +203,11 @@ func Load() (Config, error) {
 				}
 			}
 			for id, model := range cfg.AIRouting.Models {
+				// 实验室专用夹具：DemoOrbitGenerator 忽略 URL/key，结果固定
+				// 打「效果示例」徽标；其余能力在生产一律不得用 demo 厂商。
+				if model.Protocol == "demo_orbit" {
+					continue
+				}
 				if strings.EqualFold(model.Vendor, "demo") {
 					return Config{}, fmt.Errorf("production AI model %q must not use demo vendor", id)
 				}
