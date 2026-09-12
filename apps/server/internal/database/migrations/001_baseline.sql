@@ -359,7 +359,11 @@ ALTER TABLE analysis_runs
 
 ALTER TABLE user_profiles
   ADD CONSTRAINT user_profiles_current_report_fk
-  FOREIGN KEY (user_id, current_report_id) REFERENCES reports(user_id, id);
+  FOREIGN KEY (current_report_id) REFERENCES reports(id) ON DELETE SET NULL;
+ALTER TABLE user_profiles
+  ADD CONSTRAINT user_profiles_current_report_owner_fk
+  FOREIGN KEY (user_id, current_report_id) REFERENCES reports(user_id, id)
+  DEFERRABLE INITIALLY DEFERRED;
 
 CREATE TABLE plan_sets (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -536,8 +540,12 @@ CREATE TABLE render_publications (
 
 ALTER TABLE render_heads
   ADD CONSTRAINT render_heads_current_publication_fk
+  FOREIGN KEY (current_publication_id) REFERENCES render_publications(id) ON DELETE SET NULL;
+ALTER TABLE render_heads
+  ADD CONSTRAINT render_heads_current_publication_owner_fk
   FOREIGN KEY (user_id, plan_variant_id, current_publication_id)
-    REFERENCES render_publications(user_id, plan_variant_id, id) ON DELETE CASCADE;
+    REFERENCES render_publications(user_id, plan_variant_id, id)
+    DEFERRABLE INITIALLY DEFERRED;
 
 CREATE TABLE plan_selections (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
