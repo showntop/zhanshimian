@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/repository"
 )
 
 const taskLeaseReturning = `
@@ -60,6 +61,71 @@ func (s *Store) Heartbeat(ctx context.Context, lease domain.TaskLease, extend ti
 		return false, err
 	}
 	return tag.RowsAffected() > 0, nil
+}
+
+func (s *Store) CommitLeasedTask(ctx context.Context, lease domain.TaskLease, subjectGeneration int64) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var currentGeneration int64
+	err = tx.QueryRow(ctx, `
+		SELECT subject_generation
+		FROM tasks
+		WHERE id=$1::uuid AND user_id=$2::uuid AND lease_token=$3::uuid
+		  AND lease_owner=$4 AND status='leased'
+		FOR UPDATE`, lease.ID, lease.UserID, lease.LeaseToken, lease.LeaseOwner).Scan(&currentGeneration)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return repository.ErrLeaseLost
+	}
+	if err != nil {
+		return err
+	}
+
+	taskStatus := domain.TaskSucceeded
+	opStatus := domain.OperationSucceeded
+	if currentGeneration != subjectGeneration {
+		taskStatus = domain.TaskSuperseded
+		opStatus = domain.OperationSuperseded
+	}
+
+	tag, err := tx.Exec(ctx, `
+		UPDATE tasks
+		SET status=$5,
+		    lease_token=NULL,
+		    lease_owner=NULL,
+		    lease_expires_at=NULL,
+		    progress_bps=10000,
+		    finished_at=now(),
+		    updated_at=now()
+		WHERE id=$1::uuid AND user_id=$2::uuid AND lease_token=$3::uuid
+		  AND lease_owner=$4 AND status='leased'`,
+		lease.ID, lease.UserID, lease.LeaseToken, lease.LeaseOwner, taskStatus)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return repository.ErrLeaseLost
+	}
+
+	tag, err = tx.Exec(ctx, `
+		UPDATE operations
+		SET status=$3,
+		    progress_bps=CASE WHEN $3='succeeded' THEN 10000 ELSE progress_bps END,
+		    finished_at=now(),
+		    updated_at=now(),
+		    version=version+1
+		WHERE id=$1::uuid AND user_id=$2::uuid`,
+		lease.OperationID, lease.UserID, opStatus)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return repository.ErrNotFound
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *Store) Fail(ctx context.Context, lease domain.TaskLease, failure domain.TaskFailure, availableAt time.Time) (bool, error) {
