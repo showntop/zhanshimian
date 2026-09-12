@@ -15,6 +15,9 @@ import type {
   CreateTodayPlanInput,
   BillingOrder,
   BillingSummary,
+  BodyPresentation,
+  BodyPresentationStatus,
+  CreateBodyPresentationInput,
   CreateWardrobeOutfitInput,
   Diagnosis,
   DiagnosisKind,
@@ -85,6 +88,9 @@ export const API_PATHS = {
   hairPreview: 'GET /v1/hair-previews/{id}',
   hairPreviewsSaved: 'GET /v1/hair-previews',
   hairPreviewSave: 'POST /v1/hair-previews/{id}/save',
+  bodyPresentations: 'POST /v1/body-presentations',
+  bodyPresentationStatus: 'GET /v1/body-presentations/status',
+  bodyPresentation: 'GET /v1/body-presentations/{id}',
   todayContext: 'GET /v1/today/context',
   todayPlanCurrent: 'GET /v1/today/plans/current',
   todayPlans: 'POST /v1/today/plans',
@@ -191,6 +197,9 @@ export interface ApiEndpoints {
   getActiveHairPreview(): Promise<HairPreview>
   listSavedHairPreviews(): Promise<HairPreview[]>
   saveHairPreview(id: string): Promise<HairPreview>
+  createBodyPresentation(input: CreateBodyPresentationInput): Promise<TaskCreated<BodyPresentation>>
+  getBodyPresentation(id: string): Promise<BodyPresentation>
+  getBodyPresentationStatus(): Promise<BodyPresentationStatus>
 
   // ---- 今日（5） ----
   getTodayContext(city?: string): Promise<TodayContext>
@@ -328,6 +337,10 @@ export function createApiEndpoints(client: ApiClient, options: EndpointOptions =
     getActiveHairPreview: () => client.request('/v1/hair-previews/active'),
     listSavedHairPreviews: () => client.request(`/v1/hair-previews${query({ saved: true })}`),
     saveHairPreview: (id) => client.request(`/v1/hair-previews/${encodeURIComponent(id)}/save`, { method: 'POST' }),
+    createBodyPresentation: (input) =>
+      client.requestEnvelope('/v1/body-presentations', { method: 'POST', data: input, timeout: 30000 }),
+    getBodyPresentationStatus: () => client.request('/v1/body-presentations/status'),
+    getBodyPresentation: (id) => client.request(pathId('/v1/body-presentations', id)),
 
     // ---------- 今日 ----------
     getTodayContext: (city) => client.request(`/v1/today/context${query({ city })}`),

@@ -90,6 +90,8 @@ tags:
     description: 穿搭诊断（穿搭/购单品，同步）
   - name: Hair
     description: 发型推荐与试戴预览
+  - name: Body
+    description: 全身立体预览（环绕视频抽帧）
   - name: Today
     description: 今日造型（上下文、方案、激活、反馈）
   - name: Shares
@@ -1706,6 +1708,114 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  '/v1/body-presentations':
+    post:
+      operationId: createBodyPresentation
+      summary: 创建全身立体预览
+      description: 异步生成环绕预览：202 返回 BodyPresentation 与 body_orbit 任务引用，以 900ms 轮询。请求体只需正脸与全身媒体 ID；同一用户已有 queued/processing 的 body_orbit 时返回已有资源，不重复扣费。未配置 body_orbit 能力时 503（capability_unavailable）。
+      tags: [Body]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body_media_id, face_media_id]
+              properties:
+                body_media_id:
+                  type: string
+                  description: 全身照媒体 ID
+                face_media_id:
+                  type: string
+                  description: 正脸照媒体 ID
+      responses:
+        '202':
+          description: 已受理；task 用于轮询
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data, task]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BodyPresentation'
+                      task:
+                        $ref: '#/components/schemas/TaskRef'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/body-presentations/status':
+    get:
+      operationId: getBodyPresentationStatus
+      summary: 全身预览能力与最近状态
+      description: 实验室启动用：available 表示是否配置了 body_orbit；active / completed / failed 分别为进行中、最新可播成功、比成功更新的最新失败（无则为 null）。
+      tags: [Body]
+      responses:
+        '200':
+          description: 能力开关与最近预览
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BodyPresentationStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/body-presentations/{id}':
+    get:
+      operationId: getBodyPresentation
+      summary: 单个全身立体预览
+      description: 读取预览状态与环绕结果（状态/进度投影自 body_orbit 任务）；越权或不存在一律 404。
+      tags: [Body]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 预览 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 预览详情
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BodyPresentation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   '/v1/today/context':
     get:
       operationId: getTodayContext
@@ -2817,7 +2927,7 @@ components:
           description: 任务 ID（用于 GET /v1/tasks/{id} 轮询）
         type:
           type: string
-          enum: [analysis, hair_preview, plan_look, today_look]
+          enum: [analysis, hair_preview, plan_look, today_look, body_orbit]
           description: 任务类型
 
     Task:
@@ -2828,7 +2938,7 @@ components:
           type: string
         type:
           type: string
-          enum: [analysis, hair_preview, plan_look, today_look]
+          enum: [analysis, hair_preview, plan_look, today_look, body_orbit]
         status:
           type: string
           enum: [queued, processing, completed, failed]
@@ -3275,6 +3385,121 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    OrbitFrame:
+      type: object
+      required: [yaw, url]
+      properties:
+        yaw:
+          type: number
+          description: 绕竖直轴偏航角（度）
+        url:
+          type: string
+          format: uri
+          description: 该角度帧图（禁 WebP）
+
+    BodyOrbit:
+      type: object
+      required: [frames]
+      properties:
+        video_url:
+          type: string
+          format: uri
+          description: 环绕预览视频（完成前可缺省）
+        duration_ms:
+          type: integer
+          description: 视频时长毫秒
+        frames:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrbitFrame'
+          description: 抽帧结果；残帧降级后可为空数组
+
+    BodyMesh:
+      type: object
+      required: [format, url]
+      properties:
+        format:
+          type: string
+          enum: [glb]
+        url:
+          type: string
+          format: uri
+        texture_url:
+          type: string
+          format: uri
+
+    BodyPresentation:
+      type: object
+      required:
+        - id
+        - body_media_id
+        - face_media_id
+        - representation
+        - orbit
+        - mesh
+        - status
+        - progress
+        - stage
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        body_media_id:
+          type: string
+        face_media_id:
+          type: string
+        representation:
+          type: string
+          enum: [orbit, mesh]
+        orbit:
+          $ref: '#/components/schemas/BodyOrbit'
+        mesh:
+          oneOf:
+            - $ref: '#/components/schemas/BodyMesh'
+            - type: 'null'
+        provider_version:
+          type: string
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        stage:
+          type: string
+        error_message:
+          type: string
+        task:
+          $ref: '#/components/schemas/Task'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    BodyPresentationStatus:
+      type: object
+      required: [available, active, completed, failed]
+      properties:
+        available:
+          type: boolean
+          description: ai-routing 是否配置了 body_orbit
+        active:
+          oneOf:
+            - $ref: '#/components/schemas/BodyPresentation'
+            - type: 'null'
+        completed:
+          oneOf:
+            - $ref: '#/components/schemas/BodyPresentation'
+            - type: 'null'
+        failed:
+          oneOf:
+            - $ref: '#/components/schemas/BodyPresentation'
+            - type: 'null'
 
     TodayContext:
       type: object
