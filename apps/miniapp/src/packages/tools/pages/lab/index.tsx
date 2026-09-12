@@ -38,10 +38,6 @@ type Viewing = 'auto' | 'completed' | 'failed'
 
 const ACTIVE_OPERATION_STATES = new Set(['accepted', 'running', 'retrying'])
 
-function emptyStatus(): BodyPresentationStatus {
-  return { available: false, active: null, completed: null, failed: null }
-}
-
 // 角标只认服务端投影的 source_kind（红线：不按 provider、不按 URL 推断）。
 function viewerBadge(presentation: BodyPresentation): string {
   return presentation.source_kind === 'demo_example' ? IMAGE_BADGE_COPY.demo : IMAGE_BADGE_COPY.aiPreview
@@ -68,6 +64,7 @@ export default function Lab() {
   const [viewing, setViewing] = useState<Viewing>('auto')
   const [busy, setBusy] = useState(false)
   const [pollFailed, setPollFailed] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
   const { pageClass, enter } = usePageShell(true, '', 'lab')
 
   const load = useCallback(async () => {
@@ -87,8 +84,10 @@ export default function Lab() {
       )
       setOperationId(nextStatus.active && running ? running.id : '')
       setPollFailed(false)
+      setLoadFailed(false)
     } catch {
-      setStatus((prev) => prev ?? emptyStatus())
+      // 首读失败不伪造空状态（22f7b41）：保留旧数据，卡片走可读错误态。
+      setLoadFailed(true)
     }
   }, [])
 
@@ -104,12 +103,32 @@ export default function Lab() {
   const { operations } = useOperationPolling({
     operationIds: operationId ? [operationId] : [],
     enabled: Boolean(operationId) && !pollFailed,
-    onSettled: () => {
+    onSettled: (settled) => {
+      const outcome = settled[0]
       setOperationId('')
-      void peripherals.getBodyPresentationStatus().then((next) => {
-        setStatus(next)
+      // 先用轮询终态就地折叠（22f7b41：重拉失败也不能把卡片卡回进度条），
+      // 再后台对齐启动读模型。
+      if (outcome) {
+        setStatus((prev) => {
+          if (!prev?.active) return prev
+          if (outcome.status === 'succeeded') {
+            return {
+              ...prev, active: null, failed: null,
+              completed: { ...prev.active, status: 'completed', progress: 100 },
+            }
+          }
+          if (outcome.status === 'failed') {
+            return { ...prev, active: null, failed: { ...prev.active, status: 'failed' } }
+          }
+          return prev
+        })
+      }
+      if (outcome?.status === 'failed') {
         setViewing((current) => (current === 'completed' ? current : 'auto'))
-      }).catch(() => undefined)
+      }
+      void peripherals.getBodyPresentationStatus().then(setStatus).catch(() => {
+        if (outcome?.status === 'failed') setPollFailed(true)
+      })
     },
     onFetchFailure: () => {
       setPollFailed(true)
@@ -127,7 +146,6 @@ export default function Lab() {
     }
     setBusy(true)
     setPollFailed(false)
-    setViewing('auto')
     try {
       const accepted = await peripherals.createBodyPresentation({
         body_media_id: body.asset_id,
@@ -135,6 +153,7 @@ export default function Lab() {
       })
       resourceCache.write(resourceKey('operation', accepted.operation.id), accepted.operation)
       setOperationId(accepted.operation.id)
+      setViewing('auto')
       setStatus((prev) => ({
         available: prev?.available ?? true,
         active: accepted.data,
@@ -178,11 +197,14 @@ export default function Lab() {
 
   const loaded = status !== null
   const active = status?.active ? projectActive(status.active, activeOperation) : null
-  const showProgress = Boolean(active) && !pollFailed
-  const showError = Boolean(status?.available) && (Boolean(status?.failed) || pollFailed) && viewing !== 'completed' && !showProgress
+  const showLoadError = loadFailed && status === null
+  const showProgress = Boolean(active) && !pollFailed && (active?.status === 'queued' || active?.status === 'processing')
+  const showError =
+    showLoadError ||
+    (Boolean(status?.available) && !busy && (Boolean(status?.failed) || pollFailed) && viewing !== 'completed' && !showProgress)
   const showViewer = Boolean(status?.available) && Boolean(status?.completed) && !showProgress && !showError
   const showEmpty = Boolean(status?.available) && !showProgress && !showError && !showViewer && (!face || !body)
-  const showWaitlist = status !== null && !status.available
+  const showWaitlist = status !== null && !status.available && !showLoadError
 
   const cardStatus = (feature: LabFeature): string => {
     if (feature.key !== '3d' || showWaitlist) {
@@ -204,6 +226,23 @@ export default function Lab() {
         </Text>
       </View>
     )
+
+    if (showError) {
+      return (
+        <View className="lab__card-copy lab__card-copy--state">
+          {head}
+          <ErrorState
+            title={LAB_COPY.failed}
+            message={status?.failed?.error_message || LAB_COPY.failed}
+            retryText={LAB_COPY.retry}
+            onRetry={() => void (showLoadError ? load() : generate())}
+          />
+          {!showLoadError && status?.completed ? (
+            <TextLink className="lab__card-viewlast" text={LAB_COPY.viewLast} onClick={() => setViewing('completed')} />
+          ) : null}
+        </View>
+      )
+    }
 
     if (!loaded || showWaitlist) {
       return (
@@ -242,23 +281,6 @@ export default function Lab() {
             </View>
           </View>
         </>
-      )
-    }
-
-    if (showError) {
-      return (
-        <View className="lab__card-copy lab__card-copy--state">
-          {head}
-          <ErrorState
-            title={LAB_COPY.failed}
-            message={status?.failed?.error_message || LAB_COPY.failed}
-            retryText={LAB_COPY.retry}
-            onRetry={() => void generate()}
-          />
-          {status?.completed ? (
-            <TextLink className="lab__card-viewlast" text={LAB_COPY.viewLast} onClick={() => setViewing('completed')} />
-          ) : null}
-        </View>
       )
     }
 
@@ -322,8 +344,10 @@ export default function Lab() {
         <View className={`lab__intro ${enter()}`}>
           <Text className="lab__title">这里放「哇塞」，不打断核心流程</Text>
         </View>
-        {FEATURES.map((feature, i) => (
-          <View key={feature.key} className={`lab__card card ${enter((i + 1) as 1 | 2 | 3)}`}>
+        {FEATURES.map((feature, i) => {
+          const wide = feature.key === '3d' && (showViewer || showError || showEmpty || showLoadError)
+          return (
+          <View key={feature.key} className={`lab__card card ${wide ? 'lab__card--wide' : ''} ${enter((i + 1) as 1 | 2 | 3)}`}>
             {feature.key === '3d' ? (
               render3d(feature)
             ) : (
@@ -344,7 +368,8 @@ export default function Lab() {
               </>
             )}
           </View>
-        ))}
+          )
+        })}
       </View>
     </View>
   )
