@@ -187,6 +187,42 @@ func TestIdempotencyAbortsOnPanic(t *testing.T) {
 	}
 }
 
+func TestIdempotencyDoesNotAbortAfter2xxWhenRequestCancelled(t *testing.T) {
+	store := &cancelSensitiveStore{memoryIdempotencyStore: newMemoryIdempotencyStore()}
+	api := &API{idempotency: store, logger: discardLogger()}
+	calls := 0
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		writeData(w, http.StatusCreated, map[string]string{"id": "asset-1"})
+		cancel()
+	})
+	handler := api.requireIdempotency(next)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/media/upload-intents", strings.NewReader(`{"purpose":"face"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Request-ID", "req-idem-1")
+	req.Header.Set("Idempotency-Key", "key-1")
+	req = req.WithContext(context.WithValue(ctx, userKey, domain.User{ID: "u1"}))
+	first := httptest.NewRecorder()
+	handler.ServeHTTP(first, req)
+	if first.Code != http.StatusCreated {
+		t.Fatalf("first status = %d body=%s", first.Code, first.Body.String())
+	}
+	if store.aborts != 0 {
+		t.Fatalf("Abort called %d times after 2xx", store.aborts)
+	}
+
+	second := requestWithKey(t, handler, "key-1", `{"purpose":"face"}`)
+	if calls != 1 {
+		t.Fatalf("handler calls = %d, want 1 (second status=%d body=%s)", calls, second.Code, second.Body.String())
+	}
+	if second.Code != http.StatusCreated && !strings.Contains(second.Body.String(), `"code":"idempotency_in_progress"`) {
+		t.Fatalf("replay status = %d body=%s", second.Code, second.Body.String())
+	}
+}
+
 func TestIdempotencyRequiresVisibleASCIIKey(t *testing.T) {
 	handler := authenticatedIdempotentHandler(t, successfulCreateHandler())
 	for _, key := range []string{"", strings.Repeat("a", 129), "key\n1", "键"} {
@@ -329,6 +365,23 @@ func (s *memoryIdempotencyStore) CompleteIdempotency(_ context.Context, userID, 
 	rec.ResponseBody = append(json.RawMessage(nil), body...)
 	s.rows[id] = rec
 	return nil
+}
+
+type cancelSensitiveStore struct {
+	*memoryIdempotencyStore
+	aborts int
+}
+
+func (s *cancelSensitiveStore) CompleteIdempotency(ctx context.Context, userID, key string, status int, body json.RawMessage) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.memoryIdempotencyStore.CompleteIdempotency(ctx, userID, key, status, body)
+}
+
+func (s *cancelSensitiveStore) AbortIdempotency(ctx context.Context, userID, key string) error {
+	s.aborts++
+	return s.memoryIdempotencyStore.AbortIdempotency(ctx, userID, key)
 }
 
 func (s *memoryIdempotencyStore) AbortIdempotency(_ context.Context, userID, key string) error {

@@ -74,24 +74,27 @@ func (a *API) requireIdempotency(next http.Handler) http.Handler {
 		}
 
 		captured := &captureResponseWriter{ResponseWriter: w, status: http.StatusOK}
-		committed := false
+		persistCtx := context.WithoutCancel(r.Context())
+		shouldAbort := true
 		defer func() {
 			recovered := recover()
-			if recovered != nil || !committed {
-				_ = a.idempotency.AbortIdempotency(context.WithoutCancel(r.Context()), userID, key)
-			}
+			produced2xx := captured.wroteHeader && captured.status >= 200 && captured.status < 300
 			if recovered != nil {
+				if !produced2xx {
+					_ = a.idempotency.AbortIdempotency(persistCtx, userID, key)
+				}
 				panic(recovered)
+			}
+			if shouldAbort {
+				_ = a.idempotency.AbortIdempotency(persistCtx, userID, key)
 			}
 		}()
 		next.ServeHTTP(captured, r)
 		if captured.status < 200 || captured.status >= 300 {
 			return
 		}
-		if err := a.idempotency.CompleteIdempotency(r.Context(), userID, key, captured.status, captured.body.Bytes()); err != nil {
-			return
-		}
-		committed = true
+		shouldAbort = false
+		_ = a.idempotency.CompleteIdempotency(persistCtx, userID, key, captured.status, captured.body.Bytes())
 	})
 }
 
