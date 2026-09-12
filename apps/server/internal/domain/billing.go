@@ -29,6 +29,48 @@ const (
 	WelcomePlanSet  = "plan_set"
 )
 
+type BillingReservationStatus string
+
+const (
+	BillingReserved BillingReservationStatus = "reserved"
+	BillingSettled  BillingReservationStatus = "settled"
+	BillingRefunded BillingReservationStatus = "refunded"
+)
+
+type BillingReservation struct {
+	ID          string
+	UserID      string
+	OperationID string
+	Kind        string
+	Units       int
+	Status      BillingReservationStatus
+	ResultType  string
+	ResultID    string
+	Version     int
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type ReserveBilling struct {
+	UserID      string
+	OperationID string
+	Kind        string
+	Units       int
+}
+
+type SettleBilling struct {
+	UserID      string
+	OperationID string
+	ResultType  string
+	ResultID    string
+}
+
+type RefundBilling struct {
+	UserID      string
+	OperationID string
+	Reason      string
+}
+
 type BillingWallet struct {
 	UserID              string
 	Credits             int

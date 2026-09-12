@@ -9,16 +9,10 @@ import (
 	"github.com/zhanshimian/server/internal/domain"
 )
 
-var ErrNotFound = errNotFound("resource not found")
-
 // ErrTaskRemoved marks a worker task whose target row was deleted while it was
 // being processed (for example via DELETE /v1/me/data). It is not a failure
 // worth retrying: the user discarded the data, so the result is moot.
 var ErrTaskRemoved = errors.New("task target removed while processing")
-
-type errNotFound string
-
-func (e errNotFound) Error() string { return string(e) }
 
 type Repository interface {
 	// ---- 身份、会话与资料 ----

@@ -12,9 +12,7 @@ const (
 	AnalysisFailed     = "failed"
 )
 
-// ---- 统一任务系统 ----
-
-type TaskType string
+// ---- 旧业务任务常量与入队辅助（新 Task 见 task.go） ----
 
 const (
 	TaskTypeAnalysis    TaskType = "analysis"
@@ -23,33 +21,6 @@ const (
 	TaskTypePlanLook    TaskType = "plan_look"
 	TaskTypeTodayLook   TaskType = "today_look"
 )
-
-// Task statuses follow the contract enum queued/processing/completed/failed,
-// shared with the analyses table.
-const (
-	TaskQueued     = "queued"
-	TaskProcessing = "processing"
-	TaskCompleted  = "completed"
-	TaskFailed     = "failed"
-)
-
-// Task is one row of the unified queue. Payload carries the domain reference
-// (analysis_id / preview_id / plan_id); handlers re-hydrate business data by
-// that reference so the queue never duplicates domain state.
-type Task struct {
-	ID        string
-	UserID    string
-	Type      string
-	Payload   json.RawMessage
-	Status    string
-	Progress  int
-	Stage     string
-	Attempts  int
-	LastError string
-	ResultRef string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
 
 // TaskInput is what service layers hand to the queue when enqueueing.
 type TaskInput struct {
@@ -111,48 +82,6 @@ type JobsHealth struct {
 	FailedLastHour      int64 `json:"failed_last_hour"`
 }
 
-// ---- 身份与会话 ----
-
-type Session struct {
-	Token     string    `json:"token"`
-	ExpiresAt time.Time `json:"expires_at"`
-	User      User      `json:"user"`
-}
-
-type User struct {
-	ID       string `json:"id"`
-	Nickname string `json:"nickname"`
-}
-
-// IdentityProvider values are fixed by the user_identities CHECK constraint.
-const (
-	ProviderWeChatMiniApp = "wechat_miniapp"
-	ProviderWeChatApp     = "wechat_app"
-	ProviderApple         = "apple"
-	ProviderPhone         = "phone"
-)
-
-type Identity struct {
-	ID         string    `json:"id"`
-	Provider   string    `json:"provider"`
-	Identifier string    `json:"identifier"`
-	CreatedAt  time.Time `json:"created_at"`
-}
-
-// UserProfile is the persisted 补充资料: height/role/budget are required on
-// PUT, the measurements are optional. A missing row simply means the user has
-// not filled the profile yet (GET returns null).
-type UserProfile struct {
-	HeightCM  int       `json:"height_cm"`
-	Role      string    `json:"role"`
-	Budget    string    `json:"budget"`
-	WeightKG  *float64  `json:"weight_kg,omitempty"`
-	BustCM    *float64  `json:"bust_cm,omitempty"`
-	WaistCM   *float64  `json:"waist_cm,omitempty"`
-	HipCM     *float64  `json:"hip_cm,omitempty"`
-	UpdatedAt time.Time `json:"updated_at,omitempty"`
-}
-
 // MeAccount is the GET /v1/me payload: the account plus every bound identity.
 type MeAccount struct {
 	ID         string          `json:"id"`
@@ -171,18 +100,7 @@ type SmsCode struct {
 	CreatedAt time.Time
 }
 
-// ---- 媒体与分析 ----
-
-type MediaAsset struct {
-	ID         string    `json:"id"`
-	Kind       string    `json:"kind"`
-	URL        string    `json:"url"`
-	Demo       bool      `json:"demo,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
-	StorageKey string    `json:"-"`
-	MIMEType   string    `json:"-"`
-	ByteSize   int64     `json:"-"`
-}
+// ---- 分析 ----
 
 type CreateAnalysisInput struct {
 	Scene    string   `json:"scene"`
