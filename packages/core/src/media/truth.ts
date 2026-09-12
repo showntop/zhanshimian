@@ -89,6 +89,14 @@ export function lookImage(value: unknown): string {
   return isDisplayableImage(normalized) ? normalized : ''
 }
 
+export function lookVideo(value: unknown): string {
+  if (typeof value !== 'string' || !value) return ''
+  if (/\.(webp|webm)(\?\S*)?$/i.test(value)) return ''
+  if (!isDisplayableImage(value)) return ''
+  if (/\.mp4(\?\S*)?$/i.test(value)) return value
+  return ''
+}
+
 // 显式示例图：仅用于「风格参考」场景，调用点必须叠加
 // 「风格参考」/「示例」角标（.example-badge + .example-soft）。
 // 未知 slug 回落 natural、未知 variant 回落 full（与原型一致）。

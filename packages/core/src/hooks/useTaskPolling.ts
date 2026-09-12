@@ -14,7 +14,9 @@ export const POLL_INTERVALS = {
   /** 今日方案生成 */
   today: 3000,
   /** 首页任务横轨（批量） */
-  homeTasks: 1500
+  homeTasks: 1500,
+  /** 3D 形象 Lite 环绕视频 */
+  bodyOrbit: 900
 } as const
 
 export type PollScenario = keyof typeof POLL_INTERVALS

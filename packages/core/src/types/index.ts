@@ -42,7 +42,55 @@ export interface UserProfile {
 }
 
 // ---------- 统一任务 ----------
-export type TaskType = 'analysis' | 'plan_group' | 'plan_look' | 'hair_preview' | 'today_look'
+export type TaskType = 'analysis' | 'plan_group' | 'plan_look' | 'hair_preview' | 'today_look' | 'body_orbit'
+
+export type BodyRepresentation = 'orbit' | 'mesh'
+
+export interface OrbitFrame {
+  yaw: number
+  url: string
+}
+
+export interface BodyOrbit {
+  video_url?: string
+  duration_ms?: number
+  frames: OrbitFrame[]
+}
+
+export interface BodyMesh {
+  format: 'glb'
+  url: string
+  texture_url?: string
+}
+
+export interface BodyPresentation {
+  id: string
+  body_media_id: string
+  face_media_id: string
+  representation: BodyRepresentation
+  orbit: BodyOrbit
+  mesh: BodyMesh | null
+  provider_version?: string
+  status: TaskStatus
+  progress: number
+  stage: string
+  error_message?: string
+  task?: Task
+  created_at: string
+  updated_at: string
+}
+
+export interface BodyPresentationStatus {
+  available: boolean
+  active: BodyPresentation | null
+  completed: BodyPresentation | null
+  failed: BodyPresentation | null
+}
+
+export interface CreateBodyPresentationInput {
+  body_media_id: string
+  face_media_id: string
+}
 export type TaskStatus = 'queued' | 'processing' | 'completed' | 'failed'
 
 export interface TaskError {

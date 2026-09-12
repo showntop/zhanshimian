@@ -3,6 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   lookImage,
+  lookVideo,
   userImage,
   exampleImage,
   isBundledAsset,
@@ -75,6 +76,18 @@ test('exampleImage: 经注入的 LocalLooksResolver 解析（平台各自实现�
   assert.equal(exampleImage('bad', 'bad'), 'rn://natural-full')
   // 还原默认解析器，避免影响其他用例
   setLocalLooksResolver({ resolve: (slug, variant) => `/assets/${variant === 'full' ? 'looks' : variant}s/${slug}.jpg` })
+})
+
+test('lookVideo: 空/WebP/WebM/非法拒绝，MP4 协议地址通过', () => {
+  assert.equal(lookVideo(''), '')
+  assert.equal(lookVideo(null), '')
+  assert.equal(lookVideo('https://cdn.example.com/a.webp'), '')
+  assert.equal(lookVideo('https://cdn.example.com/a.webm'), '')
+  assert.equal(lookVideo('https://cdn.example.com/a.webm?v=1'), '')
+  assert.equal(lookVideo('not-a-url'), '')
+  assert.equal(lookVideo('https://cdn.example.com/orbit.mp4'), 'https://cdn.example.com/orbit.mp4')
+  assert.equal(lookVideo('http://127.0.0.1:58000/uploads/u/orbit.mp4'), 'http://127.0.0.1:58000/uploads/u/orbit.mp4')
+  assert.equal(lookVideo('wxfile://tmp/orbit.mp4'), 'wxfile://tmp/orbit.mp4')
 })
 
 test('常量与 isDisplayableImage 契约', () => {
