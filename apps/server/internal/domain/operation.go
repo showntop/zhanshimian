@@ -20,6 +20,14 @@ const (
 	OperationSuperseded OperationStatus = "superseded"
 )
 
+// OperationRef is the public operation reference exposed beside 202
+// envelopes; clients poll it instead of reading internal tasks.
+type OperationRef struct {
+	ID     string        `json:"id"`
+	Kind   OperationKind `json:"kind"`
+	Status OperationStatus `json:"status"`
+}
+
 type Operation struct {
 	ID            string
 	UserID        string

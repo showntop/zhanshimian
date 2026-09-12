@@ -115,3 +115,68 @@ type PlanStepGrounding struct {
 	SourceID   string
 	Reason     string
 }
+
+// RenderSpec is the frozen, deterministic hand-off to the rendering pipeline:
+// a machine-executable directive compiled from one plan variant. Identity and
+// composition preservation is fail-closed — only plan content varies.
+type RenderSpec struct {
+	ID               string
+	UserID           string
+	PlanVariantID    string
+	SourcePhotoSetID string
+	SchemaVersion    string
+	Spec             RenderDirective
+	ContentHash      string
+	CreatedAt        time.Time
+}
+
+type RenderDirective struct {
+	Identity    RenderIdentity    `json:"identity"`
+	Composition RenderComposition `json:"composition"`
+	Hair        RenderHair        `json:"hair"`
+	Makeup      RenderMakeup      `json:"makeup"`
+	Outfit      RenderOutfit      `json:"outfit"`
+	Output      RenderOutput      `json:"output"`
+}
+
+type RenderIdentity struct {
+	BodyAssetID            string `json:"body_asset_id"`
+	FaceAssetID            string `json:"face_asset_id"`
+	PreserveIdentity       bool   `json:"preserve_identity"`
+	PreserveBodyProportion bool   `json:"preserve_body_proportion"`
+	PreserveSkinTone       bool   `json:"preserve_skin_tone"`
+	PreserveAgeImpression  bool   `json:"preserve_age_impression"`
+}
+
+type RenderComposition struct {
+	PreservePose       bool `json:"preserve_pose"`
+	PreserveBackground bool `json:"preserve_background"`
+	PreserveLighting   bool `json:"preserve_lighting"`
+	PreserveSourceCrop bool `json:"preserve_source_crop"`
+	AllowOutpaint      bool `json:"allow_outpaint"`
+}
+
+type RenderHair struct {
+	Action    string `json:"action"`
+	Target    string `json:"target"`
+	Intensity string `json:"intensity"`
+}
+
+type RenderMakeup struct {
+	Action    string `json:"action"`
+	Target    string `json:"target"`
+	Intensity string `json:"intensity"`
+}
+
+type RenderOutfit struct {
+	Silhouette string   `json:"silhouette"`
+	Palette    []string `json:"palette"`
+	Layers     []string `json:"layers"`
+	Avoid      []string `json:"avoid"`
+}
+
+type RenderOutput struct {
+	MIMEType     string `json:"mime_type"`
+	AspectPolicy string `json:"aspect_policy"`
+	Quality      string `json:"quality"`
+}
