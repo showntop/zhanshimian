@@ -146,7 +146,7 @@ type Finding struct {
 
 // ---- 方案 ----
 
-type PlanStep struct {
+type LegacyPlanStep struct {
 	ID       string          `json:"id"`
 	Category string          `json:"category"`
 	Title    string          `json:"title"`
@@ -176,7 +176,7 @@ type Plan struct {
 	DifferenceTags   []string   `json:"difference_tags"`
 	Sort             int        `json:"sort"`
 	Selected         bool       `json:"selected"`
-	Steps            []PlanStep `json:"steps,omitempty"`
+	Steps            []LegacyPlanStep `json:"steps,omitempty"`
 	// LookTask embeds the latest plan_look task so plan lists render image
 	// generation state without a second round of polling endpoints.
 	LookTask *TaskView `json:"look_task,omitempty"`
@@ -213,7 +213,7 @@ type PlanLookJob struct {
 	Name     string
 	Slug     string
 	Why      string
-	Steps    []PlanStep
+	Steps    []LegacyPlanStep
 	MediaIDs []string
 	Attempt  int
 }

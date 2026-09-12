@@ -614,9 +614,9 @@ func (s *Service) processTodayLook(ctx context.Context, task domain.Task) (strin
 	if s.lookGenerator == nil {
 		return "", newPermanentTaskError(errors.New("plan look generator is not configured"))
 	}
-	steps := make([]domain.PlanStep, 0, len(job.Steps))
+	steps := make([]domain.LegacyPlanStep, 0, len(job.Steps))
 	for _, step := range job.Steps {
-		steps = append(steps, domain.PlanStep{Category: step.Category, Title: step.Title, Summary: step.Copy})
+		steps = append(steps, domain.LegacyPlanStep{Category: step.Category, Title: step.Title, Summary: step.Copy})
 	}
 	output, err := s.lookGenerator.Generate(jobCtx, provider.LookInput{Name: job.Title, Why: job.Summary, Steps: steps, MediaIDs: job.MediaIDs})
 	if err != nil {

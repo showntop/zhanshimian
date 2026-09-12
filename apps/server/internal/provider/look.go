@@ -15,7 +15,7 @@ type LookInput struct {
 	Name     string
 	Slug     string
 	Why      string
-	Steps    []domain.PlanStep
+	Steps    []domain.LegacyPlanStep
 	MediaIDs []string
 }
 

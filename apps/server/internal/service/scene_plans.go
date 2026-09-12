@@ -168,7 +168,7 @@ func buildScenePlans(input domain.ScenePlanInput) []domain.Plan {
 			OutcomeTags:    []string{sceneImpressions[impression], sceneTone(input), preparationDescriptor(input)},
 			DifferenceTags: []string{hairs[slug][0], makeupTitle(impression), outfitTitle(input)},
 			Sort:           index + 1,
-			Steps: []domain.PlanStep{
+			Steps: []domain.LegacyPlanStep{
 				{Category: "hair", Title: hairs[slug][0], Summary: strings.Join(hairs[slug][1:], "，"), Details: sceneDetails(hairs[slug]), Sort: 1},
 				{Category: "makeup", Title: makeupTitle(impression), Summary: makeupSummary(impression), Details: sceneDetails([]string{"底妆", "眉眼", "唇色"}), Sort: 2},
 				{Category: "outfit", Title: outfitTitle(input), Summary: outfitSummary(input), Details: sceneDetails([]string{sceneContext(input), preparationDescriptor(input), sceneTone(input)}), Sort: 3},

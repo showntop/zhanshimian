@@ -762,7 +762,7 @@ func (s *Store) GetPlan(ctx context.Context, userID, planID string) (domain.Plan
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var step domain.PlanStep
+		var step domain.LegacyPlanStep
 		if err := rows.Scan(&step.ID, &step.Category, &step.Title, &step.Summary, &step.Details, &step.Sort); err != nil {
 			return item, err
 		}
@@ -797,7 +797,7 @@ func (s *Store) GetPlanLookJob(ctx context.Context, userID, planID string) (doma
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var step domain.PlanStep
+		var step domain.LegacyPlanStep
 		if err := rows.Scan(&step.Category, &step.Title, &step.Summary); err != nil {
 			return job, err
 		}

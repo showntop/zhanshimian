@@ -19,7 +19,7 @@ func (s lookMediaLoaderStub) Load(context.Context, []string) ([]AnalysisImage, e
 func TestLookPromptRequiresFaceAndFullBodyComposition(t *testing.T) {
 	prompt := lookPrompt(LookInput{
 		Name: "都市利落风",
-		Steps: []domain.PlanStep{
+		Steps: []domain.LegacyPlanStep{
 			{Category: "hair", Title: "侧分层次", Summary: "露出面部轮廓"},
 			{Category: "makeup", Title: "清透底妆", Summary: "增强眉眼对比"},
 			{Category: "outfit", Title: "利落套装", Summary: "保留纵向线条"},

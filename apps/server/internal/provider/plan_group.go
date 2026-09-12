@@ -155,7 +155,7 @@ func planGroupPayloadToDomain(payload planGroupPayload, providerVersion string) 
 			if err != nil {
 				return PlanGroupOutput{}, err
 			}
-			domainPlan.Steps = append(domainPlan.Steps, domain.PlanStep{
+			domainPlan.Steps = append(domainPlan.Steps, domain.LegacyPlanStep{
 				Category: step.Category, Title: step.Title, Summary: step.Summary, Details: details, Sort: stepIndex + 1,
 			})
 		}
@@ -204,8 +204,8 @@ func (d *DemoPlanGroupGenerator) Generate(_ context.Context, input PlanGroupInpu
 		}
 		return "报告未提到"
 	}
-	baseSteps := func(hairTitle, makeupTitle, outfitTitle string) []domain.PlanStep {
-		return []domain.PlanStep{
+	baseSteps := func(hairTitle, makeupTitle, outfitTitle string) []domain.LegacyPlanStep {
+		return []domain.LegacyPlanStep{
 			{Category: "hair", Title: hairTitle, Summary: "针对「" + join("hair") + "」给出可执行的发型调整。", Details: json.RawMessage(`[{"label":"重点","value":"按报告可提升点执行"},{"label":"幅度","value":"小步调整，先易后难"}]`), Sort: 1},
 			{Category: "makeup", Title: makeupTitle, Summary: "针对「" + join("makeup") + "」强化眉眼与气色。", Details: json.RawMessage(`[{"label":"重点","value":"控制妆感强度"},{"label":"顺序","value":"先眉眼后唇色"}]`), Sort: 2},
 			{Category: "outfit", Title: outfitTitle, Summary: "针对「" + join("outfit") + "」与配色调整轮廓。", Details: json.RawMessage(`[{"label":"重点","value":"优先现有衣物"},{"label":"配色","value":"深外套配明亮内搭"}]`), Sort: 3},
