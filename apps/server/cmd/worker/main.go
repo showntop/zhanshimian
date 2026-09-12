@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 
@@ -21,6 +22,12 @@ func main() {
 	if err != nil {
 		logger.Error("load config", "error", err)
 		os.Exit(1)
+	}
+	if cfg.Environment == "production" {
+		if _, err := exec.LookPath("ffmpeg"); err != nil {
+			logger.Error("ffmpeg is required in production", "error", err)
+			os.Exit(1)
+		}
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
