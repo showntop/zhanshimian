@@ -177,6 +177,81 @@ func TestCommitAssessmentStaleLeaseLeavesPointerUnchanged(t *testing.T) {
 	}
 }
 
+func TestCommitAssessmentPublishesNewerReportAtSameGeneration(t *testing.T) {
+	store, fixture := newAssessmentStore(t)
+	first, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	secondParams := fixture.createParams()
+	secondParams.AnalysisInputHash = strings.Repeat("11", 32)
+	secondParams.PhotoSetContentHash = strings.Repeat("22", 32)
+	second, err := store.CreateOrReuseAssessment(ctx, secondParams)
+	if err != nil {
+		t.Fatalf("second create: %v", err)
+	}
+	if first.Task.SubjectGeneration != second.Task.SubjectGeneration {
+		t.Fatalf("subject_generation first=%d second=%d, want same profile version",
+			first.Task.SubjectGeneration, second.Task.SubjectGeneration)
+	}
+
+	firstPrepare := validPublishParams(store, first, fixture)
+	firstPrepare.Report.ContentHash = strings.Repeat("a1", 32)
+	firstReportID, err := store.PrepareReport(ctx, firstPrepare)
+	if err != nil {
+		t.Fatalf("prepare first: %v", err)
+	}
+	secondPrepare := validPublishParams(store, second, fixture)
+	secondPrepare.Report.ContentHash = strings.Repeat("b2", 32)
+	secondReportID, err := store.PrepareReport(ctx, secondPrepare)
+	if err != nil {
+		t.Fatalf("prepare second: %v", err)
+	}
+
+	firstLease := claimAssessmentTask(t, store, "worker-older")
+	if firstLease.ID != first.Task.ID {
+		t.Fatalf("claimed %s, want first task %s", firstLease.ID, first.Task.ID)
+	}
+	firstOutcome, err := store.CommitAssessment(ctx, firstLease, domain.TaskResult{
+		Disposition: domain.TaskPublish, ResultType: "report", ResultID: firstReportID,
+	})
+	if err != nil {
+		t.Fatalf("commit first: %v", err)
+	}
+	if firstOutcome != domain.CommitApplied {
+		t.Fatalf("first outcome = %s, want %s", firstOutcome, domain.CommitApplied)
+	}
+
+	secondLease := claimAssessmentTask(t, store, "worker-newer")
+	if secondLease.ID != second.Task.ID {
+		t.Fatalf("claimed %s, want second task %s", secondLease.ID, second.Task.ID)
+	}
+	secondOutcome, err := store.CommitAssessment(ctx, secondLease, domain.TaskResult{
+		Disposition: domain.TaskPublish, ResultType: "report", ResultID: secondReportID,
+	})
+	if err != nil {
+		t.Fatalf("commit second: %v", err)
+	}
+	if secondOutcome != domain.CommitApplied {
+		t.Fatalf("second outcome = %s, want %s", secondOutcome, domain.CommitApplied)
+	}
+
+	assertRunPublished(t, store.pool, first.Run.ID, firstReportID)
+	assertRunPublished(t, store.pool, second.Run.ID, secondReportID)
+	wantPointer := newerReportID(t, store.pool, firstReportID, secondReportID)
+	gotPointer := currentReportID(t, store.pool, fixture.userID)
+	if gotPointer == nil || *gotPointer != wantPointer {
+		t.Fatalf("current_report_id = %v, want newer report %s", gotPointer, wantPointer)
+	}
+	var version int64
+	if err := store.pool.QueryRow(ctx, `SELECT version FROM user_profiles WHERE user_id=$1::uuid`, fixture.userID).Scan(&version); err != nil {
+		t.Fatalf("profile version: %v", err)
+	}
+	if version != first.Task.SubjectGeneration {
+		t.Fatalf("profile version = %d, want unchanged subject_generation %d", version, first.Task.SubjectGeneration)
+	}
+}
+
 func TestFinishRunFailureDoesNotPublish(t *testing.T) {
 	store, fixture := newAssessmentStore(t)
 	created, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
@@ -362,6 +437,35 @@ func countRows(t *testing.T, pool *pgxpool.Pool, table string) int {
 		t.Fatalf("count %s: %v", table, err)
 	}
 	return n
+}
+
+func assertRunPublished(t *testing.T, pool *pgxpool.Pool, runID, reportID string) {
+	t.Helper()
+	var outcome, publishedReport string
+	if err := pool.QueryRow(ctx, `
+		SELECT outcome, report_id::text FROM analysis_runs WHERE id=$1::uuid`, runID).
+		Scan(&outcome, &publishedReport); err != nil {
+		t.Fatalf("load run %s: %v", runID, err)
+	}
+	if outcome != string(domain.AnalysisOutcomePublished) {
+		t.Fatalf("run %s outcome = %s, want published", runID, outcome)
+	}
+	if publishedReport != reportID {
+		t.Fatalf("run %s report_id = %s, want %s", runID, publishedReport, reportID)
+	}
+}
+
+func newerReportID(t *testing.T, pool *pgxpool.Pool, left, right string) string {
+	t.Helper()
+	var id string
+	if err := pool.QueryRow(ctx, `
+		SELECT id::text FROM reports
+		WHERE id IN ($1::uuid, $2::uuid)
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1`, left, right).Scan(&id); err != nil {
+		t.Fatalf("newer report: %v", err)
+	}
+	return id
 }
 
 func currentReportID(t *testing.T, pool *pgxpool.Pool, userID string) *string {

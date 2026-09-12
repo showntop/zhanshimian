@@ -290,7 +290,10 @@ func (s *Store) CommitAssessment(ctx context.Context, lease domain.TaskLease, re
 		return "", err
 	}
 	if storedGen != currentGen {
-		return domain.CommitSuperseded, nil
+		if err = supersedeAssessmentTx(ctx, tx, lease.UserID, operationID, lease.ID); err != nil {
+			return "", err
+		}
+		return domain.CommitSuperseded, tx.Commit(ctx)
 	}
 
 	if result.Disposition == domain.TaskDomainFail {
@@ -307,11 +310,10 @@ func (s *Store) CommitAssessment(ctx context.Context, lease domain.TaskLease, re
 		return "", err
 	}
 	if _, err = tx.Exec(ctx, `
-		INSERT INTO user_profiles(user_id, current_report_id, version)
-		VALUES ($1::uuid, $2::uuid, 1)
+		INSERT INTO user_profiles(user_id, current_report_id)
+		VALUES ($1::uuid, $2::uuid)
 		ON CONFLICT (user_id) DO UPDATE SET
 			current_report_id = EXCLUDED.current_report_id,
-			version = user_profiles.version + 1,
 			updated_at = now()
 		WHERE user_profiles.current_report_id IS NULL
 		   OR EXISTS (
@@ -531,7 +533,7 @@ func currentProfileGeneration(ctx context.Context, q assessmentQuerier, userID s
 	var generation int64
 	err := q.QueryRow(ctx, `SELECT version FROM user_profiles WHERE user_id=$1::uuid`, userID).Scan(&generation)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return 0, nil
+		return 1, nil
 	}
 	return generation, err
 }
@@ -665,6 +667,21 @@ func scanAssessmentTask(row pgx.Row) (domain.Task, error) {
 		task.ErrorCode = *errorCode
 	}
 	return task, err
+}
+
+func supersedeAssessmentTx(ctx context.Context, tx pgx.Tx, userID, operationID, taskID string) error {
+	if _, err := tx.Exec(ctx, `
+		UPDATE tasks
+		SET status='superseded', lease_token=NULL, lease_owner=NULL, lease_expires_at=NULL,
+		    progress_bps=10000, finished_at=now(), updated_at=now()
+		WHERE id=$1::uuid AND user_id=$2::uuid AND status='leased'`, taskID, userID); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, `
+		UPDATE operations
+		SET status='superseded', finished_at=now(), updated_at=now(), version=version+1
+		WHERE id=$1::uuid AND user_id=$2::uuid`, operationID, userID)
+	return err
 }
 
 func failAssessmentTx(ctx context.Context, tx pgx.Tx, userID, runID, operationID, taskID string, failure *domain.TaskFailure) error {
