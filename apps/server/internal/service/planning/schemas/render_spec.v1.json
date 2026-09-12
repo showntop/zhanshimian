@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "render_spec.v1",
+  "title": "RenderSpec compiler output v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["identity", "composition", "hair", "makeup", "outfit", "output"],
+  "properties": {
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["body_asset_id", "face_asset_id", "preserve_identity", "preserve_body_proportion", "preserve_skin_tone", "preserve_age_impression"],
+      "properties": {
+        "body_asset_id": { "type": "string", "format": "uuid" },
+        "face_asset_id": { "type": "string", "format": "uuid" },
+        "preserve_identity": { "const": true },
+        "preserve_body_proportion": { "const": true },
+        "preserve_skin_tone": { "const": true },
+        "preserve_age_impression": { "const": true }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preserve_pose", "preserve_background", "preserve_lighting", "preserve_source_crop", "allow_outpaint"],
+      "properties": {
+        "preserve_pose": { "const": true },
+        "preserve_background": { "const": true },
+        "preserve_lighting": { "const": true },
+        "preserve_source_crop": { "const": true },
+        "allow_outpaint": { "const": false }
+      }
+    },
+    "hair": { "$ref": "#/$defs/appearanceStep" },
+    "makeup": { "$ref": "#/$defs/appearanceStep" },
+    "outfit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["silhouette", "palette", "layers", "avoid"],
+      "properties": {
+        "silhouette": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "palette": {
+          "type": "array", "uniqueItems": true, "minItems": 1, "maxItems": 8,
+          "items": { "type": "string", "minLength": 1, "maxLength": 40 }
+        },
+        "layers": {
+          "type": "array", "uniqueItems": true, "maxItems": 8,
+          "items": { "type": "string", "minLength": 1, "maxLength": 40 }
+        },
+        "avoid": {
+          "type": "array", "uniqueItems": true, "maxItems": 8,
+          "items": { "type": "string", "minLength": 1, "maxLength": 40 }
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mime_type", "aspect_policy", "quality"],
+      "properties": {
+        "mime_type": { "const": "image/jpeg" },
+        "aspect_policy": { "const": "preserve_body_source" },
+        "quality": { "const": "high" }
+      }
+    }
+  },
+  "$defs": {
+    "appearanceStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "target", "intensity"],
+      "properties": {
+        "action": { "enum": ["keep", "adjust"] },
+        "target": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "intensity": { "enum": ["low", "medium"] }
+      }
+    }
+  }
+}
