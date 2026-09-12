@@ -1,0 +1,137 @@
+package postgres
+
+import (
+	"context"
+	"errors"
+	"strconv"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/zhanshimian/server/internal/domain"
+)
+
+const taskLeaseReturning = `
+	t.id::text, t.user_id::text, t.operation_id::text, t.type, t.subject_type, t.subject_id::text,
+	t.subject_generation, t.payload_version, t.payload, t.dedupe_key, t.status, t.priority,
+	t.attempt, t.max_attempts, t.available_at, t.lease_token::text, t.lease_owner,
+	t.lease_expires_at, t.heartbeat_at, t.cancel_requested_at, t.progress_bps, t.stage_code,
+	t.error_class, t.error_code, t.created_at, t.updated_at, t.finished_at`
+
+const leaseGuard = `id=$1::uuid AND lease_token=$2::uuid AND lease_owner=$3 AND status='leased' AND lease_expires_at>now()`
+
+func (s *Store) Claim(ctx context.Context, owner string, lease time.Duration, types []domain.TaskType) (domain.TaskLease, bool, error) {
+	claimed, err := scanTaskLease(s.pool.QueryRow(ctx, `
+		WITH candidate AS (
+			SELECT id
+			FROM tasks
+			WHERE type = ANY($1::text[])
+			  AND cancel_requested_at IS NULL
+			  AND attempt < max_attempts
+			  AND (
+			    (status IN ('queued','retry_wait') AND available_at <= now())
+			    OR (status='leased' AND lease_expires_at <= now())
+			  )
+			ORDER BY priority DESC, available_at, created_at
+			FOR UPDATE SKIP LOCKED
+			LIMIT 1
+		)
+		UPDATE tasks t
+		SET status='leased', attempt=t.attempt+1, lease_token=gen_random_uuid(),
+		    lease_owner=$2, lease_expires_at=now()+$3::interval,
+		    heartbeat_at=now(), updated_at=now()
+		FROM candidate
+		WHERE t.id=candidate.id
+		RETURNING`+taskLeaseReturning, typeNames(types), owner, pgInterval(lease)))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.TaskLease{}, false, nil
+	}
+	if err != nil {
+		return domain.TaskLease{}, false, err
+	}
+	return claimed, true, nil
+}
+
+func (s *Store) Heartbeat(ctx context.Context, lease domain.TaskLease, extend time.Duration) (bool, error) {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE tasks
+		SET lease_expires_at=now()+$4::interval, heartbeat_at=now(), updated_at=now()
+		WHERE `+leaseGuard, lease.ID, lease.LeaseToken, lease.LeaseOwner, pgInterval(extend))
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+func (s *Store) Fail(ctx context.Context, lease domain.TaskLease, failure domain.TaskFailure, availableAt time.Time) (bool, error) {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE tasks
+		SET
+			status = CASE
+				WHEN $4 = 'superseded' THEN 'superseded'
+				WHEN $4 IN ('transient','throttled') AND attempt < max_attempts THEN 'retry_wait'
+				ELSE 'failed'
+			END,
+			available_at = CASE
+				WHEN $4 IN ('transient','throttled') AND attempt < max_attempts THEN $6
+				ELSE available_at
+			END,
+			error_class = $4,
+			error_code = $5,
+			lease_token = NULL,
+			lease_owner = NULL,
+			lease_expires_at = NULL,
+			finished_at = CASE
+				WHEN $4 IN ('transient','throttled') AND attempt < max_attempts THEN NULL
+				ELSE now()
+			END,
+			updated_at = now()
+		WHERE `+leaseGuard, lease.ID, lease.LeaseToken, lease.LeaseOwner, string(failure.Class), failure.Code, availableAt)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+func scanTaskLease(row rowScanner) (domain.TaskLease, error) {
+	var lease domain.TaskLease
+	var leaseToken, leaseOwner, errorClass, errorCode *string
+	var heartbeatAt, cancelRequestedAt, finishedAt *time.Time
+	err := row.Scan(
+		&lease.ID, &lease.UserID, &lease.OperationID, &lease.Type, &lease.SubjectType, &lease.SubjectID,
+		&lease.SubjectGeneration, &lease.PayloadVersion, &lease.Payload, &lease.DedupeKey, &lease.Status, &lease.Priority,
+		&lease.Attempt, &lease.MaxAttempts, &lease.AvailableAt, &leaseToken, &leaseOwner,
+		&lease.LeaseExpiresAt, &heartbeatAt, &cancelRequestedAt, &lease.ProgressBPS, &lease.StageCode,
+		&errorClass, &errorCode, &lease.CreatedAt, &lease.UpdatedAt, &finishedAt,
+	)
+	if err != nil {
+		return domain.TaskLease{}, err
+	}
+	if leaseToken != nil {
+		lease.LeaseToken = *leaseToken
+	}
+	if leaseOwner != nil {
+		lease.LeaseOwner = *leaseOwner
+	}
+	lease.HeartbeatAt = heartbeatAt
+	lease.CancelRequestedAt = cancelRequestedAt
+	if errorClass != nil {
+		lease.ErrorClass = domain.ErrorClass(*errorClass)
+	}
+	if errorCode != nil {
+		lease.ErrorCode = *errorCode
+	}
+	lease.FinishedAt = finishedAt
+	return lease, nil
+}
+
+func typeNames(types []domain.TaskType) []string {
+	names := make([]string, len(types))
+	for i, taskType := range types {
+		names[i] = string(taskType)
+	}
+	return names
+}
+
+func pgInterval(d time.Duration) string {
+	return strconv.FormatInt(d.Milliseconds(), 10) + " milliseconds"
+}
