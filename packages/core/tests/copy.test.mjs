@@ -20,9 +20,9 @@ test('文案红线：全量文案不出现禁词', () => {
   }
 })
 
-test('场景固定四席：面试/婚礼/约会/日常', () => {
-  assert.deepEqual(SCENES.map((s) => s.label), ['面试', '婚礼', '约会', '日常'])
-  assert.deepEqual(SCENES.map((s) => s.id), ['interview', 'wedding', 'date', 'daily'])
+test('场景席位与上线文案一致：面试/婚礼/约会/日常/聚会', () => {
+  assert.deepEqual(SCENES.map((s) => s.label), ['面试', '婚礼', '约会', '日常', '聚会'])
+  assert.deepEqual(SCENES.map((s) => s.id), ['interview', 'wedding', 'date', 'daily', 'gathering'])
 })
 
 test('空态文案必须给出下一步动作（history 允许空动作除外）', () => {
