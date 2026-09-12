@@ -11,7 +11,10 @@
 ## 产品红线（违反即返工）
 
 1. **不打颜值分/身材分**、不身材羞辱、不做医学结论、不用警示红；一律用「可提升点」式尊重表达。
-2. **AI 生成图像必须显式标识**：本人预览「AI 风格预览」、Demo「效果示例」、内置模特「风格参考」；`provider_version` 以 `demo` 开头的结果强制按示例处理。
+2. **生成图来源必须显式标识**：
+   - 生成图必须携带 source_kind=generated_preview，用户角标统一“风格参考”；
+   - Demo 使用 demo_example + “效果示例”；内置图使用 bundled_reference + “风格参考”。
+   - 来源真实性依赖强类型和埋点，不依赖角标文字或 URL。
 3. **数据真实性**（移植自原型 `utils/media.js` 契约，实现在 `packages/core/src/media/truth.ts`）：
    - `lookImage(v)` 严格模式：无效 URL / webp 一律返回 `''`，绝不隐式回退内置图；
    - `userImage(v)` 用户照片无效时保持可见的空；
@@ -28,7 +31,8 @@
 - 自定义组件设 `styleIsolation: 'apply-shared'`，共享语义类才能穿透。
 - React 条件渲染禁 `{count && <View/>}`（0 会被渲染出来）；列表 key 用资源 ID 不用下标。
 - tab 页防重复加载：`useDidShow` + ref 标志；切 tab 缓存优先渲染、后台校验，不清空已渲染图片（防闪屏）。
-- 轮询：只用 `@zsm/core` 的 `useTaskPolling`（间隔单源），页面隐藏即停，失败 5 次进失败态。
+- 异步页面只轮询公开 Operation；packages/core 提供平台无关 controller，
+  Miniapp 只使用 useOperationPolling React 包装；页面隐藏即停，连续失败 5 次进入失败态。
 - 微信 3.17+ 拒绝 `http://` 图：开发环境启用 `localizeDevImages` 中间件（仅非 https 时）。
 
 ## 服务端硬规则

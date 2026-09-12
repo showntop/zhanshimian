@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "uplook 传输无关内核：API 客户端 / 401 单飞重登 / 统一任务轮询 / 媒体真实性契约 / 文案 / 埋点（零运行时依赖）",
+  "description": "uplook 传输无关内核：生成 API 客户端 / 401 单飞重登 / Operation 轮询 / 媒体真实性契约 / 文案 / 埋点",
   "exports": {
     ".": "./src/index.ts",
     "./package.json": "./package.json"
@@ -12,10 +12,17 @@
     "node": ">=22.6"
   },
   "scripts": {
+    "api:generate": "openapi-typescript ../../contracts/openapi.yaml -o src/api/generated/schema.ts",
+    "api:check": "node scripts/check-openapi.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types tests/*.mjs"
+    "test": "pnpm api:check && node --test --experimental-strip-types tests/*.mjs"
+  },
+  "dependencies": {
+    "openapi-fetch": "0.17.0"
   },
   "devDependencies": {
+    "@redocly/cli": "2.52.1",
+    "openapi-typescript": "7.13.0",
     "typescript": "5.6.3"
   }
 }

@@ -14,6 +14,24 @@ export { localizeDevImages, rewriteLoopbackAssetURLs, type ImageDownloader } fro
 export { API_PATHS, createApiEndpoints, type ApiEndpoints, type ApiPathName, type EndpointOptions, type TaskCreated } from './api/endpoints.ts'
 export * from './types/index.ts'
 export {
+  createGeneratedApiClient,
+  type GeneratedApiClient
+} from './api/client.ts'
+export type {
+  Assessment,
+  DisplayMedia,
+  Execution,
+  ExecutionStep,
+  HomeBootstrap,
+  Operation,
+  PlanSet,
+  PlanStep,
+  PlanVariant,
+  Report,
+  ReportFinding,
+  Selection
+} from './api/types.ts'
+export {
   LOCAL_LOOK_SLUGS,
   LOOK_VARIANTS,
   exampleImage,
