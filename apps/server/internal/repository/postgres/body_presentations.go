@@ -254,3 +254,71 @@ func scanBodyOrbitTask(row pgx.Row) (domain.Task, error) {
 	}
 	return task, nil
 }
+
+// CommitBodyOrbit 在租约校验下收尾：成功翻任务/操作终态，DomainFail 记失败。
+// 结果数据（视频/帧键）已在 Execute 阶段写入 body_presentations。
+func (s *Store) CommitBodyOrbit(ctx context.Context, lease domain.TaskLease, result domain.TaskResult) (domain.CommitOutcome, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var operationID string
+	err = tx.QueryRow(ctx, `
+		SELECT operation_id::text
+		FROM tasks
+		WHERE id=$1::uuid AND user_id=$2::uuid AND lease_token=$3::uuid
+		  AND lease_owner=$4 AND status='leased' AND lease_expires_at>now()
+		FOR UPDATE`, lease.ID, lease.UserID, lease.LeaseToken, lease.LeaseOwner).
+		Scan(&operationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.CommitSuperseded, nil
+	}
+	if err != nil {
+		return "", err
+	}
+
+	if result.Disposition == domain.TaskDomainFail {
+		code := ""
+		if result.Failure != nil {
+			code = result.Failure.Code
+		}
+		if _, err = tx.Exec(ctx, `
+			UPDATE tasks
+			SET status='failed', lease_token=NULL, lease_owner=NULL, lease_expires_at=NULL,
+			    error_class='permanent', error_code=$3, finished_at=now(), updated_at=now()
+			WHERE id=$1::uuid AND user_id=$2::uuid`, lease.ID, lease.UserID, code); err != nil {
+			return "", err
+		}
+		if _, err = tx.Exec(ctx, `
+			UPDATE operations
+			SET status='failed', error_code=$3, finished_at=now(), updated_at=now(), version=version+1
+			WHERE id=$1::uuid AND user_id=$2::uuid`, operationID, lease.UserID, code); err != nil {
+			return "", err
+		}
+		return domain.CommitApplied, tx.Commit(ctx)
+	}
+
+	tag, err := tx.Exec(ctx, `
+		UPDATE tasks
+		SET status='succeeded', lease_token=NULL, lease_owner=NULL, lease_expires_at=NULL,
+		    progress_bps=10000, finished_at=now(), updated_at=now()
+		WHERE id=$1::uuid AND user_id=$2::uuid AND lease_token=$3::uuid
+		  AND lease_owner=$4 AND status='leased' AND lease_expires_at>now()`,
+		lease.ID, lease.UserID, lease.LeaseToken, lease.LeaseOwner)
+	if err != nil {
+		return "", err
+	}
+	if tag.RowsAffected() != 1 {
+		return domain.CommitSuperseded, nil
+	}
+	if _, err = tx.Exec(ctx, `
+		UPDATE operations
+		SET status='succeeded', result_type='body_presentation', result_id=$3::uuid,
+		    progress_bps=10000, finished_at=now(), updated_at=now(), version=version+1
+		WHERE id=$1::uuid AND user_id=$2::uuid`, operationID, lease.UserID, result.ResultID); err != nil {
+		return "", err
+	}
+	return domain.CommitApplied, tx.Commit(ctx)
+}

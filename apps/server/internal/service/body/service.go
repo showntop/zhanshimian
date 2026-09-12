@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/zhanshimian/server/internal/domain"
@@ -33,7 +34,7 @@ type OrbitInput struct {
 type OrbitOutput struct {
 	VideoData       []byte
 	MIMEType        string
-	DurationMS      int
+	Duration        time.Duration
 	ProviderVersion string
 }
 

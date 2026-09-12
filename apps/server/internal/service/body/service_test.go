@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
@@ -70,7 +71,7 @@ func (b *stubBilling) Reserve(_ context.Context, userID, operationID string, pro
 type stubGenerator struct{}
 
 func (stubGenerator) Generate(_ context.Context, _ OrbitInput) (OrbitOutput, error) {
-	return OrbitOutput{VideoData: []byte("mp4"), MIMEType: "video/mp4", DurationMS: 3000, ProviderVersion: "demo-body-orbit-v1"}, nil
+	return OrbitOutput{VideoData: []byte("mp4"), MIMEType: "video/mp4", Duration: 3 * time.Second, ProviderVersion: "demo-body-orbit-v1"}, nil
 }
 
 const (
@@ -215,4 +216,3 @@ func TestStatusReportsAvailability(t *testing.T) {
 		t.Fatalf("available = %+v, err = %v", gotOff, err)
 	}
 }
-
