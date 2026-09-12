@@ -76,6 +76,47 @@ func TestReserveRenderInsufficientCreditsChangesNoRow(t *testing.T) {
 	}
 }
 
+// 未开通支付时（WithSkipCreditCharge）次数不足不拦生成：reserve 照常受理，
+// 台账记 0 扣减；后续退款也不得凭空返次数（31916c1 移植自旧计费）。
+func TestReserveInsufficientCreditsAllowedWhenCreditChargeSkipped(t *testing.T) {
+	store, pool, ids := newBillingRepo(t, 0)
+	gated := New(pool, WithSkipCreditCharge(true))
+	reservation, err := gated.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reservation.ChargeSource != domain.ChargeCredits {
+		t.Fatalf("charge_source = %s, want credits", reservation.ChargeSource)
+	}
+	if got := walletCredits(t, pool, ids.userID); got != 0 {
+		t.Fatalf("credits = %d, want 0 (no deduction when charge skipped)", got)
+	}
+	entry := loadLedger(t, pool, ids.userID, domain.LedgerReserve)
+	if entry.delta != 0 || entry.operationID != ids.opID {
+		t.Fatalf("reserve ledger = %+v, want delta 0 for skipped charge", entry)
+	}
+	_ = store
+}
+
+func TestRefundAfterSkippedChargeAddsNoCredits(t *testing.T) {
+	_, pool, ids := newBillingRepo(t, 0)
+	gated := New(pool, WithSkipCreditCharge(true))
+	if _, err := gated.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1); err != nil {
+		t.Fatal(err)
+	}
+	markOperationFailed(t, gated, ids.userID, ids.opID)
+	if err := gated.Refund(context.Background(), ids.userID, ids.opID); err != nil {
+		t.Fatal(err)
+	}
+	if got := walletCredits(t, pool, ids.userID); got != 0 {
+		t.Fatalf("credits = %d, want 0 (refund must not mint credits for a skipped charge)", got)
+	}
+	entry := loadLedger(t, pool, ids.userID, domain.LedgerRefund)
+	if entry.delta != 0 {
+		t.Fatalf("refund ledger = %+v, want delta 0", entry)
+	}
+}
+
 func TestReserveRenderDeductsCredits(t *testing.T) {
 	store, pool, ids := newBillingRepo(t, 5)
 	reservation, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1)

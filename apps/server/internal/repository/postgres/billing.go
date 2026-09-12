@@ -368,7 +368,11 @@ func (s *Store) Reserve(ctx context.Context, userID, operationID string, product
 	switch chargeSource {
 	case domain.ChargeCredits:
 		if credits < units {
-			return domain.Reservation{}, domain.ErrInsufficientCredits
+			if !s.skipCreditCharge {
+				return domain.Reservation{}, domain.ErrInsufficientCredits
+			}
+			// 支付未开通：次数不足不拦生成，reserve 记 0 扣减台账（退款按台账实退）。
+			break
 		}
 		delta = -units
 		if _, err := tx.Exec(ctx, `UPDATE billing_wallets SET credits=credits-$2, version=version+1, updated_at=now() WHERE user_id=$1::uuid`, userID, units); err != nil {
@@ -595,10 +599,20 @@ func refundReserved(ctx context.Context, tx pgx.Tx, reservation domain.Reservati
 	}
 	switch reservation.ChargeSource {
 	case domain.ChargeCredits:
-		if _, err := tx.Exec(ctx, `UPDATE billing_wallets SET credits=credits+$2, version=version+1, updated_at=now() WHERE user_id=$1::uuid`, reservation.UserID, reservation.Units); err != nil {
+		// 按 reserve 台账的实际扣减退回：跳过扣次的受理（支付未开通）不得凭空返次数。
+		creditBack := reservation.Units
+		var reserveDelta int
+		err := tx.QueryRow(ctx, `
+			SELECT delta FROM billing_ledger
+			WHERE user_id=$1::uuid AND operation_id=$2::uuid AND entry_type=$3 AND charge_source=$4`,
+			reservation.UserID, reservation.OperationID, domain.LedgerReserve, domain.ChargeCredits).Scan(&reserveDelta)
+		if err == nil && reserveDelta <= 0 {
+			creditBack = -reserveDelta
+		}
+		if _, err := tx.Exec(ctx, `UPDATE billing_wallets SET credits=credits+$2, version=version+1, updated_at=now() WHERE user_id=$1::uuid`, reservation.UserID, creditBack); err != nil {
 			return err
 		}
-		return insertOperationLedger(ctx, tx, reservation.UserID, domain.LedgerRefund, reservation.Product, reservation.ChargeSource, reservation.Units, reservation.OperationID, nil)
+		return insertOperationLedger(ctx, tx, reservation.UserID, domain.LedgerRefund, reservation.Product, reservation.ChargeSource, creditBack, reservation.OperationID, nil)
 	case domain.ChargeWelcomeAnalysis:
 		if _, err := tx.Exec(ctx, `UPDATE billing_wallets SET welcome_analysis_used=false, version=version+1, updated_at=now() WHERE user_id=$1::uuid`, reservation.UserID); err != nil {
 			return err

@@ -34,19 +34,20 @@ ALTER TABLE billing_ledger ADD CONSTRAINT billing_ledger_product_check
   CHECK (product IN ('assessment','plan_set','render_publication','body_orbit','credit_pack'));
 
 -- settle 行的复合约束：body_orbit 与 assessment/plan_set 同组（无 publication_id）。
+-- credits 的 reserve/refund 允许 delta=0：未开通支付时次数不足不拦生成（不扣也不返）。
 ALTER TABLE billing_ledger DROP CONSTRAINT billing_ledger_check1;
 ALTER TABLE billing_ledger ADD CONSTRAINT billing_ledger_entry_shape_check
   CHECK (
     (entry_type='reserve' AND operation_id IS NOT NULL AND publication_id IS NULL
       AND product<>'credit_pack'
-      AND ((charge_source='credits' AND delta<0)
+      AND ((charge_source='credits' AND delta<=0)
         OR (charge_source IN ('welcome_analysis','welcome_plan_set') AND delta=0)))
     OR (entry_type='settle' AND operation_id IS NOT NULL AND delta=0
       AND charge_source IN ('credits','welcome_analysis','welcome_plan_set')
       AND ((product='render_publication' AND publication_id IS NOT NULL)
         OR (product IN ('assessment','plan_set','body_orbit') AND publication_id IS NULL)))
     OR (entry_type='refund' AND operation_id IS NOT NULL AND publication_id IS NULL
-      AND ((charge_source='credits' AND delta>0)
+      AND ((charge_source='credits' AND delta>=0)
         OR (charge_source IN ('welcome_analysis','welcome_plan_set') AND delta=0)))
     OR (entry_type='purchase' AND order_id IS NOT NULL AND product='credit_pack'
       AND charge_source='purchase' AND delta>0)

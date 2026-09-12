@@ -21,9 +21,28 @@ type leasedTaskStore interface {
 
 var _ leasedTaskStore = (*Store)(nil)
 
-type Store struct{ pool *pgxpool.Pool }
+type Store struct {
+	pool *pgxpool.Pool
+	// skipCreditCharge 对应未开通支付的部署：次数不足不拦生成（reserve 记 0
+	// 扣减台账），每日配额与欢迎礼不受影响。退款按 reserve 实际扣减退回。
+	skipCreditCharge bool
+}
 
-func New(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
+// StoreOption 调整 Store 的可选行为；默认即生产安全姿态（扣次门禁开启）。
+type StoreOption func(*Store)
+
+// WithSkipCreditCharge 关闭次数不足拦截（支付未开通时使用）。
+func WithSkipCreditCharge(skip bool) StoreOption {
+	return func(s *Store) { s.skipCreditCharge = skip }
+}
+
+func New(pool *pgxpool.Pool, opts ...StoreOption) *Store {
+	s := &Store{pool: pool}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
 
 func mapNotFound(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {

@@ -84,7 +84,8 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		pool.Close()
 		return nil, err
 	}
-	store := postgres.New(pool)
+	// 未开通支付时次数不足不拦生成（每日配额和欢迎礼仍生效）；退款按台账实退。
+	store := postgres.New(pool, postgres.WithSkipCreditCharge(!cfg.BillingPaymentEnabled))
 	ai, err := BuildAI(cfg, store, objects, logger)
 	if err != nil {
 		pool.Close()
