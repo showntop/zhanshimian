@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro, { useLoad } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
-import type { ChecklistItem } from '@zsm/core'
+import { CHECKLIST_COPY, type ChecklistItem } from '@zsm/core'
 import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage } from '../../services/storage'
@@ -45,7 +45,6 @@ export default function Checklist() {
 
   const toggle = async (item: ChecklistItem) => {
     const next = !item.completed
-    // 乐观更新 + 失败回滚
     setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, completed: next } : it)))
     if (next) Taro.vibrateShort({ type: 'light' })
     try {
@@ -58,12 +57,13 @@ export default function Checklist() {
   }
 
   const done = items.filter((i) => i.completed).length
-  const allDone = items.length > 0 && done === items.length
+  const remain = items.length - done
+  const allDone = items.length > 0 && remain === 0
 
   if (loading) {
     return (
       <View className={pageClass}>
-        <AppHeader title="执行清单" back />
+        <AppHeader title={CHECKLIST_COPY.title} back />
         <Skeleton rows={4} />
       </View>
     )
@@ -72,7 +72,7 @@ export default function Checklist() {
   if (failed) {
     return (
       <View className={pageClass}>
-        <AppHeader title="执行清单" back />
+        <AppHeader title={CHECKLIST_COPY.title} back />
         <ErrorState onRetry={load} />
       </View>
     )
@@ -81,11 +81,11 @@ export default function Checklist() {
   if (items.length === 0) {
     return (
       <View className={pageClass}>
-        <AppHeader title="执行清单" back />
+        <AppHeader title={CHECKLIST_COPY.title} back />
         <EmptyState
-          title="清单还是空的"
-          description="先在方案详情页选择一套方案。"
-          actionText="去看方案"
+          title={CHECKLIST_COPY.emptyTitle}
+          description={CHECKLIST_COPY.emptyBody}
+          actionText={CHECKLIST_COPY.emptyAction}
           onAction={() => Taro.switchTab({ url: '/pages/plans/index' })}
         />
       </View>
@@ -94,43 +94,43 @@ export default function Checklist() {
 
   return (
     <View className={pageClass}>
-      <AppHeader title="执行清单" back />
+      <AppHeader title={CHECKLIST_COPY.title} back />
       <View className="cklist">
-        <View className="cklist__anchor fade-up">
-          <Text className="cklist__anchor-label">当前方案</Text>
-          <Text className="cklist__anchor-title">按步骤完成，再回来反馈</Text>
-        </View>
-        <View className="cklist__progress fade-up">
-          <View className="cklist__progress-track">
-            <View className="cklist__progress-fill" style={{ width: `${(done / items.length) * 100}%` }} />
+        <View className={`cklist__progress fade-up ${allDone ? 'cklist__progress--done' : ''}`}>
+          <View className="cklist__progress-row">
+            <Text className="cklist__progress-num">
+              {done} / {items.length} {CHECKLIST_COPY.doneOf}
+            </Text>
+            <Text className="cklist__progress-remain">
+              {allDone ? CHECKLIST_COPY.allDoneHint : `${remain} ${CHECKLIST_COPY.remainSuffix}`}
+            </Text>
           </View>
-          <Text className="cklist__progress-num">
-            {done} / {items.length} 已完成
+          <View className="cklist__progress-track">
+            <View
+              className="cklist__progress-fill"
+              style={{ width: `${(done / items.length) * 100}%` }}
+            />
+          </View>
+          <Text className="cklist__progress-hint">
+            {allDone ? CHECKLIST_COPY.celebrate : CHECKLIST_COPY.hint}
           </Text>
         </View>
 
-        {allDone ? (
-          <View className="cklist__celebrate fade-up">
-            <View className="cklist__celebrate-ring">
-              <Text className="cklist__celebrate-mark">✓</Text>
-            </View>
-            <Text className="cklist__celebrate-title">清单全部完成</Text>
-          </View>
-        ) : null}
-
         <View className="cklist__items fade-up delay-1">
           {items.map((item) => (
-            <View key={item.id} className={`cklist__item ${item.completed ? 'cklist__item--done' : ''}`}>
-              <View className="cklist__check pressable" onClick={() => toggle(item)}>
+            <View
+              key={item.id}
+              className={`cklist__item pressable ${item.completed ? 'cklist__item--done' : ''}`}
+              onClick={() => toggle(item)}
+            >
+              <View className="cklist__check">
                 {item.completed ? <Text className="cklist__check-mark">✓</Text> : null}
               </View>
               <View className="cklist__body">
-                <View className="cklist__head">
-                  <Text className="cklist__cat">{CATEGORY_LABEL[item.category] || item.category}</Text>
-                  {item.meta ? <Text className="cklist__meta">{item.meta}</Text> : null}
-                </View>
+                <Text className="cklist__cat">{CATEGORY_LABEL[item.category] || item.category}</Text>
                 <Text className="cklist__title">{item.title}</Text>
                 {item.description ? <Text className="cklist__desc">{item.description}</Text> : null}
+                {item.meta ? <Text className="cklist__meta">{item.meta}</Text> : null}
               </View>
             </View>
           ))}
@@ -138,10 +138,10 @@ export default function Checklist() {
 
         <View className="cklist__foot fade-up delay-2">
           <PrimaryButton
-            text="完成后回来反馈"
+            text={allDone ? CHECKLIST_COPY.ctaDone : CHECKLIST_COPY.cta}
             onClick={() => Taro.navigateTo({ url: `/pages/feedback/index?plan_id=${planId}` })}
           />
-          <Text className="cklist__foot-note">你的反馈会让下一次建议更准确</Text>
+          <Text className="cklist__foot-note">{CHECKLIST_COPY.footNote}</Text>
         </View>
       </View>
     </View>

@@ -240,7 +240,7 @@ func NewRoutedHairGenerator(runtime *AIRuntime, loader MediaLoader) (*RoutedHair
 }
 
 func (g *RoutedHairGenerator) Generate(ctx context.Context, input domain.HairPreviewInput) (HairPreviewOutput, error) {
-	images, err := g.loader.Load(ctx, []string{input.MediaID})
+	images, err := g.loader.Load(WithImageBudget(ctx, ImageBudgetEdit), []string{input.MediaID})
 	if err != nil {
 		return HairPreviewOutput{}, fmt.Errorf("load hair source photo: %w", err)
 	}

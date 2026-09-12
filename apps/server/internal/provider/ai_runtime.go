@@ -284,6 +284,9 @@ func (r *AIRuntime) EditImage(ctx context.Context, capability string, input Imag
 // dashScopeWanxImageEdit adapts the low-cost Wan 2.1 general image editor.
 // Unlike wan2.7, this endpoint is asynchronous: submit a task, poll it, then
 // download the short-lived result URL into our own storage.
+//
+// It only sends Images[0]. Do not use this protocol as the primary
+// full_look_edit route — the face identity frame would be discarded.
 func (r *AIRuntime) dashScopeWanxImageEdit(ctx context.Context, capability string, model AIModel, input ImageEditRequest) (ImageEditResult, error) {
 	if len(input.Images) == 0 {
 		return ImageEditResult{}, errors.New("image edit requires at least one source image")

@@ -6,12 +6,9 @@
 
   // ---------- 照片 hero ----------
   &__hero {
-    position: relative;
     height: 640rpx;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    background: var(--moss-soft);
-    border: 1rpx solid var(--line);
+    border-radius: 0;
+    border: 0;
 
     &-img {
       width: 100%;
@@ -44,7 +41,7 @@
     &-alt {
       padding: 12rpx 24rpx;
       border-radius: 999rpx;
-      background: rgba(255, 255, 255, 0.88);
+      background: var(--glass);
       font-size: 22rpx;
       color: var(--ink);
     }
@@ -114,7 +111,7 @@
       gap: 10rpx;
       height: 88rpx;
       border-radius: 999rpx;
-      background: rgba(255, 255, 255, 0.92);
+      background: var(--glass);
       box-shadow: var(--shadow-card);
 
       &-plus {
@@ -197,7 +194,7 @@
     margin: -88rpx calc(-1 * var(--page-gutter)) 0;
     padding: 48rpx var(--page-gutter) 8rpx;
     background: var(--bg);
-    box-shadow: 0 -20rpx 48rpx rgba(24, 28, 22, 0.1);
+    box-shadow: var(--shadow-sheet);
   }
 
   &__advice {
@@ -280,7 +277,7 @@
     &-chip {
       padding: 6rpx 16rpx;
       border-radius: 999rpx;
-      background: rgba(255, 255, 255, 0.9);
+      background: var(--glass);
       font-size: 20rpx;
       color: var(--ink);
       white-space: nowrap;
@@ -294,7 +291,7 @@
     padding: 8rpx 20rpx;
     border-radius: 999rpx;
     background: var(--badge);
-    color: #ffffff;
+    color: var(--on-photo);
     font-size: 18rpx;
   }
 
@@ -307,7 +304,7 @@
     align-items: center;
     justify-content: center;
     gap: 20rpx;
-    background: rgba(244, 245, 242, 0.72);
+    background: var(--glass);
 
     &-spin {
       width: 48rpx;

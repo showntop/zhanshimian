@@ -45,6 +45,30 @@ func InvocationSource(ctx context.Context) string {
 	return ""
 }
 
+type imageBudgetKey struct{}
+
+// ImageBudgetEdit asks the media loader to keep more facial detail than the
+// vision-analysis budget. Analysis/diagnosis keep the default (smaller) budget
+// so photo_check + appearance_analysis stay inside the task timeout.
+const ImageBudgetEdit = "edit"
+
+// WithImageBudget tags a Load() call. Unknown or empty budgets are treated as
+// the vision default by the loader.
+func WithImageBudget(ctx context.Context, budget string) context.Context {
+	if budget == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, imageBudgetKey{}, budget)
+}
+
+// ImageBudget returns the load budget attached to ctx, or "".
+func ImageBudget(ctx context.Context) string {
+	if value, ok := ctx.Value(imageBudgetKey{}).(string); ok {
+		return value
+	}
+	return ""
+}
+
 type AnalysisImage struct {
 	ID       string
 	Kind     string

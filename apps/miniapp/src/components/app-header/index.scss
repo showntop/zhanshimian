@@ -22,6 +22,8 @@
   }
 
   &__bar {
+    position: relative;
+    z-index: 1;
     flex: 1;
     display: flex;
     align-items: center;
@@ -33,7 +35,7 @@
   &__right {
     display: flex;
     align-items: center;
-    min-width: 96rpx;
+    min-width: 64rpx;
   }
 
   &__right {
@@ -93,10 +95,28 @@
     color: var(--ink);
   }
 
+  // 相对屏幕水平居中，不受左侧返回 / 右侧胶囊占位影响。
   &__title {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 140rpx;
+    pointer-events: none;
+  }
+
+  &__title-text {
     font-size: 31rpx;
     font-weight: 700;
     color: var(--ink);
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
   }
 }
 

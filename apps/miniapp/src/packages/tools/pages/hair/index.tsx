@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import { LOCAL_LOOK_SLUGS, POLL_INTERVALS, useTaskPolling, lookImage, userImage, type HairPreview, type HairstyleOption, type LookSlug } from '@zsm/core'
-import { usePageClass, useShowOnce } from '../../../../hooks/use-page-visibility'
+import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
@@ -29,7 +29,7 @@ export default function Hair() {
   const [mode, setMode] = useState<'source' | 'result'>('source')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const pageClass = usePageClass(!loading || Boolean(preview) || Boolean(photoPath))
+  const { pageClass, enter } = usePageShell(!loading || Boolean(preview) || Boolean(photoPath), '', 'hair')
 
   const loadOptions = useCallback(async () => {
     setLoading(true)
@@ -166,7 +166,7 @@ export default function Hair() {
     <View className={pageClass}>
       <AppHeader title="发型预览" back />
       <View className="hair">
-        <View className="hair__hero fade-up">
+        <View className={`hair__hero photo-hero photo-hero--bleed ${enter()}`}>
           <View className="hair__hero-frame">
             {mode === 'result' && resultUrl ? (
               <Image className="hair__hero-img" src={resultUrl} mode="aspectFit" />
@@ -182,7 +182,7 @@ export default function Hair() {
               />
             )}
             {(mode === 'result' || (!sourceUrl && !running)) && (
-              <View className="hair__badge">
+              <View className="hair__badge layer-on-photo">
                 <Text>{isDemo ? '效果示例，仅供参考' : 'AI 风格预览'}</Text>
               </View>
             )}
@@ -212,12 +212,13 @@ export default function Hair() {
           </View>
         </View>
 
-        <View className="hair__hint fade-up delay-1">
+        <View className={`hair__hint ${enter(1)}`}>
           <Text className="hair__hint-title">先看效果，再决定剪不剪</Text>
+          <View className="section-rule" />
           <Text className="hair__hint-desc">{options.find((o) => o.id === styleId)?.reason || '基于你的正脸照生成，发型轮廓与发色可实时对比。'}</Text>
         </View>
 
-        <ScrollView className="hair__styles fade-up delay-2" scrollX enhanced showScrollbar={false}>
+        <ScrollView className={`hair__styles ${enter(2)}`} scrollX enhanced showScrollbar={false}>
           {(options.length > 0 ? options : STYLES.map((s) => ({ id: s.id, name: s.name } as HairstyleOption))).map((opt) => (
             <View
               key={opt.id}
@@ -237,12 +238,12 @@ export default function Hair() {
         </ScrollView>
 
         {preview?.status === 'failed' ? (
-          <View className="hair__failed fade-up">
+          <View className={`hair__failed ${enter()}`}>
             <Text className="hair__failed-text">{preview.error_message || '生成没有完成，请重试'}</Text>
           </View>
         ) : null}
 
-        <View className="hair__foot fade-up delay-3">
+        <View className={`hair__foot ${enter(3)}`}>
           {preview?.status === 'completed' && resultUrl ? (
             <>
               <PrimaryButton text={`保存「${styleName}」`} onClick={save} />

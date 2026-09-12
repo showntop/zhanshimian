@@ -31,9 +31,15 @@ func (l *AnalysisMediaLoader) Load(ctx context.Context, ids []string) ([]provide
 	if err != nil {
 		return nil, err
 	}
+	constrain := constrainVisionImage
+	process := visionCOSProcess
+	if provider.ImageBudget(ctx) == provider.ImageBudgetEdit {
+		constrain = constrainEditImage
+		process = editCOSProcess
+	}
 	images := make([]provider.AnalysisImage, 0, len(assets))
 	for _, asset := range assets {
-		reader, url, err := l.open(ctx, asset)
+		reader, url, err := l.open(ctx, asset, process)
 		if err != nil {
 			return nil, err
 		}
@@ -48,7 +54,7 @@ func (l *AnalysisMediaLoader) Load(ctx context.Context, ids []string) ([]provide
 		if int64(len(data)) > l.maxBytes {
 			return nil, fmt.Errorf("%s photo exceeds provider limit", asset.Kind)
 		}
-		data, mime := constrainVisionImage(data, asset.MIMEType)
+		data, mime := constrain(data, asset.MIMEType)
 		images = append(images, provider.AnalysisImage{
 			ID: asset.ID, Kind: asset.Kind, MIMEType: mime,
 			URL: url, Data: data,
@@ -60,7 +66,7 @@ func (l *AnalysisMediaLoader) Load(ctx context.Context, ids []string) ([]provide
 // open resolves one asset to a reader and its public URL. Demo photos are
 // bundled with the server (see demoMediaAssetPath) and never exist in object
 // storage, so they are read from the local asset directory instead.
-func (l *AnalysisMediaLoader) open(ctx context.Context, asset domain.MediaAsset) (io.ReadCloser, string, error) {
+func (l *AnalysisMediaLoader) open(ctx context.Context, asset domain.MediaAsset, process string) (io.ReadCloser, string, error) {
 	if strings.HasPrefix(asset.StorageKey, "demo/") {
 		if l.assetDir == "" {
 			return nil, "", fmt.Errorf("open %s photo: demo asset directory is not configured", asset.Kind)
@@ -74,7 +80,7 @@ func (l *AnalysisMediaLoader) open(ctx context.Context, asset domain.MediaAsset)
 	}
 	publicURL := l.publicBaseURL + "/uploads/" + strings.TrimPrefix(asset.StorageKey, "/")
 	if processed, ok := l.storage.(storage.ProcessedOpener); ok {
-		if reader, err := processed.OpenProcessed(ctx, asset.StorageKey, visionCOSProcess); err == nil {
+		if reader, err := processed.OpenProcessed(ctx, asset.StorageKey, process); err == nil {
 			return reader, publicURL, nil
 		}
 	}

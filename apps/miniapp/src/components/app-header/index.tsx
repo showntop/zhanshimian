@@ -67,6 +67,8 @@ export default function AppHeader({ title, back, transparent, onBack, right }: A
     else Taro.switchTab({ url: '/pages/home/index' })
   }
 
+  const barH = Math.max(nav.navHeight - nav.statusBar, 0)
+
   return (
     <View className="app-header-wrap">
       <View
@@ -77,6 +79,14 @@ export default function AppHeader({ title, back, transparent, onBack, right }: A
           paddingRight: `${nav.rightPad}px`,
         }}
       >
+        {title ? (
+          <View
+            className="app-header__title"
+            style={{ top: `${nav.statusBar}px`, height: `${barH}px` }}
+          >
+            <Text className="app-header__title-text">{title}</Text>
+          </View>
+        ) : null}
         <View className="app-header__bar">
           <View className="app-header__left">
             {back ? (
@@ -93,7 +103,6 @@ export default function AppHeader({ title, back, transparent, onBack, right }: A
               </View>
             )}
           </View>
-          {title ? <Text className="app-header__title">{title}</Text> : <View />}
           <View className="app-header__right">{right}</View>
         </View>
       </View>

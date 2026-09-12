@@ -253,6 +253,21 @@ export const ADVISOR_COPY = {
   send: '发送'
 } as const
 
+export const CHECKLIST_COPY = {
+  title: '执行清单',
+  hint: '完成一项勾一项',
+  doneOf: '已完成',
+  remainSuffix: '项未完成',
+  allDoneHint: '可以去反馈了',
+  celebrate: '清单全部完成',
+  cta: '完成后回来反馈',
+  ctaDone: '去反馈',
+  footNote: '你的反馈会让下一次建议更准确',
+  emptyTitle: '清单还是空的',
+  emptyBody: '先在方案详情页选择一套方案。',
+  emptyAction: '去看方案'
+} as const
+
 export const PLAN_DETAIL_COPY = {
   title: '方案详情',
   cta: '生成清单',

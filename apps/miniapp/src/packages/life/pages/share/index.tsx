@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Taro, { useLoad, useShareAppMessage } from '@tarojs/taro'
 import { Button, Text, View } from '@tarojs/components'
 import { APP_NAME, lookImage, trackEvent, type Share } from '@zsm/core'
-import { usePageClass } from '../../../../hooks/use-page-visibility'
+import { usePageShell } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
@@ -24,7 +24,7 @@ export default function SharePage() {
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [isOwner, setIsOwner] = useState(false)
-  const pageClass = usePageClass(!loading || Boolean(share))
+  const { pageClass, enter } = usePageShell(!loading || Boolean(share), '', 'share')
 
   const loadByToken = useCallback(async (token: string) => {
     setLoading(true)
@@ -129,7 +129,7 @@ export default function SharePage() {
     <View className={pageClass}>
       <AppHeader title="分享卡" back />
       <View className="sh">
-        <View className="sh__card fade-up">
+        <View className={`sh__card ${enter()}`}>
           <Text className="sh__brand">{APP_NAME}</Text>
           {snapshot.label ? <Text className="sh__label">{snapshot.label}</Text> : null}
           <Text className="sh__title">{snapshot.title || '我的形象方案'}</Text>
@@ -142,7 +142,7 @@ export default function SharePage() {
           </View>
         </View>
 
-        <View className="sh__actions fade-up delay-1">
+        <View className={`sh__actions ${enter(1)}`}>
           {isOwner ? (
             <>
               <Button className="sh__share-btn" openType="share">

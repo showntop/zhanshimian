@@ -24,12 +24,22 @@ func TestLookPromptRequiresFaceAndFullBodyComposition(t *testing.T) {
 			{Category: "makeup", Title: "清透底妆", Summary: "增强眉眼对比"},
 			{Category: "outfit", Title: "利落套装", Summary: "保留纵向线条"},
 		},
-	})
+	}, true)
 
-	for _, required := range []string{"完整脸部", "发型", "妆面", "上衣和下装", "从头到脚", "绝不能裁掉头部"} {
+	for _, required := range []string{"完整脸部", "发型", "妆面", "上衣和下装", "从头到脚", "绝不能裁掉头部", "第二张是同一人物的面部特写", "禁止换脸"} {
 		if !strings.Contains(prompt, required) {
 			t.Fatalf("look prompt must contain %q: %s", required, prompt)
 		}
+	}
+}
+
+func TestLookPromptWithoutFaceDoesNotClaimSecondPhoto(t *testing.T) {
+	prompt := lookPrompt(LookInput{Name: "都市利落风"}, false)
+	if strings.Contains(prompt, "第二张") {
+		t.Fatalf("single-image look prompt must not claim a face reference: %s", prompt)
+	}
+	if !strings.Contains(prompt, "唯一身份来源") || !strings.Contains(prompt, "禁止换脸") {
+		t.Fatalf("single-image look prompt must still lock identity: %s", prompt)
 	}
 }
 

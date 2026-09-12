@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
-import { usePageClass } from '../../../../hooks/use-page-visibility'
+import { usePageShell } from '../../../../hooks/use-page-visibility'
 import AppHeader from '../../../../components/app-header'
 import ExampleImage from '../../../../components/example-image'
 import './index.scss'
@@ -15,7 +15,7 @@ const FEATURES = [
 
 export default function Lab() {
   const [waitlisted, setWaitlisted] = useState<string[]>([])
-  const pageClass = usePageClass(true)
+  const { pageClass, enter } = usePageShell(true, '', 'lab')
 
   const act = (feature: (typeof FEATURES)[number]) => {
     if (feature.status === '内测') {
@@ -39,11 +39,11 @@ export default function Lab() {
     <View className={pageClass}>
       <AppHeader title="体验实验室" back />
       <View className="lab">
-        <View className="lab__intro fade-up">
+        <View className={`lab__intro ${enter()}`}>
           <Text className="lab__title">这里放「哇塞」，不打断核心流程</Text>
         </View>
         {FEATURES.map((feature, i) => (
-          <View key={feature.key} className={`lab__card fade-up delay-${i + 1}`}>
+          <View key={feature.key} className={`lab__card card ${enter((i + 1) as 1 | 2 | 3)}`}>
             <ExampleImage className="lab__card-img" slug={feature.slug} variant="full" badgeText="风格参考" anchor="top" />
             <View className="lab__card-copy">
               <View className="lab__card-head">

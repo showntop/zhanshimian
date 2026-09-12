@@ -19,14 +19,14 @@
     &-name { font-size: 30rpx; font-weight: 600; color: var(--ink); }
     &-status {
       padding: 4rpx 16rpx; border-radius: 999rpx;
-      background: #efeee9; font-size: 18rpx; color: var(--ink-3);
+      background: var(--moss-soft); font-size: 18rpx; color: var(--ink-3);
       &--live { background: var(--moss-soft); color: var(--moss); }
     }
     &-desc { font-size: 22rpx; line-height: 1.6; color: var(--ink-2); }
     &-btn {
       align-self: flex-start; margin-top: auto;
       padding: 10rpx 28rpx; border-radius: 999rpx;
-      background: var(--moss); color: #ffffff; font-size: 22rpx; font-weight: 600;
+      background: var(--moss); color: var(--cream); font-size: 22rpx; font-weight: 600;
     }
   }
 }

@@ -7,10 +7,6 @@
     &-frame {
       position: relative;
       height: 720rpx;
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-      background: var(--moss-soft);
-      border: 1rpx solid var(--line);
     }
 
     &-img {
@@ -30,8 +26,8 @@
     right: 20rpx;
     padding: 8rpx 20rpx;
     border-radius: 999rpx;
-    background: rgba(30, 35, 29, 0.55);
-    color: #ffffff;
+    background: var(--badge);
+    color: var(--on-photo);
     font-size: 18rpx;
   }
 
@@ -49,7 +45,7 @@
     align-items: center;
     justify-content: center;
     gap: 20rpx;
-    background: rgba(244, 245, 242, 0.72);
+    background: var(--glass);
 
     &-spin {
       width: 48rpx;
@@ -123,7 +119,7 @@
   &__failed {
     padding: 24rpx 28rpx;
     border-radius: var(--radius-md);
-    background: rgba(155, 109, 88, 0.08);
+    background: var(--moss-soft);
 
     &-text {
       font-size: 24rpx;
@@ -154,8 +150,8 @@
 .hair__toggle {
   position: absolute; top: 20rpx; left: 20rpx;
   display: inline-flex; padding: 6rpx;
-  border-radius: 999rpx; background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(5px); border: 1rpx solid var(--line);
+  border-radius: 999rpx; background: var(--glass);
+  backdrop-filter: blur(24rpx); border: 1rpx solid var(--line);
 }
 .hair__toggle-seg {
   display: flex; align-items: center; justify-content: center;

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import { POLL_INTERVALS, lookImage, shouldStopPolling, useTaskPolling, trackEvent, type TodayContext, type TodayPlan } from '@zsm/core'
-import { usePageClass, useShowOnce } from '../../../../hooks/use-page-visibility'
+import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
@@ -24,7 +24,7 @@ export default function Today() {
   const [previewOpen, setPreviewOpen] = useState(false)
   const planRef = useRef<TodayPlan | null>(null)
   planRef.current = plan
-  const pageClass = usePageClass(!loading || Boolean(plan))
+  const { pageClass, enter } = usePageShell(!loading || Boolean(plan), '', 'today')
 
   const load = useCallback(async () => {
     const cached = Boolean(planRef.current)
@@ -157,7 +157,7 @@ export default function Today() {
     <View className={pageClass}>
       <AppHeader title="今日造型" back />
       <View className="today">
-        <View className="today__ctx fade-up" onClick={editCity}>
+        <View className={`today__ctx card--quiet ${enter()}`} onClick={editCity}>
           <Text className="today__ctx-city">{context?.city || '设置城市'}</Text>
           {context ? (
             <Text className="today__ctx-weather">
@@ -168,8 +168,8 @@ export default function Today() {
           <Text className="today__ctx-edit">轻触修改</Text>
         </View>
 
-        <View className="today__card fade-up delay-1">
-          <View className="today__img-wrap pressable" onClick={() => imageUrl && setPreviewOpen(true)}>
+        <View className={`today__card card ${enter(1)}`}>
+          <View className="today__img-wrap photo-hero pressable" onClick={() => imageUrl && setPreviewOpen(true)}>
             <ExampleImage
               className="today__img"
               src={plan?.generated_image_url || plan?.image_url}
@@ -177,12 +177,13 @@ export default function Today() {
               anchor="top"
             />
             {aiBadge ? (
-              <View className="today__img-badge">
+              <View className="today__img-badge layer-on-photo">
                 <Text>{aiBadge}</Text>
               </View>
             ) : null}
             {generating ? (
               <View className="today__mask">
+                <View className="scan-sweep" />
                 <View className="today__mask-spin spinner" />
                 <Text className="today__mask-text">{plan?.look_task?.stage || '正在生成搭配图'}</Text>
               </View>
@@ -203,7 +204,7 @@ export default function Today() {
           </View>
         </View>
 
-        <View className="today__actions fade-up delay-2">
+        <View className={`today__actions ${enter(2)}`}>
           <PrimaryButton text={plan?.active ? '已加入今日清单' : '加入今日清单'} disabled={plan?.active} onClick={activate} />
           <View className="today__actions-row">
             <Text className="today__actions-alt pressable" onClick={() => generate(true)}>换一个方案</Text>
@@ -211,7 +212,7 @@ export default function Today() {
           </View>
         </View>
 
-        <View className="today__feedback fade-up delay-3">
+        <View className={`today__feedback ${enter(3)}`}>
           <Text className="today__feedback-title">今天穿了效果如何</Text>
           <View className="today__feedback-pills">
             {FEEDBACKS.map((word) => (

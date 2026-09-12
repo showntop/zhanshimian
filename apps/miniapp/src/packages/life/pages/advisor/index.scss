@@ -71,7 +71,7 @@
 
     .adv__msg--user & {
       background: var(--moss);
-      color: #ffffff;
+      color: var(--cream);
       border-bottom-right-radius: 6rpx;
     }
 
@@ -98,7 +98,7 @@
     font-weight: 600;
 
     &--done {
-      background: #efeee9;
+      background: var(--moss-soft);
       color: var(--ink-3);
     }
   }
@@ -183,12 +183,12 @@
     height: 84rpx;
     border-radius: 999rpx;
     background: var(--moss);
-    color: #ffffff;
+    color: var(--cream);
     font-size: 26rpx;
     font-weight: 600;
 
     &--off {
-      background: #cdd3c8;
+      background: var(--disabled);
     }
   }
 }

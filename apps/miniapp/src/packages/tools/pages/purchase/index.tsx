@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import { PURCHASE_COPY, userImage, type Diagnosis } from '@zsm/core'
-import { usePageClass, useShowOnce } from '../../../../hooks/use-page-visibility'
+import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import {
   clearPurchaseResult,
@@ -38,7 +38,7 @@ export default function Purchase() {
 
   const resumingRef = useRef(false)
   const freshStartRef = useRef(false)
-  const pageClass = usePageClass(true)
+  const { pageClass, enter } = usePageShell(true, '', 'purchase')
 
   const applySession = useCallback((item: Diagnosis) => {
     setResult(item)
@@ -250,7 +250,7 @@ export default function Purchase() {
     <View className={pageClass}>
       <AppHeader title="购买判断" back />
       <View className={`pk${result ? ' pk--done' : ''}`}>
-        <View className="pk__hero fade-up" style={nativeFill ? { height: 'auto' } : undefined}>
+        <View className={`pk__hero photo-hero photo-hero--bleed ${enter()}`} style={nativeFill ? { height: 'auto' } : undefined}>
           {demoSlug ? (
             nativeFill ? (
               <ExampleImage
@@ -322,7 +322,7 @@ export default function Purchase() {
         </View>
 
         {result ? (
-          <View className="pk__sheet fade-up delay-1">
+          <View className={`pk__sheet ${enter(1)}`}>
             <View className="pk__advice">
               {adviceLead ? <Text className="pk__advice-lead">{adviceLead}</Text> : null}
               <Text className="pk__advice-title">{adviceAction}</Text>
@@ -356,7 +356,7 @@ export default function Purchase() {
           </View>
         ) : (
           <>
-            <View className="pk__hint fade-up delay-1">
+            <View className={`pk__hint ${enter(1)}`}>
               <Text className="pk__hint-title">{PURCHASE_COPY.title}</Text>
               <Text className="pk__hint-desc">{PURCHASE_COPY.desc}</Text>
               {!shownUrl && !demoSlug ? (
@@ -364,7 +364,7 @@ export default function Purchase() {
               ) : null}
             </View>
             {error ? <ErrorState message={error} onRetry={() => analyze(false)} /> : null}
-            <View className="pk__foot fade-up delay-2">
+            <View className={`pk__foot ${enter(2)}`}>
               <PrimaryButton
                 text={busy ? PURCHASE_COPY.busy : PURCHASE_COPY.start}
                 loading={busy}

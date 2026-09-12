@@ -119,9 +119,9 @@
     },
     "full_look_edit": {
       "policy": "quality_first",
-      "primary": "aliyun/wanx2.1-imageedit",
+      "primary": "aliyun/wan2.7-image-pro",
       "fallbacks": [
-        "aliyun/wan2.7-image-pro"
+        "aliyun/wanx2.1-imageedit"
       ],
       "max_cost_cny": 0.6
     }

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Input, ScrollView, Text, View } from '@tarojs/components'
 import { ADVISOR_COPY, trackEvent, type AdvisorMessage } from '@zsm/core'
-import { usePageClass, useShowOnce } from '../../../../hooks/use-page-visibility'
+import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
@@ -17,7 +17,7 @@ export default function Advisor() {
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [scrollKey, setScrollKey] = useState('')
-  const pageClass = usePageClass(loaded, 'page--advisor')
+  const { pageClass, enter } = usePageShell(loaded, 'page--advisor', 'advisor')
 
   const restore = useCallback(async () => {
     const conversationId = readStorage(STORAGE_KEYS.advisorConversationId)
@@ -106,7 +106,7 @@ export default function Advisor() {
       <View className="adv">
         <ScrollView className="adv__list" scrollY scrollIntoView={scrollKey || undefined} enhanced showScrollbar={false}>
           {!loaded ? null : messages.length === 0 ? (
-            <View className="adv__empty fade-up">
+            <View className={`adv__empty ${enter()}`}>
               <Text className="adv__empty-title">{ADVISOR_COPY.emptyTitle}</Text>
               <Text className="adv__empty-desc">{ADVISOR_COPY.emptyDesc}</Text>
             </View>
