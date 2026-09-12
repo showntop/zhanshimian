@@ -19,6 +19,7 @@ type TaskType string
 const (
 	TaskTypeAnalysis    TaskType = "analysis"
 	TaskTypeHairPreview TaskType = "hair_preview"
+	TaskTypeBodyOrbit   TaskType = "body_orbit"
 	TaskTypePlanGroup   TaskType = "plan_group"
 	TaskTypePlanLook    TaskType = "plan_look"
 	TaskTypeTodayLook   TaskType = "today_look"
@@ -88,6 +89,10 @@ type AnalysisTaskPayload struct {
 
 type HairPreviewTaskPayload struct {
 	PreviewID string `json:"preview_id"`
+}
+
+type BodyOrbitTaskPayload struct {
+	PresentationID string `json:"presentation_id"`
 }
 
 type PlanLookTaskPayload struct {
@@ -580,6 +585,52 @@ type HairPreview struct {
 	Task            *TaskView `json:"task,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type BodyPresentationInput struct {
+	BodyMediaID string `json:"body_media_id"`
+	FaceMediaID string `json:"face_media_id"`
+}
+
+type OrbitFrame struct {
+	Yaw float64 `json:"yaw"`
+	URL string  `json:"url"`
+}
+
+type BodyOrbitView struct {
+	VideoURL   string       `json:"video_url,omitempty"`
+	DurationMS int          `json:"duration_ms,omitempty"`
+	Frames     []OrbitFrame `json:"frames"`
+}
+
+type BodyMesh struct {
+	Format     string `json:"format"`
+	URL        string `json:"url"`
+	TextureURL string `json:"texture_url,omitempty"`
+}
+
+type BodyPresentation struct {
+	ID              string        `json:"id"`
+	BodyMediaID     string        `json:"body_media_id"`
+	FaceMediaID     string        `json:"face_media_id"`
+	Representation  string        `json:"representation"`
+	Orbit           BodyOrbitView `json:"orbit"`
+	Mesh            *BodyMesh     `json:"mesh"`
+	ProviderVersion string        `json:"provider_version,omitempty"`
+	Status          string        `json:"status"`
+	Progress        int           `json:"progress"`
+	Stage           string        `json:"stage"`
+	ErrorMessage    string        `json:"error_message,omitempty"`
+	Task            *TaskView     `json:"task,omitempty"`
+	CreatedAt       time.Time     `json:"created_at"`
+	UpdatedAt       time.Time     `json:"updated_at"`
+}
+
+type BodyPresentationStatus struct {
+	Available bool              `json:"available"`
+	Active    *BodyPresentation `json:"active"`
+	Completed *BodyPresentation `json:"completed"`
+	Failed    *BodyPresentation `json:"failed"`
 }
 
 type AnalysisOutput struct {
