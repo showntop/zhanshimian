@@ -6,6 +6,7 @@ import { Text, View } from '@tarojs/components'
 import { SCENES } from '@zsm/core'
 import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
+import { handleBillingError } from '../../services/billing'
 import { analysisPageUrl, isAnalysisRunning } from '../../services/task-utils'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
@@ -88,6 +89,7 @@ export default function Scene() {
       writeStorage(STORAGE_KEYS.sceneBrief, JSON.stringify({ scene, answers }))
       Taro.switchTab({ url: '/pages/plans/index' })
     } catch (e) {
+      if (handleBillingError(e)) return
       Taro.showToast({ title: (e as Error).message || '生成没有成功，请重试', icon: 'none' })
     } finally {
       setBusy(false)

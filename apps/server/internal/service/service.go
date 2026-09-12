@@ -51,23 +51,29 @@ type Service struct {
 	sessionTTL             time.Duration
 	maxUpload              int64
 	logger                 *slog.Logger
+	billingSKUs            []domain.BillingSKU
+	virtualPay             provider.VirtualPayer
+	wechatSession          provider.WeChatSessionExchanger
 }
 
 type ProviderOptions struct {
-	Hair        provider.HairPreviewGenerator
-	Look        provider.LookGenerator
-	PlanGroup   provider.PlanGroupGenerator
-	Outfit      provider.OutfitAdvisor
-	Purchase    provider.OutfitAdvisor
-	Advisor     provider.AdvisorChat
-	Today       provider.TodayPlanner
-	Weather     provider.WeatherProvider
-	WeChat      provider.WeChatAuthenticator
-	WeChatApp   provider.WeChatAuthenticator
-	Apple       provider.AppleAuthenticator
-	Sms         provider.SmsSender
-	SmsPerPhone int64
-	AssetURLTTL time.Duration
+	Hair          provider.HairPreviewGenerator
+	Look          provider.LookGenerator
+	PlanGroup     provider.PlanGroupGenerator
+	Outfit        provider.OutfitAdvisor
+	Purchase      provider.OutfitAdvisor
+	Advisor       provider.AdvisorChat
+	Today         provider.TodayPlanner
+	Weather       provider.WeatherProvider
+	WeChat        provider.WeChatAuthenticator
+	WeChatApp     provider.WeChatAuthenticator
+	Apple         provider.AppleAuthenticator
+	Sms           provider.SmsSender
+	SmsPerPhone   int64
+	AssetURLTTL   time.Duration
+	BillingSKUs   []domain.BillingSKU
+	VirtualPay    provider.VirtualPayer
+	WeChatSession provider.WeChatSessionExchanger
 }
 
 func New(repo repository.Repository, objects storage.ObjectStorage, analyzer provider.Analyzer, publicBaseURL string, sessionTTL time.Duration, maxUpload int64, logger *slog.Logger, options ...ProviderOptions) *Service {
@@ -85,6 +91,9 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 	smsPerPhone := int64(5)
 	var lookGenerator provider.LookGenerator
 	assetURLTTL := 15 * time.Minute
+	billingSKUs := defaultBillingSKUs()
+	var virtualPay provider.VirtualPayer
+	var wechatSession provider.WeChatSessionExchanger
 	if len(options) > 0 {
 		if options[0].Hair != nil {
 			hairGenerator = options[0].Hair
@@ -116,6 +125,11 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 		if options[0].AssetURLTTL > 0 {
 			assetURLTTL = options[0].AssetURLTTL
 		}
+		if len(options[0].BillingSKUs) > 0 {
+			billingSKUs = options[0].BillingSKUs
+		}
+		virtualPay = options[0].VirtualPay
+		wechatSession = options[0].WeChatSession
 	}
 	service := &Service{
 		repo: repo, storage: objects, analyzer: analyzer, hairGenerator: hairGenerator,
@@ -127,6 +141,7 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 		ipLimiter:              newSlidingWindowLimiter(10, time.Minute),
 		publicBaseURL:          strings.TrimSuffix(publicBaseURL, "/"),
 		assetURLTTL:            assetURLTTL, sessionTTL: sessionTTL, maxUpload: maxUpload, logger: logger,
+		billingSKUs: billingSKUs, virtualPay: virtualPay, wechatSession: wechatSession,
 	}
 	service.handlers = map[domain.TaskType]TaskHandler{
 		domain.TaskTypeAnalysis:    analysisTaskHandler{service},
@@ -164,6 +179,11 @@ func (s *Service) WeChatLogin(ctx context.Context, code, nickname string) (domai
 		return domain.Session{}, err
 	}
 	return s.loginWithIdentity(ctx, domain.ProviderWeChatMiniApp, identity.OpenID, nickname)
+}
+
+func (s *Service) hasActiveTaskType(ctx context.Context, userID, taskType string) bool {
+	count, err := s.repo.CountActiveTasksByTypes(ctx, userID, []string{taskType})
+	return err == nil && count > 0
 }
 
 func (s *Service) WeChatAppLogin(ctx context.Context, code, nickname string) (domain.Session, error) {
@@ -239,7 +259,11 @@ func (s *Service) GetAccount(ctx context.Context, user domain.User) (domain.MeAc
 	if err != nil {
 		return domain.MeAccount{}, err
 	}
-	return domain.MeAccount{ID: user.ID, Nickname: user.Nickname, Identities: identities}, nil
+	account := domain.MeAccount{ID: user.ID, Nickname: user.Nickname, Identities: identities}
+	if summary, err := s.BillingSummary(ctx, user.ID); err == nil {
+		account.Billing = &summary
+	}
+	return account, nil
 }
 
 // ---- 补充资料 ----
@@ -521,9 +545,23 @@ func (s *Service) CreateAnalysis(ctx context.Context, userID string, input domai
 			input.Profile = domain.Profile{HeightCM: profile.HeightCM, Role: profile.Role, Budget: profile.Budget}
 		}
 	}
+	var chargeRefs []string
+	if !s.hasActiveTaskType(ctx, userID, string(domain.TaskTypeAnalysis)) {
+		refs, authErr := s.authorize(ctx, userID, domainActionAnalysis, domain.WelcomeAnalysis, 1)
+		if authErr != nil {
+			return domain.Analysis{}, nil, authErr
+		}
+		chargeRefs = refs
+	}
 	analysis, task, err := s.repo.CreateAnalysis(ctx, userID, input)
 	if err != nil {
+		s.refundRefs(ctx, chargeRefs)
 		return domain.Analysis{}, nil, err
+	}
+	if task != nil && len(chargeRefs) > 0 {
+		s.bindCharges(ctx, chargeRefs, []string{task.ID})
+	} else {
+		s.refundRefs(ctx, chargeRefs)
 	}
 	// 幂等返回的旧分析已经带原始照片；只有真正新建的分析才回填本次照片，
 	// 避免响应里挂上和实际分析输入不符的 media ids。

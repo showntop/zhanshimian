@@ -13,6 +13,8 @@ import type {
   CreateHairPreviewInput,
   CreateShareInput,
   CreateTodayPlanInput,
+  BillingOrder,
+  BillingSummary,
   CreateWardrobeOutfitInput,
   Diagnosis,
   DiagnosisKind,
@@ -99,7 +101,11 @@ export const API_PATHS = {
   advisorConversationMessages: 'GET /v1/advisor/conversations/{id}/messages',
   advisorActionApply: 'POST /v1/advisor/actions/{id}/apply',
   events: 'POST /v1/events',
-  meData: 'DELETE /v1/me/data'
+  meData: 'DELETE /v1/me/data',
+  billingMe: 'GET /v1/billing/me',
+  billingOrders: 'POST /v1/billing/orders',
+  billingOrderSync: 'POST /v1/billing/orders/{id}/sync',
+  billingNotify: 'POST /v1/billing/notify'
 } as const
 
 export type ApiPathName = keyof typeof API_PATHS
@@ -210,6 +216,9 @@ export interface ApiEndpoints {
   // ---- 埋点与隐私（2） ----
   postEvent(body: EventInput): Promise<void>
   deleteMyData(): Promise<void>
+  getBillingMe(): Promise<BillingSummary>
+  createBillingOrder(input: { sku_id: string; code?: string }): Promise<BillingOrder>
+  syncBillingOrder(id: string): Promise<BillingOrder>
 }
 
 export function createApiEndpoints(client: ApiClient, options: EndpointOptions = {}): ApiEndpoints {
@@ -350,6 +359,9 @@ export function createApiEndpoints(client: ApiClient, options: EndpointOptions =
     },
     deleteMyData: async () => {
       await client.request('/v1/me/data', { method: 'DELETE' })
-    }
+    },
+    getBillingMe: () => client.request('/v1/billing/me'),
+    createBillingOrder: (input) => client.request('/v1/billing/orders', { method: 'POST', data: input }),
+    syncBillingOrder: (id) => client.request(`/v1/billing/orders/${encodeURIComponent(id)}/sync`, { method: 'POST' })
   }
 }

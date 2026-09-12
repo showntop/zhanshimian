@@ -12,6 +12,7 @@ import {
 } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
+import { handleBillingError } from '../../services/billing'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
@@ -117,7 +118,8 @@ export default function Report() {
       // 方案组幂等创建（PUT）：成功后再切 Tab，避免用户进入空方案页。
       await api.upsertPlans(report.id, { scene: 'general', answers: {} })
       Taro.switchTab({ url: '/pages/plans/index' })
-    } catch {
+    } catch (e) {
+      if (handleBillingError(e)) return
       Taro.showToast({ title: '方案暂时没有生成，请稍后重试', icon: 'none' })
     } finally {
       setPlansBusy(false)

@@ -5,6 +5,7 @@ import { Image, Text, View } from '@tarojs/components'
 import { IMAGE_BADGE_COPY, POLL_INTERVALS, lookImage, shouldStopPolling, useTaskPolling, trackEvent, type TodayContext, type TodayPlan } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
+import { handleBillingError } from '../../../../services/billing'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
@@ -57,6 +58,7 @@ export default function Today() {
       setPlan(data)
       trackEvent('today_plan_generate', { refresh: String(refresh) })
     } catch (e) {
+      if (handleBillingError(e)) return
       Taro.showToast({ title: (e as Error).message || '生成没有成功', icon: 'none' })
     } finally {
       setBusy(false)

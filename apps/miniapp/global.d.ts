@@ -7,3 +7,16 @@ declare function defineAppConfig(config: Record<string, unknown>): Record<string
 declare function definePageConfig(config: Record<string, unknown>): Record<string, unknown>
 
 declare const API_BASE_URL: string
+
+interface WeChatVirtualPaymentOptions {
+  signData: string
+  paySig: string
+  signature: string
+  mode: string
+  success?: () => void
+  fail?: (err: { errMsg?: string }) => void
+}
+
+declare const wx: {
+  requestVirtualPayment?: (options: WeChatVirtualPaymentOptions) => void
+}

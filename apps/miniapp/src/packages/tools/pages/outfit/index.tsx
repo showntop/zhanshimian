@@ -7,6 +7,7 @@ import { Image, Text, View } from '@tarojs/components'
 import { OUTFIT_COPY, userImage, type Diagnosis } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
+import { handleBillingError } from '../../../../services/billing'
 import {
   clearOutfitResult,
   getOutfitInflight,
@@ -233,6 +234,7 @@ export default function Outfit() {
       )
       applySession(item)
     } catch (e) {
+      handleBillingError(e)
       setError((e as Error).message || '诊断没有成功，请重试')
     } finally {
       setBusy(false)

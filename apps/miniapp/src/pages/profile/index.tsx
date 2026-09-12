@@ -4,13 +4,14 @@
 import { useCallback, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
-import { DEFAULT_NICKNAME, isBundledAsset, type Account, type Report, type Task, type UserProfile } from '@zsm/core'
+import { BILLING_COPY, DEFAULT_NICKNAME, isBundledAsset, type Account, type BillingSummary, type Report, type Task, type UserProfile } from '@zsm/core'
 import { usePageShell } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { groupTasksByType, openTask, taskTitle } from '../../services/task-utils'
-import { clearAllLocalState, STORAGE_KEYS, readStorage } from '../../services/storage'
+import { clearAllLocalState, STORAGE_KEYS, readStorage, removeStorage } from '../../services/storage'
 import { globalData } from '../../app'
 import AppHeader from '../../components/app-header'
+import CreditSheet from '../../components/credit-sheet'
 import ExampleImage from '../../components/example-image'
 import Skeleton from '../../components/skeleton'
 import './index.scss'
@@ -20,6 +21,8 @@ export default function Profile() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [report, setReport] = useState<Report | null>(null)
+  const [billing, setBilling] = useState<BillingSummary | null>(null)
+  const [buyOpen, setBuyOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const hasCacheRef = useRef(false)
   const { pageClass, enter } = usePageShell(!loading, 'page--tab', 'profile')
@@ -36,14 +39,21 @@ export default function Profile() {
       setProfile(myProfile)
       setTasks(bootstrap?.active_tasks ?? [])
       setReport(bootstrap?.report ?? null)
+      const nextBilling = bootstrap?.billing ?? me?.billing ?? null
+      setBilling(nextBilling)
       hasCacheRef.current = true
+      return nextBilling
     } finally {
       setLoading(false)
     }
   }, [])
 
   useDidShow(() => {
-    load()
+    load().then((nextBilling) => {
+      if (!readStorage(STORAGE_KEYS.openCreditSheet)) return
+      removeStorage(STORAGE_KEYS.openCreditSheet)
+      if (nextBilling?.payment_enabled) setBuyOpen(true)
+    })
   })
 
   const hasReport = Boolean(readStorage(STORAGE_KEYS.reportId))
@@ -155,6 +165,32 @@ export default function Profile() {
             ) : null}
 
             <View className={`me__card ${enter(1)}`}>
+              <Text className="me__section">{BILLING_COPY.section}</Text>
+              <View className="me__row">
+                <Text className="me__row-label">{BILLING_COPY.remaining}</Text>
+                <Text className="me__row-value me__row-value--moss">{billing?.credits ?? 0} {BILLING_COPY.packUnit}</Text>
+              </View>
+              <Text className="me__note">{BILLING_COPY.hint}</Text>
+              {billing?.welcome_analysis_available ? (
+                <Text className="me__note">{BILLING_COPY.welcomeAnalysis}</Text>
+              ) : null}
+              {billing?.welcome_plan_set_available ? (
+                <Text className="me__note">{BILLING_COPY.welcomePlanSet}</Text>
+              ) : null}
+              {billing?.payment_enabled ? (
+                <View className="me__row pressable" onClick={() => setBuyOpen(true)}>
+                  <Text className="me__row-label">{BILLING_COPY.buyAction}</Text>
+                  <Text className="me__row-value">{BILLING_COPY.buyNow}</Text>
+                </View>
+              ) : (
+                <View className="me__row">
+                  <Text className="me__row-label">{BILLING_COPY.buyAction}</Text>
+                  <Text className="me__row-value">{BILLING_COPY.exhausted}</Text>
+                </View>
+              )}
+            </View>
+
+            <View className={`me__card ${enter(1)}`}>
               <Text className="me__section">形象档案</Text>
               <View className="me__row pressable" onClick={() => Taro.navigateTo({ url: '/pages/report/index' })}>
                 <Text className="me__row-label">最近的分析报告</Text>
@@ -202,6 +238,7 @@ export default function Profile() {
             </View>
 
             <Text className={`me__privacy ${enter(3)}`}>照片与建议只对你可见</Text>
+            <CreditSheet open={buyOpen} billing={billing} onClose={() => setBuyOpen(false)} onPurchased={load} />
           </>
         )}
       </View>

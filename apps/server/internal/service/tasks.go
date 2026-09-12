@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
-	"github.com/google/uuid"
 )
 
 // TaskHandler processes one claimed task of its type. Handlers persist all
@@ -275,6 +275,7 @@ func (s *Service) RunWorker(ctx context.Context, poll time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			s.sweepFailedTaskCharges(ctx)
 			for _, taskType := range taskTypeOrder {
 				task, ok, err := s.repo.ClaimTask(ctx, taskType)
 				if err != nil {
@@ -301,6 +302,7 @@ func (s *Service) runClaimedTask(ctx context.Context, task domain.Task) {
 		failCtx, cancel := failContext()
 		defer cancel()
 		_ = s.repo.FailTask(failCtx, task.ID, taskErrorCodeTaskFailed, "no handler registered for task type", nil, time.Time{})
+		s.refundTaskCharge(failCtx, task.ID)
 		return
 	}
 	s.guardWorkerJob(task.Type, task.ID, func(cause error) {
@@ -339,11 +341,13 @@ func (s *Service) finishTask(task domain.Task, cause error) {
 		if err := s.repo.FailTask(failCtx, task.ID, taskErrorCodePhotoRejected, rejected.UserMessage(), photoRejectionReasons(rejected), time.Time{}); err != nil {
 			s.loggerOrDefault().Error("fail task writeback", "task_id", task.ID, "error", err)
 		}
+		s.refundTaskCharge(failCtx, task.ID)
 		s.loggerOrDefault().Error("task failed: photos rejected", "type", task.Type, "task_id", task.ID)
 	case terminalTaskFailure(task, cause):
 		if err := s.repo.FailTask(failCtx, task.ID, taskErrorCodeTaskFailed, taskUserMessage(domain.TaskType(task.Type)), nil, time.Time{}); err != nil {
 			s.loggerOrDefault().Error("fail task writeback", "task_id", task.ID, "error", err)
 		}
+		s.refundTaskCharge(failCtx, task.ID)
 		s.loggerOrDefault().Error("task failed permanently", "type", task.Type, "task_id", task.ID, "attempt", task.Attempts, "error", cause)
 	default:
 		delay := taskRetryDelay(domain.TaskType(task.Type), task.Attempts)

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { DEFAULT_NICKNAME, type Account, type UserProfile } from '@zsm/core'
+import { BILLING_COPY, DEFAULT_NICKNAME, type Account, type BillingSummary, type UserProfile } from '@zsm/core'
 import { api } from '../../src/api'
 import { STORAGE_KEYS, clearAllLocalState, readStorage, writeStorage } from '../../src/storage'
 import { PrimaryButton, Screen } from '../../src/ui/Screen'
@@ -11,11 +11,13 @@ export default function Profile() {
   const router = useRouter()
   const [account, setAccount] = useState<Account | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [billing, setBilling] = useState<BillingSummary | null>(null)
 
   const load = useCallback(async () => {
     const [me, myProfile] = await Promise.all([api.getMe().catch(() => null), api.getMyProfile().catch(() => null)])
     setAccount(me)
     setProfile(myProfile)
+    setBilling(me?.billing ?? null)
   }, [])
 
   useEffect(() => {
@@ -61,6 +63,14 @@ export default function Profile() {
             已绑定：{(account?.identities ?? []).map((i) => i.provider).join('、') || '手机号'}
           </Text>
         </View>
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.section}>{BILLING_COPY.section}</Text>
+        <Text style={styles.meta}>
+          {BILLING_COPY.remaining} {billing?.credits ?? 0} {BILLING_COPY.packUnit}
+        </Text>
+        <Text style={styles.meta}>{BILLING_COPY.hint}</Text>
+        <Text style={styles.meta}>{BILLING_COPY.buyOnMiniapp}</Text>
       </View>
       {profile ? (
         <View style={styles.card}>

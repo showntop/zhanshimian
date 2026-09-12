@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
-	"github.com/google/uuid"
 )
 
 // ---- 今日方案 ----
@@ -148,13 +148,19 @@ func (s *Service) GenerateTodayPlan(ctx context.Context, userID string, input do
 	}
 	var task *domain.Task
 	if item.ReportID != "" && s.lookGenerator != nil {
+		refs, authErr := s.authorize(ctx, userID, domainActionLook, "", 1)
+		if authErr != nil {
+			return domain.TodayPlan{}, nil, authErr
+		}
 		created, taskErr := s.repo.CreateTask(ctx, userID, domain.TaskInput{
 			Type:    domain.TaskTypeTodayLook,
 			Payload: domain.TodayLookTaskPayload{PlanID: item.ID},
 		})
 		if taskErr != nil {
+			s.refundRefs(ctx, refs)
 			return domain.TodayPlan{}, nil, taskErr
 		}
+		s.bindCharges(ctx, refs, []string{created.ID})
 		task = &created
 	}
 	s.hydrateTodayPlan(ctx, userID, &item)
@@ -511,6 +517,9 @@ func (s *Service) SendAdvisorMessage(ctx context.Context, userID string, input d
 	if strings.TrimSpace(input.Content) == "" || len([]rune(input.Content)) > 500 {
 		return domain.AdvisorMessage{}, fmt.Errorf("%w: 请输入 1–500 字的问题", ErrValidation)
 	}
+	if _, err := s.authorize(ctx, userID, domainActionAdvisor, "", 1); err != nil {
+		return domain.AdvisorMessage{}, err
+	}
 	conversationID := input.ConversationID
 	if conversationID == "" {
 		conversation, err := s.CreateAdvisorConversation(ctx, userID, input)
@@ -576,6 +585,9 @@ func (s *Service) RunDiagnostic(ctx context.Context, userID string, input domain
 	validKinds := map[string]bool{"outfit": true, "purchase": true}
 	if !validKinds[input.Kind] {
 		return domain.ToolResult{}, fmt.Errorf("%w: 不支持的诊断类型", ErrValidation)
+	}
+	if _, err := s.authorize(ctx, userID, domainActionDiagnostic, "", 1); err != nil {
+		return domain.ToolResult{}, err
 	}
 	if input.Scene == "" {
 		input.Scene = "daily"
@@ -743,9 +755,23 @@ func (s *Service) CreateHairPreview(ctx context.Context, userID string, input do
 	if !validPlanScenes[input.Scene] {
 		return domain.HairPreview{}, nil, fmt.Errorf("%w: 不支持的使用场景", ErrValidation)
 	}
+	var chargeRefs []string
+	if !s.hasActiveTaskType(ctx, userID, string(domain.TaskTypeHairPreview)) {
+		refs, authErr := s.authorize(ctx, userID, domainActionLook, "", 1)
+		if authErr != nil {
+			return domain.HairPreview{}, nil, authErr
+		}
+		chargeRefs = refs
+	}
 	preview, task, err := s.repo.CreateHairPreview(ctx, userID, input, styleName)
 	if err != nil {
+		s.refundRefs(ctx, chargeRefs)
 		return domain.HairPreview{}, nil, err
+	}
+	if task != nil && len(chargeRefs) > 0 {
+		s.bindCharges(ctx, chargeRefs, []string{task.ID})
+	} else {
+		s.refundRefs(ctx, chargeRefs)
 	}
 	preview.SourceImageURL = s.absoluteURL(preview.SourceImageURL)
 	return preview, task, nil

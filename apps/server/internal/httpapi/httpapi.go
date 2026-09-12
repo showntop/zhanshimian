@@ -28,14 +28,14 @@ type API struct {
 }
 
 type RuntimeInfo struct {
-	Environment             string
-	StorageProvider         string
-	WeatherProvider         string
-	WeChatLoginConfigured   bool
-	WeChatAppConfigured     bool
-	AppleLoginConfigured    bool
-	SmsProvider             string
-	AIRoutes                map[string]string
+	Environment           string
+	StorageProvider       string
+	WeatherProvider       string
+	WeChatLoginConfigured bool
+	WeChatAppConfigured   bool
+	AppleLoginConfigured  bool
+	SmsProvider           string
+	AIRoutes              map[string]string
 }
 
 type contextKey string
@@ -43,7 +43,7 @@ type contextKey string
 const userKey contextKey = "user"
 const tokenKey contextKey = "token"
 
-// New 注册全部路由（契约见 contracts/openapi.yaml，49 路径 / 53 操作）。
+// New 注册全部路由（契约见 contracts/openapi.yaml）。
 func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtime RuntimeInfo) http.Handler {
 	api := &API{service: svc, logger: logger, devLoginEnabled: devLoginEnabled, runtime: runtime}
 	mux := http.NewServeMux()
@@ -119,6 +119,11 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("POST /v1/advisor/actions/{id}/apply", api.auth(http.HandlerFunc(api.applyAdvisorAction)))
 
 	mux.Handle("POST /v1/events", api.auth(http.HandlerFunc(api.trackProductEvent)))
+
+	mux.Handle("GET /v1/billing/me", api.auth(http.HandlerFunc(api.getBillingMe)))
+	mux.Handle("POST /v1/billing/orders", api.auth(http.HandlerFunc(api.createBillingOrder)))
+	mux.Handle("POST /v1/billing/orders/{id}/sync", api.auth(http.HandlerFunc(api.syncBillingOrder)))
+	mux.HandleFunc("POST /v1/billing/notify", api.billingNotify)
 	return requestMiddleware(logger, mux)
 }
 
@@ -214,6 +219,10 @@ func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 		a.internalError(w, r, err)
 	case errors.Is(err, service.ErrRateLimited):
 		writeError(w, r, http.StatusTooManyRequests, "rate_limited", strings.TrimPrefix(err.Error(), service.ErrRateLimited.Error()+": "))
+	case errors.Is(err, service.ErrInsufficientCredits):
+		writeError(w, r, http.StatusPaymentRequired, "insufficient_credits", strings.TrimPrefix(err.Error(), service.ErrInsufficientCredits.Error()+": "))
+	case errors.Is(err, service.ErrPaymentUnavailable):
+		writeError(w, r, http.StatusServiceUnavailable, "payment_unavailable", "购买暂未开通")
 	case errors.Is(err, service.ErrValidation):
 		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), service.ErrValidation.Error()+": "))
 	case errors.Is(err, repository.ErrNotFound):

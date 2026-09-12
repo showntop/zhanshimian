@@ -5,6 +5,7 @@ import { Input, ScrollView, Text, View } from '@tarojs/components'
 import { ADVISOR_COPY, trackEvent, type AdvisorMessage } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
+import { handleBillingError } from '../../../../services/billing'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
 import './index.scss'
@@ -77,6 +78,7 @@ export default function Advisor() {
     } catch (e) {
       setMessages((prev) => prev.filter((m) => m.id !== localId))
       setInput(text)
+      if (handleBillingError(e)) return
       Taro.showToast({ title: (e as Error).message || '发送没有成功，请重试', icon: 'none' })
     } finally {
       setBusy(false)

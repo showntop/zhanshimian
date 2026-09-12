@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -10,47 +11,53 @@ import (
 )
 
 type Config struct {
-	Environment                   string
-	Addr                          string
-	DatabaseURL                   string
-	PublicBaseURL                 string
-	UploadDir                     string
-	AssetDir                      string
-	StorageProvider               string
-	AssetURLTTL                   time.Duration
-	COSBucketURL                  string
-	COSRegion                     string
-	COSEndpoint                   string
-	COSSecretID                   string
-	COSSecretKey                  string
-	COSKeyPrefix                  string
-	DevLoginEnabled               bool
-	WeChatAppID                   string
-	WeChatAppSecret               string
-	WeChatAPIBaseURL              string
-	WeChatRequestTimeout          time.Duration
-	WeatherProvider               string
-	AMapWebServiceKey             string
-	AMapAPIBaseURL                string
-	AMapDefaultCity               string
-	AMapDefaultAdcode             string
-	WeatherRequestTimeout         time.Duration
+	Environment           string
+	Addr                  string
+	DatabaseURL           string
+	PublicBaseURL         string
+	UploadDir             string
+	AssetDir              string
+	StorageProvider       string
+	AssetURLTTL           time.Duration
+	COSBucketURL          string
+	COSRegion             string
+	COSEndpoint           string
+	COSSecretID           string
+	COSSecretKey          string
+	COSKeyPrefix          string
+	DevLoginEnabled       bool
+	WeChatAppID           string
+	WeChatAppSecret       string
+	WeChatAPIBaseURL      string
+	WeChatRequestTimeout  time.Duration
+	WeatherProvider       string
+	AMapWebServiceKey     string
+	AMapAPIBaseURL        string
+	AMapDefaultCity       string
+	AMapDefaultAdcode     string
+	WeatherRequestTimeout time.Duration
 	// 二期：多端身份与登录
-	SmsProvider               string
-	SmsRatePerPhonePerHour    int64
-	AliyunSmsAccessKeyID      string
-	AliyunSmsAccessKeySecret  string
-	AliyunSmsSign             string
-	AliyunSmsTemplateCode     string
-	AppleBundleID             string
-	WeChatOpenAppID           string
-	WeChatOpenAppSecret       string
-	RunWorker                 bool
-	SessionTTL                    time.Duration
-	MaxUploadBytes                int64
-	AnalysisPollTime              time.Duration
-	AIRouting                     AIRoutingConfig
-	AIRoutingSource               string
+	SmsProvider              string
+	SmsRatePerPhonePerHour   int64
+	AliyunSmsAccessKeyID     string
+	AliyunSmsAccessKeySecret string
+	AliyunSmsSign            string
+	AliyunSmsTemplateCode    string
+	AppleBundleID            string
+	WeChatOpenAppID          string
+	WeChatOpenAppSecret      string
+	RunWorker                bool
+	SessionTTL               time.Duration
+	MaxUploadBytes           int64
+	AnalysisPollTime         time.Duration
+	AIRouting                AIRoutingConfig
+	AIRoutingSource          string
+	BillingPaymentEnabled    bool
+	BillingSKUs              []BillingSKU
+	VirtualPayOfferID        string
+	VirtualPayAppKey         string
+	VirtualPayEnv            int
+	VirtualPayAPIBase        string
 }
 
 func Load() (Config, error) {
@@ -62,46 +69,67 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("AI_ROUTING_FILE or AI_ROUTING_JSON is required")
 	}
 	cfg := Config{
-		Environment:                   env("APP_ENV", "development"),
-		Addr:                          env("ADDR", ":58000"),
-		DatabaseURL:                   env("DATABASE_URL", "postgres://jianwo:jianwo@localhost:55432/jianwo?sslmode=disable"),
-		PublicBaseURL:                 env("PUBLIC_BASE_URL", "http://localhost:58000"),
-		UploadDir:                     env("UPLOAD_DIR", "data/uploads"),
-		AssetDir:                      env("ASSET_DIR", "assets"),
-		StorageProvider:               env("STORAGE_PROVIDER", "local"),
-		AssetURLTTL:                   time.Duration(envInt("ASSET_URL_TTL_SECONDS", 900)) * time.Second,
-		COSBucketURL:                  resolvedCOSBucketURL(),
-		COSRegion:                     env("ASSET_REGION", ""),
-		COSEndpoint:                   env("ASSET_S3_ENDPOINT", ""),
-		COSSecretID:                   os.Getenv("COS_SECRET_ID"),
-		COSSecretKey:                  os.Getenv("COS_SECRET_KEY"),
-		COSKeyPrefix:                  env("COS_KEY_PREFIX", "jianwo"),
-		DevLoginEnabled:               envBool("DEV_LOGIN_ENABLED", true),
-		WeChatAppID:                   os.Getenv("WECHAT_APP_ID"),
-		WeChatAppSecret:               os.Getenv("WECHAT_APP_SECRET"),
-		WeChatAPIBaseURL:              env("WECHAT_API_BASE_URL", "https://api.weixin.qq.com/sns/jscode2session"),
-		WeChatRequestTimeout:          time.Duration(envInt("WECHAT_REQUEST_TIMEOUT_SECONDS", 5)) * time.Second,
-		WeatherProvider:               env("WEATHER_PROVIDER", "demo"),
-		AMapWebServiceKey:             os.Getenv("AMAP_WEB_SERVICE_KEY"),
-		AMapAPIBaseURL:                env("AMAP_API_BASE_URL", "https://restapi.amap.com/v3/weather/weatherInfo"),
-		AMapDefaultCity:               env("AMAP_DEFAULT_CITY", "上海"),
-		AMapDefaultAdcode:             env("AMAP_DEFAULT_ADCODE", "310000"),
-		WeatherRequestTimeout:         time.Duration(envInt("WEATHER_REQUEST_TIMEOUT_SECONDS", 5)) * time.Second,
-		SmsProvider:                   env("SMS_PROVIDER", "console"),
-		SmsRatePerPhonePerHour:        int64(envInt("SMS_RATE_PER_PHONE_PER_HOUR", 5)),
-		AliyunSmsAccessKeyID:          os.Getenv("ALIYUN_SMS_ACCESS_KEY_ID"),
-		AliyunSmsAccessKeySecret:      os.Getenv("ALIYUN_SMS_ACCESS_KEY_SECRET"),
-		AliyunSmsSign:                 os.Getenv("ALIYUN_SMS_SIGN"),
-		AliyunSmsTemplateCode:         os.Getenv("ALIYUN_SMS_TEMPLATE_CODE"),
-		AppleBundleID:                 os.Getenv("APPLE_BUNDLE_ID"),
-		WeChatOpenAppID:               os.Getenv("WECHAT_OPEN_APP_ID"),
-		WeChatOpenAppSecret:           os.Getenv("WECHAT_OPEN_APP_SECRET"),
-		RunWorker:                     envBool("RUN_WORKER", true),
-		SessionTTL:                    30 * 24 * time.Hour,
-		MaxUploadBytes:                10 << 20,
-		AnalysisPollTime:              time.Duration(envInt("ANALYSIS_POLL_MS", 700)) * time.Millisecond,
-		AIRouting:                     aiRouting,
-		AIRoutingSource:               aiRoutingSource,
+		Environment:              env("APP_ENV", "development"),
+		Addr:                     env("ADDR", ":58000"),
+		DatabaseURL:              env("DATABASE_URL", "postgres://jianwo:jianwo@localhost:55432/jianwo?sslmode=disable"),
+		PublicBaseURL:            env("PUBLIC_BASE_URL", "http://localhost:58000"),
+		UploadDir:                env("UPLOAD_DIR", "data/uploads"),
+		AssetDir:                 env("ASSET_DIR", "assets"),
+		StorageProvider:          env("STORAGE_PROVIDER", "local"),
+		AssetURLTTL:              time.Duration(envInt("ASSET_URL_TTL_SECONDS", 900)) * time.Second,
+		COSBucketURL:             resolvedCOSBucketURL(),
+		COSRegion:                env("ASSET_REGION", ""),
+		COSEndpoint:              env("ASSET_S3_ENDPOINT", ""),
+		COSSecretID:              os.Getenv("COS_SECRET_ID"),
+		COSSecretKey:             os.Getenv("COS_SECRET_KEY"),
+		COSKeyPrefix:             env("COS_KEY_PREFIX", "jianwo"),
+		DevLoginEnabled:          envBool("DEV_LOGIN_ENABLED", true),
+		WeChatAppID:              os.Getenv("WECHAT_APP_ID"),
+		WeChatAppSecret:          os.Getenv("WECHAT_APP_SECRET"),
+		WeChatAPIBaseURL:         env("WECHAT_API_BASE_URL", "https://api.weixin.qq.com/sns/jscode2session"),
+		WeChatRequestTimeout:     time.Duration(envInt("WECHAT_REQUEST_TIMEOUT_SECONDS", 5)) * time.Second,
+		WeatherProvider:          env("WEATHER_PROVIDER", "demo"),
+		AMapWebServiceKey:        os.Getenv("AMAP_WEB_SERVICE_KEY"),
+		AMapAPIBaseURL:           env("AMAP_API_BASE_URL", "https://restapi.amap.com/v3/weather/weatherInfo"),
+		AMapDefaultCity:          env("AMAP_DEFAULT_CITY", "上海"),
+		AMapDefaultAdcode:        env("AMAP_DEFAULT_ADCODE", "310000"),
+		WeatherRequestTimeout:    time.Duration(envInt("WEATHER_REQUEST_TIMEOUT_SECONDS", 5)) * time.Second,
+		SmsProvider:              env("SMS_PROVIDER", "console"),
+		SmsRatePerPhonePerHour:   int64(envInt("SMS_RATE_PER_PHONE_PER_HOUR", 5)),
+		AliyunSmsAccessKeyID:     os.Getenv("ALIYUN_SMS_ACCESS_KEY_ID"),
+		AliyunSmsAccessKeySecret: os.Getenv("ALIYUN_SMS_ACCESS_KEY_SECRET"),
+		AliyunSmsSign:            os.Getenv("ALIYUN_SMS_SIGN"),
+		AliyunSmsTemplateCode:    os.Getenv("ALIYUN_SMS_TEMPLATE_CODE"),
+		AppleBundleID:            os.Getenv("APPLE_BUNDLE_ID"),
+		WeChatOpenAppID:          os.Getenv("WECHAT_OPEN_APP_ID"),
+		WeChatOpenAppSecret:      os.Getenv("WECHAT_OPEN_APP_SECRET"),
+		RunWorker:                envBool("RUN_WORKER", true),
+		SessionTTL:               30 * 24 * time.Hour,
+		MaxUploadBytes:           10 << 20,
+		AnalysisPollTime:         time.Duration(envInt("ANALYSIS_POLL_MS", 700)) * time.Millisecond,
+		AIRouting:                aiRouting,
+		AIRoutingSource:          aiRoutingSource,
+	}
+	if skus, err := loadBillingSKUs(); err != nil {
+		return Config{}, err
+	} else {
+		cfg.BillingSKUs = skus
+	}
+	cfg.BillingPaymentEnabled = envBool("BILLING_PAYMENT_ENABLED", false)
+	cfg.VirtualPayOfferID = strings.TrimSpace(os.Getenv("WECHAT_VIRTUAL_PAY_OFFER_ID"))
+	cfg.VirtualPayAppKey = strings.TrimSpace(os.Getenv("WECHAT_VIRTUAL_PAY_APP_KEY"))
+	cfg.VirtualPayEnv = 1
+	if cfg.Environment == "production" {
+		cfg.VirtualPayEnv = 0
+	}
+	if raw := strings.TrimSpace(os.Getenv("WECHAT_VIRTUAL_PAY_ENV")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && (parsed == 0 || parsed == 1) {
+			cfg.VirtualPayEnv = parsed
+		}
+	}
+	cfg.VirtualPayAPIBase = env("WECHAT_VIRTUAL_PAY_API_BASE", "https://api.weixin.qq.com")
+	if cfg.BillingPaymentEnabled && (cfg.VirtualPayOfferID == "" || cfg.VirtualPayAppKey == "") {
+		return Config{}, fmt.Errorf("WECHAT_VIRTUAL_PAY_OFFER_ID and WECHAT_VIRTUAL_PAY_APP_KEY are required when billing payment is enabled")
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
@@ -233,6 +261,39 @@ func envBool(key string, fallback bool) bool {
 		return fallback
 	}
 	return parsed
+}
+
+type BillingSKU struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Credits   int    `json:"credits"`
+	PriceFen  int    `json:"price_fen"`
+	ProductID string `json:"product_id"`
+}
+
+func loadBillingSKUs() ([]BillingSKU, error) {
+	defaults := []BillingSKU{
+		{ID: "pack_3", Title: "体验次数 ×3", Credits: 3, PriceFen: 600, ProductID: "pack_3"},
+		{ID: "pack_10", Title: "常用次数 ×10", Credits: 10, PriceFen: 1800, ProductID: "pack_10"},
+		{ID: "pack_30", Title: "超值次数 ×30", Credits: 30, PriceFen: 4800, ProductID: "pack_30"},
+	}
+	raw := strings.TrimSpace(os.Getenv("BILLING_SKUS_JSON"))
+	if raw == "" {
+		return defaults, nil
+	}
+	var skus []BillingSKU
+	if err := json.Unmarshal([]byte(raw), &skus); err != nil {
+		return nil, fmt.Errorf("BILLING_SKUS_JSON: %w", err)
+	}
+	if len(skus) == 0 {
+		return nil, fmt.Errorf("BILLING_SKUS_JSON must contain at least one sku")
+	}
+	for _, sku := range skus {
+		if sku.ID == "" || sku.Credits <= 0 || sku.PriceFen <= 0 || sku.ProductID == "" {
+			return nil, fmt.Errorf("BILLING_SKUS_JSON entries need id, credits, price_fen and product_id")
+		}
+	}
+	return skus, nil
 }
 
 func envInt(key string, fallback int) int {

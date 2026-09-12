@@ -155,9 +155,10 @@ type UserProfile struct {
 
 // MeAccount is the GET /v1/me payload: the account plus every bound identity.
 type MeAccount struct {
-	ID         string     `json:"id"`
-	Nickname   string     `json:"nickname"`
-	Identities []Identity `json:"identities"`
+	ID         string          `json:"id"`
+	Nickname   string          `json:"nickname"`
+	Identities []Identity      `json:"identities"`
+	Billing    *BillingSummary `json:"billing,omitempty"`
 }
 
 type SmsCode struct {
@@ -594,9 +595,10 @@ type AnalysisOutput struct {
 
 type HomeBootstrap struct {
 	// ProfileSummary is the persisted profile when present (null otherwise).
-	ProfileSummary *UserProfile `json:"profile_summary"`
-	Report         *Report      `json:"report"`
-	TodayPlan      *TodayPlan   `json:"today_plan"`
-	ActiveTasks    []TaskView   `json:"active_tasks"`
-	RecentPlan     *Plan        `json:"recent_plan"`
+	ProfileSummary *UserProfile    `json:"profile_summary"`
+	Report         *Report         `json:"report"`
+	TodayPlan      *TodayPlan      `json:"today_plan"`
+	ActiveTasks    []TaskView      `json:"active_tasks"`
+	RecentPlan     *Plan           `json:"recent_plan"`
+	Billing        *BillingSummary `json:"billing,omitempty"`
 }

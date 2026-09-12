@@ -154,4 +154,17 @@ type Repository interface {
 	RecentPlan(ctx context.Context, userID string) (domain.Plan, error)
 
 	DeleteUserData(ctx context.Context, userID string) ([]string, error)
+
+	// ---- 计费 ----
+	CountActiveTasksByTypes(ctx context.Context, userID string, types []string) (int, error)
+	GetBillingWallet(ctx context.Context, userID string) (domain.BillingWallet, error)
+	GetBillingUsage(ctx context.Context, userID string, day, hour, minute time.Time) (analysis, looks, diagnostics, advisor, advisorHour, orders int, err error)
+	ApplyBilling(ctx context.Context, userID string, now time.Time, activeLooks int, decide func(domain.BillingSnapshot) (domain.BillingDecision, error)) error
+	RefundBilling(ctx context.Context, refType, refID string) error
+	RelinkBillingRefs(ctx context.Context, fromRefs, toRefs []string) error
+	ListUnrefundedFailedTaskCharges(ctx context.Context) ([]domain.BillingLedgerEntry, error)
+	CreateBillingOrder(ctx context.Context, row domain.BillingOrderRow) (domain.BillingOrderRow, error)
+	GetBillingOrder(ctx context.Context, userID, orderID string) (domain.BillingOrderRow, error)
+	GetBillingOrderByOutTradeNo(ctx context.Context, outTradeNo string) (domain.BillingOrderRow, error)
+	FulfillBillingOrder(ctx context.Context, outTradeNo, wxOrderID string) (domain.BillingOrderRow, bool, error)
 }

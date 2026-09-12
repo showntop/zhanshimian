@@ -278,6 +278,32 @@ export const PLAN_DETAIL_COPY = {
   specTexture: '卷度'
 } as const
 
+export const PLANS_COPY = {
+  cta: '选这套 · 查看执行清单',
+  ctaGenerating: '正在生成形象图'
+} as const
+
+export const BILLING_COPY = {
+  section: '权益额度',
+  remaining: '剩余额度',
+  hint: '可用于形象分析、形象方案制作，各消耗 1 次',
+  welcomeAnalysis: '另有 1 次免费形象分析',
+  welcomePlanSet: '另有 1 次免费形象方案制作',
+  buyAction: '购买次数',
+  insufficientTitle: '额度不足',
+  insufficientBody: '购买次数后可继续形象分析或形象方案制作。',
+  rateLimited: '今日额度已用完，明天再来',
+  paymentUnavailable: '购买暂未开通',
+  buySuccess: '次数已到账',
+  buyCancel: '已取消支付',
+  buyPending: '支付已提交，次数稍后到账',
+  buyNow: '去购买',
+  paying: '支付中',
+  exhausted: '次数已用完',
+  buyOnMiniapp: '请到微信小程序购买次数',
+  packUnit: '次'
+} as const
+
 /** 诊断发现语气标签（positive/improve/optional/caution → 尊重表达，无警示红） */
 export const FINDING_TONE_COPY: Record<string, string> = {
   positive: '适合',

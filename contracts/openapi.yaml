@@ -43,7 +43,9 @@ info:
     | wechat_code_invalid | 401 | 微信登录凭证被拒 |
     | wechat_login_limited | 429 | 微信侧登录限频 |
     | wechat_unavailable | 502 | 微信登录服务暂不可用 |
-    | rate_limited | 429 | 短信/接口限频（短信 60s 冷却、10/min/IP、5/h/号） |
+    | rate_limited | 429 | 短信/接口限频（短信 60s 冷却、10/min/IP、5/h/号）以及 AI 日额度 |
+    | insufficient_credits | 402 | 次数不足，需购买次数包 |
+    | payment_unavailable | 503 | 虚拟支付未开通 |
     | internal_error | 500 | 服务内部错误 |
 
     ## 轮询纪律（「该请求时才请求」）
@@ -2340,6 +2342,137 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  '/v1/billing/me':
+    get:
+      operationId: getBillingMe
+      summary: 次数钱包与可购次数包
+      tags: [Me]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: 钱包摘要
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BillingSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/billing/orders':
+    post:
+      operationId: createBillingOrder
+      summary: 创建次数包订单并返回虚拟支付签名
+      tags: [Me]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sku_id]
+              properties:
+                sku_id:
+                  type: string
+                code:
+                  type: string
+                  description: 微信 login code，用于生成用户态 signature
+      responses:
+        '201':
+          description: 已创建订单
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BillingOrder'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/PaymentUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/billing/orders/{id}/sync':
+    post:
+      operationId: syncBillingOrder
+      summary: 查单并补发货
+      tags: [Me]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 订单当前状态
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BillingOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/PaymentUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  '/v1/billing/notify':
+    post:
+      operationId: billingNotify
+      summary: 微信虚拟支付发货通知
+      tags: [Me]
+      security: []
+      responses:
+        '200':
+          description: 已受理
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   '/v1/events':
     post:
       operationId: trackEvent
@@ -2444,6 +2577,16 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
+    PaymentUnavailable:
+      description: 虚拟支付未开通（payment_unavailable）
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
     InternalError:
       description: 服务内部错误（internal_error）
       headers:
@@ -2481,6 +2624,8 @@ components:
             - wechat_login_limited
             - wechat_unavailable
             - rate_limited
+            - insufficient_credits
+            - payment_unavailable
             - internal_error
           description: 业务错误码（保留码 forbidden 当前契约内罕见）
         message:
@@ -2542,6 +2687,8 @@ components:
           items:
             $ref: '#/components/schemas/Identity'
           description: 多端身份列表（按绑定时间排序）
+        billing:
+          $ref: '#/components/schemas/BillingSummary'
 
     UserProfile:
       type: object
@@ -3352,6 +3499,81 @@ components:
         recent_plan:
           $ref: '#/components/schemas/Plan'
           description: 最近选定/生成的方案（无方案时缺省）
+        billing:
+          $ref: '#/components/schemas/BillingSummary'
+
+    BillingSKU:
+      type: object
+      required: [id, title, credits, price_fen, product_id]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        credits:
+          type: integer
+        price_fen:
+          type: integer
+        product_id:
+          type: string
+
+    BillingSummary:
+      type: object
+      required: [credits, welcome_analysis_available, welcome_plan_set_available, daily_remaining, payment_enabled, skus]
+      properties:
+        credits:
+          type: integer
+        welcome_analysis_available:
+          type: boolean
+        welcome_plan_set_available:
+          type: boolean
+        payment_enabled:
+          type: boolean
+        daily_remaining:
+          type: object
+          required: [analysis, looks, diagnostics, advisor]
+          properties:
+            analysis:
+              type: integer
+            looks:
+              type: integer
+            diagnostics:
+              type: integer
+            advisor:
+              type: integer
+        skus:
+          type: array
+          items:
+            $ref: '#/components/schemas/BillingSKU'
+
+    BillingOrder:
+      type: object
+      required: [id, sku, credits, amount_fen, out_trade_no, status, created_at]
+      properties:
+        id:
+          type: string
+        sku:
+          $ref: '#/components/schemas/BillingSKU'
+        credits:
+          type: integer
+        amount_fen:
+          type: integer
+        out_trade_no:
+          type: string
+        status:
+          type: string
+          enum: [created, paid, fulfilled, refunded, closed]
+        sign_data:
+          type: string
+        pay_sig:
+          type: string
+        signature:
+          type: string
+        mode:
+          type: string
+        created_at:
+          type: string
+          format: date-time
 
     SmsRequestAck:
       type: object

@@ -32,7 +32,7 @@ export default function PrimaryButton({
       {loading ? (
         <>
           <View className={`spinner ${tone === 'onDark' ? 'spinner--on-deep' : ''} primary-button__spinner`} />
-          <Text>请稍候…</Text>
+          <Text>{text}</Text>
         </>
       ) : (
         <Text>{text}</Text>

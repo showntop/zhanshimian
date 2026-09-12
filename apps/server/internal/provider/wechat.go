@@ -66,13 +66,26 @@ func NewWeChatCodeExchanger(cfg WeChatConfig, client *http.Client) (*WeChatCodeE
 }
 
 func (w *WeChatCodeExchanger) ExchangeCode(ctx context.Context, code string) (WeChatIdentity, error) {
+	identity, _, err := w.exchange(ctx, code)
+	return identity, err
+}
+
+func (w *WeChatCodeExchanger) ExchangeSession(ctx context.Context, code string) (WeChatSession, error) {
+	identity, sessionKey, err := w.exchange(ctx, code)
+	if err != nil {
+		return WeChatSession{}, err
+	}
+	return WeChatSession{OpenID: identity.OpenID, SessionKey: sessionKey}, nil
+}
+
+func (w *WeChatCodeExchanger) exchange(ctx context.Context, code string) (WeChatIdentity, string, error) {
 	code = strings.TrimSpace(code)
 	if code == "" || len(code) > 256 {
-		return WeChatIdentity{}, ErrWeChatCodeRejected
+		return WeChatIdentity{}, "", ErrWeChatCodeRejected
 	}
 	endpoint, err := url.Parse(w.baseURL)
 	if err != nil {
-		return WeChatIdentity{}, ErrWeChatUnavailable
+		return WeChatIdentity{}, "", ErrWeChatUnavailable
 	}
 	query := endpoint.Query()
 	query.Set("appid", w.appID)
@@ -83,39 +96,40 @@ func (w *WeChatCodeExchanger) ExchangeCode(ctx context.Context, code string) (We
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return WeChatIdentity{}, ErrWeChatUnavailable
+		return WeChatIdentity{}, "", ErrWeChatUnavailable
 	}
 	response, err := w.client.Do(req)
 	if err != nil {
 		// Do not wrap url.Error: it contains the request URL, including AppSecret.
-		return WeChatIdentity{}, ErrWeChatUnavailable
+		return WeChatIdentity{}, "", ErrWeChatUnavailable
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4<<10))
-		return WeChatIdentity{}, ErrWeChatUnavailable
+		return WeChatIdentity{}, "", ErrWeChatUnavailable
 	}
 	var payload struct {
-		OpenID  string `json:"openid"`
-		UnionID string `json:"unionid"`
-		ErrCode int    `json:"errcode"`
+		OpenID     string `json:"openid"`
+		UnionID    string `json:"unionid"`
+		SessionKey string `json:"session_key"`
+		ErrCode    int    `json:"errcode"`
 	}
 	decoder := json.NewDecoder(io.LimitReader(response.Body, 64<<10))
 	if err := decoder.Decode(&payload); err != nil {
-		return WeChatIdentity{}, ErrWeChatUnavailable
+		return WeChatIdentity{}, "", ErrWeChatUnavailable
 	}
 	switch payload.ErrCode {
 	case 0:
 		if strings.TrimSpace(payload.OpenID) == "" {
-			return WeChatIdentity{}, ErrWeChatUnavailable
+			return WeChatIdentity{}, "", ErrWeChatUnavailable
 		}
-		return WeChatIdentity{OpenID: payload.OpenID, UnionID: payload.UnionID}, nil
+		return WeChatIdentity{OpenID: payload.OpenID, UnionID: payload.UnionID}, payload.SessionKey, nil
 	case 40029, 40163:
-		return WeChatIdentity{}, ErrWeChatCodeRejected
+		return WeChatIdentity{}, "", ErrWeChatCodeRejected
 	case 45011, 40226:
-		return WeChatIdentity{}, ErrWeChatRateLimited
+		return WeChatIdentity{}, "", ErrWeChatRateLimited
 	default:
-		return WeChatIdentity{}, ErrWeChatUnavailable
+		return WeChatIdentity{}, "", ErrWeChatUnavailable
 	}
 }
 

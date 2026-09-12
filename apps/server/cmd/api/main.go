@@ -13,6 +13,7 @@ import (
 	"github.com/zhanshimian/server/internal/bootstrap"
 	"github.com/zhanshimian/server/internal/config"
 	"github.com/zhanshimian/server/internal/database"
+	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/httpapi"
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository/postgres"
@@ -63,6 +64,15 @@ func main() {
 		logger.Error("create wechat login provider", "error", err)
 		os.Exit(1)
 	}
+	var wechatSession provider.WeChatSessionExchanger
+	if exchanger, ok := wechat.(*provider.WeChatCodeExchanger); ok {
+		wechatSession = exchanger
+	}
+	virtualPay, err := buildVirtualPay(cfg)
+	if err != nil {
+		logger.Error("create virtual pay provider", "error", err)
+		os.Exit(1)
+	}
 	wechatApp := buildWeChatApp(cfg, logger)
 	apple := buildApple(cfg, logger)
 	sms, err := buildSms(cfg, logger)
@@ -75,6 +85,7 @@ func main() {
 		Hair: ai.Hair, Look: ai.Look, PlanGroup: ai.PlanGroup, Outfit: ai.Outfit, Purchase: ai.Purchase, Advisor: ai.Advisor, Today: ai.Today,
 		Weather: weather, WeChat: wechat, WeChatApp: wechatApp, Apple: apple, Sms: sms,
 		SmsPerPhone: cfg.SmsRatePerPhonePerHour, AssetURLTTL: cfg.AssetURLTTL,
+		BillingSKUs: billingSKUsFromConfig(cfg), VirtualPay: virtualPay, WeChatSession: wechatSession,
 	})
 	if cfg.RunWorker {
 		go svc.RunWorker(ctx, cfg.AnalysisPollTime)
@@ -84,14 +95,14 @@ func main() {
 	root.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(cfg.AssetDir))))
 	root.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadDir))))
 	root.Handle("/", httpapi.New(svc, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
-		Environment:             cfg.Environment,
-		StorageProvider:         cfg.StorageProvider,
-		WeatherProvider:         cfg.WeatherProvider,
-		WeChatLoginConfigured:   wechat != nil,
-		WeChatAppConfigured:     wechatApp != nil,
-		AppleLoginConfigured:    apple != nil,
-		SmsProvider:             cfg.SmsProvider,
-		AIRoutes:                ai.Routes,
+		Environment:           cfg.Environment,
+		StorageProvider:       cfg.StorageProvider,
+		WeatherProvider:       cfg.WeatherProvider,
+		WeChatLoginConfigured: wechat != nil,
+		WeChatAppConfigured:   wechatApp != nil,
+		AppleLoginConfigured:  apple != nil,
+		SmsProvider:           cfg.SmsProvider,
+		AIRoutes:              ai.Routes,
 	}))
 	// 写超时随路由表里最慢的模型走（+10s 余量），保证长生成的响应不被掐断
 	writeTimeout := 30 * time.Second
@@ -176,6 +187,25 @@ func buildSms(cfg config.Config, logger *slog.Logger) (provider.SmsSender, error
 		}, nil)
 	}
 	return provider.NewConsoleSms(logger, cfg.Environment == "development"), nil
+}
+
+func buildVirtualPay(cfg config.Config) (provider.VirtualPayer, error) {
+	if !cfg.BillingPaymentEnabled {
+		return nil, nil
+	}
+	return provider.NewWeChatVirtualPay(provider.VirtualPayConfig{
+		AppID: cfg.WeChatAppID, AppSecret: cfg.WeChatAppSecret,
+		OfferID: cfg.VirtualPayOfferID, AppKey: cfg.VirtualPayAppKey,
+		Env: cfg.VirtualPayEnv, APIBase: cfg.VirtualPayAPIBase,
+	}, nil)
+}
+
+func billingSKUsFromConfig(cfg config.Config) []domain.BillingSKU {
+	items := make([]domain.BillingSKU, 0, len(cfg.BillingSKUs))
+	for _, sku := range cfg.BillingSKUs {
+		items = append(items, domain.BillingSKU{ID: sku.ID, Title: sku.Title, Credits: sku.Credits, PriceFen: sku.PriceFen, ProductID: sku.ProductID})
+	}
+	return items
 }
 
 func buildWeather(cfg config.Config) (provider.WeatherProvider, error) {

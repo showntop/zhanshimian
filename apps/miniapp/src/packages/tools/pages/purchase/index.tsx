@@ -6,6 +6,7 @@ import { Image, Text, View } from '@tarojs/components'
 import { PURCHASE_COPY, userImage, type Diagnosis } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
+import { handleBillingError } from '../../../../services/billing'
 import {
   clearPurchaseResult,
   getPurchaseInflight,
@@ -211,6 +212,7 @@ export default function Purchase() {
       )
       applySession(item)
     } catch (e) {
+      handleBillingError(e)
       setError((e as Error).message || '判断没有成功，请重试')
     } finally {
       setBusy(false)

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
-	"github.com/google/uuid"
 )
 
 var validPlanScenes = map[string]bool{"general": true, "daily": true, "interview": true, "wedding": true, "date": true, "gathering": true}
@@ -164,7 +164,7 @@ func (s *Service) enqueueMissingPlanLooks(ctx context.Context, userID string, pl
 	if err != nil {
 		return nil, err
 	}
-	created := make([]domain.Task, 0, len(plans))
+	pending := make([]domain.Plan, 0, len(plans))
 	for _, plan := range plans {
 		if plan.GeneratedImageURL != "" {
 			continue
@@ -172,15 +172,40 @@ func (s *Service) enqueueMissingPlanLooks(ctx context.Context, userID string, pl
 		if task, ok := latest[plan.ID]; ok && (task.Status == domain.TaskQueued || task.Status == domain.TaskProcessing) {
 			continue
 		}
-		task, err := s.repo.CreateTask(ctx, userID, domain.TaskInput{
+		pending = append(pending, plan)
+	}
+	if len(pending) == 0 {
+		return nil, nil
+	}
+	welcome := domain.WelcomePlanSet
+	for _, plan := range pending {
+		if plan.Scene != "" && plan.Scene != "general" {
+			welcome = ""
+			break
+		}
+	}
+	refs, err := s.authorize(ctx, userID, domainActionLook, welcome, len(pending))
+	if err != nil {
+		return nil, err
+	}
+	created := make([]domain.Task, 0, len(pending))
+	taskIDs := make([]string, 0, len(pending))
+	for _, plan := range pending {
+		task, createErr := s.repo.CreateTask(ctx, userID, domain.TaskInput{
 			Type:    domain.TaskTypePlanLook,
 			Payload: domain.PlanLookTaskPayload{PlanID: plan.ID},
 		})
-		if err != nil {
-			return nil, err
+		if createErr != nil {
+			s.refundRefs(ctx, refs[len(created):])
+			if len(taskIDs) > 0 {
+				s.bindCharges(ctx, refs[:len(created)], taskIDs)
+			}
+			return created, createErr
 		}
 		created = append(created, task)
+		taskIDs = append(taskIDs, task.ID)
 	}
+	s.bindCharges(ctx, refs, taskIDs)
 	return created, nil
 }
 
@@ -202,13 +227,19 @@ func (s *Service) RegeneratePlanLook(ctx context.Context, userID, planID string)
 	if existing, ok := latest[plan.ID]; ok && (existing.Status == domain.TaskQueued || existing.Status == domain.TaskProcessing) {
 		task = existing
 	} else {
+		refs, authErr := s.authorize(ctx, userID, domainActionLook, "", 1)
+		if authErr != nil {
+			return domain.Plan{}, domain.TaskView{}, authErr
+		}
 		task, err = s.repo.CreateTask(ctx, userID, domain.TaskInput{
 			Type:    domain.TaskTypePlanLook,
 			Payload: domain.PlanLookTaskPayload{PlanID: plan.ID},
 		})
 		if err != nil {
+			s.refundRefs(ctx, refs)
 			return domain.Plan{}, domain.TaskView{}, err
 		}
+		s.bindCharges(ctx, refs, []string{task.ID})
 	}
 	plan.LookTask = ptrTaskView(decodeTaskErrorView(taskView(task)))
 	s.resolvePlanURLs(&plan)

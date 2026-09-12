@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zhanshimian/server/internal/domain"
-	"github.com/zhanshimian/server/internal/repository"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/repository"
 )
 
 type Store struct{ pool *pgxpool.Pool }
@@ -1108,6 +1108,10 @@ func (s *Store) SaveHairPreview(ctx context.Context, userID, previewID string) (
 // users 必须放在最后：user_sessions 删除后旧 token 立即失效，而迁移里的
 // ON DELETE CASCADE 只在 users 行被删除时才会触发。
 var deleteUserDataQueries = []string{
+	`DELETE FROM billing_ledger WHERE user_id=$1`,
+	`DELETE FROM billing_usage WHERE user_id=$1`,
+	`DELETE FROM billing_orders WHERE user_id=$1`,
+	`DELETE FROM billing_wallets WHERE user_id=$1`,
 	`DELETE FROM share_cards WHERE user_id=$1`,
 	`DELETE FROM today_plans WHERE user_id=$1`,
 	`DELETE FROM tasks WHERE user_id=$1`,

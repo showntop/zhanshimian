@@ -7,6 +7,7 @@ import type { MediaAsset } from '@zsm/core'
 import { PROFILE_SETUP_COPY, type UserProfile } from '@zsm/core'
 import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
+import { handleBillingError } from '../../services/billing'
 import { analysisPageUrl, isAnalysisRunning } from '../../services/task-utils'
 import { STORAGE_KEYS, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
@@ -228,6 +229,7 @@ export default function Capture() {
       writeStorage(STORAGE_KEYS.activeTaskAnalysis, data.id)
       Taro.reLaunch({ url: `/pages/analysis/index?id=${data.id}` })
     } catch (e) {
+      if (handleBillingError(e)) return
       Taro.showToast({ title: (e as Error).message || '提交没有成功，请重试', icon: 'none' })
     } finally {
       setBusy(false)

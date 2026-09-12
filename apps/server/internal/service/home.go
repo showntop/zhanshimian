@@ -40,6 +40,9 @@ func (s *Service) HomeBootstrap(ctx context.Context, user domain.User) (domain.H
 		return bootstrap, err
 	}
 	bootstrap.ActiveTasks = viewTasks(tasks)
+	if summary, err := s.BillingSummary(ctx, user.ID); err == nil {
+		bootstrap.Billing = &summary
+	}
 	if plan, err := s.repo.RecentPlan(ctx, user.ID); err == nil {
 		if err := s.attachPlanLookTasks(ctx, user.ID, []domain.Plan{plan}); err == nil {
 			s.resolvePlanURLs(&plan)

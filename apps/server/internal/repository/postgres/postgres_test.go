@@ -36,6 +36,7 @@ func TestIsForeignKeyViolation(t *testing.T) {
 // ON DELETE CASCADE 只在 users 被删除时触发，漏删 users 会让旧 token 继续有效。
 func TestDeleteUserDataCoversAllUserTables(t *testing.T) {
 	for _, table := range []string{
+		"billing_ledger", "billing_usage", "billing_orders", "billing_wallets",
 		"share_cards", "today_plans", "wardrobe_outfits", "wardrobe_items",
 		"advisor_conversations", "product_events", "tool_results",
 		"analyses", "hair_previews", "media_assets", "feedback", "user_sessions", "users",

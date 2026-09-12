@@ -5,6 +5,7 @@ import { Image, ScrollView, Text, View } from '@tarojs/components'
 import { IMAGE_BADGE_COPY, LOCAL_LOOK_SLUGS, POLL_INTERVALS, useTaskPolling, lookImage, userImage, type HairPreview, type HairstyleOption, type LookSlug } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
+import { handleBillingError } from '../../../../services/billing'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
@@ -140,6 +141,7 @@ export default function Hair() {
       writeStorage(STORAGE_KEYS.activeTaskHairPreview, data.id)
       setMode('source')
     } catch (e) {
+      if (handleBillingError(e)) return
       Taro.showToast({ title: (e as Error).message || '生成没有开始，请重试', icon: 'none' })
     } finally {
       setBusy(false)

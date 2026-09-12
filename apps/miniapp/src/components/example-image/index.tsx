@@ -98,6 +98,10 @@ function ExampleImage({
     ? `example-image--anchor-top example-image--fill-${fillAxis}`
     : ''
 
+  // widthFix / aspectFit 的可见图与 cover 衬底裁法不同，叠在一起会腿部错位。
+  // 衬底只留给顶对齐自动铺满（短框裁底），显式 mode 不再铺第二层图。
+  const useBackdrop = Boolean(url) && anchor === 'top' && !mode
+
   const handleLoad: ExampleImageProps['onLoad'] = (event) => {
     if (anchor === 'top' && !mode && frameAspect) {
       const w = Number(event.detail.width)
@@ -113,7 +117,7 @@ function ExampleImage({
   return (
     <View
       className={`example-image ${anchorClass} ${className}`}
-      style={url ? { backgroundImage: `url("${url}")` } : undefined}
+      style={useBackdrop ? { backgroundImage: `url("${url}")` } : undefined}
     >
       <PinnedImage
         className={`example-image__img ${softExample ? 'example-soft' : ''}`}

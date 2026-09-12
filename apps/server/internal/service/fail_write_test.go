@@ -42,9 +42,13 @@ func (r *taskWriteRecorder) GetAnalysisInput(context.Context, string, string) (d
 	return domain.CreateAnalysisInput{Scene: "interview"}, nil
 }
 
-func (r *taskWriteRecorder) UpdateTaskProgress(context.Context, string, int, string) error { return nil }
+func (r *taskWriteRecorder) UpdateTaskProgress(context.Context, string, int, string) error {
+	return nil
+}
 
-func (r *taskWriteRecorder) UpdateAnalysisProgress(context.Context, string, int, string) error { return nil }
+func (r *taskWriteRecorder) UpdateAnalysisProgress(context.Context, string, int, string) error {
+	return nil
+}
 
 func (r *taskWriteRecorder) FailTask(ctx context.Context, _, code, _ string, _ []string, retryAt time.Time) error {
 	r.failErr = ctx.Err()
@@ -58,6 +62,8 @@ func (r *taskWriteRecorder) CompleteTask(context.Context, string, string) error 
 	r.completeCalled = true
 	return nil
 }
+
+func (r *taskWriteRecorder) RefundBilling(context.Context, string, string) error { return nil }
 
 func (r *taskWriteRecorder) FailAnalysisPresentation(ctx context.Context, _, _, _ string) error {
 	r.presentationErr = ctx.Err()

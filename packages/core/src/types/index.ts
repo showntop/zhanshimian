@@ -20,6 +20,7 @@ export interface Account {
   id: string
   nickname: string
   identities: UserIdentity[]
+  billing?: BillingSummary
 }
 
 export interface Session {
@@ -405,6 +406,43 @@ export interface HomeBootstrap {
   today_plan: TodayPlan | null
   active_tasks: Task[]
   recent_plan: Plan | null
+  billing?: BillingSummary
+}
+
+export interface BillingSKU {
+  id: string
+  title: string
+  credits: number
+  price_fen: number
+  product_id: string
+}
+
+export interface BillingSummary {
+  credits: number
+  welcome_analysis_available: boolean
+  welcome_plan_set_available: boolean
+  daily_remaining: {
+    analysis: number
+    looks: number
+    diagnostics: number
+    advisor: number
+  }
+  payment_enabled: boolean
+  skus: BillingSKU[]
+}
+
+export interface BillingOrder {
+  id: string
+  sku: BillingSKU
+  credits: number
+  amount_fen: number
+  out_trade_no: string
+  status: 'created' | 'paid' | 'fulfilled' | 'refunded' | 'closed'
+  sign_data?: string
+  pay_sig?: string
+  signature?: string
+  mode?: string
+  created_at: string
 }
 
 // ---------- 埋点 ----------

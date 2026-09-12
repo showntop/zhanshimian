@@ -18,6 +18,7 @@ export const STORAGE_KEYS = {
   sceneBrief: 'zsm_scene_brief',
   advisorConversationId: 'zsm_advisor_conversation_id',
   city: 'zsm_city',
+  openCreditSheet: 'zsm_open_credit_sheet',
 } as const
 
 export function readStorage(key: string): string {

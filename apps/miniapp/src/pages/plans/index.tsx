@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
-import { EMPTY_COPY, IMAGE_BADGE_COPY, POLL_INTERVALS, useTaskPolling, type Plan } from '@zsm/core'
+import { EMPTY_COPY, IMAGE_BADGE_COPY, PLANS_COPY, POLL_INTERVALS, useTaskPolling, type Plan } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
+import { handleBillingError } from '../../services/billing'
 import { analysisPageUrl, isAnalysisRunning, resolveRunningAnalysisId } from '../../services/task-utils'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader, { getNavMetrics } from '../../components/app-header'
@@ -205,6 +206,7 @@ export default function Plans() {
       Taro.vibrateShort({ type: 'light' })
       load(scene)
     } catch (e) {
+      if (handleBillingError(e)) return
       Taro.showToast({ title: (e as Error).message || '重试没有成功', icon: 'none' })
     }
   }
@@ -265,7 +267,8 @@ export default function Plans() {
           return
         }
         load(scene)
-      } catch {
+      } catch (e) {
+        if (handleBillingError(e)) return
         Taro.showToast({ title: '方案暂时没有生成，请稍后重试', icon: 'none' })
       }
       return
@@ -420,7 +423,8 @@ export default function Plans() {
               </View>
             </View>
             <PrimaryButton
-              text="选这套 · 查看执行清单"
+              text={activeLook ? PLANS_COPY.ctaGenerating : PLANS_COPY.cta}
+              loading={Boolean(activeLook)}
               onClick={() => Taro.navigateTo({ url: `/pages/plan/index?id=${plan.id}` })}
             />
             <Text className="plans__cta-note">
