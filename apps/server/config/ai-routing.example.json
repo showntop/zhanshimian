@@ -62,6 +62,14 @@
       "api_key_env": "VOLCENGINE_API_KEY",
       "timeout_seconds": 180,
       "output_image_cost": 0.25
+    },
+    "demo/body-orbit": {
+      "vendor": "demo",
+      "protocol": "demo_orbit",
+      "model": "body-orbit",
+      "base_url": "http://127.0.0.1/demo-orbit",
+      "api_key_env": "AI_TEST_PRIMARY_KEY",
+      "timeout_seconds": 30
     }
   },
   "routes": {
@@ -114,6 +122,10 @@
       "primary": "aliyun/wan2.7-image-pro",
       "fallbacks": ["volcengine/seedream-4.5", "aliyun/wanx2.1-imageedit"],
       "max_cost_cny": 0.6
+    },
+    "body_orbit": {
+      "policy": "quality_first",
+      "primary": "demo/body-orbit"
     }
   }
 }

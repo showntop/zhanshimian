@@ -18,6 +18,7 @@ type AIBundle struct {
 	Hair      provider.HairPreviewGenerator
 	PlanGroup provider.PlanGroupGenerator
 	Look      provider.LookGenerator
+	Orbit     provider.OrbitGenerator
 	Outfit    provider.OutfitAdvisor
 	Purchase  provider.OutfitAdvisor
 	Advisor   provider.AdvisorChat
@@ -107,6 +108,9 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 		if err != nil {
 			return AIBundle{}, err
 		}
+	}
+	if runtime.HasRoute(provider.CapabilityBodyOrbit) {
+		bundle.Orbit = provider.NewDemoOrbitGenerator(cfg.AssetDir)
 	}
 	return bundle, nil
 }

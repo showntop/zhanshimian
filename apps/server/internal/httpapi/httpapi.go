@@ -120,6 +120,10 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("GET /v1/advisor/conversations/{id}/messages", api.auth(http.HandlerFunc(api.listAdvisorMessages)))
 	mux.Handle("POST /v1/advisor/actions/{id}/apply", api.auth(http.HandlerFunc(api.applyAdvisorAction)))
 
+	mux.Handle("POST /v1/body-presentations", api.auth(http.HandlerFunc(api.createBodyPresentation)))
+	mux.Handle("GET /v1/body-presentations/status", api.auth(http.HandlerFunc(api.getBodyPresentationStatus)))
+	mux.Handle("GET /v1/body-presentations/{id}", api.auth(http.HandlerFunc(api.getBodyPresentation)))
+
 	mux.Handle("POST /v1/events", api.auth(http.HandlerFunc(api.trackProductEvent)))
 
 	mux.Handle("GET /v1/billing/me", api.auth(http.HandlerFunc(api.getBillingMe)))
@@ -225,6 +229,9 @@ func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 		writeError(w, r, http.StatusPaymentRequired, "insufficient_credits", strings.TrimPrefix(err.Error(), service.ErrInsufficientCredits.Error()+": "))
 	case errors.Is(err, service.ErrPaymentUnavailable):
 		writeError(w, r, http.StatusServiceUnavailable, "payment_unavailable", "购买暂未开通")
+	case errors.Is(err, service.ErrCapabilityUnavailable):
+		writeError(w, r, http.StatusServiceUnavailable, "capability_unavailable",
+			strings.TrimPrefix(err.Error(), service.ErrCapabilityUnavailable.Error()+": "))
 	case errors.Is(err, service.ErrValidation):
 		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), service.ErrValidation.Error()+": "))
 	case errors.Is(err, repository.ErrNotFound):

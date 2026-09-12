@@ -92,9 +92,11 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		"dashscope_wan":            true,
 		"dashscope_wanx_imageedit": true,
 		"ark_image":                true,
+		"demo_orbit":               true,
 	}
 	structuredCapabilities := map[string]bool{"appearance_analysis": true, "photo_check": true, "outfit_diagnosis": true, "purchase_diagnosis": true, "advisor_chat": true, "today_plan": true}
 	imageCapabilities := map[string]bool{"hair_edit": true, "makeup_edit": true, "full_look_edit": true}
+	videoCapabilities := map[string]bool{"body_orbit": true}
 	for id, model := range routing.Models {
 		if strings.TrimSpace(id) == "" || strings.TrimSpace(model.Vendor) == "" || strings.TrimSpace(model.Model) == "" {
 			return fmt.Errorf("AI model %q requires vendor and model", id)
@@ -116,7 +118,7 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		}
 	}
 	for capability, route := range routing.Routes {
-		if !structuredCapabilities[capability] && !imageCapabilities[capability] {
+		if !structuredCapabilities[capability] && !imageCapabilities[capability] && !videoCapabilities[capability] {
 			return fmt.Errorf("AI route %q is not a supported capability", capability)
 		}
 		if strings.TrimSpace(capability) == "" || route.Primary == "" {
@@ -148,6 +150,9 @@ func validateAIRouting(routing AIRoutingConfig) error {
 			}
 			if imageCapabilities[capability] && protocol != "openai_image_edit" && protocol != "dashscope_wan" && protocol != "dashscope_wanx_imageedit" && protocol != "ark_image" {
 				return fmt.Errorf("AI route %q uses structured protocol %q", capability, protocol)
+			}
+			if videoCapabilities[capability] && protocol != "demo_orbit" {
+				return fmt.Errorf("AI route %q uses unsupported video protocol %q", capability, protocol)
 			}
 		}
 	}

@@ -124,7 +124,7 @@ func NewAIRuntime(models []AIModel, routes []AIRoute, client *http.Client, logge
 		if model.ID == "" || model.Model == "" || model.Vendor == "" || model.Protocol == "" || model.BaseURL == "" || model.APIKeyEnv == "" {
 			return nil, errors.New("AI model configuration is incomplete")
 		}
-		if strings.TrimSpace(os.Getenv(model.APIKeyEnv)) == "" {
+		if model.Protocol != "demo_orbit" && strings.TrimSpace(os.Getenv(model.APIKeyEnv)) == "" {
 			return nil, fmt.Errorf("%s is required by AI model %q", model.APIKeyEnv, model.ID)
 		}
 		if model.Timeout <= 0 {
