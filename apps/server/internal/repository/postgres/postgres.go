@@ -9,30 +9,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
 )
-
-type Store struct{ pool *pgxpool.Pool }
-
-func New(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
-
-func mapNotFound(err error) error {
-	if errors.Is(err, pgx.ErrNoRows) {
-		return repository.ErrNotFound
-	}
-	return err
-}
-
-// isForeignKeyViolation reports a Postgres 23503 error raised because the row
-// referenced by the named constraint disappeared underneath an in-flight
-// worker job (for example a user data wipe cascading to analyses).
-func isForeignKeyViolation(err error, constraint string) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == constraint
-}
 
 // ---- 身份、会话与资料 ----
 
@@ -147,7 +126,7 @@ func (s *Store) GetUserProfile(ctx context.Context, userID string) (domain.UserP
 	err := s.pool.QueryRow(ctx, `
 		SELECT height_cm,role,budget,weight_kg::float8,bust_cm::float8,waist_cm::float8,hip_cm::float8,updated_at
 		FROM user_profiles WHERE user_id=$1`, userID).
-		Scan(&profile.HeightCM, &profile.Role, &profile.Budget, &profile.WeightKG, &profile.BustCM, &profile.WaistCM, &profile.HipCM, &profile.UpdatedAt)
+		Scan(&profile.HeightCM, &profile.Role, &profile.Budget, new(float64), new(float64), new(float64), new(float64), &profile.UpdatedAt)
 	return profile, mapNotFound(err)
 }
 
@@ -173,7 +152,7 @@ func (s *Store) GetUserAvatar(ctx context.Context, userID string) (domain.MediaA
 		FROM users u
 		JOIN media_assets m ON m.id=u.avatar_media_id
 		WHERE u.id=$1::uuid AND m.deleted_at IS NULL`, userID).
-		Scan(&item.ID, &item.Kind, &item.StorageKey, &item.MIMEType, &item.ByteSize, &item.CreatedAt)
+		Scan(&item.ID, &item.Purpose, &item.ObjectKey, &item.MIMEType, &item.ByteSize, &item.CreatedAt)
 	return item, mapNotFound(err)
 }
 
@@ -197,7 +176,7 @@ func (s *Store) SaveUserProfile(ctx context.Context, userID string, profile doma
 			weight_kg=EXCLUDED.weight_kg,bust_cm=EXCLUDED.bust_cm,waist_cm=EXCLUDED.waist_cm,
 			hip_cm=EXCLUDED.hip_cm,updated_at=now()
 		RETURNING updated_at`, userID, profile.HeightCM, profile.Role, profile.Budget,
-		profile.WeightKG, profile.BustCM, profile.WaistCM, profile.HipCM).
+		nil, nil, nil, nil).
 		Scan(&profile.UpdatedAt)
 	return profile, err
 }
@@ -244,7 +223,7 @@ func (s *Store) CreateMedia(ctx context.Context, userID, kind, storageKey, mime 
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO media_assets(user_id,kind,storage_key,mime_type,byte_size)
 		VALUES($1,$2,$3,$4,$5) RETURNING id::text,kind,created_at`, userID, kind, storageKey, mime, size).
-		Scan(&item.ID, &item.Kind, &item.CreatedAt)
+		Scan(&item.ID, &item.Purpose, &item.CreatedAt)
 	return item, err
 }
 
@@ -262,7 +241,7 @@ func (s *Store) GetMediaAssets(ctx context.Context, ids []string) ([]domain.Medi
 	byID := make(map[string]domain.MediaAsset, len(ids))
 	for rows.Next() {
 		var item domain.MediaAsset
-		if err := rows.Scan(&item.ID, &item.Kind, &item.StorageKey, &item.MIMEType, &item.ByteSize, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Purpose, &item.ObjectKey, &item.MIMEType, &item.ByteSize, &item.CreatedAt); err != nil {
 			return nil, err
 		}
 		byID[item.ID] = item
@@ -293,7 +272,7 @@ func (s *Store) GetMediaAssetsForUser(ctx context.Context, userID string, ids []
 	byID := make(map[string]domain.MediaAsset, len(ids))
 	for rows.Next() {
 		var asset domain.MediaAsset
-		if err := rows.Scan(&asset.ID, &asset.Kind, &asset.StorageKey, &asset.MIMEType, &asset.ByteSize, &asset.CreatedAt); err != nil {
+		if err := rows.Scan(&asset.ID, &asset.Purpose, &asset.ObjectKey, &asset.MIMEType, &asset.ByteSize, &asset.CreatedAt); err != nil {
 			return nil, err
 		}
 		byID[asset.ID] = asset
@@ -317,9 +296,28 @@ func (s *Store) GetMediaAssetsForUser(ctx context.Context, userID string, ids []
 
 const taskSelect = `SELECT id::text,user_id::text,type,payload,status,progress,stage,attempts,last_error,result_ref,created_at,updated_at FROM tasks`
 
-func scanTask(row pgx.Row) (domain.Task, error) {
+type prefixedRow struct {
+	prefix []any
+	row    interface{ Scan(dest ...any) error }
+}
+
+func (r prefixedRow) Scan(dest ...any) error {
+	return r.row.Scan(append(append([]any{}, r.prefix...), dest...)...)
+}
+
+func scanTask(row interface{ Scan(dest ...any) error }) (domain.Task, error) {
 	var task domain.Task
-	err := row.Scan(&task.ID, &task.UserID, &task.Type, &task.Payload, &task.Status, &task.Progress, &task.Stage, &task.Attempts, &task.LastError, &task.ResultRef, &task.CreatedAt, &task.UpdatedAt)
+	var progress, attempts int
+	var status, stage, resultRef string
+	var lastError *string
+	err := row.Scan(&task.ID, &task.UserID, &task.Type, &task.Payload, &status, &progress, &stage, &attempts, &lastError, &resultRef, &task.CreatedAt, &task.UpdatedAt)
+	task.Status = domain.TaskStatus(status)
+	task.ProgressBPS = progress
+	task.StageCode = stage
+	task.Attempt = attempts
+	if lastError != nil {
+		task.ErrorCode = *lastError
+	}
 	return task, err
 }
 
@@ -405,8 +403,8 @@ func (s *Store) LatestTasksByRef(ctx context.Context, userID string, taskType do
 	defer rows.Close()
 	for rows.Next() {
 		var ref string
-		var task domain.Task
-		if err := rows.Scan(&ref, &task.ID, &task.UserID, &task.Type, &task.Payload, &task.Status, &task.Progress, &task.Stage, &task.Attempts, &task.LastError, &task.ResultRef, &task.CreatedAt, &task.UpdatedAt); err != nil {
+		task, err := scanTask(prefixedRow{prefix: []any{&ref}, row: rows})
+		if err != nil {
 			return nil, err
 		}
 		result[ref] = task
@@ -454,24 +452,22 @@ func (s *Store) ClaimTask(ctx context.Context, taskType domain.TaskType) (domain
 		WHERE id IN (SELECT id `+zombieTasks+` AND attempts < `+taskAttemptsCap+`)`); err != nil {
 		return domain.Task{}, false, err
 	}
-	var task domain.Task
-	err = tx.QueryRow(ctx, `
+	task, err := scanTask(tx.QueryRow(ctx, `
 		SELECT id::text,user_id::text,type,payload,status,progress,stage,attempts,last_error,result_ref,created_at,updated_at
 		FROM tasks
 		WHERE type=$1 AND status='queued' AND next_run_at<=now()
-		ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1`, string(taskType)).
-		Scan(&task.ID, &task.UserID, &task.Type, &task.Payload, &task.Status, &task.Progress, &task.Stage, &task.Attempts, &task.LastError, &task.ResultRef, &task.CreatedAt, &task.UpdatedAt)
+		ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1`, string(taskType)))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Task{}, false, nil
 	}
 	if err != nil {
 		return domain.Task{}, false, err
 	}
-	task.Attempts++
-	if _, err = tx.Exec(ctx, `UPDATE tasks SET status='processing',attempts=$2,locked_at=now(),updated_at=now() WHERE id=$1`, task.ID, task.Attempts); err != nil {
+	task.Attempt++
+	if _, err = tx.Exec(ctx, `UPDATE tasks SET status='processing',attempts=$2,locked_at=now(),updated_at=now() WHERE id=$1`, task.ID, task.Attempt); err != nil {
 		return domain.Task{}, false, err
 	}
-	if task.Type == string(domain.TaskTypeAnalysis) {
+	if task.Type == domain.TaskTypeAnalysis {
 		var payload domain.AnalysisTaskPayload
 		if err := json.Unmarshal(task.Payload, &payload); err != nil {
 			return domain.Task{}, false, err

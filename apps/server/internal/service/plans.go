@@ -35,12 +35,12 @@ func (s *Service) attachPlanLookTasks(ctx context.Context, userID string, plans 
 	for index := range plans {
 		plan := &plans[index]
 		if plan.GeneratedImageURL != "" {
-			plan.GenerationStatus = domain.TaskCompleted
+			plan.GenerationStatus = string(domain.TaskSucceeded)
 		}
 		if task, ok := tasks[plan.ID]; ok {
 			view := decodeTaskErrorView(taskView(task))
 			plan.LookTask = ptrTaskView(view)
-			plan.GenerationStatus = task.Status
+			plan.GenerationStatus = string(task.Status)
 			if task.Status == domain.TaskFailed && view.Error != nil {
 				plan.GenerationError = view.Error.Message
 			}
@@ -110,7 +110,7 @@ func (s *Service) PutReportPlans(ctx context.Context, userID, reportID string, i
 				return nil, nil, err
 			}
 			var task domain.Task
-			if existing, ok := latest[reportID]; ok && (existing.Status == domain.TaskQueued || existing.Status == domain.TaskProcessing) {
+			if existing, ok := latest[reportID]; ok && (existing.Status == domain.TaskQueued || existing.Status == domain.TaskLeased) {
 				task = existing
 			} else {
 				task, err = s.repo.CreateTask(ctx, userID, domain.TaskInput{
@@ -169,7 +169,7 @@ func (s *Service) enqueueMissingPlanLooks(ctx context.Context, userID string, pl
 		if plan.GeneratedImageURL != "" {
 			continue
 		}
-		if task, ok := latest[plan.ID]; ok && (task.Status == domain.TaskQueued || task.Status == domain.TaskProcessing) {
+		if task, ok := latest[plan.ID]; ok && (task.Status == domain.TaskQueued || task.Status == domain.TaskLeased) {
 			continue
 		}
 		pending = append(pending, plan)
@@ -224,7 +224,7 @@ func (s *Service) RegeneratePlanLook(ctx context.Context, userID, planID string)
 		return domain.Plan{}, domain.TaskView{}, err
 	}
 	var task domain.Task
-	if existing, ok := latest[plan.ID]; ok && (existing.Status == domain.TaskQueued || existing.Status == domain.TaskProcessing) {
+	if existing, ok := latest[plan.ID]; ok && (existing.Status == domain.TaskQueued || existing.Status == domain.TaskLeased) {
 		task = existing
 	} else {
 		refs, authErr := s.authorize(ctx, userID, domainActionLook, "", 1)
@@ -281,7 +281,7 @@ func (s *Service) AddPlanFeedback(ctx context.Context, userID, planID string, in
 	}
 	if input.MediaID != "" {
 		assets, err := s.repo.GetMediaAssetsForUser(ctx, userID, []string{input.MediaID})
-		if err != nil || len(assets) != 1 || assets[0].Kind != "feedback" {
+		if err != nil || len(assets) != 1 || string(assets[0].Purpose) != "feedback" {
 			return FeedbackAck{}, repository.ErrNotFound
 		}
 	}

@@ -18,14 +18,19 @@ import (
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/service"
+	"github.com/zhanshimian/server/internal/service/media"
+	"github.com/zhanshimian/server/internal/storage"
 )
 
 type API struct {
 	service         *service.Service
+	media           *media.Service
 	logger          *slog.Logger
 	devLoginEnabled bool
 	runtime         RuntimeInfo
 }
+
+var errMediaUnavailable = errors.New("media service unavailable")
 
 type RuntimeInfo struct {
 	Environment           string
@@ -70,7 +75,8 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("GET /v1/tasks", api.auth(http.HandlerFunc(api.getTasks)))
 	mux.Handle("GET /v1/home/bootstrap", api.auth(http.HandlerFunc(api.homeBootstrap)))
 
-	mux.Handle("POST /v1/media", api.auth(http.HandlerFunc(api.uploadMedia)))
+	mux.Handle("POST /v1/media/upload-intents", api.auth(http.HandlerFunc(api.createUploadIntent)))
+	mux.Handle("POST /v1/media/upload-intents/{id}/complete", api.auth(http.HandlerFunc(api.completeUploadIntent)))
 	mux.Handle("POST /v1/media/demo", api.auth(http.HandlerFunc(api.createDemoMedia)))
 
 	mux.Handle("POST /v1/analyses", api.auth(http.HandlerFunc(api.createAnalysis)))
@@ -226,8 +232,18 @@ func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 		writeError(w, r, http.StatusServiceUnavailable, "payment_unavailable", "购买暂未开通")
 	case errors.Is(err, service.ErrValidation):
 		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), service.ErrValidation.Error()+": "))
+	case errors.Is(err, media.ErrValidation):
+		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), media.ErrValidation.Error()+": "))
+	case errors.Is(err, media.ErrUploadMetadataMismatch):
+		writeError(w, r, http.StatusBadRequest, "validation_error", "上传文件与申报信息不一致")
+	case errors.Is(err, storage.ErrDirectUploadUnavailable):
+		writeError(w, r, http.StatusServiceUnavailable, "service_unavailable", "当前存储不支持直传")
+	case errors.Is(err, storage.ErrObjectNotFound):
+		writeError(w, r, http.StatusBadRequest, "validation_error", "还没有收到完整上传")
 	case errors.Is(err, repository.ErrNotFound):
 		writeError(w, r, http.StatusNotFound, "not_found", "没有找到对应内容")
+	case errors.Is(err, repository.ErrConflict):
+		writeError(w, r, http.StatusConflict, "conflict", "上传意图已失效")
 	case errors.Is(err, service.ErrForbidden):
 		writeError(w, r, http.StatusForbidden, "forbidden", "没有访问权限")
 	default:
@@ -267,7 +283,7 @@ func domainTaskRef(task *domain.Task) *taskRef {
 	if task == nil {
 		return nil
 	}
-	return &taskRef{ID: task.ID, Type: task.Type}
+	return &taskRef{ID: task.ID, Type: string(task.Type)}
 }
 
 func viewTaskRef(view domain.TaskView) *taskRef {

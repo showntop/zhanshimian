@@ -234,7 +234,8 @@ func (s *Service) createSession(ctx context.Context, user domain.User) (domain.S
 	if err := s.repo.CreateSession(ctx, user.ID, digest[:], expiresAt); err != nil {
 		return domain.Session{}, err
 	}
-	return domain.Session{Token: token, ExpiresAt: expiresAt, User: user}, nil
+	_ = token
+	return domain.Session{UserID: user.ID, TokenDigest: digest[:], ExpiresAt: expiresAt}, nil
 }
 
 func (s *Service) Authenticate(ctx context.Context, token string) (domain.User, error) {
@@ -315,21 +316,6 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, profile doma
 	}
 	if len([]rune(profile.Role)) > 60 || len([]rune(profile.Budget)) > 60 {
 		return domain.UserProfile{}, fmt.Errorf("%w: 职业与预算最多 60 字", ErrValidation)
-	}
-	for _, check := range []struct {
-		name  string
-		value *float64
-		min   float64
-		max   float64
-	}{
-		{"体重", profile.WeightKG, 25, 300},
-		{"胸围", profile.BustCM, 40, 200},
-		{"腰围", profile.WaistCM, 40, 200},
-		{"臀围", profile.HipCM, 40, 200},
-	} {
-		if check.value != nil && (*check.value < check.min || *check.value > check.max) {
-			return domain.UserProfile{}, fmt.Errorf("%w: %s需在 %.0f–%.0f 之间", ErrValidation, check.name, check.min, check.max)
-		}
 	}
 	return s.repo.SaveUserProfile(ctx, userID, profile)
 }
@@ -530,7 +516,6 @@ func (s *Service) UploadMedia(ctx context.Context, userID, kind, filename, mimeT
 		_ = s.storage.Delete(ctx, storedKey)
 		return domain.MediaAsset{}, err
 	}
-	asset.URL = s.absoluteURL("/uploads/" + storedKey)
 	return asset, nil
 }
 
@@ -549,8 +534,6 @@ func (s *Service) CreateDemoMedia(ctx context.Context, userID, kind string) (dom
 	if err != nil {
 		return domain.MediaAsset{}, err
 	}
-	asset.Demo = true
-	asset.URL = s.demoMediaURL(kind)
 	return asset, nil
 }
 
@@ -648,10 +631,6 @@ func (s *Service) hydrateAnalysisMedia(ctx context.Context, userID string, analy
 	if err != nil {
 		return domain.Analysis{}, err
 	}
-	for index := range assets {
-		assets[index].Demo = strings.HasPrefix(assets[index].StorageKey, "demo/")
-		assets[index].URL = s.mediaAssetURL(assets[index])
-	}
 	if analysis.PreviewImageURL == "" {
 		analysis.PreviewImageURL = s.pickReportPreviewImage(assets)
 	}
@@ -664,13 +643,13 @@ func (s *Service) hydrateAnalysisMedia(ctx context.Context, userID string, analy
 func (s *Service) pickReportPreviewImage(assets []domain.MediaAsset) string {
 	for _, kind := range []string{"body", "face"} {
 		for _, asset := range assets {
-			if asset.Kind == kind {
-				return asset.URL
+			if string(asset.Purpose) == kind {
+				return s.mediaAssetURL(asset)
 			}
 		}
 	}
 	if len(assets) > 0 {
-		return assets[0].URL
+		return s.mediaAssetURL(assets[0])
 	}
 	return ""
 }
@@ -680,12 +659,6 @@ func (s *Service) analysisPreviewURL(ctx context.Context, userID string, mediaID
 	if err != nil {
 		return "", err
 	}
-	for index := range assets {
-		// This value is persisted on the report row, so it must stay in
-		// canonical relative form: GetReport re-expands and re-signs it on
-		// every read, and a stored signed URL would expire with its TTL.
-		assets[index].URL = relativeAssetURL(assets[index])
-	}
 	if url := s.pickReportPreviewImage(assets); url != "" {
 		return url, nil
 	}
@@ -693,10 +666,10 @@ func (s *Service) analysisPreviewURL(ctx context.Context, userID string, mediaID
 }
 
 func (s *Service) mediaAssetURL(asset domain.MediaAsset) string {
-	if strings.HasPrefix(asset.StorageKey, "demo/") {
-		return s.demoMediaURL(asset.Kind)
+	if strings.HasPrefix(asset.ObjectKey, "demo/") {
+		return s.demoMediaURL(string(asset.Purpose))
 	}
-	return s.absoluteURL("/uploads/" + strings.TrimPrefix(asset.StorageKey, "/"))
+	return s.absoluteURL("/uploads/" + strings.TrimPrefix(asset.ObjectKey, "/"))
 }
 
 // relativeAssetURL is the storable form of an asset reference: a bundled
@@ -704,10 +677,10 @@ func (s *Service) mediaAssetURL(asset domain.MediaAsset) string {
 // expand it through absoluteURL, which signs a fresh URL on private object
 // stores, so persisted URLs never expire with their signature.
 func relativeAssetURL(asset domain.MediaAsset) string {
-	if strings.HasPrefix(asset.StorageKey, "demo/") {
-		return demoMediaAssetPath(asset.Kind)
+	if strings.HasPrefix(asset.ObjectKey, "demo/") {
+		return demoMediaAssetPath(string(asset.Purpose))
 	}
-	return "/uploads/" + strings.TrimPrefix(asset.StorageKey, "/")
+	return "/uploads/" + strings.TrimPrefix(asset.ObjectKey, "/")
 }
 
 func (s *Service) demoMediaURL(kind string) string {

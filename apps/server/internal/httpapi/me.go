@@ -45,7 +45,7 @@ func (a *API) getMyProfile(w http.ResponseWriter, r *http.Request) {
 		a.writeServiceError(w, r, err)
 		return
 	}
-	if profile == (domain.UserProfile{}) {
+	if profile.ID == "" && profile.UserID == "" && profile.Role == "" && profile.HeightCM == 0 {
 		writeData(w, http.StatusOK, nil)
 		return
 	}

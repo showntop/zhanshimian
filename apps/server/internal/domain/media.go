@@ -71,6 +71,7 @@ type UploadIntent struct {
 }
 
 type CreateUploadIntent struct {
+	ID        string
 	UserID    string
 	Purpose   MediaPurpose
 	MIMEType  string

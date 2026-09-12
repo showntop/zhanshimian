@@ -1,6 +1,14 @@
 package storage
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+var (
+	ErrDirectUploadUnavailable = errors.New("direct upload unavailable")
+	ErrObjectNotFound          = errors.New("object not found")
+)
 
 type Config struct {
 	Provider  string

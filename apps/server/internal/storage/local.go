@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/zhanshimian/server/internal/domain"
 )
 
 type ObjectStorage interface {
@@ -82,4 +84,12 @@ func (l *Local) Delete(_ context.Context, key string) error {
 		return nil
 	}
 	return err
+}
+
+func (l *Local) PresignUpload(context.Context, domain.UploadIntent, time.Duration) (domain.UploadGrant, error) {
+	return domain.UploadGrant{}, ErrDirectUploadUnavailable
+}
+
+func (l *Local) HeadObject(context.Context, string) (domain.ObjectMetadata, error) {
+	return domain.ObjectMetadata{}, ErrDirectUploadUnavailable
 }

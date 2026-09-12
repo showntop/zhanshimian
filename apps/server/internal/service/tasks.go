@@ -122,7 +122,7 @@ func terminalTaskFailure(task domain.Task, cause error) bool {
 		return true
 	}
 	maxAttempts := taskMaxAttempts[domain.TaskType(task.Type)]
-	return task.Attempts >= maxAttempts || !retryableTaskError(cause)
+	return task.Attempt >= maxAttempts || !retryableTaskError(cause)
 }
 
 func taskRetryDelay(taskType domain.TaskType, attempt int) time.Duration {
@@ -174,11 +174,11 @@ func photoRejectionReasons(rejected *provider.PhotoRejectedError) []string {
 // taskView converts a stored task into its API shape.
 func taskView(task domain.Task) domain.TaskView {
 	view := domain.TaskView{
-		ID: task.ID, Type: task.Type, Status: task.Status, Progress: task.Progress,
-		Stage: task.Stage, ResultRef: task.ResultRef, CreatedAt: task.CreatedAt, UpdatedAt: task.UpdatedAt,
+		ID: task.ID, Type: string(task.Type), Status: string(task.Status), Progress: task.ProgressBPS,
+		Stage: task.StageCode, CreatedAt: task.CreatedAt, UpdatedAt: task.UpdatedAt,
 	}
 	if task.Status == domain.TaskFailed {
-		view.Error = &domain.TaskError{Message: task.LastError}
+		view.Error = &domain.TaskError{Message: task.ErrorCode}
 	}
 	return view
 }
@@ -225,10 +225,10 @@ func (s *Service) GetCurrentAnalysis(ctx context.Context, userID string) (domain
 		return domain.Analysis{}, err
 	}
 	for _, task := range tasks {
-		if task.Type != string(domain.TaskTypeAnalysis) {
+		if task.Type != domain.TaskTypeAnalysis {
 			continue
 		}
-		if task.Status != domain.TaskQueued && task.Status != domain.TaskProcessing {
+		if task.Status != domain.TaskQueued && task.Status != domain.TaskLeased {
 			continue
 		}
 		var payload domain.AnalysisTaskPayload
@@ -305,7 +305,7 @@ func (s *Service) runClaimedTask(ctx context.Context, task domain.Task) {
 		s.refundTaskCharge(failCtx, task.ID)
 		return
 	}
-	s.guardWorkerJob(task.Type, task.ID, func(cause error) {
+	s.guardWorkerJob(string(task.Type), task.ID, func(cause error) {
 		s.finishTask(task, cause)
 	}, func() {
 		jobCtx, cancel := context.WithTimeout(ctx, taskTimeouts[domain.TaskType(task.Type)])
@@ -348,13 +348,13 @@ func (s *Service) finishTask(task domain.Task, cause error) {
 			s.loggerOrDefault().Error("fail task writeback", "task_id", task.ID, "error", err)
 		}
 		s.refundTaskCharge(failCtx, task.ID)
-		s.loggerOrDefault().Error("task failed permanently", "type", task.Type, "task_id", task.ID, "attempt", task.Attempts, "error", cause)
+		s.loggerOrDefault().Error("task failed permanently", "type", task.Type, "task_id", task.ID, "attempt", task.Attempt, "error", cause)
 	default:
-		delay := taskRetryDelay(domain.TaskType(task.Type), task.Attempts)
+		delay := taskRetryDelay(domain.TaskType(task.Type), task.Attempt)
 		if err := s.repo.FailTask(failCtx, task.ID, "", cause.Error(), nil, time.Now().Add(delay)); err != nil {
 			s.loggerOrDefault().Error("requeue task writeback", "task_id", task.ID, "error", err)
 		}
-		s.loggerOrDefault().Warn("task failed, retry scheduled", "type", task.Type, "task_id", task.ID, "attempt", task.Attempts, "retry_in", delay.String(), "error", cause)
+		s.loggerOrDefault().Warn("task failed, retry scheduled", "type", task.Type, "task_id", task.ID, "attempt", task.Attempt, "retry_in", delay.String(), "error", cause)
 	}
 }
 
@@ -385,7 +385,7 @@ func (s *Service) processAnalysis(ctx context.Context, task domain.Task) (string
 		_ = s.repo.UpdateTaskProgress(jobCtx, task.ID, progress, stage)
 		_ = s.repo.UpdateAnalysisProgress(jobCtx, payload.AnalysisID, progress, stage)
 	}
-	reportProgress(maxInt(task.Progress, 15), "正在排队等待分析")
+	reportProgress(maxInt(task.ProgressBPS, 15), "正在排队等待分析")
 	jobCtx = provider.WithProgressReporter(jobCtx, reportProgress)
 	output, err := s.analyzer.Analyze(jobCtx, input)
 	if err != nil {

@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
 	cos "github.com/tencentyun/cos-go-sdk-v5"
+	"github.com/zhanshimian/server/internal/domain"
 )
 
 type COSConfig struct {
@@ -147,6 +149,58 @@ func (c *COS) RefreshURL(value string, ttl time.Duration) (string, bool) {
 		return "", false
 	}
 	return signed, true
+}
+
+func (c *COS) PresignUpload(ctx context.Context, intent domain.UploadIntent, ttl time.Duration) (domain.UploadGrant, error) {
+	key, err := c.objectKey(intent.ObjectKey)
+	if err != nil {
+		return domain.UploadGrant{}, err
+	}
+	if ttl <= 0 {
+		ttl = 15 * time.Minute
+	}
+	headers := http.Header{}
+	headers.Set("Content-Type", intent.MIMEType)
+	headers.Set("Content-Length", strconv.FormatInt(intent.ByteSize, 10))
+	headers.Set("x-cos-meta-sha256", intent.SHA256)
+	signed, err := c.client.Object.GetPresignedURL(ctx, http.MethodPut, key, c.secretID, c.secretKey, ttl, &cos.PresignedURLOptions{Header: &headers})
+	if err != nil {
+		return domain.UploadGrant{}, fmt.Errorf("sign COS upload URL: %w", err)
+	}
+	return domain.UploadGrant{
+		Method: http.MethodPut,
+		URL:    signed.String(),
+		Headers: map[string]string{
+			"Content-Type":      intent.MIMEType,
+			"Content-Length":    strconv.FormatInt(intent.ByteSize, 10),
+			"x-cos-meta-sha256": intent.SHA256,
+		},
+		ExpiresAt: time.Now().Add(ttl),
+	}, nil
+}
+
+func (c *COS) HeadObject(ctx context.Context, objectKey string) (domain.ObjectMetadata, error) {
+	key, err := c.objectKey(objectKey)
+	if err != nil {
+		return domain.ObjectMetadata{}, err
+	}
+	response, err := c.client.Object.Head(ctx, key, nil)
+	if err != nil {
+		if cos.IsNotFoundError(err) {
+			return domain.ObjectMetadata{}, fmt.Errorf("%w: %s", ErrObjectNotFound, objectKey)
+		}
+		return domain.ObjectMetadata{}, fmt.Errorf("head COS object: %w", err)
+	}
+	byteSize, _ := strconv.ParseInt(response.Header.Get("Content-Length"), 10, 64)
+	if response.ContentLength > 0 {
+		byteSize = response.ContentLength
+	}
+	return domain.ObjectMetadata{
+		ObjectKey: objectKey,
+		MIMEType:  response.Header.Get("Content-Type"),
+		ByteSize:  byteSize,
+		SHA256:    response.Header.Get("x-cos-meta-sha256"),
+	}, nil
 }
 
 func (c *COS) objectKey(value string) (string, error) {

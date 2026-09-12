@@ -51,7 +51,7 @@ func (s *Service) GetTodayContext(ctx context.Context, userID, city, schedule st
 // generation_status/generation_error fields and embeds look_task.
 func (s *Service) attachTodayLookTask(ctx context.Context, userID string, plan *domain.TodayPlan) {
 	if plan.GeneratedImageURL != "" {
-		plan.GenerationStatus = domain.TaskCompleted
+		plan.GenerationStatus = string(domain.TaskSucceeded)
 	}
 	tasks, err := s.repo.LatestTasksByRef(ctx, userID, domain.TaskTypeTodayLook, "plan_id", []string{plan.ID})
 	if err != nil {
@@ -60,7 +60,7 @@ func (s *Service) attachTodayLookTask(ctx context.Context, userID string, plan *
 	if task, ok := tasks[plan.ID]; ok {
 		view := decodeTaskErrorView(taskView(task))
 		plan.LookTask = ptrTaskView(view)
-		plan.GenerationStatus = task.Status
+		plan.GenerationStatus = string(task.Status)
 		if task.Status == domain.TaskFailed && view.Error != nil {
 			plan.GenerationError = view.Error.Message
 		}
@@ -279,10 +279,10 @@ func (s *Service) CreateWardrobeItem(ctx context.Context, userID string, input d
 	imageURL := map[string]string{"top": "/assets/plans/warm.jpg", "bottom": "/assets/plans/sharp.jpg", "outer": "/assets/plans/natural.jpg", "shoes": "/assets/reports/sharp.jpg", "bag": "/assets/reports/warm.jpg"}[input.Category]
 	if input.MediaID != "" {
 		assets, err := s.repo.GetMediaAssetsForUser(ctx, userID, []string{input.MediaID})
-		if err != nil || len(assets) != 1 || assets[0].Kind != "wardrobe" {
+		if err != nil || len(assets) != 1 || string(assets[0].Purpose) != "wardrobe" {
 			return domain.WardrobeItem{}, repository.ErrNotFound
 		}
-		imageURL = "/uploads/" + assets[0].StorageKey
+		imageURL = "/uploads/" + assets[0].ObjectKey
 	}
 	item, err := s.repo.CreateWardrobeItem(ctx, userID, input, imageURL)
 	if err != nil {
@@ -384,18 +384,6 @@ func advisorContextForAI(grounding advisorGrounding) map[string]any {
 	}
 	if grounding.Profile != nil {
 		profile := map[string]any{"height_cm": grounding.Profile.HeightCM}
-		if grounding.Profile.WeightKG != nil {
-			profile["weight_kg"] = *grounding.Profile.WeightKG
-		}
-		if grounding.Profile.BustCM != nil {
-			profile["bust_cm"] = *grounding.Profile.BustCM
-		}
-		if grounding.Profile.WaistCM != nil {
-			profile["waist_cm"] = *grounding.Profile.WaistCM
-		}
-		if grounding.Profile.HipCM != nil {
-			profile["hip_cm"] = *grounding.Profile.HipCM
-		}
 		if grounding.Profile.Role != "" {
 			profile["role"] = grounding.Profile.Role
 		}
@@ -641,7 +629,7 @@ func (s *Service) RunDiagnostic(ctx context.Context, userID string, input domain
 		return domain.ToolResult{}, err
 	}
 	expectedKind := map[string]string{"outfit": "outfit", "purchase": "product"}[input.Kind]
-	if len(assets) != 1 || assets[0].Kind != expectedKind {
+	if len(assets) != 1 || string(assets[0].Purpose) != expectedKind {
 		return domain.ToolResult{}, fmt.Errorf("%w: 照片类型与诊断不匹配", ErrValidation)
 	}
 	result := buildToolResult(input.Kind, input.Scene)
@@ -781,7 +769,7 @@ func (s *Service) CreateHairPreview(ctx context.Context, userID string, input do
 // status/progress/stage/error fields and embeds task.
 func (s *Service) attachHairPreviewTask(ctx context.Context, userID string, preview *domain.HairPreview) {
 	if preview.ResultImageURL != "" {
-		preview.Status = domain.TaskCompleted
+		preview.Status = string(domain.TaskSucceeded)
 		preview.Progress = 100
 		preview.Stage = "预览已生成"
 	}
@@ -792,9 +780,9 @@ func (s *Service) attachHairPreviewTask(ctx context.Context, userID string, prev
 	if task, ok := tasks[preview.ID]; ok {
 		view := decodeTaskErrorView(taskView(task))
 		preview.Task = ptrTaskView(view)
-		preview.Status = task.Status
-		preview.Progress = task.Progress
-		preview.Stage = task.Stage
+		preview.Status = string(task.Status)
+		preview.Progress = task.ProgressBPS
+		preview.Stage = task.StageCode
 		if task.Status == domain.TaskFailed && view.Error != nil {
 			preview.ErrorMessage = view.Error.Message
 		}
