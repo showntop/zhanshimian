@@ -158,8 +158,8 @@ func removeGrounding(candidate *GeneratedPlanSet, sourceType domain.GroundingSou
 // check; individual tests mutate one dimension at a time.
 func validValidationInput() ValidationInput {
 	return ValidationInput{
-		Report:    validReport("20000000-0000-0000-0000-000000000001"),
-		Brief:     validBrief(),
+		Report: validReport("20000000-0000-0000-0000-000000000001"),
+		Brief:  validBrief(),
 		Candidate: GeneratedPlanSet{InvocationID: "inv-gate", Variants: []GeneratedPlanVariant{
 			validGeneratedVariant(1, domain.VariantSharp, "轮廓利落", true,
 				"颅顶蓬松", "low", "合肩直线版型", []string{"象牙白"}, "smart"),
@@ -184,10 +184,10 @@ func validBrief() domain.SceneBrief {
 func validGeneratedVariant(slot int, key domain.PlanVariantKey, name string, recommended bool, hairTarget, intensity, silhouette string, palette []string, formality string) GeneratedPlanVariant {
 	return GeneratedPlanVariant{
 		Slot: slot, Key: key, Name: name,
-		Descriptor: "落实报告优先建议并覆盖场景约束",
-		Rationale:  "依据报告发型重心与场景约束给出方向",
-		Recommended:   recommended,
-		OutcomeTags:   []string{"易执行"},
+		Descriptor:     "落实报告优先建议并覆盖场景约束",
+		Rationale:      "依据报告发型重心与场景约束给出方向",
+		Recommended:    recommended,
+		OutcomeTags:    []string{"易执行"},
 		DifferenceTags: []string{"发型线条", "配色层次"},
 		Steps: []GeneratedPlanStep{
 			{

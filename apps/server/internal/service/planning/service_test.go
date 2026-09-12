@@ -145,12 +145,14 @@ func (f *fakeStarter) StartWithTask(_ context.Context, command StartOperationCom
 }
 
 type fakeStore struct {
-	found      bool
-	planSet    domain.PlanSet
-	getCalls   int
-	listCalls  int
-	listScene  *domain.Scene
-	prepareCmd *PrepareCommand
+	found        bool
+	planSet      domain.PlanSet
+	getCalls     int
+	listCalls    int
+	listScene    *domain.Scene
+	prepareCalls int
+	commitCalls  int
+	command      PrepareCommand
 }
 
 func (f *fakeStore) FindPublished(_ context.Context, _ PlanSetKey) (domain.PlanSet, bool, error) {
@@ -173,13 +175,15 @@ func (f *fakeStore) List(_ context.Context, _ string, _ string, scene *domain.Sc
 }
 
 func (f *fakeStore) Prepare(_ context.Context, _ domain.TaskLease, command PrepareCommand) (domain.PlanSet, error) {
-	f.prepareCmd = &command
+	f.prepareCalls++
+	f.command = command
 	f.planSet = command.PlanSet
 	f.found = true
 	return command.PlanSet, nil
 }
 
 func (f *fakeStore) CommitPrepared(_ context.Context, _ domain.TaskLease, _ domain.TaskResult) (domain.CommitOutcome, error) {
+	f.commitCalls++
 	return domain.CommitApplied, nil
 }
 

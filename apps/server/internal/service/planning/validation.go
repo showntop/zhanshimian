@@ -25,20 +25,20 @@ type ValidationInput struct {
 // Stable gate reason codes. Codes must stay sorted and deduplicated in the
 // returned slice.
 const (
-	ReasonVariantCount          = "plan.variant_count"
-	ReasonVariantKeySet         = "plan.variant_key_set"
-	ReasonVariantSlotSet        = "plan.variant_slot_set"
-	ReasonRecommendedCount      = "plan.recommended_count"
-	ReasonStepCategorySet       = "plan.step_category_set"
-	ReasonStepActionInvalid     = "plan.step_action_invalid"
-	ReasonStepDetailsInvalid    = "plan.step_details_invalid"
-	ReasonStepGroundingMissing  = "plan.step_grounding_missing"
-	ReasonGroundingUnknownSrc   = "plan.grounding_unknown_source"
-	ReasonGroundingUnknownID    = "plan.grounding_unknown_id"
-	ReasonReportPriorityUncovered = "plan.report_priority_uncovered"
+	ReasonVariantCount             = "plan.variant_count"
+	ReasonVariantKeySet            = "plan.variant_key_set"
+	ReasonVariantSlotSet           = "plan.variant_slot_set"
+	ReasonRecommendedCount         = "plan.recommended_count"
+	ReasonStepCategorySet          = "plan.step_category_set"
+	ReasonStepActionInvalid        = "plan.step_action_invalid"
+	ReasonStepDetailsInvalid       = "plan.step_details_invalid"
+	ReasonStepGroundingMissing     = "plan.step_grounding_missing"
+	ReasonGroundingUnknownSrc      = "plan.grounding_unknown_source"
+	ReasonGroundingUnknownID       = "plan.grounding_unknown_id"
+	ReasonReportPriorityUncovered  = "plan.report_priority_uncovered"
 	ReasonSceneConstraintUncovered = "plan.scene_constraint_uncovered"
-	ReasonDifferenceInsufficient  = "plan.difference_insufficient"
-	ReasonCopyPolicyViolation     = "plan.copy_policy_violation"
+	ReasonDifferenceInsufficient   = "plan.difference_insufficient"
+	ReasonCopyPolicyViolation      = "plan.copy_policy_violation"
 )
 
 var copyPolicyBannedWords = []string{"颜值", "身材分", "缺陷严重", "医学诊断", "年龄判定", "族裔"}
