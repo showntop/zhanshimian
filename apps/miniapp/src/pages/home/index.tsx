@@ -25,7 +25,7 @@ import { usePageShell } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { hasOutfitResult, isOutfitPending } from '../../services/outfit-session'
 import { hasPurchaseResult, isPurchasePending } from '../../services/purchase-session'
-import { taskDoneTitle } from '../../services/task-utils'
+import { analysisPageUrl, taskDoneTitle } from '../../services/task-utils'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
@@ -336,7 +336,7 @@ export default function Home() {
                   tone="onDark"
                   onClick={() =>
                     Taro.navigateTo({
-                      url: analysisActive ? '/pages/analysis/index' : '/pages/capture/index',
+                      url: analysisActive ? analysisPageUrl() : '/pages/capture/index',
                     })
                   }
                 />

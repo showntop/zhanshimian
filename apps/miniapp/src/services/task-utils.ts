@@ -1,6 +1,62 @@
 // 任务展示与跳转共享工具：首页（入口状态 / Tab badge）与「我的」任务中心复用。
 import Taro from '@tarojs/taro'
 import type { Task } from '@zsm/core'
+import { api } from './api'
+import { STORAGE_KEYS, readStorage, writeStorage } from './storage'
+
+function isRunningStatus(status?: string): boolean {
+  return status === 'queued' || status === 'processing'
+}
+
+export function isAnalysisTaskRunning(tasks: readonly Pick<Task, 'type' | 'status'>[]): boolean {
+  return tasks.some((task) => task.type === 'analysis' && isRunningStatus(task.status))
+}
+
+/** 找回进行中的分析 id，并写回本地。没有进行中的分析返回空。 */
+export async function resolveRunningAnalysisId(): Promise<string> {
+  const persist = (id: string) => {
+    if (id) writeStorage(STORAGE_KEYS.activeTaskAnalysis, id)
+    return id
+  }
+
+  try {
+    const current = await api.getCurrentAnalysis()
+    if (current && isRunningStatus(current.status)) return persist(current.id)
+  } catch {
+    /* 旧服务端无此端点或网络失败，走 bootstrap / 本地 */
+  }
+
+  try {
+    const boot = await api.getHomeBootstrap()
+    if (!isAnalysisTaskRunning(boot.active_tasks ?? [])) return ''
+  } catch {
+    /* bootstrap 失败时看本地 */
+  }
+
+  const local = readStorage(STORAGE_KEYS.activeTaskAnalysis)
+  if (!local) return ''
+  try {
+    const item = await api.getAnalysis(local)
+    return isRunningStatus(item.status) ? persist(item.id) : ''
+  } catch {
+    return ''
+  }
+}
+
+/** 服务端 queued/processing 才算进行中；失败/完成允许重新建档。 */
+export async function isAnalysisRunning(): Promise<boolean> {
+  if (await resolveRunningAnalysisId()) return true
+  try {
+    const boot = await api.getHomeBootstrap()
+    return isAnalysisTaskRunning(boot.active_tasks ?? [])
+  } catch {
+    return false
+  }
+}
+
+export function analysisPageUrl(id = readStorage(STORAGE_KEYS.activeTaskAnalysis)): string {
+  return id ? `/pages/analysis/index?id=${id}` : '/pages/analysis/index'
+}
 
 export function taskTitle(task: Task): string {
   switch (task.type) {
@@ -40,7 +96,7 @@ export function taskDoneTitle(task: Task): string {
 export function openTask(task: Task) {
   switch (task.type) {
     case 'analysis':
-      Taro.navigateTo({ url: '/pages/analysis/index' })
+      Taro.navigateTo({ url: analysisPageUrl() })
       break
     case 'plan_group':
     case 'plan_look':

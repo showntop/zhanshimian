@@ -770,6 +770,35 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  '/v1/analyses/current':
+    get:
+      operationId: getCurrentAnalysis
+      summary: 进行中的分析
+      description: 当前用户 queued/processing 的分析；没有进行中的分析返回 404。用于本地分析 id 丢失时恢复进度页。
+      tags: [Analysis]
+      responses:
+        '200':
+          description: 进行中的分析
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Analysis'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   '/v1/analyses/{id}':
     get:
       operationId: getAnalysis

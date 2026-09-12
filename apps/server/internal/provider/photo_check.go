@@ -95,6 +95,7 @@ func (a *RoutedAnalyzer) checkPhotos(ctx context.Context, images []AnalysisImage
 		Instructions: "你是严格的拍摄引导检查员。只判断照片是否符合声明的拍摄类型与清晰度要求，不评价人物外貌。",
 		Prompt:       photoCheckPrompt, Images: images,
 		SchemaName: CapabilityPhotoCheck, Schema: photoCheckSchema(), MaxOutputTokens: 400,
+		ImageDetail: "low",
 		Validate: func(data []byte) error {
 			var candidate photoCheckPayload
 			if err := json.Unmarshal(data, &candidate); err != nil {

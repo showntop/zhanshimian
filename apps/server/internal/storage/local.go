@@ -16,6 +16,12 @@ type ObjectStorage interface {
 	Delete(context.Context, string) error
 }
 
+// ProcessedOpener is implemented by stores that can return a derived image
+// (for example COS 数据万象) instead of the original object bytes.
+type ProcessedOpener interface {
+	OpenProcessed(ctx context.Context, key, process string) (io.ReadCloser, error)
+}
+
 // SignedURLStorage is implemented by private object stores that can grant
 // short-lived read access without making the bucket public.
 type SignedURLStorage interface {

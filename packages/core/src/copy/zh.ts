@@ -67,6 +67,8 @@ export const ERROR_COPY = {
 export const EMPTY_COPY = {
   report: { title: '还没有形象报告', body: '拍三张照片，几分钟拿到你的第一份形象分析。', action: '开始分析' },
   plans: { title: '这个场合还没有方案', body: '选定一份形象报告后，即可生成对应场合的穿搭方案。', action: '去选报告' },
+  plansNeedArchive: { title: '还没有方案', body: '先完成三图建档，或在场景页生成场合方案。', action: '去建档' },
+  plansAnalyzing: { title: '正在分析你的照片', body: '分析完成后就可以生成方案，现在不用重新建档。', action: '查看分析进度' },
   checklist: { title: '清单已就绪', body: '按步骤准备，完成一项勾一项。', action: '查看方案' },
   today: { title: '今天还没有方案', body: '看看今天适合怎么穿，一分钟生成。', action: '生成今日方案' },
   wardrobe: { title: '衣橱还是空的', body: '拍两张单品照，让方案用上你已有的衣服。', action: '添加单品' },

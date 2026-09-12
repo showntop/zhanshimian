@@ -73,6 +73,7 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("POST /v1/media/demo", api.auth(http.HandlerFunc(api.createDemoMedia)))
 
 	mux.Handle("POST /v1/analyses", api.auth(http.HandlerFunc(api.createAnalysis)))
+	mux.Handle("GET /v1/analyses/current", api.auth(http.HandlerFunc(api.getCurrentAnalysis)))
 	mux.Handle("GET /v1/analyses/{id}", api.auth(http.HandlerFunc(api.getAnalysis)))
 	mux.Handle("GET /v1/reports/current", api.auth(http.HandlerFunc(api.getCurrentReport)))
 	mux.Handle("GET /v1/reports/{id}", api.auth(http.HandlerFunc(api.getReport)))

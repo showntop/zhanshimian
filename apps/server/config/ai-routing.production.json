@@ -38,7 +38,7 @@
       "parameters": {
         "enable_thinking": false
       },
-      "timeout_seconds": 60,
+      "timeout_seconds": 120,
       "input_cost_per_million": 0.2,
       "output_cost_per_million": 0.8
     },

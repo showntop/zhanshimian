@@ -7,6 +7,8 @@ import type { MediaAsset } from '@zsm/core'
 import { PROFILE_SETUP_COPY, type UserProfile } from '@zsm/core'
 import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
+import { analysisPageUrl, isAnalysisRunning } from '../../services/task-utils'
+import { STORAGE_KEYS, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
 import ExampleImage from '../../components/example-image'
@@ -57,9 +59,19 @@ export default function Capture() {
   const [role, setRole] = useState<string>(PROFILE_SETUP_COPY.skip)
   const [budget, setBudget] = useState<string>(PROFILE_SETUP_COPY.skip)
   const [busy, setBusy] = useState(false)
+  const [gated, setGated] = useState(true)
 
   useLoad((options) => {
     if (options?.scene) setScene(options.scene)
+    void isAnalysisRunning()
+      .then((running) => {
+        if (running) {
+          Taro.redirectTo({ url: analysisPageUrl() })
+          return
+        }
+        setGated(false)
+      })
+      .catch(() => setGated(false))
   })
 
   const pageClass = usePageClass(true)
@@ -213,12 +225,21 @@ export default function Capture() {
         profile,
       })
       // 建档链路是一次正向流程，reLaunch 清栈直达分析页。
+      writeStorage(STORAGE_KEYS.activeTaskAnalysis, data.id)
       Taro.reLaunch({ url: `/pages/analysis/index?id=${data.id}` })
     } catch (e) {
       Taro.showToast({ title: (e as Error).message || '提交没有成功，请重试', icon: 'none' })
     } finally {
       setBusy(false)
     }
+  }
+
+  if (gated) {
+    return (
+      <View className={pageClass}>
+        <AppHeader title="创建形象档案" back />
+      </View>
+    )
   }
 
   return (

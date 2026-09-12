@@ -30,29 +30,29 @@ func (s *staleAnalysisRepositoryStub) FailAnalysisPresentation(_ context.Context
 
 func TestGetAnalysisFailsStaleProcessingOrphan(t *testing.T) {
 	repo := &staleAnalysisRepositoryStub{analysis: domain.Analysis{
-		ID: "analysis-1", Status: "processing", Progress: 72,
+		ID: "11111111-1111-1111-1111-111111111111", Status: "processing", Progress: 72,
 		UpdatedAt: time.Now().Add(-staleAnalysisProcessingTimeout - time.Minute),
 	}}
 	service := &Service{repo: repo}
-	analysis, err := service.GetAnalysis(context.Background(), "user-1", "analysis-1")
+	analysis, err := service.GetAnalysis(context.Background(), "user-1", "11111111-1111-1111-1111-111111111111")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if analysis.Status != "failed" || analysis.ErrorMessage == "" {
 		t.Fatalf("stale processing analysis should fail with message, got %#v", analysis)
 	}
-	if len(repo.failed) != 1 || repo.failed[0] != "analysis-1" {
+	if len(repo.failed) != 1 || repo.failed[0] != "11111111-1111-1111-1111-111111111111" {
 		t.Fatalf("FailAnalysisPresentation should be called once, got %v", repo.failed)
 	}
 }
 
 func TestGetAnalysisKeepsFreshProcessing(t *testing.T) {
 	repo := &staleAnalysisRepositoryStub{analysis: domain.Analysis{
-		ID: "analysis-1", Status: "processing", Progress: 72,
+		ID: "11111111-1111-1111-1111-111111111111", Status: "processing", Progress: 72,
 		UpdatedAt: time.Now().Add(-time.Minute),
 	}}
 	service := &Service{repo: repo}
-	analysis, err := service.GetAnalysis(context.Background(), "user-1", "analysis-1")
+	analysis, err := service.GetAnalysis(context.Background(), "user-1", "11111111-1111-1111-1111-111111111111")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,11 +64,11 @@ func TestGetAnalysisKeepsFreshProcessing(t *testing.T) {
 func TestGetAnalysisQueuedUsesWiderWindow(t *testing.T) {
 	// queued 11 分钟：仍在宽限窗内，不误杀
 	repo := &staleAnalysisRepositoryStub{analysis: domain.Analysis{
-		ID: "analysis-1", Status: "queued",
+		ID: "11111111-1111-1111-1111-111111111111", Status: "queued",
 		UpdatedAt: time.Now().Add(-staleAnalysisProcessingTimeout - time.Minute),
 	}}
 	service := &Service{repo: repo}
-	analysis, err := service.GetAnalysis(context.Background(), "user-1", "analysis-1")
+	analysis, err := service.GetAnalysis(context.Background(), "user-1", "11111111-1111-1111-1111-111111111111")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,11 +78,11 @@ func TestGetAnalysisQueuedUsesWiderWindow(t *testing.T) {
 
 	// queued 21 分钟：孤儿，落失败
 	repo = &staleAnalysisRepositoryStub{analysis: domain.Analysis{
-		ID: "analysis-2", Status: "queued",
+		ID: "22222222-2222-2222-2222-222222222222", Status: "queued",
 		UpdatedAt: time.Now().Add(-staleAnalysisQueuedTimeout - time.Minute),
 	}}
 	service = &Service{repo: repo}
-	analysis, err = service.GetAnalysis(context.Background(), "user-1", "analysis-2")
+	analysis, err = service.GetAnalysis(context.Background(), "user-1", "22222222-2222-2222-2222-222222222222")
 	if err != nil {
 		t.Fatal(err)
 	}

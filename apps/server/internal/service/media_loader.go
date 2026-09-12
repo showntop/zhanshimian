@@ -48,8 +48,9 @@ func (l *AnalysisMediaLoader) Load(ctx context.Context, ids []string) ([]provide
 		if int64(len(data)) > l.maxBytes {
 			return nil, fmt.Errorf("%s photo exceeds provider limit", asset.Kind)
 		}
+		data, mime := constrainVisionImage(data, asset.MIMEType)
 		images = append(images, provider.AnalysisImage{
-			ID: asset.ID, Kind: asset.Kind, MIMEType: asset.MIMEType,
+			ID: asset.ID, Kind: asset.Kind, MIMEType: mime,
 			URL: url, Data: data,
 		})
 	}
@@ -71,9 +72,15 @@ func (l *AnalysisMediaLoader) open(ctx context.Context, asset domain.MediaAsset)
 		}
 		return file, l.publicBaseURL + path, nil
 	}
+	publicURL := l.publicBaseURL + "/uploads/" + strings.TrimPrefix(asset.StorageKey, "/")
+	if processed, ok := l.storage.(storage.ProcessedOpener); ok {
+		if reader, err := processed.OpenProcessed(ctx, asset.StorageKey, visionCOSProcess); err == nil {
+			return reader, publicURL, nil
+		}
+	}
 	reader, err := l.storage.Open(ctx, asset.StorageKey)
 	if err != nil {
 		return nil, "", fmt.Errorf("open %s photo: %w", asset.Kind, err)
 	}
-	return reader, l.publicBaseURL + "/uploads/" + strings.TrimPrefix(asset.StorageKey, "/"), nil
+	return reader, publicURL, nil
 }

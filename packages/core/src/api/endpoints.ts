@@ -60,6 +60,7 @@ export const API_PATHS = {
   media: 'POST /v1/media',
   mediaDemo: 'POST /v1/media/demo',
   analyses: 'POST /v1/analyses',
+  analysisCurrent: 'GET /v1/analyses/current',
   analysis: 'GET /v1/analyses/{id}',
   reportCurrent: 'GET /v1/reports/current',
   report: 'GET /v1/reports/{id}',
@@ -153,6 +154,7 @@ export interface ApiEndpoints {
   // ---- 分析与报告（4） ----
   createAnalysis(input: CreateAnalysisInput): Promise<TaskCreated<Analysis>>
   getAnalysis(id: string): Promise<Analysis>
+  getCurrentAnalysis(): Promise<Analysis | null>
   getCurrentReport(): Promise<Report | null>
   getReport(id: string): Promise<Report>
 
@@ -250,7 +252,23 @@ export function createApiEndpoints(client: ApiClient, options: EndpointOptions =
     // ---------- 分析与报告 ----------
     createAnalysis: (input) => client.requestEnvelope('/v1/analyses', { method: 'POST', data: input, timeout: 30000 }),
     getAnalysis: (id) => client.request(pathId('/v1/analyses', id)),
-    getCurrentReport: () => client.request('/v1/reports/current'),
+    getCurrentAnalysis: async () => {
+      try {
+        return await client.request('/v1/analyses/current')
+      } catch (error) {
+        if (isApiErrorWithStatus(error, 404)) return null
+        throw error
+      }
+    },
+    getCurrentReport: async () => {
+      try {
+        return await client.request('/v1/reports/current')
+      } catch (error) {
+        // 服务端无当前报告一律 404；契约是 null，不能让方案/报告页进失败态。
+        if (isApiErrorWithStatus(error, 404)) return null
+        throw error
+      }
+    },
     getReport: (id) => client.request(pathId('/v1/reports', id)),
 
     // ---------- 方案 ----------

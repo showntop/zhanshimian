@@ -78,6 +78,27 @@ func (c *COS) Open(ctx context.Context, key string) (io.ReadCloser, error) {
 	return response.Body, nil
 }
 
+// OpenProcessed downloads a COS object after 数据万象 processing (download-time
+// imageMogr2). The bucket must have CI enabled; callers should fall back to Open.
+func (c *COS) OpenProcessed(ctx context.Context, key, process string) (io.ReadCloser, error) {
+	key, err := c.objectKey(key)
+	if err != nil {
+		return nil, err
+	}
+	process = strings.TrimSpace(process)
+	if process == "" {
+		return nil, fmt.Errorf("open processed COS object: empty process rule")
+	}
+	response, err := c.client.CI.Get(ctx, key, process, nil)
+	if err != nil {
+		if response != nil && response.Body != nil {
+			response.Body.Close()
+		}
+		return nil, fmt.Errorf("open processed COS object: %w", err)
+	}
+	return response.Body, nil
+}
+
 func (c *COS) Delete(ctx context.Context, key string) error {
 	key, err := c.objectKey(key)
 	if err != nil {

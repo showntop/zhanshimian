@@ -21,6 +21,15 @@ func (a *API) createAnalysis(w http.ResponseWriter, r *http.Request) {
 	writeDataTask(w, http.StatusAccepted, analysis, domainTaskRef(task))
 }
 
+func (a *API) getCurrentAnalysis(w http.ResponseWriter, r *http.Request) {
+	item, err := a.service.GetCurrentAnalysis(r.Context(), currentUser(r).ID)
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, item)
+}
+
 func (a *API) getAnalysis(w http.ResponseWriter, r *http.Request) {
 	item, err := a.service.GetAnalysis(r.Context(), currentUser(r).ID, r.PathValue("id"))
 	if err != nil {

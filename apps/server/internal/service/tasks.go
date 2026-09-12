@@ -216,6 +216,30 @@ func viewTasks(tasks []domain.Task) []domain.TaskView {
 
 // ---- 任务读取（GET /v1/tasks） ----
 
+// GetCurrentAnalysis returns the user's in-flight analysis (queued/processing).
+// Clients that lost the local analysis id (tab switch, storage wipe) use this
+// instead of bouncing home.
+func (s *Service) GetCurrentAnalysis(ctx context.Context, userID string) (domain.Analysis, error) {
+	tasks, err := s.repo.ActiveTasks(ctx, userID, 10)
+	if err != nil {
+		return domain.Analysis{}, err
+	}
+	for _, task := range tasks {
+		if task.Type != string(domain.TaskTypeAnalysis) {
+			continue
+		}
+		if task.Status != domain.TaskQueued && task.Status != domain.TaskProcessing {
+			continue
+		}
+		var payload domain.AnalysisTaskPayload
+		if json.Unmarshal(task.Payload, &payload) != nil || payload.AnalysisID == "" {
+			continue
+		}
+		return s.GetAnalysis(ctx, userID, payload.AnalysisID)
+	}
+	return domain.Analysis{}, repository.ErrNotFound
+}
+
 func (s *Service) GetTask(ctx context.Context, userID, taskID string) (domain.TaskView, error) {
 	task, err := s.repo.GetTask(ctx, userID, taskID)
 	if err != nil {

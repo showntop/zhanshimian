@@ -14,6 +14,7 @@ import {
 } from '@zsm/core'
 import { usePageShell } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
+import { resolveRunningAnalysisId } from '../../services/task-utils'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import { useStablePolling } from '../../hooks/use-stable-polling'
 import AppHeader from '../../components/app-header'
@@ -61,14 +62,17 @@ export default function Analysis() {
   const { pageClass, enter } = usePageShell(Boolean(analysis) || Boolean(failed), '', 'analysis')
 
   useLoad((options) => {
-    const id = options?.id || readStorage(STORAGE_KEYS.activeTaskAnalysis)
-    if (id) {
-      setAnalysisId(id)
-      writeStorage(STORAGE_KEYS.activeTaskAnalysis, id)
-    } else {
-      // 无任务引用直达本页（任务已完成清理/异常入口）：回首页，避免 0% 假进度死等
+    const fromQuery = options?.id || ''
+    void (async () => {
+      // 查询参数优先；否则问服务端进行中的分析，避免本地 id 丢失或过期后误回首页
+      const id = fromQuery || (await resolveRunningAnalysisId()) || readStorage(STORAGE_KEYS.activeTaskAnalysis)
+      if (id) {
+        setAnalysisId(id)
+        writeStorage(STORAGE_KEYS.activeTaskAnalysis, id)
+        return
+      }
       Taro.switchTab({ url: '/pages/home/index' })
-    }
+    })()
   })
 
   // 轮询走稳定包装：单实例，页面不可见自动暂停、恢复可见补拉，卸载即停

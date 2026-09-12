@@ -61,6 +61,7 @@ type StructuredRequest struct {
 	SchemaName      string
 	Schema          map[string]any
 	MaxOutputTokens int
+	ImageDetail     string
 	Validate        func([]byte) error
 }
 
@@ -400,7 +401,7 @@ func wanxTaskURL(baseURL, taskID string) (string, error) {
 func (r *AIRuntime) openAIResponses(ctx context.Context, capability string, model AIModel, input StructuredRequest) (StructuredResult, error) {
 	content := []map[string]any{{"type": "input_text", "text": input.Prompt}}
 	for _, image := range input.Images {
-		content = append(content, map[string]any{"type": "input_text", "text": "照片类型：" + photoKindName(image.Kind)}, map[string]any{"type": "input_image", "detail": "high", "image_url": dataURL(image.MIMEType, image.Data)})
+		content = append(content, map[string]any{"type": "input_text", "text": "照片类型：" + photoKindName(image.Kind)}, map[string]any{"type": "input_image", "detail": defaultString(input.ImageDetail, "high"), "image_url": dataURL(image.MIMEType, image.Data)})
 	}
 	body := map[string]any{
 		"model": model.Model, "store": false, "instructions": input.Instructions,
@@ -454,7 +455,7 @@ func (r *AIRuntime) openAIResponses(ctx context.Context, capability string, mode
 func (r *AIRuntime) openAIChatCompletions(ctx context.Context, capability string, model AIModel, input StructuredRequest) (StructuredResult, error) {
 	content := []map[string]any{{"type": "text", "text": input.Prompt}}
 	for _, image := range input.Images {
-		content = append(content, map[string]any{"type": "text", "text": "照片类型：" + photoKindName(image.Kind)}, map[string]any{"type": "image_url", "image_url": map[string]any{"url": dataURL(image.MIMEType, image.Data), "detail": "high"}})
+		content = append(content, map[string]any{"type": "text", "text": "照片类型：" + photoKindName(image.Kind)}, map[string]any{"type": "image_url", "image_url": map[string]any{"url": dataURL(image.MIMEType, image.Data), "detail": defaultString(input.ImageDetail, "high")}})
 	}
 	mode := defaultString(model.StructuredMode, "json_schema")
 	responseFormat := map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": input.SchemaName, "strict": true, "schema": input.Schema}}

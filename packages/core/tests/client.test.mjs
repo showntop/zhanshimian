@@ -224,6 +224,30 @@ test('rewriteLoopbackAssetURLs：生产 API 下把 127.0.0.1/uploads 改到 API 
   assert.equal((await local({ url: 'http://127.0.0.1:58000/uploads/x.png' })).url, 'http://127.0.0.1:58000/uploads/x.png')
 })
 
+test('getCurrentAnalysis：无进行中分析 404 返回 null，其它错误仍抛出', async () => {
+  let status = 404
+  const { adapter } = fakeAdapter(() => ({
+    statusCode: status,
+    data: { error: { code: status === 404 ? 'not_found' : 'server_error', message: status === 404 ? '分析不存在' : '服务暂时不可用' } },
+  }))
+  const api = createApiEndpoints(createApiClient({ adapter, baseUrl: 'https://api.test' }))
+  assert.equal(await api.getCurrentAnalysis(), null)
+  status = 500
+  await assert.rejects(() => api.getCurrentAnalysis(), (error) => error.statusCode === 500)
+})
+
+test('getCurrentReport：无档案 404 返回 null，其它错误仍抛出', async () => {
+  let status = 404
+  const { adapter } = fakeAdapter(() => ({
+    statusCode: status,
+    data: { error: { code: status === 404 ? 'not_found' : 'server_error', message: status === 404 ? '报告不存在' : '服务暂时不可用' } },
+  }))
+  const api = createApiEndpoints(createApiClient({ adapter, baseUrl: 'https://api.test' }))
+  assert.equal(await api.getCurrentReport(), null)
+  status = 500
+  await assert.rejects(() => api.getCurrentReport(), (error) => error.statusCode === 500)
+})
+
 test('diagnose：404 清 report 引用后无 report_id 重试一次', async () => {
   const posts = []
   let clearCalls = 0

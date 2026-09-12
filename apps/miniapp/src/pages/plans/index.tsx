@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
-import { POLL_INTERVALS, useTaskPolling, type Plan } from '@zsm/core'
+import { EMPTY_COPY, POLL_INTERVALS, useTaskPolling, type Plan } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
+import { analysisPageUrl, isAnalysisRunning, resolveRunningAnalysisId } from '../../services/task-utils'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader, { getNavMetrics } from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
@@ -51,6 +52,7 @@ export default function Plans() {
   // 区分「未建档」与「该场景无方案」：两者空态与 CTA 完全不同，
   // 此前一律按未建档处理，导致已建档用户切场景时被错误引导去重新建档
   const [hasReport, setHasReport] = useState(true)
+  const [analyzing, setAnalyzing] = useState(false)
   // general 方案组生成任务（报告与方案解耦后由 plan_group 任务产出）
   const [groupTaskId, setGroupTaskId] = useState('')
   const plansRef = useRef<Plan[]>([])
@@ -72,15 +74,17 @@ export default function Plans() {
     try {
       const reportId = readStorage(STORAGE_KEYS.reportId)
       if (!reportId) {
-        const current = await api.getCurrentReport()
+        const [current, running] = await Promise.all([api.getCurrentReport(), isAnalysisRunning()])
         if (!current) {
           setHasReport(false)
+          setAnalyzing(running)
           setPlans([])
           return
         }
         writeStorage(STORAGE_KEYS.reportId, current.id)
       }
       setHasReport(true)
+      setAnalyzing(false)
       const items = await api.listPlans(readStorage(STORAGE_KEYS.reportId)!, targetScene)
       setPlans(items)
       // 报告与方案解耦：general 空组时接管已在进行的 plan_group 生成任务
@@ -223,17 +227,26 @@ export default function Plans() {
     )
   }
 
-  // 空态分两层：未建档 → 全页引导建档；已建档但该场景无方案 → 保留场景 tab，
-  // 引导生成该场合方案（general 走 upsertPlans 直接生成，其余进场景 Brief 页）
+  // 空态分三层：分析进行中 → 回进度页；未建档 → 去建档；
+  // 已建档但该场景无方案 → 保留场景 tab，引导生成该场合方案
   if (plans.length === 0 && !hasReport) {
+    const empty = analyzing ? EMPTY_COPY.plansAnalyzing : EMPTY_COPY.plansNeedArchive
     return (
       <View className={pageClass}>
         <AppHeader />
         <EmptyState
-          title="还没有方案"
-          description="先完成三图建档，或在场景页生成场合方案。"
-          actionText="去建档"
-          onAction={() => Taro.navigateTo({ url: '/pages/capture/index' })}
+          title={empty.title}
+          description={empty.body}
+          actionText={empty.action}
+          onAction={() => {
+            if (!analyzing) {
+              Taro.navigateTo({ url: '/pages/capture/index' })
+              return
+            }
+            void resolveRunningAnalysisId().then((id) => {
+              Taro.navigateTo({ url: analysisPageUrl(id) })
+            })
+          }}
         />
       </View>
     )

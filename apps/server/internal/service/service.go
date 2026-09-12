@@ -535,6 +535,9 @@ func (s *Service) CreateAnalysis(ctx context.Context, userID string, input domai
 }
 
 func (s *Service) GetAnalysis(ctx context.Context, userID, id string) (domain.Analysis, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return domain.Analysis{}, repository.ErrNotFound
+	}
 	analysis, err := s.repo.GetAnalysis(ctx, userID, id)
 	if err != nil {
 		return domain.Analysis{}, err

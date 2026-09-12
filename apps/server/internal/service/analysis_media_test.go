@@ -27,7 +27,7 @@ func (s analysisMediaRepositoryStub) GetMediaAssetsForUser(_ context.Context, _ 
 
 func TestGetAnalysisReturnsOwnedMediaPreview(t *testing.T) {
 	repo := analysisMediaRepositoryStub{
-		analysis: domain.Analysis{ID: "analysis-1", MediaIDs: []string{"face-1", "side-1", "body-1"}},
+		analysis: domain.Analysis{ID: "11111111-1111-1111-1111-111111111111", MediaIDs: []string{"face-1", "side-1", "body-1"}},
 		assets: []domain.MediaAsset{
 			{ID: "face-1", Kind: "face", StorageKey: "user/face.jpg"},
 			{ID: "side-1", Kind: "side", StorageKey: "user/side.jpg"},
@@ -35,7 +35,7 @@ func TestGetAnalysisReturnsOwnedMediaPreview(t *testing.T) {
 		},
 	}
 	service := &Service{repo: repo, publicBaseURL: "https://api.example.test"}
-	analysis, err := service.GetAnalysis(context.Background(), "user-1", "analysis-1")
+	analysis, err := service.GetAnalysis(context.Background(), "user-1", "11111111-1111-1111-1111-111111111111")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,11 +57,11 @@ func TestAnalysisMediaUsesBundledDemoAsset(t *testing.T) {
 
 func TestGetAnalysisMarksBundledDemoMedia(t *testing.T) {
 	repo := analysisMediaRepositoryStub{
-		analysis: domain.Analysis{ID: "analysis-1", MediaIDs: []string{"body-1"}},
+		analysis: domain.Analysis{ID: "11111111-1111-1111-1111-111111111111", MediaIDs: []string{"body-1"}},
 		assets:   []domain.MediaAsset{{ID: "body-1", Kind: "body", StorageKey: "demo/body.png"}},
 	}
 	service := &Service{repo: repo, publicBaseURL: "https://api.example.test"}
-	analysis, err := service.GetAnalysis(context.Background(), "user-1", "analysis-1")
+	analysis, err := service.GetAnalysis(context.Background(), "user-1", "11111111-1111-1111-1111-111111111111")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,6 +6,7 @@ import { Text, View } from '@tarojs/components'
 import { SCENES } from '@zsm/core'
 import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
+import { analysisPageUrl, isAnalysisRunning } from '../../services/task-utils'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import AppHeader from '../../components/app-header'
 import PrimaryButton from '../../components/primary-button'
@@ -73,9 +74,11 @@ export default function Scene() {
       if (!reportId) {
         const current = await api.getCurrentReport()
         if (!current) {
-          // 无档案：先建档（brief 存本地，analysis 完成后 plans 页取用）
+          // 无档案：分析进行中回进度页；否则先建档（brief 存本地，完成后 plans 取用）
           writeStorage(STORAGE_KEYS.scenePending, scene)
-          Taro.navigateTo({ url: `/pages/capture/index?scene=${scene}` })
+          Taro.navigateTo({
+            url: (await isAnalysisRunning()) ? analysisPageUrl() : `/pages/capture/index?scene=${scene}`,
+          })
           return
         }
         reportId = current.id
