@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/repository"
 )
 
 var (
@@ -69,6 +70,9 @@ func (s *Service) Create(ctx context.Context, userID string, input domain.BodyPr
 	}
 	assets, err := s.assets.GetReadyAssets(ctx, userID, []string{input.BodyMediaID, input.FaceMediaID})
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return domain.CreatedBodyPresentation{}, fmt.Errorf("%w: 需要正脸和正面全身", ErrValidation)
+		}
 		return domain.CreatedBodyPresentation{}, err
 	}
 	byID := make(map[string]domain.MediaAsset, len(assets))
