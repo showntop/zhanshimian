@@ -1,6 +1,8 @@
 #!/bin/sh
-# 新契约（contracts/openapi.yaml）端到端回归。
-# 覆盖：主闭环、统一任务轮询、PUT plans 幂等、单方案重试、诊断/发型、
+# [SUPERSEDED] 面向重构前旧 API（/v1/tasks、/v1/analyses）的 curl 回归；
+# 质量核心链路的端到端回归由 apps/server/internal/service/assessment/e2e_test.go
+# 承接，本脚本待 Peripherals/Cutover 一并删除或重写。
+# 覆盖（旧契约）：主闭环、统一任务轮询、PUT plans 幂等、单方案重试、诊断/发型、
 # 首页聚合、今日、分享、衣橱（显式 item_ids）、顾问、sms 登录与跨次同号互通、
 # 越权 404、删除完整性。
 set -eu
