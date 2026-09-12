@@ -14,18 +14,8 @@ import (
 type CreateAssessmentParams = domain.CreateAssessmentParams
 type CreatedAssessment = domain.CreatedAssessment
 type AssessmentReport = domain.AssessmentReport
-
-type PrepareReportParams struct {
-	RunID, UserID string
-	Report        domain.Report
-	Quality       domain.QualityEvaluation
-	Findings      []domain.ReportFinding
-}
-
-type AssessmentRunInput struct {
-	Run      domain.AnalysisRun
-	PhotoSet domain.PhotoSet
-}
+type PrepareReportParams = domain.PrepareReportParams
+type AssessmentRunInput = domain.AssessmentRunInput
 
 type assessmentQuerier interface {
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)

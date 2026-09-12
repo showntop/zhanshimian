@@ -113,3 +113,15 @@ type AssessmentReport struct {
 	Report
 	PhotoSet PhotoSet
 }
+
+type AssessmentRunInput struct {
+	Run      AnalysisRun
+	PhotoSet PhotoSet
+}
+
+type PrepareReportParams struct {
+	RunID, UserID string
+	Report        Report
+	Quality       QualityEvaluation
+	Findings      []ReportFinding
+}
