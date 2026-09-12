@@ -1,5 +1,11 @@
 -- 3D 形象 Lite：身体环绕展示。视频与抽帧只存 COS object key，
 -- 签名 URL 一律在读取时投影（敏感信息红线：库不存签名 URL）。
+
+-- 公开操作允许 body_orbit 类型（与 assessment/plan_set/render 同一轮询入口）。
+ALTER TABLE operations DROP CONSTRAINT operations_kind_check;
+ALTER TABLE operations ADD CONSTRAINT operations_kind_check
+  CHECK (kind IN ('assessment','plan_set','render','execution_feedback','body_orbit'));
+
 CREATE TABLE body_presentations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
