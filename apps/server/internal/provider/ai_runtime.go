@@ -28,6 +28,7 @@ const (
 	CapabilityHairEdit           = "hair_edit"
 	CapabilityMakeupEdit         = "makeup_edit"
 	CapabilityFullLookEdit       = "full_look_edit"
+	CapabilityBodyOrbit          = "body_orbit"
 )
 
 type AIModel struct {
