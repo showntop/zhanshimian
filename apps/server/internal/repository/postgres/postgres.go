@@ -659,35 +659,15 @@ func (s *Store) FailAnalysisPresentation(ctx context.Context, analysisID, stage,
 	return err
 }
 
-func (s *Store) GetReport(ctx context.Context, userID, reportID string) (domain.Report, error) {
-	var report domain.Report
-	err := s.pool.QueryRow(ctx, `SELECT id::text,analysis_id::text,current_image_url,impression_tags,priority_title,priority_copy,provider_version,generated_at FROM reports WHERE id=$1::uuid AND user_id=$2`, reportID, userID).
-		Scan(&report.ID, &report.AnalysisID, &report.CurrentImageURL, &report.ImpressionTags, &report.PriorityTitle, &report.PriorityCopy, &report.ProviderVersion, &report.GeneratedAt)
-	if err != nil {
-		return report, mapNotFound(err)
-	}
-	rows, err := s.pool.Query(ctx, `SELECT id::text,label,category,severity,detail,photo,anchor_x,anchor_y FROM report_findings WHERE report_id=$1::uuid ORDER BY sort_order`, reportID)
-	if err != nil {
-		return report, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var finding domain.Finding
-		if err := rows.Scan(&finding.ID, &finding.Label, &finding.Category, &finding.Severity, &finding.Detail, &finding.Photo, &finding.AnchorX, &finding.AnchorY); err != nil {
-			return report, err
-		}
-		report.Findings = append(report.Findings, finding)
-	}
-	return report, rows.Err()
+// GetReport is a compile stub after the Assessment domain.Report rewrite.
+// The real assessment report reader lands in a later task; do not scan
+// obsolete warehouse columns (analysis_id, current_image_url, generated_at, …).
+func (s *Store) GetReport(context.Context, string, string) (domain.Report, error) {
+	return domain.Report{}, repository.ErrNotFound
 }
 
-func (s *Store) LatestReport(ctx context.Context, userID string) (domain.Report, error) {
-	var reportID string
-	err := s.pool.QueryRow(ctx, `SELECT id::text FROM reports WHERE user_id=$1 ORDER BY generated_at DESC LIMIT 1`, userID).Scan(&reportID)
-	if err != nil {
-		return domain.Report{}, mapNotFound(err)
-	}
-	return s.GetReport(ctx, userID, reportID)
+func (s *Store) LatestReport(context.Context, string) (domain.Report, error) {
+	return domain.Report{}, repository.ErrNotFound
 }
 
 // ---- 方案 ----
