@@ -71,6 +71,25 @@ func TestHandlerRejectsIdentityUncertaintyWithoutAnalysis(t *testing.T) {
 	}
 }
 
+func TestHandlerUnknownPolicyVersionDoesNotPublish(t *testing.T) {
+	spy := newHandlerFixture()
+	spy.repo.input.Run.QualityPolicyVersion = "quality.unknown"
+	result, err := spy.handler.Execute(ctx, spy.lease)
+	assertPublicFailure(t, result, err, "quality_policy_unsupported", "这次未能形成可靠报告，请重新拍摄后再试", false)
+	if spy.analyzer.calls != 0 {
+		t.Fatalf("analyzer.calls = %d, want 0", spy.analyzer.calls)
+	}
+	if spy.repo.prepared != nil {
+		t.Fatalf("PrepareReport ran for unknown policy: %+v", spy.repo.prepared)
+	}
+	if spy.repo.publishCount != 0 {
+		t.Fatalf("publishCount = %d, want 0", spy.repo.publishCount)
+	}
+	if result.Failure == nil || result.Failure.Class != domain.ErrorQualityRejected {
+		t.Fatalf("Failure.Class = %+v, want %s", result.Failure, domain.ErrorQualityRejected)
+	}
+}
+
 func TestHandlerFailsClosedAfterSecondEvidenceFailure(t *testing.T) {
 	spy := newHandlerFixture()
 	spy.evidence.results = []ai.EvidenceResult{onlyTwoSupported(), onlyTwoSupported()}

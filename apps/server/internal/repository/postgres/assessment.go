@@ -658,13 +658,17 @@ func supersedeAssessmentTx(ctx context.Context, tx pgx.Tx, userID, operationID, 
 func failAssessmentTx(ctx context.Context, tx pgx.Tx, userID, runID, operationID, taskID string, failure *domain.TaskFailure) error {
 	code := ""
 	class := ""
+	runOutcome := domain.AnalysisOutcomeFailed
 	if failure != nil {
 		code = failure.Code
 		class = string(failure.Class)
+		if failure.Class == domain.ErrorQualityRejected {
+			runOutcome = domain.AnalysisOutcomeRejected
+		}
 	}
 	if _, err := tx.Exec(ctx, `
-		UPDATE analysis_runs SET outcome='failed', finished_at=now()
-		WHERE id=$1::uuid AND user_id=$2::uuid`, runID, userID); err != nil {
+		UPDATE analysis_runs SET outcome=$3, finished_at=now()
+		WHERE id=$1::uuid AND user_id=$2::uuid`, runID, userID, string(runOutcome)); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `

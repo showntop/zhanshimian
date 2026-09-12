@@ -252,6 +252,46 @@ func TestCommitAssessmentPublishesNewerReportAtSameGeneration(t *testing.T) {
 	}
 }
 
+func TestCommitAssessmentQualityRejectedWritesRunRejected(t *testing.T) {
+	store, fixture := newAssessmentStore(t)
+	created, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	lease := claimAssessmentTask(t, store, "worker-1")
+	outcome, err := store.CommitAssessment(ctx, lease, domain.TaskResult{
+		Disposition: domain.TaskDomainFail,
+		Failure:     &domain.TaskFailure{Class: domain.ErrorQualityRejected, Code: "photo_identity_uncertain"},
+	})
+	if err != nil {
+		t.Fatalf("CommitAssessment: %v", err)
+	}
+	if outcome != domain.CommitApplied {
+		t.Fatalf("outcome = %s, want %s", outcome, domain.CommitApplied)
+	}
+	assertAssessmentDomainFail(t, store, created, domain.AnalysisOutcomeRejected, domain.ErrorQualityRejected, "photo_identity_uncertain")
+}
+
+func TestCommitAssessmentPermanentDomainFailWritesRunFailed(t *testing.T) {
+	store, fixture := newAssessmentStore(t)
+	created, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	lease := claimAssessmentTask(t, store, "worker-1")
+	outcome, err := store.CommitAssessment(ctx, lease, domain.TaskResult{
+		Disposition: domain.TaskDomainFail,
+		Failure:     &domain.TaskFailure{Class: domain.ErrorPermanent, Code: "provider_failed"},
+	})
+	if err != nil {
+		t.Fatalf("CommitAssessment: %v", err)
+	}
+	if outcome != domain.CommitApplied {
+		t.Fatalf("outcome = %s, want %s", outcome, domain.CommitApplied)
+	}
+	assertAssessmentDomainFail(t, store, created, domain.AnalysisOutcomeFailed, domain.ErrorPermanent, "provider_failed")
+}
+
 func TestFinishRunFailureDoesNotPublish(t *testing.T) {
 	store, fixture := newAssessmentStore(t)
 	created, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
@@ -418,6 +458,37 @@ func publishedFinding(userID, itemID, category string, position int) domain.Repo
 		Anchor:             domain.EvidenceAnchor{X: 0.1, Y: 0.1, W: 0.2, H: 0.2},
 		Confidence:         0.96,
 		Position:           position,
+	}
+}
+
+func assertAssessmentDomainFail(t *testing.T, store *Store, created CreatedAssessment, wantOutcome domain.AnalysisOutcome, wantClass domain.ErrorClass, wantCode string) {
+	t.Helper()
+	if id := currentReportID(t, store.pool, created.Run.UserID); id != nil {
+		t.Fatalf("domain fail published current_report_id = %s", *id)
+	}
+	var outcome, opStatus, taskStatus, errorClass, errorCode string
+	if err := store.pool.QueryRow(ctx, `SELECT outcome FROM analysis_runs WHERE id=$1::uuid`, created.Run.ID).Scan(&outcome); err != nil {
+		t.Fatalf("load run outcome: %v", err)
+	}
+	if outcome != string(wantOutcome) {
+		t.Fatalf("run outcome = %s, want %s", outcome, wantOutcome)
+	}
+	if err := store.pool.QueryRow(ctx, `SELECT status FROM operations WHERE id=$1::uuid`, created.Operation.ID).Scan(&opStatus); err != nil {
+		t.Fatalf("load operation: %v", err)
+	}
+	if opStatus != string(domain.OperationFailed) {
+		t.Fatalf("operation status = %s, want %s", opStatus, domain.OperationFailed)
+	}
+	if err := store.pool.QueryRow(ctx, `
+		SELECT status, COALESCE(error_class, ''), COALESCE(error_code, '')
+		FROM tasks WHERE id=$1::uuid`, created.Task.ID).Scan(&taskStatus, &errorClass, &errorCode); err != nil {
+		t.Fatalf("load task: %v", err)
+	}
+	if taskStatus != string(domain.TaskFailed) {
+		t.Fatalf("task status = %s, want %s", taskStatus, domain.TaskFailed)
+	}
+	if errorClass != string(wantClass) || errorCode != wantCode {
+		t.Fatalf("task error = %s/%s, want %s/%s", errorClass, errorCode, wantClass, wantCode)
 	}
 }
 

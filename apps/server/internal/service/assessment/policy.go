@@ -16,6 +16,7 @@ const (
 	codePhotoIdentityUncertain     = "photo_identity_uncertain"
 	codeReportEvidenceInsufficient = "report_evidence_insufficient"
 	codePhotoContentRejected       = "photo_content_rejected"
+	codeQualityPolicyUnsupported   = "quality_policy_unsupported"
 )
 
 type Policy struct{}
@@ -50,6 +51,9 @@ var publicFailures = map[string]PublicFailure{
 	codePhotoContentRejected: {
 		Code: codePhotoContentRejected, Message: "照片不符合拍摄要求，请按提示重新拍摄", Retryable: false,
 	},
+	codeQualityPolicyUnsupported: {
+		Code: codeQualityPolicyUnsupported, Message: "这次未能形成可靠报告，请重新拍摄后再试", Retryable: false,
+	},
 }
 
 var evidenceConfidenceByPolicy = map[string]float64{
@@ -70,18 +74,20 @@ func LookupPublicFailure(code string) (PublicFailure, bool) {
 	return PublicFailure{}, false
 }
 
-func (Policy) EvidenceThreshold(policyVersion string) float64 {
-	if threshold, ok := evidenceConfidenceByPolicy[policyVersion]; ok {
-		return threshold
+func (Policy) EvidenceThreshold(policyVersion string) (float64, error) {
+	threshold, ok := evidenceConfidenceByPolicy[policyVersion]
+	if !ok {
+		return 0, catalogFailure(codeQualityPolicyUnsupported)
 	}
-	return evidenceConfidenceByPolicy[QualityPolicyVersion]
+	return threshold, nil
 }
 
-func (Policy) IdentityThreshold(policyVersion string) float64 {
-	if threshold, ok := identityConfidenceByPolicy[policyVersion]; ok {
-		return threshold
+func (Policy) IdentityThreshold(policyVersion string) (float64, error) {
+	threshold, ok := identityConfidenceByPolicy[policyVersion]
+	if !ok {
+		return 0, catalogFailure(codeQualityPolicyUnsupported)
 	}
-	return identityConfidenceByPolicy[QualityPolicyVersion]
+	return threshold, nil
 }
 
 func (Policy) AcceptContent(content ai.PhotoQualityResult) error {
@@ -97,14 +103,21 @@ func (Policy) AcceptContent(content ai.PhotoQualityResult) error {
 }
 
 func (p Policy) AcceptIdentity(identity ai.IdentityResult, policyVersion string) error {
-	if identity.Decision != "pass" || identity.Confidence < p.IdentityThreshold(policyVersion) {
+	threshold, err := p.IdentityThreshold(policyVersion)
+	if err != nil {
+		return err
+	}
+	if identity.Decision != "pass" || identity.Confidence < threshold {
 		return catalogFailure(codePhotoIdentityUncertain)
 	}
 	return nil
 }
 
 func (p Policy) SupportedFindings(findings []domain.DraftFinding, evidence ai.EvidenceResult, policyVersion string) []domain.DraftFinding {
-	threshold := p.EvidenceThreshold(policyVersion)
+	threshold, err := p.EvidenceThreshold(policyVersion)
+	if err != nil {
+		return nil
+	}
 	byKey := make(map[string]ai.EvidenceDecision, len(evidence.Findings))
 	for _, decision := range evidence.Findings {
 		byKey[decision.Key] = decision
