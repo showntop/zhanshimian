@@ -156,3 +156,51 @@ func boolText(v bool) string {
 	}
 	return "false"
 }
+
+func TestPlanSetVerifierPassesCleanCandidate(t *testing.T) {
+	runtime := &fakeStructuredRuntime{result: []byte(`{"decision":"pass","reason_codes":[],"violations":[]}`)}
+	got, err := NewPlanSetVerifier(runtime).Verify(context.Background(), planning.VerificationInput{
+		Report: validPlanningReport(), Brief: validDailyBrief(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Decision != "pass" || len(got.ReasonCodes) != 0 || got.InvocationID != "inv-plan-1" {
+		t.Fatalf("unexpected verification: %#v", got)
+	}
+	if runtime.request.Capability != CapabilityPlanGroundingVerification {
+		t.Fatalf("capability = %s", runtime.request.Capability)
+	}
+	if len(runtime.request.Images) != 0 {
+		t.Fatal("verifier must not receive images")
+	}
+}
+
+func TestPlanSetVerifierDecodesRejection(t *testing.T) {
+	runtime := &fakeStructuredRuntime{result: []byte(`{"decision":"reject","reason_codes":["plan.unsupported_brand_claim"],"violations":["方案提到具体品牌"]}`)}
+	got, err := NewPlanSetVerifier(runtime).Verify(context.Background(), planning.VerificationInput{
+		Report: validPlanningReport(), Brief: validDailyBrief(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Decision != "reject" || len(got.ReasonCodes) != 1 || got.ReasonCodes[0] != "plan.unsupported_brand_claim" {
+		t.Fatalf("unexpected rejection: %#v", got)
+	}
+}
+
+func TestPlanSetVerifierRejectsContractViolations(t *testing.T) {
+	cases := [][]byte{
+		[]byte(`{"decision":"reject","reason_codes":[],"violations":[]}`),
+		[]byte(`{"decision":"pass","reason_codes":["plan.report_contradiction"],"violations":[]}`),
+		[]byte(`{"decision":"maybe","reason_codes":[],"violations":[]}`),
+	}
+	for _, result := range cases {
+		runtime := &fakeStructuredRuntime{result: result}
+		if _, err := NewPlanSetVerifier(runtime).Verify(context.Background(), planning.VerificationInput{
+			Report: validPlanningReport(), Brief: validDailyBrief(),
+		}); !errors.Is(err, ErrVerifierContract) {
+			t.Fatalf("got %v, want ErrVerifierContract for %s", err, result)
+		}
+	}
+}

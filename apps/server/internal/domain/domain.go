@@ -166,16 +166,16 @@ type Plan struct {
 	GeneratedImageURL string `json:"generated_image_url,omitempty"`
 	// GenerationStatus/GenerationError are API-facing projections of the
 	// plan_look task (the queue state itself lives in tasks).
-	GenerationStatus string     `json:"generation_status,omitempty"`
-	GenerationError  string     `json:"generation_error,omitempty"`
-	LookProvider     string     `json:"look_provider,omitempty"`
-	Recommended      bool       `json:"recommended"`
-	Descriptor       string     `json:"descriptor"`
-	Why              string     `json:"why"`
-	OutcomeTags      []string   `json:"outcome_tags"`
-	DifferenceTags   []string   `json:"difference_tags"`
-	Sort             int        `json:"sort"`
-	Selected         bool       `json:"selected"`
+	GenerationStatus string           `json:"generation_status,omitempty"`
+	GenerationError  string           `json:"generation_error,omitempty"`
+	LookProvider     string           `json:"look_provider,omitempty"`
+	Recommended      bool             `json:"recommended"`
+	Descriptor       string           `json:"descriptor"`
+	Why              string           `json:"why"`
+	OutcomeTags      []string         `json:"outcome_tags"`
+	DifferenceTags   []string         `json:"difference_tags"`
+	Sort             int              `json:"sort"`
+	Selected         bool             `json:"selected"`
 	Steps            []LegacyPlanStep `json:"steps,omitempty"`
 	// LookTask embeds the latest plan_look task so plan lists render image
 	// generation state without a second round of polling endpoints.

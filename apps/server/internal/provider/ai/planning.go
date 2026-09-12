@@ -83,6 +83,149 @@ func (g *PlanSetGenerator) Generate(ctx context.Context, input planning.Generati
 	return planning.GeneratedPlanSet{InvocationID: result.Meta.InvocationID, Variants: candidate}, nil
 }
 
+// PlanSetVerifier wraps the plan_grounding_verification capability. It only
+// runs after the deterministic gate is clean.
+type PlanSetVerifier struct {
+	runtime StructuredRuntime
+}
+
+// NewPlanSetVerifier builds the semantic text-consistency verifier.
+func NewPlanSetVerifier(runtime StructuredRuntime) *PlanSetVerifier {
+	return &PlanSetVerifier{runtime: runtime}
+}
+
+const planVerifierInstructions = `你是独立的文字一致性核验器。只对照报告观察/建议、场景答案、候选方案和全部 grounding 引用做判断，不接收图片。候选不得与报告矛盾，不得编造衣橱单品、品牌、价格、材质或身体特征，方案场景不得偏离。`
+
+var planVerifierAllowedCodes = map[string]bool{
+	"plan.report_contradiction":       true,
+	"plan.unsupported_wardrobe_claim": true,
+	"plan.unsupported_brand_claim":    true,
+	"plan.unsupported_price_claim":    true,
+	"plan.unsupported_material_claim": true,
+	"plan.unsupported_body_claim":     true,
+	"plan.scene_mismatch":             true,
+}
+
+func (v *PlanSetVerifier) Verify(ctx context.Context, input planning.VerificationInput) (planning.VerificationResult, error) {
+	result, err := v.runtime.Structured(ctx, StructuredRequest{
+		Capability:      CapabilityPlanGroundingVerification,
+		Instructions:    planVerifierInstructions,
+		Prompt:          buildPlanVerificationPrompt(input),
+		SchemaName:      CapabilityPlanGroundingVerification,
+		Schema:          PlanVerificationSchema(),
+		MaxOutputTokens: 800,
+		Validate:        validatePlanVerificationPayload,
+	})
+	if err != nil {
+		return planning.VerificationResult{}, err
+	}
+	return decodePlanVerificationPayload(result.JSON, result.Meta.InvocationID)
+}
+
+func buildPlanVerificationPrompt(input planning.VerificationInput) string {
+	findings := make([]map[string]string, 0, len(input.Report.Findings))
+	for _, finding := range input.Report.Findings {
+		findings = append(findings, map[string]string{
+			"id":                  finding.ID,
+			"visible_observation": finding.VisibleObservation,
+			"recommendation":      finding.Recommendation,
+		})
+	}
+	variants := make([]planVariantPayload, 0, len(input.Candidate.Variants))
+	for _, variant := range input.Candidate.Variants {
+		steps := make([]planStepPayload, 0, len(variant.Steps))
+		for _, step := range variant.Steps {
+			groundings := make([]planGroundingPayload, 0, len(step.Groundings))
+			for _, grounding := range step.Groundings {
+				groundings = append(groundings, planGroundingPayload{
+					SourceType: string(grounding.SourceType),
+					SourceID:   grounding.SourceID,
+					Reason:     grounding.Reason,
+				})
+			}
+			steps = append(steps, planStepPayload{
+				Category:   string(step.Category),
+				Action:     string(step.Action),
+				Title:      step.Title,
+				Summary:    step.Summary,
+				Details:    planDetailsPayload(step.Details),
+				Groundings: groundings,
+			})
+		}
+		variants = append(variants, planVariantPayload{
+			Slot: variant.Slot, Key: string(variant.Key), Name: variant.Name,
+			Descriptor: variant.Descriptor, Rationale: variant.Rationale,
+			Recommended: variant.Recommended, OutcomeTags: variant.OutcomeTags,
+			DifferenceTags: variant.DifferenceTags, Steps: steps,
+		})
+	}
+	encoded, err := json.Marshal(map[string]any{
+		"report": map[string]any{
+			"id":                  input.Report.ID,
+			"priority_title":      input.Report.PriorityTitle,
+			"priority_copy":       input.Report.PriorityCopy,
+			"priority_finding_id": input.Report.PriorityFindingID,
+			"findings":            findings,
+		},
+		"profile_snapshot": json.RawMessage(defaultJSON(input.Report.ProfileSnapshot)),
+		"brief":            input.Brief,
+		"candidate":        map[string]any{"variants": variants},
+	})
+	if err != nil {
+		return "{}"
+	}
+	return string(encoded)
+}
+
+type planVerificationPayload struct {
+	Decision    string   `json:"decision"`
+	ReasonCodes []string `json:"reason_codes"`
+	Violations  []string `json:"violations"`
+}
+
+func validatePlanVerificationPayload(data []byte) error {
+	var payload planVerificationPayload
+	decode := json.NewDecoder(strings.NewReader(string(data)))
+	decode.DisallowUnknownFields()
+	if err := decode.Decode(&payload); err != nil {
+		return fmt.Errorf("%w: %v", ErrVerifierContract, err)
+	}
+	if payload.Decision != "pass" && payload.Decision != "reject" {
+		return fmt.Errorf("%w: decision must be pass|reject, got %q", ErrVerifierContract, payload.Decision)
+	}
+	if payload.Decision == "reject" && len(payload.ReasonCodes) == 0 {
+		return fmt.Errorf("%w: reject requires at least one reason code", ErrVerifierContract)
+	}
+	if payload.Decision == "pass" && len(payload.ReasonCodes) > 0 {
+		return fmt.Errorf("%w: pass must not carry reason codes", ErrVerifierContract)
+	}
+	for _, code := range payload.ReasonCodes {
+		if !planVerifierAllowedCodes[code] {
+			return fmt.Errorf("%w: unknown reason code %q", ErrVerifierContract, code)
+		}
+	}
+	if len(payload.Violations) > 16 {
+		return fmt.Errorf("%w: too many violations", ErrVerifierContract)
+	}
+	return nil
+}
+
+func decodePlanVerificationPayload(data []byte, invocationID string) (planning.VerificationResult, error) {
+	if err := validatePlanVerificationPayload(data); err != nil {
+		return planning.VerificationResult{}, err
+	}
+	var payload planVerificationPayload
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return planning.VerificationResult{}, fmt.Errorf("%w: %v", ErrVerifierContract, err)
+	}
+	return planning.VerificationResult{
+		InvocationID: invocationID,
+		Decision:     payload.Decision,
+		ReasonCodes:  payload.ReasonCodes,
+		Violations:   payload.Violations,
+	}, nil
+}
+
 // buildPlanSetPrompt renders the full report, profile snapshot, normalized
 // brief, style rule IDs and retry context. The grounding contract is spelled
 // out with stable IDs so the model can only cite what exists.
