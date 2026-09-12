@@ -27,6 +27,7 @@ type API struct {
 	service         *service.Service
 	media           *media.Service
 	operations      *operation.Service
+	idempotency     IdempotencyStore
 	logger          *slog.Logger
 	devLoginEnabled bool
 	runtime         RuntimeInfo
@@ -55,7 +56,8 @@ const tokenKey contextKey = "token"
 func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtime RuntimeInfo) http.Handler {
 	api := &API{
 		service: svc, media: mediaFromService(svc), operations: operationsFromService(svc),
-		logger: logger, devLoginEnabled: devLoginEnabled, runtime: runtime,
+		idempotency: idempotencyFromService(svc),
+		logger:      logger, devLoginEnabled: devLoginEnabled, runtime: runtime,
 	}
 	mux := http.NewServeMux()
 
@@ -81,8 +83,8 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("GET /v1/operations", api.auth(http.HandlerFunc(api.listOperations)))
 	mux.Handle("GET /v1/home/bootstrap", api.auth(http.HandlerFunc(api.homeBootstrap)))
 
-	mux.Handle("POST /v1/media/upload-intents", api.auth(http.HandlerFunc(api.createUploadIntent)))
-	mux.Handle("POST /v1/media/upload-intents/{id}/complete", api.auth(http.HandlerFunc(api.completeUploadIntent)))
+	mux.Handle("POST /v1/media/upload-intents", api.auth(api.requireIdempotency(http.HandlerFunc(api.createUploadIntent))))
+	mux.Handle("POST /v1/media/upload-intents/{id}/complete", api.auth(api.requireIdempotency(http.HandlerFunc(api.completeUploadIntent))))
 	mux.Handle("POST /v1/media/demo", api.auth(http.HandlerFunc(api.createDemoMedia)))
 
 	mux.Handle("POST /v1/analyses", api.auth(http.HandlerFunc(api.createAnalysis)))
@@ -166,6 +168,17 @@ func operationsFromService(svc *service.Service) *operation.Service {
 	return operation.New(reader)
 }
 
+func idempotencyFromService(svc *service.Service) IdempotencyStore {
+	if svc == nil {
+		return nil
+	}
+	store, ok := svc.Repository().(IdempotencyStore)
+	if !ok {
+		return nil
+	}
+	return store
+}
+
 func requestMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
@@ -176,7 +189,7 @@ func requestMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
 		r.Header.Set("X-Request-ID", requestID)
 		w.Header().Set("X-Request-ID", requestID)
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID, Idempotency-Key")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if r.Method == http.MethodOptions {
@@ -327,5 +340,17 @@ func viewTaskRef(view domain.TaskView) *taskRef {
 func writeError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": code, "message": message, "request_id": r.Header.Get("X-Request-ID")}})
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{
+		"code": code, "message": message, "request_id": r.Header.Get("X-Request-ID"), "retryable": errorRetryable(code, status),
+	}})
+}
+
+func errorRetryable(code string, status int) bool {
+	switch code {
+	case "idempotency_in_progress":
+		return true
+	case "idempotency_conflict", "idempotency_key_required":
+		return false
+	}
+	return status >= 500 || status == http.StatusTooManyRequests
 }

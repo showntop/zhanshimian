@@ -126,6 +126,7 @@ func TestNewWiresMediaAndLoginToken(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/media/upload-intents", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+session.Data.Token)
+	req.Header.Set("Idempotency-Key", "wire-media-1")
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create intent via New status = %d body=%s", rec.Code, rec.Body.String())
@@ -299,15 +300,17 @@ type combinedObjectStore struct {
 type sessionMediaRepo struct {
 	repository.Repository
 	*httpRepoFake
+	*memoryIdempotencyStore
 	users    map[string]domain.User
 	sessions map[string]string
 }
 
 func newSessionMediaRepo() *sessionMediaRepo {
 	return &sessionMediaRepo{
-		httpRepoFake: newHTTPRepoFake(),
-		users:        map[string]domain.User{},
-		sessions:     map[string]string{},
+		httpRepoFake:           newHTTPRepoFake(),
+		memoryIdempotencyStore: newMemoryIdempotencyStore(),
+		users:                  map[string]domain.User{},
+		sessions:               map[string]string{},
 	}
 }
 
