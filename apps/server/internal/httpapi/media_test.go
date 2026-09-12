@@ -16,7 +16,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/service"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/storage"
 )
@@ -82,6 +84,51 @@ func TestCompleteUploadRejectsHeadMismatch(t *testing.T) {
 	rec := doJSON(t, api, userID, http.MethodPost, "/v1/media/upload-intents/"+intentID+"/complete", map[string]any{})
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestNewWiresMediaAndLoginToken(t *testing.T) {
+	repo := newSessionMediaRepo()
+	local, err := storage.NewLocal(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	objects := combinedObjectStore{ObjectStorage: local, ObjectStore: matchingHTTPStore()}
+	svc := newServiceForAPI(t, repo, objects)
+	handler := New(svc, discardLogger(), true, RuntimeInfo{})
+
+	login := httptest.NewRecorder()
+	loginReq := httptest.NewRequest(http.MethodPost, "/v1/auth/dev", strings.NewReader(`{"nickname":"wired"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(login, loginReq)
+	if login.Code != http.StatusCreated {
+		t.Fatalf("login status = %d body=%s", login.Code, login.Body.String())
+	}
+	var session struct {
+		Data struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(login.Body.Bytes(), &session); err != nil {
+		t.Fatal(err)
+	}
+	if session.Data.Token == "" {
+		t.Fatalf("login token is empty: %s", login.Body.String())
+	}
+
+	rec := httptest.NewRecorder()
+	body, err := json.Marshal(map[string]any{
+		"purpose": "face", "mime_type": "image/jpeg", "byte_size": 20, "sha256": strings.Repeat("b", 64),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/media/upload-intents", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+session.Data.Token)
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create intent via New status = %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -242,4 +289,52 @@ func (s *httpObjectStore) HeadObject(_ context.Context, key string) (domain.Obje
 		return domain.ObjectMetadata{}, fmt.Errorf("missing object")
 	}
 	return meta, nil
+}
+
+type combinedObjectStore struct {
+	storage.ObjectStorage
+	media.ObjectStore
+}
+
+type sessionMediaRepo struct {
+	repository.Repository
+	*httpRepoFake
+	users    map[string]domain.User
+	sessions map[string]string
+}
+
+func newSessionMediaRepo() *sessionMediaRepo {
+	return &sessionMediaRepo{
+		httpRepoFake: newHTTPRepoFake(),
+		users:        map[string]domain.User{},
+		sessions:     map[string]string{},
+	}
+}
+
+func (r *sessionMediaRepo) CreateDevUser(_ context.Context, nickname string) (domain.User, error) {
+	user := domain.User{ID: uuid.NewString(), Nickname: nickname, CreatedAt: time.Now()}
+	r.users[user.ID] = user
+	return user, nil
+}
+
+func (r *sessionMediaRepo) CreateSession(_ context.Context, userID string, digest []byte, _ time.Time) error {
+	r.sessions[string(digest)] = userID
+	return nil
+}
+
+func (r *sessionMediaRepo) UserByTokenDigest(_ context.Context, digest []byte) (domain.User, error) {
+	userID, ok := r.sessions[string(digest)]
+	if !ok {
+		return domain.User{}, repository.ErrNotFound
+	}
+	user, ok := r.users[userID]
+	if !ok {
+		return domain.User{}, repository.ErrNotFound
+	}
+	return user, nil
+}
+
+func newServiceForAPI(t *testing.T, repo repository.Repository, objects storage.ObjectStorage) *service.Service {
+	t.Helper()
+	return service.New(repo, objects, provider.NewDemoAnalyzer(), "", time.Hour, 10<<20, discardLogger())
 }

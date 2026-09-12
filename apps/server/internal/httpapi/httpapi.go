@@ -50,7 +50,7 @@ const tokenKey contextKey = "token"
 
 // New 注册全部路由（契约见 contracts/openapi.yaml）。
 func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtime RuntimeInfo) http.Handler {
-	api := &API{service: svc, logger: logger, devLoginEnabled: devLoginEnabled, runtime: runtime}
+	api := &API{service: svc, media: mediaFromService(svc), logger: logger, devLoginEnabled: devLoginEnabled, runtime: runtime}
 	mux := http.NewServeMux()
 
 	// ---- 公开端点（免 bearer）：healthz、auth/*、分享公开读 ----
@@ -132,6 +132,21 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("POST /v1/billing/orders/{id}/sync", api.auth(http.HandlerFunc(api.syncBillingOrder)))
 	mux.HandleFunc("POST /v1/billing/notify", api.billingNotify)
 	return requestMiddleware(logger, mux)
+}
+
+func mediaFromService(svc *service.Service) *media.Service {
+	if svc == nil {
+		return nil
+	}
+	repo, ok := svc.Repository().(media.Repository)
+	if !ok {
+		return nil
+	}
+	objects, ok := svc.ObjectStorage().(media.ObjectStore)
+	if !ok {
+		return nil
+	}
+	return media.New(repo, objects, svc.MaxUploadBytes(), 15*time.Minute)
 }
 
 func requestMiddleware(logger *slog.Logger, next http.Handler) http.Handler {

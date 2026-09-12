@@ -124,9 +124,9 @@ func (s *Store) DeleteSessionByTokenDigest(ctx context.Context, digest []byte) e
 func (s *Store) GetUserProfile(ctx context.Context, userID string) (domain.UserProfile, error) {
 	var profile domain.UserProfile
 	err := s.pool.QueryRow(ctx, `
-		SELECT height_cm,role,budget,weight_kg::float8,bust_cm::float8,waist_cm::float8,hip_cm::float8,updated_at
+		SELECT id::text,user_id::text,role,COALESCE(height_cm,0),budget,updated_at
 		FROM user_profiles WHERE user_id=$1`, userID).
-		Scan(&profile.HeightCM, &profile.Role, &profile.Budget, new(float64), new(float64), new(float64), new(float64), &profile.UpdatedAt)
+		Scan(&profile.ID, &profile.UserID, &profile.Role, &profile.HeightCM, &profile.Budget, &profile.UpdatedAt)
 	return profile, mapNotFound(err)
 }
 
@@ -148,7 +148,7 @@ func (s *Store) UpdateUserAvatar(ctx context.Context, userID, mediaID string) er
 func (s *Store) GetUserAvatar(ctx context.Context, userID string) (domain.MediaAsset, error) {
 	var item domain.MediaAsset
 	err := s.pool.QueryRow(ctx, `
-		SELECT m.id::text,m.kind,m.storage_key,m.mime_type,m.byte_size,m.created_at
+		SELECT m.id::text,m.purpose,m.object_key,m.mime_type,m.byte_size,m.created_at
 		FROM users u
 		JOIN media_assets m ON m.id=u.avatar_media_id
 		WHERE u.id=$1::uuid AND m.deleted_at IS NULL`, userID).
@@ -168,16 +168,17 @@ func (s *Store) UpdateUserNickname(ctx context.Context, userID, nickname string)
 }
 
 func (s *Store) SaveUserProfile(ctx context.Context, userID string, profile domain.UserProfile) (domain.UserProfile, error) {
+	var height any
+	if profile.HeightCM >= 100 {
+		height = profile.HeightCM
+	}
 	err := s.pool.QueryRow(ctx, `
-		INSERT INTO user_profiles(user_id,height_cm,role,budget,weight_kg,bust_cm,waist_cm,hip_cm)
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+		INSERT INTO user_profiles(user_id,height_cm,role,budget)
+		VALUES($1,$2,$3,$4)
 		ON CONFLICT(user_id) DO UPDATE SET
-			height_cm=EXCLUDED.height_cm,role=EXCLUDED.role,budget=EXCLUDED.budget,
-			weight_kg=EXCLUDED.weight_kg,bust_cm=EXCLUDED.bust_cm,waist_cm=EXCLUDED.waist_cm,
-			hip_cm=EXCLUDED.hip_cm,updated_at=now()
-		RETURNING updated_at`, userID, profile.HeightCM, profile.Role, profile.Budget,
-		nil, nil, nil, nil).
-		Scan(&profile.UpdatedAt)
+			height_cm=EXCLUDED.height_cm,role=EXCLUDED.role,budget=EXCLUDED.budget,updated_at=now()
+		RETURNING id::text,user_id::text,updated_at`, userID, height, profile.Role, profile.Budget).
+		Scan(&profile.ID, &profile.UserID, &profile.UpdatedAt)
 	return profile, err
 }
 
@@ -219,12 +220,7 @@ func (s *Store) ConsumeSmsCode(ctx context.Context, id string) error {
 // ---- 媒体 ----
 
 func (s *Store) CreateMedia(ctx context.Context, userID, kind, storageKey, mime string, size int64) (domain.MediaAsset, error) {
-	var item domain.MediaAsset
-	err := s.pool.QueryRow(ctx, `
-		INSERT INTO media_assets(user_id,kind,storage_key,mime_type,byte_size)
-		VALUES($1,$2,$3,$4,$5) RETURNING id::text,kind,created_at`, userID, kind, storageKey, mime, size).
-		Scan(&item.ID, &item.Purpose, &item.CreatedAt)
-	return item, err
+	return domain.MediaAsset{}, fmt.Errorf("legacy multipart CreateMedia is not supported; use upload intents")
 }
 
 func (s *Store) GetMediaAssets(ctx context.Context, ids []string) ([]domain.MediaAsset, error) {
@@ -232,7 +228,7 @@ func (s *Store) GetMediaAssets(ctx context.Context, ids []string) ([]domain.Medi
 		return nil, nil
 	}
 	rows, err := s.pool.Query(ctx, `
-		SELECT id::text,kind,storage_key,mime_type,byte_size,created_at
+		SELECT id::text,purpose,object_key,mime_type,byte_size,created_at
 		FROM media_assets WHERE id=ANY($1::uuid[]) AND deleted_at IS NULL`, ids)
 	if err != nil {
 		return nil, err
@@ -264,7 +260,7 @@ func (s *Store) GetMediaAssetsForUser(ctx context.Context, userID string, ids []
 	if len(ids) == 0 {
 		return []domain.MediaAsset{}, nil
 	}
-	rows, err := s.pool.Query(ctx, `SELECT id::text,kind,storage_key,mime_type,byte_size,created_at FROM media_assets WHERE id=ANY($1::uuid[]) AND user_id=$2 AND deleted_at IS NULL`, ids, userID)
+	rows, err := s.pool.Query(ctx, `SELECT id::text,purpose,object_key,mime_type,byte_size,created_at FROM media_assets WHERE id=ANY($1::uuid[]) AND user_id=$2 AND deleted_at IS NULL`, ids, userID)
 	if err != nil {
 		return nil, err
 	}

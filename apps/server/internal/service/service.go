@@ -153,6 +153,12 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 	return service
 }
 
+func (s *Service) Repository() repository.Repository { return s.repo }
+
+func (s *Service) ObjectStorage() storage.ObjectStorage { return s.storage }
+
+func (s *Service) MaxUploadBytes() int64 { return s.maxUpload }
+
 // ---- 登录与身份 ----
 
 func defaultNickname(nickname string) string {
@@ -234,8 +240,7 @@ func (s *Service) createSession(ctx context.Context, user domain.User) (domain.S
 	if err := s.repo.CreateSession(ctx, user.ID, digest[:], expiresAt); err != nil {
 		return domain.Session{}, err
 	}
-	_ = token
-	return domain.Session{UserID: user.ID, TokenDigest: digest[:], ExpiresAt: expiresAt}, nil
+	return domain.Session{UserID: user.ID, Token: token, TokenDigest: digest[:], ExpiresAt: expiresAt}, nil
 }
 
 func (s *Service) Authenticate(ctx context.Context, token string) (domain.User, error) {

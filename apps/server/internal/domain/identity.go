@@ -24,9 +24,10 @@ type Identity struct {
 }
 
 type Session struct {
-	ID          string
-	UserID      string
-	TokenDigest []byte
-	ExpiresAt   time.Time
-	CreatedAt   time.Time
+	ID          string    `json:"-"`
+	UserID      string    `json:"-"`
+	Token       string    `json:"token"`
+	TokenDigest []byte    `json:"-"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	CreatedAt   time.Time `json:"-"`
 }

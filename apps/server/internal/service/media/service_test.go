@@ -74,6 +74,30 @@ func TestCompleteUploadCrossUserNotFound(t *testing.T) {
 	}
 }
 
+func TestCreateUploadIntentObjectKeyUsesIntentID(t *testing.T) {
+	repo := newMediaRepoFake()
+	svc := New(repo, matchingObjectStore(), 10<<20, 15*time.Minute)
+	userID := "u1"
+	intent := createIntent(t, svc, userID)
+	if intent.ID == "" {
+		t.Fatal("intent ID is empty")
+	}
+	wantKey := "users/" + userID + "/uploads/" + intent.ID
+	if intent.ObjectKey != wantKey {
+		t.Fatalf("object key = %q, want %q", intent.ObjectKey, wantKey)
+	}
+	stored, err := repo.GetUploadIntent(context.Background(), userID, intent.ID)
+	if err != nil {
+		t.Fatalf("GetUploadIntent: %v", err)
+	}
+	if stored.ID != intent.ID {
+		t.Fatalf("stored ID = %q, want %q", stored.ID, intent.ID)
+	}
+	if stored.ObjectKey != wantKey {
+		t.Fatalf("stored object key = %q, want %q", stored.ObjectKey, wantKey)
+	}
+}
+
 func TestCreateUploadIntentRejectsInvalidInput(t *testing.T) {
 	svc := New(newMediaRepoFake(), matchingObjectStore(), 10<<20, 15*time.Minute)
 	valid := CreateIntentInput{
@@ -123,7 +147,10 @@ func newMediaRepoFake() *mediaRepoFake {
 }
 
 func (r *mediaRepoFake) CreateUploadIntent(_ context.Context, in domain.CreateUploadIntent) (domain.UploadIntent, error) {
-	id := uuid.NewString()
+	id := in.ID
+	if id == "" {
+		id = uuid.NewString()
+	}
 	key := in.ObjectKey
 	if key == "" {
 		key = fmt.Sprintf("users/%s/uploads/%s", in.UserID, id)
