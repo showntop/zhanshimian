@@ -10,13 +10,15 @@ interface BottomSheetProps {
   open: boolean
   title?: string
   description?: string
+  /** 拉满可视高度，给内部滚动 + 底部操作条用 */
+  tall?: boolean
   onClose: () => void
   children?: React.ReactNode
 }
 
 const EXIT_MS = 240
 
-export default function BottomSheet({ open, title, description, onClose, children }: BottomSheetProps) {
+export default function BottomSheet({ open, title, description, tall, onClose, children }: BottomSheetProps) {
   // closed：不渲染；in：进场动画后停靠；exit：退场动画后卸载
   const [phase, setPhase] = useState<'closed' | 'in' | 'exit'>('closed')
   const [dragY, setDragY] = useState(0)
@@ -71,9 +73,8 @@ export default function BottomSheet({ open, title, description, onClose, childre
     <View className={`bottom-sheet ${phase === 'exit' ? 'bottom-sheet--exit' : ''}`}>
       <View className="bottom-sheet__mask" onClick={onClose} catchMove />
       <View
-        className="bottom-sheet__panel"
+        className={`bottom-sheet__panel ${tall ? 'bottom-sheet__panel--tall' : ''}`}
         style={dragY > 0 ? `transform: translateY(${dragY}px)` : ''}
-        catchMove
       >
         <View
           className="bottom-sheet__grab-zone"

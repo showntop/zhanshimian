@@ -447,6 +447,46 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateMe
+      summary: 修改当前账户称呼或头像
+      tags: [Me]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nickname:
+                  type: string
+                  minLength: 1
+                  maxLength: 20
+                avatar_media_id:
+                  type: string
+                  description: 已上传媒体 ID，用作展示头像，不替换建档照片
+      responses:
+        '200':
+          description: 更新后的账户
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MeAccount'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   '/v1/me/profile':
     get:
@@ -2682,6 +2722,9 @@ components:
           type: string
         nickname:
           type: string
+        avatar_url:
+          type: string
+          description: 账户展示头像；未设置时客户端回退形象档案图
         identities:
           type: array
           items:

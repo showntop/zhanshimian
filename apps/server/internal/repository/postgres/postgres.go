@@ -151,6 +151,43 @@ func (s *Store) GetUserProfile(ctx context.Context, userID string) (domain.UserP
 	return profile, mapNotFound(err)
 }
 
+func (s *Store) UpdateUserAvatar(ctx context.Context, userID, mediaID string) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE users SET avatar_media_id=$2::uuid,updated_at=now()
+		WHERE id=$1::uuid AND EXISTS (
+			SELECT 1 FROM media_assets WHERE id=$2::uuid AND user_id=$1::uuid AND deleted_at IS NULL
+		)`, userID, mediaID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) GetUserAvatar(ctx context.Context, userID string) (domain.MediaAsset, error) {
+	var item domain.MediaAsset
+	err := s.pool.QueryRow(ctx, `
+		SELECT m.id::text,m.kind,m.storage_key,m.mime_type,m.byte_size,m.created_at
+		FROM users u
+		JOIN media_assets m ON m.id=u.avatar_media_id
+		WHERE u.id=$1::uuid AND m.deleted_at IS NULL`, userID).
+		Scan(&item.ID, &item.Kind, &item.StorageKey, &item.MIMEType, &item.ByteSize, &item.CreatedAt)
+	return item, mapNotFound(err)
+}
+
+func (s *Store) UpdateUserNickname(ctx context.Context, userID, nickname string) error {
+	tag, err := s.pool.Exec(ctx, `UPDATE users SET nickname=$2 WHERE id=$1::uuid`, userID, nickname)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) SaveUserProfile(ctx context.Context, userID string, profile domain.UserProfile) (domain.UserProfile, error) {
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO user_profiles(user_id,height_cm,role,budget,weight_kg,bust_cm,waist_cm,hip_cm)

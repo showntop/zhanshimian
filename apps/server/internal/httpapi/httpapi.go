@@ -61,6 +61,7 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	// ---- 认证态端点 ----
 	mux.Handle("DELETE /v1/auth/session", api.auth(http.HandlerFunc(api.logout)))
 	mux.Handle("GET /v1/me", api.auth(http.HandlerFunc(api.getMe)))
+	mux.Handle("PATCH /v1/me", api.auth(http.HandlerFunc(api.updateMe)))
 	mux.Handle("GET /v1/me/profile", api.auth(http.HandlerFunc(api.getMyProfile)))
 	mux.Handle("PUT /v1/me/profile", api.auth(http.HandlerFunc(api.updateMyProfile)))
 	mux.Handle("DELETE /v1/me/data", api.auth(http.HandlerFunc(api.deleteData)))

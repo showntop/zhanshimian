@@ -15,6 +15,9 @@
     left: 0;
     right: 0;
     bottom: 0;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
     padding: 20rpx 32rpx calc(env(safe-area-inset-bottom) + 40rpx);
     background: var(--surface-strong);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
@@ -22,6 +25,12 @@
     animation: bottom-sheet-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
     // 松手回弹（拖拽中由内联 transform 接管，无过渡）
     transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  &__panel--tall {
+    height: 85vh;
+    max-height: 85vh;
+    overflow: hidden;
   }
 
   // 下拉手势热区：grabber + 标题区（高度充足才好拖）
@@ -57,7 +66,11 @@
   }
 
   &__body {
+    flex: 1;
+    min-height: 0;
     margin-top: 28rpx;
+    display: flex;
+    flex-direction: column;
   }
 
   // 退场：面板更快更重地下滑（§4.3 sheetOut），遮罩同步淡出

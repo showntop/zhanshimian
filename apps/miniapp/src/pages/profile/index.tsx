@@ -3,8 +3,8 @@
 // 报告/方案入口、体验实验室、删除我的数据。
 import { useCallback, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
-import { Text, View } from '@tarojs/components'
-import { BILLING_COPY, DEFAULT_NICKNAME, isBundledAsset, type Account, type BillingSummary, type Report, type Task, type UserProfile } from '@zsm/core'
+import { Input, Text, View } from '@tarojs/components'
+import { BILLING_COPY, DEFAULT_NICKNAME, PROFILE_SETUP_COPY, isBundledAsset, type Account, type BillingSummary, type Report, type Task, type UserProfile } from '@zsm/core'
 import { usePageShell } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { groupTasksByType, openTask, taskTitle } from '../../services/task-utils'
@@ -13,7 +13,9 @@ import { globalData } from '../../app'
 import AppHeader from '../../components/app-header'
 import BottomSheet from '../../components/bottom-sheet'
 import CreditSheet from '../../components/credit-sheet'
+import ProfileSheet from '../../components/profile-sheet'
 import ExampleImage from '../../components/example-image'
+import PrimaryButton from '../../components/primary-button'
 import Skeleton from '../../components/skeleton'
 import './index.scss'
 
@@ -24,6 +26,11 @@ export default function Profile() {
   const [report, setReport] = useState<Report | null>(null)
   const [billing, setBilling] = useState<BillingSummary | null>(null)
   const [buyOpen, setBuyOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [nameOpen, setNameOpen] = useState(false)
+  const [nicknameDraft, setNicknameDraft] = useState('')
+  const [nameBusy, setNameBusy] = useState(false)
+  const [avatarBusy, setAvatarBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const hasCacheRef = useRef(false)
   const { pageClass, enter } = usePageShell(!loading, 'page--tab', 'profile')
@@ -65,6 +72,37 @@ export default function Profile() {
   )
   const taskGroups = groupTasksByType(activeTasks)
 
+  const avatarUrl = account?.avatar_url || report?.current_image_url || ''
+  const avatarIsUser = Boolean(account?.avatar_url) || (
+    Boolean(report?.current_image_url) &&
+    !isBundledAsset(report?.current_image_url) &&
+    !report?.provider_version?.startsWith('demo')
+  )
+
+  const pickAvatar = () => {
+    if (avatarBusy) return
+    Taro.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      success: async (res) => {
+        const file = res.tempFiles[0]
+        if (!file) return
+        setAvatarBusy(true)
+        try {
+          const asset = await api.uploadMedia({ kind: 'face', filePath: file.tempFilePath })
+          const next = await api.updateMe({ avatar_media_id: asset.id })
+          setAccount(next)
+          Taro.showToast({ title: PROFILE_SETUP_COPY.saved, icon: 'success' })
+        } catch (error) {
+          Taro.showToast({ title: (error as Error).message || '头像没有更新成功，请重试', icon: 'none' })
+        } finally {
+          setAvatarBusy(false)
+        }
+      },
+    })
+  }
+
   const deleteData = () => {
     Taro.showModal({
       title: '删除我的数据',
@@ -96,18 +134,32 @@ export default function Profile() {
         ) : (
           <>
             <View className={`me__hero ${enter()}`}>
-              {report?.current_image_url ? (
-                <ExampleImage
-                  className="me__hero-photo"
-                  src={report.current_image_url}
-                  user={!isBundledAsset(report.current_image_url) && !report.provider_version?.startsWith('demo')}
-                  anchor="top"
-                />
-              ) : (
-                <View className="me__avatar">{(account?.nickname ?? 'U').slice(0, 1)}</View>
-              )}
+              <View className="me__avatar-wrap pressable" onClick={pickAvatar}>
+                {avatarUrl ? (
+                  <ExampleImage
+                    className="me__hero-photo"
+                    src={avatarUrl}
+                    user={avatarIsUser}
+                    anchor="top"
+                    frameAspect={1}
+                  />
+                ) : (
+                  <View className="me__avatar">{(account?.nickname ?? 'U').slice(0, 1)}</View>
+                )}
+              </View>
               <View className="me__meta">
-                <Text className="me__nickname">{account?.nickname ?? DEFAULT_NICKNAME}</Text>
+                <View className="me__name-row">
+                  <Text className="me__nickname">{account?.nickname ?? DEFAULT_NICKNAME}</Text>
+                  <Text
+                    className="me__edit pressable"
+                    onClick={() => {
+                      setNicknameDraft(account?.nickname ?? DEFAULT_NICKNAME)
+                      setNameOpen(true)
+                    }}
+                  >
+                    {PROFILE_SETUP_COPY.editAction}
+                  </Text>
+                </View>
                 <Text className="me__identities">
                   {report?.priority_title || report?.priority_copy || '你的形象档案'}
                 </Text>
@@ -203,18 +255,31 @@ export default function Profile() {
             </View>
 
             <View className={`me__card ${enter(2)}`}>
-              <Text className="me__section">身体数据</Text>
-              <View className="me__row">
-                <Text className="me__row-label">身高</Text>
+              <Text className="me__section">基本资料</Text>
+              <View className="me__row pressable" onClick={() => setProfileOpen(true)}>
+                <Text className="me__row-label">{PROFILE_SETUP_COPY.height}</Text>
                 <Text className="me__row-value">{profile?.height_cm ? `${profile.height_cm} cm` : '未填写'}</Text>
               </View>
-              <View className="me__row">
-                <Text className="me__row-label">职业 / 预算</Text>
+              <View className="me__row pressable" onClick={() => setProfileOpen(true)}>
+                <Text className="me__row-label">{PROFILE_SETUP_COPY.role}</Text>
+                <Text className="me__row-value">{profile?.role && profile.role !== '未填写' ? profile.role : '未填写'}</Text>
+              </View>
+              <View className="me__row pressable" onClick={() => setProfileOpen(true)}>
+                <Text className="me__row-label">{PROFILE_SETUP_COPY.budget}</Text>
+                <Text className="me__row-value">{profile?.budget && profile.budget !== '未填写' ? profile.budget : '未填写'}</Text>
+              </View>
+              <View className="me__row pressable" onClick={() => setProfileOpen(true)}>
+                <Text className="me__row-label">{PROFILE_SETUP_COPY.weight}</Text>
+                <Text className="me__row-value">{profile?.weight_kg ? `${profile.weight_kg} kg` : '未填写'}</Text>
+              </View>
+              <View className="me__row pressable" onClick={() => setProfileOpen(true)}>
+                <Text className="me__row-label">三围</Text>
                 <Text className="me__row-value">
-                  {profile?.role && profile?.budget ? `${profile.role} · ${profile.budget}` : '未填写'}
+                  {profile?.bust_cm || profile?.waist_cm || profile?.hip_cm
+                    ? `${profile?.bust_cm ?? '—'} / ${profile?.waist_cm ?? '—'} / ${profile?.hip_cm ?? '—'}`
+                    : '未填写'}
                 </Text>
               </View>
-              <Text className="me__note">体重与三围为选填，随时可在建档时补充</Text>
             </View>
 
             <View className={`me__card ${enter(2)}`}>
@@ -237,6 +302,66 @@ export default function Profile() {
           </>
         )}
       </View>
+      <BottomSheet
+        open={nameOpen}
+        title={PROFILE_SETUP_COPY.editName}
+        onClose={() => setNameOpen(false)}
+      >
+        <View className="me__name-sheet">
+          <Input
+            className="me__name-input"
+            maxlength={20}
+            value={nicknameDraft}
+            onInput={(event) => setNicknameDraft(event.detail.value)}
+          />
+          <PrimaryButton
+            text={PROFILE_SETUP_COPY.save}
+            loading={nameBusy}
+            onClick={async () => {
+              const nickname = nicknameDraft.trim()
+              if (!nickname) {
+                Taro.showToast({ title: '请填写称呼', icon: 'none' })
+                return
+              }
+              setNameBusy(true)
+              try {
+                const next = await api.updateMe({ nickname })
+                setAccount(next)
+                setNameOpen(false)
+                Taro.showToast({ title: PROFILE_SETUP_COPY.saved, icon: 'success' })
+              } catch (error) {
+                Taro.showToast({ title: (error as Error).message || '保存没有成功，请重试', icon: 'none' })
+              } finally {
+                setNameBusy(false)
+              }
+            }}
+          />
+          <Text
+            className="me__hero-link pressable"
+            onClick={() => {
+              setNameOpen(false)
+              pickAvatar()
+            }}
+          >
+            {PROFILE_SETUP_COPY.changePhoto} ›
+          </Text>
+        </View>
+      </BottomSheet>
+      <BottomSheet
+        open={profileOpen}
+        title={PROFILE_SETUP_COPY.editTitle}
+        description={PROFILE_SETUP_COPY.editBody}
+        tall
+        onClose={() => setProfileOpen(false)}
+      >
+        <ProfileSheet
+          profile={profile}
+          onSaved={(next) => {
+            setProfile(next)
+            setProfileOpen(false)
+          }}
+        />
+      </BottomSheet>
       <BottomSheet
         open={buyOpen}
         title={BILLING_COPY.buyAction}

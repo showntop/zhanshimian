@@ -36,6 +36,9 @@ type Repository interface {
 	DeleteSessionByTokenDigest(ctx context.Context, digest []byte) error
 	GetUserProfile(ctx context.Context, userID string) (domain.UserProfile, error)
 	SaveUserProfile(ctx context.Context, userID string, profile domain.UserProfile) (domain.UserProfile, error)
+	UpdateUserNickname(ctx context.Context, userID, nickname string) error
+	UpdateUserAvatar(ctx context.Context, userID, mediaID string) error
+	GetUserAvatar(ctx context.Context, userID string) (domain.MediaAsset, error)
 
 	// ---- 短信验证码 ----
 	CreateSmsCode(ctx context.Context, phone string, digest []byte, expiresAt time.Time) error

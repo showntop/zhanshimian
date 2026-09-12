@@ -54,6 +54,7 @@ export const API_PATHS = {
   authWechatApp: 'POST /v1/auth/wechat-app',
   authSession: 'DELETE /v1/auth/session',
   me: 'GET /v1/me',
+  meUpdate: 'PATCH /v1/me',
   meProfile: 'GET /v1/me/profile',
   meProfileUpdate: 'PUT /v1/me/profile',
   task: 'GET /v1/tasks/{id}',
@@ -143,6 +144,7 @@ export interface ApiEndpoints {
   loginWechatApp(input: { code: string }): Promise<Session>
   logout(): Promise<void>
   getMe(): Promise<Account>
+  updateMe(input: { nickname?: string; avatar_media_id?: string }): Promise<Account>
   getMyProfile(): Promise<UserProfile>
   updateMyProfile(profile: Partial<UserProfile>): Promise<UserProfile>
 
@@ -237,6 +239,7 @@ export function createApiEndpoints(client: ApiClient, options: EndpointOptions =
       await client.request('/v1/auth/session', { method: 'DELETE' })
     },
     getMe: () => client.request('/v1/me'),
+    updateMe: (input) => client.request('/v1/me', { method: 'PATCH', data: input }),
     getMyProfile: () => client.request('/v1/me/profile'),
     updateMyProfile: (profile) => client.request('/v1/me/profile', { method: 'PUT', data: profile }),
 

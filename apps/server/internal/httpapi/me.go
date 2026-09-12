@@ -8,6 +8,23 @@ import (
 	"github.com/zhanshimian/server/internal/repository"
 )
 
+func (a *API) updateMe(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Nickname      string `json:"nickname"`
+		AvatarMediaID string `json:"avatar_media_id"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+	account, err := a.service.UpdateAccount(r.Context(), currentUser(r), input.Nickname, input.AvatarMediaID)
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, account)
+}
+
 func (a *API) getMe(w http.ResponseWriter, r *http.Request) {
 	account, err := a.service.GetAccount(r.Context(), currentUser(r))
 	if err != nil {

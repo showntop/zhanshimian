@@ -183,7 +183,22 @@ export const PROFILE_SETUP_COPY = {
   skipAction: '跳过并生成',
   privacy: '资料可随时删除；不会用于评分或身材判断',
   whyTitle: '为什么要问这些？',
-  whyBody: '身份和预算只用来约束建议的可执行性，避免推荐不适合日常场景或超出预算的选择。'
+  whyBody: '身份和预算只用来约束建议的可执行性，避免推荐不适合日常场景或超出预算的选择。',
+  editTitle: '修改资料',
+  editBody: '身份和预算只用来约束建议，不会评分或做身材判断。',
+  editAction: '修改',
+  editName: '修改称呼',
+  nickname: '称呼',
+  changePhoto: '更换形象照片',
+  save: '保存',
+  saved: '已保存',
+  weight: '体重',
+  bust: '胸围',
+  waist: '腰围',
+  hip: '臀围',
+  optional: '选填',
+  roles: ['产品经理', '设计师', '咨询顾问', '学生'],
+  budgets: ['500 以内', '500–1500', '1500 以上']
 } as const
 
 // ---------- 形象报告 ----------

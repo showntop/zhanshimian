@@ -19,6 +19,7 @@ export interface UserIdentity {
 export interface Account {
   id: string
   nickname: string
+  avatar_url?: string
   identities: UserIdentity[]
   billing?: BillingSummary
 }
@@ -37,7 +38,7 @@ export interface UserProfile {
   weight_kg?: number
   bust_cm?: number
   waist_cm?: number
-  hips_cm?: number
+  hip_cm?: number
 }
 
 // ---------- 统一任务 ----------

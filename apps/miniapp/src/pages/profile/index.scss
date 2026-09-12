@@ -6,22 +6,28 @@
   &__hero {
     display: flex;
     align-items: center;
-    gap: 24rpx;
-    padding: 28rpx;
+    gap: 28rpx;
+    padding: 32rpx;
     border-radius: var(--radius-lg);
     background: var(--moss-soft);
   }
 
-  &__hero-photo {
+  &__avatar-wrap,
+  &__hero-photo,
+  &__avatar {
     width: 128rpx;
-    height: 168rpx;
+    height: 128rpx;
     flex-shrink: 0;
-    border-radius: var(--radius-md);
+    border-radius: 50%;
     overflow: hidden;
   }
 
+  &__hero-photo.example-image {
+    border-radius: 50%;
+  }
+
   &__hero-link {
-    margin-top: 8rpx;
+    margin-top: 10rpx;
     font-size: 24rpx;
     font-weight: 600;
     color: var(--moss);
@@ -41,28 +47,59 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 96rpx;
-    height: 96rpx;
-    border-radius: 999rpx;
     background: var(--moss);
     color: #ffffff;
     font-size: 44rpx;
     font-weight: 700;
   }
 
-  &__card > &__avatar {
-    margin-bottom: 16rpx;
-  }
-
   &__meta {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 6rpx;
+    justify-content: center;
+    gap: 8rpx;
+  }
+
+  &__name-row {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+    min-width: 0;
   }
 
   &__nickname {
+    flex: 1;
+    min-width: 0;
     font-size: 32rpx;
     font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  &__edit {
+    flex-shrink: 0;
+    font-size: 22rpx;
+    font-weight: 600;
+    color: var(--moss);
+  }
+
+  &__name-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 24rpx;
+    align-items: stretch;
+  }
+
+  &__name-input {
+    min-height: 88rpx;
+    padding: 0 28rpx;
+    border-radius: var(--radius-pill);
+    background: var(--surface-soft, #edf1ea);
+    font-size: 30rpx;
     color: var(--ink);
   }
 

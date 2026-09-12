@@ -157,6 +157,7 @@ type UserProfile struct {
 type MeAccount struct {
 	ID         string          `json:"id"`
 	Nickname   string          `json:"nickname"`
+	AvatarURL  string          `json:"avatar_url,omitempty"`
 	Identities []Identity      `json:"identities"`
 	Billing    *BillingSummary `json:"billing,omitempty"`
 }

@@ -260,10 +260,42 @@ func (s *Service) GetAccount(ctx context.Context, user domain.User) (domain.MeAc
 		return domain.MeAccount{}, err
 	}
 	account := domain.MeAccount{ID: user.ID, Nickname: user.Nickname, Identities: identities}
+	if avatar, err := s.repo.GetUserAvatar(ctx, user.ID); err == nil {
+		account.AvatarURL = s.resolveAssetURL(relativeAssetURL(avatar))
+	} else if !errors.Is(err, repository.ErrNotFound) {
+		return domain.MeAccount{}, err
+	}
 	if summary, err := s.BillingSummary(ctx, user.ID); err == nil {
 		account.Billing = &summary
 	}
 	return account, nil
+}
+
+func (s *Service) UpdateAccount(ctx context.Context, user domain.User, nickname, avatarMediaID string) (domain.MeAccount, error) {
+	nickname = strings.TrimSpace(nickname)
+	avatarMediaID = strings.TrimSpace(avatarMediaID)
+	if nickname == "" && avatarMediaID == "" {
+		return domain.MeAccount{}, fmt.Errorf("%w: 请填写要修改的内容", ErrValidation)
+	}
+	if nickname != "" {
+		runes := []rune(nickname)
+		if len(runes) < 1 || len(runes) > 20 {
+			return domain.MeAccount{}, fmt.Errorf("%w: 称呼需在 1–20 字之间", ErrValidation)
+		}
+		if err := s.repo.UpdateUserNickname(ctx, user.ID, nickname); err != nil {
+			return domain.MeAccount{}, err
+		}
+		user.Nickname = nickname
+	}
+	if avatarMediaID != "" {
+		if _, err := uuid.Parse(avatarMediaID); err != nil {
+			return domain.MeAccount{}, repository.ErrNotFound
+		}
+		if err := s.repo.UpdateUserAvatar(ctx, user.ID, avatarMediaID); err != nil {
+			return domain.MeAccount{}, err
+		}
+	}
+	return s.GetAccount(ctx, user)
 }
 
 // ---- 补充资料 ----
