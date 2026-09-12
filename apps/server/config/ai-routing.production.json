@@ -152,6 +152,22 @@
         "aliyun/wanx2.1-imageedit"
       ],
       "max_cost_cny": 0.6
+    },
+    "plan_set_generation": {
+      "policy": "quality_first",
+      "primary": "aliyun/kimi-k3",
+      "fallbacks": [
+        "aliyun/qwen3.7-plus"
+      ],
+      "max_cost_cny": 0.6
+    },
+    "plan_grounding_verification": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.7-plus",
+      "fallbacks": [
+        "aliyun/qwen3.7-flash"
+      ],
+      "max_cost_cny": 0.3
     }
   }
 }

@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plan_set.v1",
+  "title": "Plan set generator output v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["variants"],
+  "properties": {
+    "variants": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/variant" }
+    }
+  },
+  "$defs": {
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slot", "key", "name", "descriptor", "rationale",
+        "recommended", "outcome_tags", "difference_tags", "steps"
+      ],
+      "properties": {
+        "slot": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "key": { "enum": ["sharp", "warm", "natural"] },
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "descriptor": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "recommended": { "type": "boolean" },
+        "outcome_tags": {
+          "type": "array", "uniqueItems": true, "maxItems": 8,
+          "items": { "type": "string", "minLength": 1, "maxLength": 40 }
+        },
+        "difference_tags": {
+          "type": "array", "uniqueItems": true, "maxItems": 8,
+          "items": { "type": "string", "minLength": 1, "maxLength": 40 }
+        },
+        "steps": {
+          "type": "array", "minItems": 3, "maxItems": 3,
+          "items": { "$ref": "#/$defs/step" }
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "action", "title", "summary", "details", "groundings"],
+      "properties": {
+        "category": { "enum": ["hair", "makeup", "outfit"] },
+        "action": { "enum": ["keep", "adjust"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "details": { "$ref": "#/$defs/details" },
+        "groundings": {
+          "type": "array", "minItems": 1, "maxItems": 8,
+          "items": { "$ref": "#/$defs/grounding" }
+        }
+      }
+    },
+    "grounding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "source_id", "reason"],
+      "properties": {
+        "source_type": {
+          "enum": ["report_finding", "scene_answer", "profile_preference", "style_rule"]
+        },
+        "source_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 240 }
+      }
+    },
+    "details": {
+      "oneOf": [
+        { "$ref": "#/$defs/hairMakeupDetails" },
+        { "type": "object", "additionalProperties": false, "required": ["target", "intensity", "silhouette", "palette", "layers", "avoid", "formality"], "properties": {
+          "target": { "const": "" },
+          "intensity": { "const": "" },
+          "silhouette": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "palette": { "type": "array", "uniqueItems": true, "minItems": 1, "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 40 } },
+          "layers": { "type": "array", "uniqueItems": true, "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 40 } },
+          "avoid": { "type": "array", "uniqueItems": true, "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 40 } },
+          "formality": { "type": "string", "maxLength": 40 }
+        } }
+      ]
+    },
+    "hairMakeupDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "intensity", "silhouette", "palette", "layers", "avoid", "formality"],
+      "properties": {
+        "target": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "intensity": { "enum": ["low", "medium"] },
+        "silhouette": { "const": "" },
+        "palette": { "maxItems": 0 },
+        "layers": { "maxItems": 0 },
+        "avoid": {
+          "type": "array", "uniqueItems": true, "maxItems": 8,
+          "items": { "type": "string", "minLength": 1, "maxLength": 40 }
+        },
+        "formality": { "const": "" }
+      }
+    }
+  }
+}

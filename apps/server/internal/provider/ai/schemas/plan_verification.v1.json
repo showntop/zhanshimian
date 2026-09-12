@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plan_verification.v1",
+  "title": "Plan set text consistency verification output v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision", "reason_codes", "violations"],
+  "properties": {
+    "decision": { "enum": ["pass", "reject"] },
+    "reason_codes": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "enum": [
+          "plan.report_contradiction",
+          "plan.unsupported_wardrobe_claim",
+          "plan.unsupported_brand_claim",
+          "plan.unsupported_price_claim",
+          "plan.unsupported_material_claim",
+          "plan.unsupported_body_claim",
+          "plan.scene_mismatch"
+        ]
+      }
+    },
+    "violations": {
+      "type": "array",
+      "maxItems": 16,
+      "items": { "type": "string", "minLength": 1, "maxLength": 240 }
+    }
+  }
+}
