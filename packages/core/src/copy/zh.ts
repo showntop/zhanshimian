@@ -316,7 +316,13 @@ export const BILLING_COPY = {
   paying: '支付中',
   exhausted: '次数已用完',
   buyOnMiniapp: '请到微信小程序购买次数',
-  packUnit: '次'
+  packUnit: '次',
+  original: '原价',
+  saved: '已优惠',
+  zhe: '折',
+  featured: '推荐',
+  bestValue: '超值',
+  perCredit: '/次'
 } as const
 
 /** 诊断发现语气标签（positive/improve/optional/caution → 尊重表达，无警示红） */

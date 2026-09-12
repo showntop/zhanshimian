@@ -3557,6 +3557,12 @@ components:
           type: integer
         price_fen:
           type: integer
+        original_price_fen:
+          type: integer
+          description: 划线原价（分），须大于 price_fen，仅用于展示
+        badge:
+          type: string
+          description: featured 推荐 / value 超值
         product_id:
           type: string
 

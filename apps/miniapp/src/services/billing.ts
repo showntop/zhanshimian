@@ -1,5 +1,5 @@
 import Taro from '@tarojs/taro'
-import { ApiError, BILLING_COPY, type BillingOrder } from '@zsm/core'
+import { ApiError, BILLING_COPY, type BillingOrder, type BillingSKU } from '@zsm/core'
 import { api } from './api'
 import { STORAGE_KEYS, writeStorage } from './storage'
 
@@ -67,5 +67,19 @@ function requestVirtualPayment(order: BillingOrder): Promise<void> {
 }
 
 export function formatPrice(fen: number): string {
-  return `¥${(fen / 100).toFixed(fen % 100 === 0 ? 0 : 2)}`
+  if (fen % 100 === 0) return `¥${fen / 100}`
+  if (fen % 10 === 0) return `¥${(fen / 100).toFixed(1)}`
+  return `¥${(fen / 100).toFixed(2)}`
+}
+
+export function skuOffer(sku: BillingSKU) {
+  const original = sku.original_price_fen && sku.original_price_fen > sku.price_fen ? sku.original_price_fen : 0
+  const saved = original > 0 ? original - sku.price_fen : 0
+  const zhe = original > 0 ? Math.round((sku.price_fen / original) * 10) : 0
+  return {
+    original,
+    saved,
+    zhe: zhe > 0 && zhe < 10 ? zhe : 0,
+    perCredit: sku.credits > 0 ? Math.round(sku.price_fen / sku.credits) : 0,
+  }
 }

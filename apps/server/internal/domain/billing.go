@@ -48,11 +48,13 @@ type BillingLedgerEntry struct {
 }
 
 type BillingSKU struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Credits   int    `json:"credits"`
-	PriceFen  int    `json:"price_fen"`
-	ProductID string `json:"product_id"`
+	ID               string `json:"id"`
+	Title            string `json:"title"`
+	Credits          int    `json:"credits"`
+	PriceFen         int    `json:"price_fen"`
+	OriginalPriceFen int    `json:"original_price_fen,omitempty"`
+	Badge            string `json:"badge,omitempty"`
+	ProductID        string `json:"product_id"`
 }
 
 type BillingDailyRemaining struct {

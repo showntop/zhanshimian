@@ -203,7 +203,10 @@ func buildVirtualPay(cfg config.Config) (provider.VirtualPayer, error) {
 func billingSKUsFromConfig(cfg config.Config) []domain.BillingSKU {
 	items := make([]domain.BillingSKU, 0, len(cfg.BillingSKUs))
 	for _, sku := range cfg.BillingSKUs {
-		items = append(items, domain.BillingSKU{ID: sku.ID, Title: sku.Title, Credits: sku.Credits, PriceFen: sku.PriceFen, ProductID: sku.ProductID})
+		items = append(items, domain.BillingSKU{
+			ID: sku.ID, Title: sku.Title, Credits: sku.Credits, PriceFen: sku.PriceFen,
+			OriginalPriceFen: sku.OriginalPriceFen, Badge: sku.Badge, ProductID: sku.ProductID,
+		})
 	}
 	return items
 }

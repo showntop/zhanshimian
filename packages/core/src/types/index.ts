@@ -415,6 +415,8 @@ export interface BillingSKU {
   title: string
   credits: number
   price_fen: number
+  original_price_fen?: number
+  badge?: 'featured' | 'value' | string
   product_id: string
 }
 

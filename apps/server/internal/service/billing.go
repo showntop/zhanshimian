@@ -239,8 +239,8 @@ func (s *Service) skuByID(id string) (domain.BillingSKU, bool) {
 
 func defaultBillingSKUs() []domain.BillingSKU {
 	return []domain.BillingSKU{
-		{ID: "pack_3", Title: "体验次数 ×3", Credits: 3, PriceFen: 600, ProductID: "pack_3"},
-		{ID: "pack_10", Title: "常用次数 ×10", Credits: 10, PriceFen: 1800, ProductID: "pack_10"},
-		{ID: "pack_30", Title: "超值次数 ×30", Credits: 30, PriceFen: 4800, ProductID: "pack_30"},
+		{ID: "pack_3", Title: "体验次数 ×3", Credits: 3, PriceFen: 690, OriginalPriceFen: 990, ProductID: "pack_3"},
+		{ID: "pack_10", Title: "常用次数 ×10", Credits: 10, PriceFen: 1690, OriginalPriceFen: 2990, Badge: "featured", ProductID: "pack_10"},
+		{ID: "pack_30", Title: "超值次数 ×30", Credits: 30, PriceFen: 4990, OriginalPriceFen: 9990, Badge: "value", ProductID: "pack_30"},
 	}
 }
