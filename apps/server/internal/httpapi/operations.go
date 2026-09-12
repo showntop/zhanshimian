@@ -11,19 +11,19 @@ import (
 type operationDTO struct {
 	ID            string  `json:"id"`
 	Kind          string  `json:"kind"`
-	SubjectType   string  `json:"subject_type,omitempty"`
-	SubjectID     string  `json:"subject_id,omitempty"`
+	SubjectType   string  `json:"subject_type"`
+	SubjectID     string  `json:"subject_id"`
 	Status        string  `json:"status"`
 	ProgressBPS   int     `json:"progress_bps"`
-	StageCode     string  `json:"stage_code,omitempty"`
-	PublicMessage string  `json:"public_message,omitempty"`
+	StageCode     string  `json:"stage_code"`
+	PublicMessage string  `json:"public_message"`
 	ErrorCode     string  `json:"error_code,omitempty"`
-	TraceID       string  `json:"trace_id,omitempty"`
+	TraceID       *string `json:"trace_id,omitempty"`
 	Retryable     bool    `json:"retryable"`
 	ResultType    string  `json:"result_type,omitempty"`
 	ResultID      string  `json:"result_id,omitempty"`
-	CreatedAt     string  `json:"created_at,omitempty"`
-	UpdatedAt     string  `json:"updated_at,omitempty"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
 	FinishedAt    *string `json:"finished_at,omitempty"`
 }
 
@@ -76,12 +76,15 @@ func publicOperation(op domain.Operation) operationDTO {
 		StageCode:     op.StageCode,
 		PublicMessage: op.PublicMessage,
 		ErrorCode:     op.ErrorCode,
-		TraceID:       op.TraceID,
 		Retryable:     op.Retryable,
 		ResultType:    op.ResultType,
 		ResultID:      op.ResultID,
 		CreatedAt:     formatPublicTime(op.CreatedAt),
 		UpdatedAt:     formatPublicTime(op.UpdatedAt),
+	}
+	if op.TraceID != "" || op.Status == domain.OperationFailed {
+		traceID := op.TraceID
+		dto.TraceID = &traceID
 	}
 	if op.FinishedAt != nil {
 		value := formatPublicTime(*op.FinishedAt)

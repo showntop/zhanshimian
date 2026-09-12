@@ -34,7 +34,37 @@ func TestGetOperationHidesTaskInternals(t *testing.T) {
 			t.Fatalf("response leaked %q: %s", leaked, body)
 		}
 	}
-	assertJSONEq(t, `{"data":{"id":"op1","kind":"assessment","status":"running","progress_bps":3500,"stage_code":"photo.technical_check","public_message":"正在检查照片","retryable":false}}`, body)
+	assertJSONEq(t, `{"data":{"id":"op1","kind":"assessment","subject_type":"","subject_id":"","status":"running","progress_bps":3500,"stage_code":"photo.technical_check","public_message":"正在检查照片","retryable":false,"created_at":"","updated_at":""}}`, body)
+}
+
+func TestGetAcceptedOperationEmitsRequiredEmptyFields(t *testing.T) {
+	op := domain.Operation{
+		ID: "op-accepted", UserID: "u1", Kind: domain.OperationAssessment,
+		Status: domain.OperationAccepted,
+	}
+	api := newOperationAPI(t, op)
+	response := authenticatedRequest(t, api, "u1", http.MethodGet, "/v1/operations/op-accepted", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
+	}
+	body := response.Body.String()
+	for _, required := range []string{
+		`"subject_type":""`,
+		`"subject_id":""`,
+		`"stage_code":""`,
+		`"public_message":""`,
+		`"created_at":""`,
+		`"updated_at":""`,
+	} {
+		if !strings.Contains(body, required) {
+			t.Fatalf("missing required field %s: %s", required, body)
+		}
+	}
+	for _, omitted := range []string{`"error_code"`, `"trace_id"`, `"result_type"`, `"result_id"`, `"finished_at"`} {
+		if strings.Contains(body, omitted) {
+			t.Fatalf("optional field should be omitted: %s in %s", omitted, body)
+		}
+	}
 }
 
 func TestGetOperationFromAnotherUserReturnsNotFound(t *testing.T) {
@@ -103,6 +133,21 @@ func TestGetFailedOperationIncludesTraceID(t *testing.T) {
 	}
 	if !strings.Contains(response.Body.String(), `"trace_id":"trace-fail-1"`) {
 		t.Fatalf("failed operation missing trace_id: %s", response.Body.String())
+	}
+}
+
+func TestGetFailedOperationEmitsEmptyTraceID(t *testing.T) {
+	op := domain.Operation{
+		ID: "op-fail-empty", UserID: "u1", Kind: domain.OperationPlanSet,
+		Status: domain.OperationFailed,
+	}
+	api := newOperationAPI(t, op)
+	response := authenticatedRequest(t, api, "u1", http.MethodGet, "/v1/operations/op-fail-empty", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"trace_id":""`) {
+		t.Fatalf("failed operation missing empty trace_id: %s", response.Body.String())
 	}
 }
 
