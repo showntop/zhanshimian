@@ -95,6 +95,36 @@ func TestRunnerRetriesTransientWithRegistryBackoff(t *testing.T) {
 	}
 }
 
+func TestRunnerRetriesHandlerTimeoutWithRegistryBackoff(t *testing.T) {
+	backoff := 42 * time.Second
+	store := &taskStoreFake{leases: []domain.TaskLease{fakeLease("timeout-1", 1)}}
+	handler := &recordingHandler{
+		taskType: "assessment",
+		executeFn: func(ctx context.Context, _ domain.TaskLease) (domain.TaskResult, error) {
+			<-ctx.Done()
+			return domain.TaskResult{}, ctx.Err()
+		},
+	}
+	def := shortDefinition("assessment", 1)
+	def.Timeout = 25 * time.Millisecond
+	def.HeartbeatEvery = 10 * time.Millisecond
+	def.LeaseDuration = 40 * time.Millisecond
+	def.MaxAttempts = 3
+	def.RetryBackoff = func(int) time.Duration { return backoff }
+	runUntilRegistry(t, store, mustRegistry(t, def, handler), handler, func() bool { return store.failCount() == 1 })
+	if handler.commitCalls.Load() != 0 {
+		t.Fatal("handler timeout must Fail, not Commit")
+	}
+	call := store.lastFail()
+	if call.failure.Class != domain.ErrorTransient || call.failure.Code != "handler_timeout" {
+		t.Fatalf("failure = %+v, want transient/handler_timeout", call.failure)
+	}
+	delay := time.Until(call.availableAt)
+	if delay < 40*time.Second || delay > 44*time.Second {
+		t.Fatalf("available_at delay = %s, want ~%s from Registry backoff", delay, backoff)
+	}
+}
+
 func TestRunnerCommitsDomainFailWhenNotRetryable(t *testing.T) {
 	cases := []struct {
 		name    string

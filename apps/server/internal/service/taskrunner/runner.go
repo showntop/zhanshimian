@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	codeUnclassified = "unclassified"
-	codeHandlerPanic = "handler_panic"
+	codeUnclassified   = "unclassified"
+	codeHandlerPanic   = "handler_panic"
+	codeHandlerTimeout = "handler_timeout"
 )
 
 type TaskError struct {
@@ -238,6 +239,9 @@ func classifyExecuteError(err error) (domain.ErrorClass, string) {
 			code = codeUnclassified
 		}
 		return te.Class, code
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return domain.ErrorTransient, codeHandlerTimeout
 	}
 	return domain.ErrorPermanent, codeUnclassified
 }
