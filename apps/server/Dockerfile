@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/uplook-api ./cmd/a
 RUN mkdir -p /out/data/uploads
 
 FROM alpine:3.22
-RUN apk add --no-cache ca-certificates \
+RUN apk add --no-cache ca-certificates ffmpeg \
     && addgroup -S uplook \
     && adduser -S -G uplook uplook
 WORKDIR /app
