@@ -2308,6 +2308,35 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  '/v1/advisor/conversations/latest/messages':
+    get:
+      operationId: listLatestAdvisorMessages
+      summary: 最近一次顾问会话的消息时间线
+      description: 按 updated_at 取当前用户最近会话；没有会话时返回空数组。
+      tags: [Advisor]
+      responses:
+        '200':
+          description: 消息时间线
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AdvisorMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   '/v1/advisor/conversations/{id}/messages':
     get:
       operationId: listAdvisorMessages

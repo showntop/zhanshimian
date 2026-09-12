@@ -148,6 +148,7 @@ type Repository interface {
 	CreateWardrobeOutfit(ctx context.Context, userID string, input domain.WardrobeOutfitInput, contextData json.RawMessage, items []domain.WardrobeItem) (domain.WardrobeOutfit, error)
 	MarkWardrobeOutfitWorn(ctx context.Context, userID, outfitID string) (domain.WardrobeOutfit, error)
 	CreateAdvisorConversation(ctx context.Context, userID string, contextData json.RawMessage) (domain.AdvisorConversation, error)
+	LatestAdvisorConversation(ctx context.Context, userID string) (domain.AdvisorConversation, error)
 	AddAdvisorExchange(ctx context.Context, userID, conversationID, userContent, assistantContent string, actions []domain.AdvisorAction) (domain.AdvisorMessage, error)
 	ListAdvisorMessages(ctx context.Context, userID, conversationID string) ([]domain.AdvisorMessage, error)
 	ApplyAdvisorAction(ctx context.Context, userID, actionID string) (domain.AdvisorAction, error)

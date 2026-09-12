@@ -99,6 +99,7 @@ export const API_PATHS = {
   wardrobeOutfits: 'POST /v1/wardrobe/outfits',
   wardrobeOutfitWear: 'POST /v1/wardrobe/outfits/{id}/wear',
   advisorMessages: 'POST /v1/advisor/messages',
+  advisorLatestMessages: 'GET /v1/advisor/conversations/latest/messages',
   advisorConversationMessages: 'GET /v1/advisor/conversations/{id}/messages',
   advisorActionApply: 'POST /v1/advisor/actions/{id}/apply',
   events: 'POST /v1/events',
@@ -213,6 +214,7 @@ export interface ApiEndpoints {
   // ---- 顾问（3） ----
   sendAdvisorMessage(input: SendAdvisorMessageInput): Promise<AdvisorMessage>
   getAdvisorMessages(conversationId: string): Promise<AdvisorMessage[]>
+  getLatestAdvisorMessages(): Promise<AdvisorMessage[]>
   applyAdvisorAction(id: string): Promise<AdvisorAction>
 
   // ---- 埋点与隐私（2） ----
@@ -354,6 +356,7 @@ export function createApiEndpoints(client: ApiClient, options: EndpointOptions =
     // ---------- 顾问 ----------
     sendAdvisorMessage: (input) => client.request('/v1/advisor/messages', { method: 'POST', data: input, timeout: 20000 }),
     getAdvisorMessages: (conversationId) => client.request(`/v1/advisor/conversations/${encodeURIComponent(conversationId)}/messages`),
+    getLatestAdvisorMessages: () => client.request('/v1/advisor/conversations/latest/messages'),
     applyAdvisorAction: (id) => client.request(`/v1/advisor/actions/${encodeURIComponent(id)}/apply`, { method: 'POST' }),
 
     // ---------- 埋点与隐私 ----------

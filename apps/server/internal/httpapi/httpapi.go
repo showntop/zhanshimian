@@ -116,6 +116,7 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("POST /v1/wardrobe/outfits/{id}/wear", api.auth(http.HandlerFunc(api.wearWardrobeOutfit)))
 
 	mux.Handle("POST /v1/advisor/messages", api.auth(http.HandlerFunc(api.sendAdvisorMessage)))
+	mux.Handle("GET /v1/advisor/conversations/latest/messages", api.auth(http.HandlerFunc(api.listLatestAdvisorMessages)))
 	mux.Handle("GET /v1/advisor/conversations/{id}/messages", api.auth(http.HandlerFunc(api.listAdvisorMessages)))
 	mux.Handle("POST /v1/advisor/actions/{id}/apply", api.auth(http.HandlerFunc(api.applyAdvisorAction)))
 

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Input, ScrollView, Text, View } from '@tarojs/components'
-import { ADVISOR_COPY, trackEvent, type AdvisorMessage } from '@zsm/core'
+import { ADVISOR_COPY, ApiError, trackEvent, type AdvisorMessage } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import { handleBillingError } from '../../../../services/billing'
@@ -21,15 +21,25 @@ export default function Advisor() {
   const { pageClass, enter } = usePageShell(loaded, 'page--advisor', 'advisor')
 
   const restore = useCallback(async () => {
-    const conversationId = readStorage(STORAGE_KEYS.advisorConversationId)
-    if (!conversationId) {
-      setLoaded(true)
-      return
+    const remember = (items: AdvisorMessage[]) => {
+      setMessages(items)
+      const conversationId = items[0]?.conversation_id || ''
+      writeStorage(STORAGE_KEYS.advisorConversationId, conversationId)
     }
+    const localId = readStorage(STORAGE_KEYS.advisorConversationId)
     try {
-      setMessages(await api.getAdvisorMessages(conversationId))
+      if (localId) {
+        try {
+          remember(await api.getAdvisorMessages(localId))
+          return
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.statusCode !== 404) throw error
+          writeStorage(STORAGE_KEYS.advisorConversationId, '')
+        }
+      }
+      remember(await api.getLatestAdvisorMessages())
     } catch {
-      writeStorage(STORAGE_KEYS.advisorConversationId, '')
+      /* 网络失败保留本地会话，下次再拉 */
     } finally {
       setLoaded(true)
     }

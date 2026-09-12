@@ -546,6 +546,17 @@ func (s *Service) ListAdvisorMessages(ctx context.Context, userID, conversationI
 	return s.repo.ListAdvisorMessages(ctx, userID, conversationID)
 }
 
+func (s *Service) ListLatestAdvisorMessages(ctx context.Context, userID string) ([]domain.AdvisorMessage, error) {
+	conversation, err := s.repo.LatestAdvisorConversation(ctx, userID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return []domain.AdvisorMessage{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.ListAdvisorMessages(ctx, userID, conversation.ID)
+}
+
 func (s *Service) ApplyAdvisorAction(ctx context.Context, userID, actionID string) (domain.AdvisorAction, error) {
 	return s.repo.ApplyAdvisorAction(ctx, userID, actionID)
 }

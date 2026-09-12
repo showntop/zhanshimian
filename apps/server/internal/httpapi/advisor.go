@@ -29,6 +29,15 @@ func (a *API) listAdvisorMessages(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, items)
 }
 
+func (a *API) listLatestAdvisorMessages(w http.ResponseWriter, r *http.Request) {
+	items, err := a.service.ListLatestAdvisorMessages(r.Context(), currentUser(r).ID)
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	writeData(w, http.StatusOK, items)
+}
+
 func (a *API) applyAdvisorAction(w http.ResponseWriter, r *http.Request) {
 	item, err := a.service.ApplyAdvisorAction(r.Context(), currentUser(r).ID, r.PathValue("id"))
 	if err != nil {

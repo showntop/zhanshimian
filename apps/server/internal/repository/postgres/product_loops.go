@@ -261,6 +261,18 @@ func (s *Store) CreateAdvisorConversation(ctx context.Context, userID string, co
 	return item, err
 }
 
+func (s *Store) LatestAdvisorConversation(ctx context.Context, userID string) (domain.AdvisorConversation, error) {
+	var item domain.AdvisorConversation
+	err := s.pool.QueryRow(ctx, `
+		SELECT id::text,title,context,created_at,updated_at
+		FROM advisor_conversations
+		WHERE user_id=$1
+		ORDER BY updated_at DESC
+		LIMIT 1`, userID).
+		Scan(&item.ID, &item.Title, &item.Context, &item.CreatedAt, &item.UpdatedAt)
+	return item, mapNotFound(err)
+}
+
 func (s *Store) AddAdvisorExchange(ctx context.Context, userID, conversationID, userContent, assistantContent string, actions []domain.AdvisorAction) (domain.AdvisorMessage, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
