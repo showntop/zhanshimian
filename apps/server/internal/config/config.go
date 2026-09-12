@@ -196,6 +196,11 @@ func Load() (Config, error) {
 				}
 			}
 			for id, model := range cfg.AIRouting.Models {
+				// Lab-only fixture: DemoOrbitGenerator ignores URL/key and results
+				// are forced to the 「效果示例」 badge. Other capabilities stay Demo-free.
+				if model.Protocol == "demo_orbit" {
+					continue
+				}
 				if strings.EqualFold(model.Vendor, "demo") {
 					return Config{}, fmt.Errorf("production AI model %q must not use demo vendor", id)
 				}
