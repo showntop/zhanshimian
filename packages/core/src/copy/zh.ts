@@ -196,6 +196,21 @@ export function captureFillMissingText(missing: number): string {
   return `补齐剩余 ${missing} 张 ›`
 }
 
+export const LAB_COPY = {
+  title3d: '3D 形象 Lite',
+  desc3d: '表达比例和穿搭轮廓，不承诺精确测量。',
+  generate: '生成 3D 形象',
+  regenerate: '再生成一圈',
+  empty: '先拍正脸和正面全身，才能转起来看。',
+  emptyAction: '去拍摄',
+  failed: '这一圈没生成成功，再试一次或先返回。',
+  retry: '再试一次',
+  viewLast: '看上一圈',
+  noCompare: '对比需要更完整的静帧，先转着看。',
+  badgeAI: 'AI 风格预览',
+  waitlist: '已加入候补'
+} as const
+
 // ---------- 分析页阶段文案 ----------
 export const ANALYSIS_STAGE_COPY = {
   queued: '已提交，排队中',
