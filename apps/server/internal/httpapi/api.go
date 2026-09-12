@@ -20,6 +20,7 @@ type API struct {
 	media           *media.Service
 	operations      *operation.Service
 	assessment      *assessment.Service
+	planning        planSetService
 	idempotency     IdempotencyStore
 	logger          *slog.Logger
 	devLoginEnabled bool
