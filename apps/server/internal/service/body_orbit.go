@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -21,6 +22,9 @@ func (s *Service) CreateBodyPresentation(ctx context.Context, userID string, inp
 	}
 	assets, err := s.repo.GetMediaAssetsForUser(ctx, userID, []string{input.BodyMediaID, input.FaceMediaID})
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return domain.BodyPresentation{}, nil, fmt.Errorf("%w: 需要正脸和正面全身", ErrValidation)
+		}
 		return domain.BodyPresentation{}, nil, err
 	}
 	byID := make(map[string]domain.MediaAsset, len(assets))

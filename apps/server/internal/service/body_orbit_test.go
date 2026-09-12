@@ -15,6 +15,7 @@ import (
 type bodyOrbitRepoStub struct {
 	repository.Repository
 	assets       []domain.MediaAsset
+	assetsErr    error
 	activeCount  int
 	countedTypes []string
 	createCalled bool
@@ -25,6 +26,9 @@ type bodyOrbitRepoStub struct {
 }
 
 func (r *bodyOrbitRepoStub) GetMediaAssetsForUser(_ context.Context, _ string, _ []string) ([]domain.MediaAsset, error) {
+	if r.assetsErr != nil {
+		return nil, r.assetsErr
+	}
 	return r.assets, nil
 }
 
@@ -69,6 +73,21 @@ func TestCreateBodyPresentationRequiresGenerator(t *testing.T) {
 	}
 	if repo.createCalled {
 		t.Fatal("nil generator must not write")
+	}
+}
+
+func TestCreateBodyPresentationRejectsMissingMedia(t *testing.T) {
+	repo := &bodyOrbitRepoStub{assetsErr: repository.ErrNotFound}
+	svc := newBodyOrbitService(repo, &fakeOrbitGen{})
+	_, _, err := svc.CreateBodyPresentation(context.Background(), "user-1", domain.BodyPresentationInput{
+		BodyMediaID: "11111111-1111-1111-1111-111111111111",
+		FaceMediaID: "22222222-2222-2222-2222-222222222222",
+	})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("err=%v", err)
+	}
+	if repo.createCalled {
+		t.Fatal("missing media must not write")
 	}
 }
 
