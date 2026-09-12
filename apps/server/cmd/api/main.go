@@ -86,6 +86,7 @@ func main() {
 		Weather: weather, WeChat: wechat, WeChatApp: wechatApp, Apple: apple, Sms: sms,
 		SmsPerPhone: cfg.SmsRatePerPhonePerHour, AssetURLTTL: cfg.AssetURLTTL,
 		BillingSKUs: billingSKUsFromConfig(cfg), VirtualPay: virtualPay, WeChatSession: wechatSession,
+		AssetDir: cfg.AssetDir,
 	})
 	if cfg.RunWorker {
 		go svc.RunWorker(ctx, cfg.AnalysisPollTime)
