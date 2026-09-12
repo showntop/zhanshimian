@@ -11,6 +11,7 @@ import { groupTasksByType, openTask, taskTitle } from '../../services/task-utils
 import { clearAllLocalState, STORAGE_KEYS, readStorage, removeStorage } from '../../services/storage'
 import { globalData } from '../../app'
 import AppHeader from '../../components/app-header'
+import BottomSheet from '../../components/bottom-sheet'
 import CreditSheet from '../../components/credit-sheet'
 import ExampleImage from '../../components/example-image'
 import Skeleton from '../../components/skeleton'
@@ -177,17 +178,12 @@ export default function Profile() {
               {billing?.welcome_plan_set_available ? (
                 <Text className="me__note">{BILLING_COPY.welcomePlanSet}</Text>
               ) : null}
-              {billing?.payment_enabled ? (
-                <View className="me__row pressable" onClick={() => setBuyOpen(true)}>
-                  <Text className="me__row-label">{BILLING_COPY.buyAction}</Text>
-                  <Text className="me__row-value">{BILLING_COPY.buyNow}</Text>
-                </View>
-              ) : (
-                <View className="me__row">
-                  <Text className="me__row-label">{BILLING_COPY.buyAction}</Text>
-                  <Text className="me__row-value">{BILLING_COPY.exhausted}</Text>
-                </View>
-              )}
+              <View className="me__row pressable" onClick={() => setBuyOpen(true)}>
+                <Text className="me__row-label">{BILLING_COPY.buyAction}</Text>
+                <Text className="me__row-value">
+                  {billing?.payment_enabled ? BILLING_COPY.buyNow : BILLING_COPY.paymentUnavailable}
+                </Text>
+              </View>
             </View>
 
             <View className={`me__card ${enter(1)}`}>
@@ -238,10 +234,23 @@ export default function Profile() {
             </View>
 
             <Text className={`me__privacy ${enter(3)}`}>照片与建议只对你可见</Text>
-            <CreditSheet open={buyOpen} billing={billing} onClose={() => setBuyOpen(false)} onPurchased={load} />
           </>
         )}
       </View>
+      <BottomSheet
+        open={buyOpen}
+        title={BILLING_COPY.buyAction}
+        description={BILLING_COPY.insufficientBody}
+        onClose={() => setBuyOpen(false)}
+      >
+        <CreditSheet
+          billing={billing}
+          onPurchased={() => {
+            setBuyOpen(false)
+            load()
+          }}
+        />
+      </BottomSheet>
     </View>
   )
 }
