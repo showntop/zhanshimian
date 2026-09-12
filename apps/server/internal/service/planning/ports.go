@@ -73,14 +73,14 @@ type RenderSpecReader interface {
 // The cross-boundary DTOs below live in domain (frozen contract shared with
 // the postgres adapter); planning re-exposes them under the frozen names.
 type (
-	ReportSnapshot       = domain.PlanningReportSnapshot
-	FindingSnapshot      = domain.PlanningFindingSnapshot
-	PlanSetKey           = domain.PlanningPlanSetKey
+	ReportSnapshot        = domain.PlanningReportSnapshot
+	FindingSnapshot       = domain.PlanningFindingSnapshot
+	PlanSetKey            = domain.PlanningPlanSetKey
 	StartOperationCommand = domain.PlanningStartOperationCommand
-	EnqueueTask          = domain.PlanningEnqueueTask
-	EnqueueRetryCommand  = domain.PlanningEnqueueRetryCommand
-	PlanQualityRecord    = domain.PlanningPlanQualityRecord
-	PrepareCommand       = domain.PlanningPrepareCommand
+	EnqueueTask           = domain.PlanningEnqueueTask
+	EnqueueRetryCommand   = domain.PlanningEnqueueRetryCommand
+	PlanQualityRecord     = domain.PlanningPlanQualityRecord
+	PrepareCommand        = domain.PlanningPrepareCommand
 )
 
 type CreateCommand struct {
@@ -112,35 +112,35 @@ type GenerationInput struct {
 }
 
 type GeneratedPlanSet struct {
-	InvocationID string
-	Variants     []GeneratedPlanVariant
+	InvocationID string                 `json:"-"`
+	Variants     []GeneratedPlanVariant `json:"variants"`
 }
 
 type GeneratedPlanVariant struct {
-	Slot           int
-	Key            domain.PlanVariantKey
-	Name           string
-	Descriptor     string
-	Rationale      string
-	Recommended    bool
-	OutcomeTags    []string
-	DifferenceTags []string
-	Steps          []GeneratedPlanStep
+	Slot           int                   `json:"slot"`
+	Key            domain.PlanVariantKey `json:"key"`
+	Name           string                `json:"name"`
+	Descriptor     string                `json:"descriptor"`
+	Rationale      string                `json:"rationale"`
+	Recommended    bool                  `json:"recommended"`
+	OutcomeTags    []string              `json:"outcome_tags"`
+	DifferenceTags []string              `json:"difference_tags"`
+	Steps          []GeneratedPlanStep   `json:"steps"`
 }
 
 type GeneratedPlanStep struct {
-	Category   domain.StepCategory
-	Action     domain.StepAction
-	Title      string
-	Summary    string
-	Details    domain.PlanStepDetails
-	Groundings []GeneratedGrounding
+	Category   domain.StepCategory    `json:"category"`
+	Action     domain.StepAction      `json:"action"`
+	Title      string                 `json:"title"`
+	Summary    string                 `json:"summary"`
+	Details    domain.PlanStepDetails `json:"details"`
+	Groundings []GeneratedGrounding   `json:"groundings"`
 }
 
 type GeneratedGrounding struct {
-	SourceType domain.GroundingSourceType
-	SourceID   string
-	Reason     string
+	SourceType domain.GroundingSourceType `json:"source_type"`
+	SourceID   string                     `json:"source_id"`
+	Reason     string                     `json:"reason"`
 }
 
 type VerificationInput struct {
