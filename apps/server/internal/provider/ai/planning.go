@@ -110,13 +110,13 @@ func buildPlanSetPrompt(input planning.GenerationInput) string {
 	})
 	payload := map[string]any{
 		"report": map[string]any{
-			"id":                 input.Report.ID,
-			"photo_set_id":       input.Report.PhotoSetID,
-			"impression_tags":    input.Report.ImpressionTags,
-			"priority_title":     input.Report.PriorityTitle,
-			"priority_copy":      input.Report.PriorityCopy,
+			"id":                  input.Report.ID,
+			"photo_set_id":        input.Report.PhotoSetID,
+			"impression_tags":     input.Report.ImpressionTags,
+			"priority_title":      input.Report.PriorityTitle,
+			"priority_copy":       input.Report.PriorityCopy,
 			"priority_finding_id": priorityFindingID,
-			"findings":           findings,
+			"findings":            findings,
 		},
 		"profile_snapshot": json.RawMessage(defaultJSON(input.Report.ProfileSnapshot)),
 		"brief":            json.RawMessage(briefRepr),

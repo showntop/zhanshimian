@@ -185,12 +185,12 @@ func (f *fakeStore) CommitPrepared(_ context.Context, _ domain.TaskLease, _ doma
 
 func validReport(reportID string) ReportSnapshot {
 	return ReportSnapshot{
-		ID:          reportID,
-		UserID:      "00000000-0000-0000-0000-000000000001",
-		PhotoSetID:  "50000000-0000-0000-0000-000000000001",
-		FaceAssetID: "40000000-0000-0000-0000-000000000002",
-		BodyAssetID: "40000000-0000-0000-0000-000000000001",
-		ProfileSnapshot: json.RawMessage(`{"role":"designer"}`),
+		ID:                reportID,
+		UserID:            "00000000-0000-0000-0000-000000000001",
+		PhotoSetID:        "50000000-0000-0000-0000-000000000001",
+		FaceAssetID:       "40000000-0000-0000-0000-000000000002",
+		BodyAssetID:       "40000000-0000-0000-0000-000000000001",
+		ProfileSnapshot:   json.RawMessage(`{"role":"designer"}`),
 		ImpressionTags:    []string{"利落"},
 		PriorityTitle:     "先整理额前碎发",
 		PriorityCopy:      "额前碎发落到眉毛上方，先固定发根。",

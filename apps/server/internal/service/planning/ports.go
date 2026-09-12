@@ -16,7 +16,7 @@ const (
 	StagePlanChecking      = "plan.checking"
 	StagePlanReady         = "plan.ready"
 
-	ProgressPlanReading = 1500
+	ProgressPlanReading  = 1500
 	ProgressPlanChecking = 6500
 	ProgressPlanReady    = 10000
 )
@@ -138,15 +138,15 @@ type CreateCommand struct {
 
 // GenerateTaskPayload is the versioned task payload of plan_set.generate.
 type GenerateTaskPayload struct {
-	PlanSetID            string             `json:"plan_set_id"`
-	ReportID             string             `json:"report_id"`
-	Scene                domain.Scene       `json:"scene"`
-	Brief                domain.SceneBrief  `json:"brief"`
-	BriefHash            string             `json:"brief_hash"`
-	PlannerSchemaVersion string             `json:"planner_schema_version"`
-	StyleRuleVersion     string             `json:"style_rule_version"`
-	ContentAttempt       int                `json:"content_attempt"`
-	PriorReasonCodes     []string           `json:"prior_reason_codes"`
+	PlanSetID            string            `json:"plan_set_id"`
+	ReportID             string            `json:"report_id"`
+	Scene                domain.Scene      `json:"scene"`
+	Brief                domain.SceneBrief `json:"brief"`
+	BriefHash            string            `json:"brief_hash"`
+	PlannerSchemaVersion string            `json:"planner_schema_version"`
+	StyleRuleVersion     string            `json:"style_rule_version"`
+	ContentAttempt       int               `json:"content_attempt"`
+	PriorReasonCodes     []string          `json:"prior_reason_codes"`
 }
 
 type EnqueueRetryCommand struct {
