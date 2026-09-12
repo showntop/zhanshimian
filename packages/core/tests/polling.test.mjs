@@ -34,7 +34,7 @@ test('shouldStopPolling：completed/failed 为终态', () => {
 })
 
 test('POLL_INTERVALS 间隔常量单源（规范值）', () => {
-  assert.deepEqual(POLL_INTERVALS, { analysis: 700, planLook: 2500, hairPreview: 900, today: 3000, homeTasks: 1500 })
+  assert.deepEqual(POLL_INTERVALS, { analysis: 700, planLook: 2500, hairPreview: 900, bodyOrbit: 900, today: 3000, homeTasks: 1500 })
   assert.equal(MAX_POLL_FAILURES, 5)
 })
 
