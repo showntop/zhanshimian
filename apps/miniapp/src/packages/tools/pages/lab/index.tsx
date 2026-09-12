@@ -1,7 +1,7 @@
 // 体验实验室：发型 AR / 试衣保持候补；3D 形象 Lite 按 status 状态机接生成与轮询。
 // 状态只经两条服务端通道：GET /v1/body-presentations/status（启动读模型）
 // 与公开 Operation 轮询（useOperationPolling）；本地不落任何业务 id。
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import {
@@ -43,6 +43,29 @@ function viewerBadge(presentation: BodyPresentation): string {
   return presentation.source_kind === 'demo_example' ? IMAGE_BADGE_COPY.demo : IMAGE_BADGE_COPY.aiPreview
 }
 
+function isActiveStatus(value?: string): boolean {
+  return value === 'queued' || value === 'processing'
+}
+
+/** 过期 status 不盖掉更新的进行中任务（25e27d1）： prev 的 active 更新就保留。 */
+function preferNewerActive(
+  prev: BodyPresentationStatus | null,
+  incoming: BodyPresentationStatus,
+): BodyPresentationStatus {
+  const prevActive = prev?.active
+  if (!prevActive || !isActiveStatus(prevActive.status)) {
+    return incoming
+  }
+  const incomingActive = incoming.active
+  if (!incomingActive || !isActiveStatus(incomingActive.status)) {
+    return { ...incoming, active: prevActive }
+  }
+  if (prevActive.id !== incomingActive.id && (prevActive.created_at || '') > (incomingActive.created_at || '')) {
+    return { ...incoming, active: prevActive }
+  }
+  return incoming
+}
+
 /**  Operation 进度投影成卡片的 active 展示态：阶段文案与百分比来自服务端。 */
 function projectActive(base: BodyPresentation, operation: Operation | undefined): BodyPresentation {
   if (!operation) return base
@@ -65,9 +88,12 @@ export default function Lab() {
   const [busy, setBusy] = useState(false)
   const [pollFailed, setPollFailed] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
+  const statusEpochRef = useRef(0)
+  const busyRef = useRef(false)
   const { pageClass, enter } = usePageShell(true, '', 'lab')
 
   const load = useCallback(async () => {
+    const epoch = ++statusEpochRef.current
     try {
       const [nextStatus, report, boot] = await Promise.all([
         peripherals.getBodyPresentationStatus(),
@@ -82,10 +108,12 @@ export default function Lab() {
       const running = (boot?.active_operations ?? []).find(
         (operation) => operation.kind === 'body_orbit' && ACTIVE_OPERATION_STATES.has(operation.status),
       )
+      if (epoch !== statusEpochRef.current) return
       setOperationId(nextStatus.active && running ? running.id : '')
       setPollFailed(false)
       setLoadFailed(false)
     } catch {
+      if (epoch !== statusEpochRef.current) return
       // 首读失败不伪造空状态（22f7b41）：保留旧数据，卡片走可读错误态。
       setLoadFailed(true)
     }
@@ -126,24 +154,34 @@ export default function Lab() {
       if (outcome?.status === 'failed') {
         setViewing((current) => (current === 'completed' ? current : 'auto'))
       }
-      void peripherals.getBodyPresentationStatus().then(setStatus).catch(() => {
+      const epoch = statusEpochRef.current
+      void peripherals.getBodyPresentationStatus().then((next) => {
+        if (epoch !== statusEpochRef.current) return
+        setStatus((prev) => preferNewerActive(prev, next))
+      }).catch(() => {
+        if (epoch !== statusEpochRef.current) return
         if (outcome?.status === 'failed') setPollFailed(true)
       })
     },
     onFetchFailure: () => {
       setPollFailed(true)
       setOperationId('')
-      void peripherals.getBodyPresentationStatus().then(setStatus).catch(() => undefined)
+      const epoch = statusEpochRef.current
+      void peripherals.getBodyPresentationStatus().then((next) => {
+        if (epoch !== statusEpochRef.current) return
+        setStatus((prev) => preferNewerActive(prev, next))
+      }).catch(() => undefined)
     },
   })
   const activeOperation = operations.find((operation) => operation.id === operationId)
 
   const generate = async () => {
-    if (busy || (status?.active && !pollFailed)) return
+    if (busyRef.current || busy || (status?.active && !pollFailed)) return
     if (!face || !body) {
       Taro.navigateTo({ url: '/pages/capture/index' })
       return
     }
+    busyRef.current = true
     setBusy(true)
     setPollFailed(false)
     try {
@@ -152,6 +190,8 @@ export default function Lab() {
         face_media_id: face.asset_id,
       })
       resourceCache.write(resourceKey('operation', accepted.operation.id), accepted.operation)
+      // 新任务生效：作废旧 load/轮询回调里晚到的 status（25e27d1）。
+      statusEpochRef.current += 1
       setOperationId(accepted.operation.id)
       setViewing('auto')
       setStatus((prev) => ({
@@ -173,6 +213,7 @@ export default function Lab() {
       }
       Taro.showToast({ title: (error as Error).message || '生成没有开始，请重试', icon: 'none' })
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
