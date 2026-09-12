@@ -64,6 +64,7 @@ export type {
   AdvisorMessage,
   AdvisorAction,
   BillingOrder,
+  BillingSKU,
   BillingSummary,
   MeAccount,
   UserProfile
