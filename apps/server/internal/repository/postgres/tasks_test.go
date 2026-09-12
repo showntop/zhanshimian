@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/testutil"
 )
 
@@ -88,6 +90,39 @@ func TestExpiredLeaseIsReclaimedAndOldTokenCannotWrite(t *testing.T) {
 	row := loadTaskRow(t, pool, taskID)
 	if row.status != string(domain.TaskLeased) || row.leaseOwner != "new" || row.leaseToken != newLease.LeaseToken {
 		t.Fatalf("newer lease overwritten: %+v", row)
+	}
+}
+
+func TestCommitLeasedTaskRejectsExpiredLease(t *testing.T) {
+	store, pool := newTaskStore(t)
+	taskID := enqueueTask(t, pool, "assessment")
+	lease, ok, err := store.Claim(context.Background(), "worker-a", 30*time.Second, []domain.TaskType{"assessment"})
+	if err != nil || !ok {
+		t.Fatalf("claim: ok=%v err=%v", ok, err)
+	}
+	advanceLeaseExpiry(t, pool, taskID)
+
+	if err := store.CommitLeasedTask(context.Background(), lease, lease.SubjectGeneration); !errors.Is(err, repository.ErrLeaseLost) {
+		t.Fatalf("expired commit err = %v, want ErrLeaseLost", err)
+	}
+
+	row := loadTaskRow(t, pool, taskID)
+	if row.status != string(domain.TaskLeased) {
+		t.Fatalf("task status = %s, want leased", row.status)
+	}
+	if row.leaseToken != lease.LeaseToken || row.leaseOwner != lease.LeaseOwner {
+		t.Fatalf("expired commit mutated lease: %+v", row)
+	}
+	if !row.finishedAt.IsZero() {
+		t.Fatalf("expired commit set finished_at = %s", row.finishedAt)
+	}
+
+	var opStatus string
+	if err := pool.QueryRow(context.Background(), `SELECT status FROM operations WHERE id=$1::uuid`, lease.OperationID).Scan(&opStatus); err != nil {
+		t.Fatalf("load operation: %v", err)
+	}
+	if opStatus == string(domain.OperationSucceeded) {
+		t.Fatal("operation was marked succeeded after expired commit")
 	}
 }
 

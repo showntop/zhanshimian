@@ -75,7 +75,7 @@ func (s *Store) CommitLeasedTask(ctx context.Context, lease domain.TaskLease, su
 		SELECT subject_generation
 		FROM tasks
 		WHERE id=$1::uuid AND user_id=$2::uuid AND lease_token=$3::uuid
-		  AND lease_owner=$4 AND status='leased'
+		  AND lease_owner=$4 AND status='leased' AND lease_expires_at>now()
 		FOR UPDATE`, lease.ID, lease.UserID, lease.LeaseToken, lease.LeaseOwner).Scan(&currentGeneration)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return repository.ErrLeaseLost
@@ -101,7 +101,7 @@ func (s *Store) CommitLeasedTask(ctx context.Context, lease domain.TaskLease, su
 		    finished_at=now(),
 		    updated_at=now()
 		WHERE id=$1::uuid AND user_id=$2::uuid AND lease_token=$3::uuid
-		  AND lease_owner=$4 AND status='leased'`,
+		  AND lease_owner=$4 AND status='leased' AND lease_expires_at>now()`,
 		lease.ID, lease.UserID, lease.LeaseToken, lease.LeaseOwner, taskStatus)
 	if err != nil {
 		return err
