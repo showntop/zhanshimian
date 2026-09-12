@@ -70,6 +70,8 @@ export function taskTitle(task: Task): string {
       return '正在生成方案形象图'
     case 'today_look':
       return '正在生成今日搭配图'
+    case 'body_orbit':
+      return '正在生成 3D 形象'
     default:
       return '任务进行中'
   }
@@ -88,6 +90,8 @@ export function taskDoneTitle(task: Task): string {
       return '方案形象图已生成'
     case 'today_look':
       return '今日搭配图已生成'
+    case 'body_orbit':
+      return '3D 形象已生成'
     default:
       return '任务已完成'
   }
@@ -107,6 +111,9 @@ export function openTask(task: Task) {
       break
     case 'today_look':
       Taro.navigateTo({ url: '/packages/life/pages/today/index' })
+      break
+    case 'body_orbit':
+      Taro.navigateTo({ url: '/packages/tools/pages/lab/index' })
       break
   }
 }

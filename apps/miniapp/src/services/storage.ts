@@ -10,6 +10,7 @@ export const STORAGE_KEYS = {
   activeTaskAnalysis: 'zsm_active_task_analysis',
   activeTaskPlanLook: 'zsm_active_task_plan_look',
   activeTaskHairPreview: 'zsm_active_task_hair_preview',
+  activeTaskBodyOrbit: 'zsm_active_task_body_orbit',
   outfitSession: 'zsm_outfit_session',
   lastOutfitDiagnosis: 'zsm_last_outfit_diagnosis',
   purchaseSession: 'zsm_purchase_session',
