@@ -2,9 +2,13 @@
 // 固定栏 + 同高占位，页面内容从导航下方开始，不再依赖 .page 的猜测顶距。
 import { useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
-import { Text, View } from '@tarojs/components'
+import { Image, Text, View } from '@tarojs/components'
 import { APP_NAME } from '@zsm/core'
 import './index.scss'
+
+const BRAND_MARK = '/assets/brand/app-icon-mark.png'
+const WORDMARK_UP = APP_NAME.slice(0, 2)
+const WORDMARK_LOOK = APP_NAME.slice(2)
 
 interface AppHeaderProps {
   title?: string
@@ -80,7 +84,13 @@ export default function AppHeader({ title, back, transparent, onBack, right }: A
                 <Text className="app-header__back-icon">‹</Text>
               </View>
             ) : (
-              <Text className="app-header__wordmark">{APP_NAME}</Text>
+              <View className="app-header__brand">
+                <Image className="app-header__mark" src={BRAND_MARK} mode="aspectFit" />
+                <View className="app-header__wordmark">
+                  <Text className="app-header__wordmark-up">{WORDMARK_UP}</Text>
+                  <Text className="app-header__wordmark-look">{WORDMARK_LOOK}</Text>
+                </View>
+              </View>
             )}
           </View>
           {title ? <Text className="app-header__title">{title}</Text> : <View />}
