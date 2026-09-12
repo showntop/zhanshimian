@@ -39,7 +39,7 @@ func TestDeleteUserDataCoversAllUserTables(t *testing.T) {
 		"billing_ledger", "billing_usage", "billing_orders", "billing_wallets",
 		"share_cards", "today_plans", "wardrobe_outfits", "wardrobe_items",
 		"advisor_conversations", "product_events", "tool_results",
-		"analyses", "hair_previews", "media_assets", "feedback", "user_sessions", "users",
+		"analyses", "body_presentations", "hair_previews", "media_assets", "feedback", "user_sessions", "users",
 	} {
 		found := false
 		for _, query := range deleteUserDataQueries {

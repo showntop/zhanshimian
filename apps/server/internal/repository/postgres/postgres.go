@@ -19,6 +19,8 @@ type Store struct{ pool *pgxpool.Pool }
 
 func New(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
+var _ repository.Repository = (*Store)(nil)
+
 func mapNotFound(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return repository.ErrNotFound
@@ -1158,6 +1160,7 @@ var deleteUserDataQueries = []string{
 	`DELETE FROM product_events WHERE user_id=$1`,
 	`DELETE FROM tool_results WHERE user_id=$1`,
 	`DELETE FROM analyses WHERE user_id=$1`,
+	`DELETE FROM body_presentations WHERE user_id=$1`,
 	`DELETE FROM hair_previews WHERE user_id=$1`,
 	`DELETE FROM media_assets WHERE user_id=$1`,
 	`DELETE FROM feedback WHERE user_id=$1`,
@@ -1176,7 +1179,12 @@ func (s *Store) DeleteUserData(ctx context.Context, userID string) ([]string, er
 	rows, err := tx.Query(ctx, `SELECT storage_key FROM media_assets WHERE user_id=$1 AND deleted_at IS NULL
 		UNION ALL SELECT result_storage_key FROM hair_previews WHERE user_id=$1 AND result_storage_key<>''
 		UNION ALL SELECT generated_storage_key FROM plans WHERE user_id=$1 AND generated_storage_key<>''
-		UNION ALL SELECT generated_storage_key FROM today_plans WHERE user_id=$1 AND generated_storage_key<>''`, userID)
+		UNION ALL SELECT generated_storage_key FROM today_plans WHERE user_id=$1 AND generated_storage_key<>''
+		UNION ALL SELECT video_storage_key FROM body_presentations WHERE user_id=$1 AND video_storage_key<>''
+		UNION ALL SELECT key FROM body_presentations p
+		  CROSS JOIN LATERAL jsonb_array_elements(p.frames) f
+		  CROSS JOIN LATERAL (SELECT f->>'storage_key' AS key) k
+		  WHERE p.user_id=$1 AND k.key<>''`, userID)
 	if err != nil {
 		return nil, err
 	}

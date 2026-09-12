@@ -128,6 +128,13 @@ type Repository interface {
 	ApplyHairPreviewResult(ctx context.Context, previewID, resultURL, storageKey, providerVersion string) error
 	SaveHairPreview(ctx context.Context, userID, previewID string) (domain.HairPreview, error)
 
+	// ---- 3D 形象（环绕预览） ----
+	CreateBodyPresentation(ctx context.Context, userID string, input domain.BodyPresentationInput) (domain.BodyPresentation, *domain.Task, error)
+	GetBodyPresentation(ctx context.Context, userID, id string) (domain.BodyPresentation, error)
+	GetBodyOrbitWork(ctx context.Context, userID, id string) (domain.BodyPresentationInput, error)
+	ListBodyPresentationStatus(ctx context.Context, userID string) (active, completed, failed *domain.BodyPresentation, err error)
+	ApplyBodyOrbitResult(ctx context.Context, id, videoURL, videoKey string, durationMS int, frames []domain.OrbitFrame, frameKeys []string, providerVersion string) error
+
 	// ---- 今日方案 ----
 	GetTodayPlan(ctx context.Context, userID string) (domain.TodayPlan, error)
 	SaveTodayPlan(ctx context.Context, userID string, input domain.TodayPlan) (domain.TodayPlan, error)
