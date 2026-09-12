@@ -10,7 +10,6 @@ import (
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
-	"github.com/zhanshimian/server/internal/repository/postgres"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
 )
 
@@ -236,10 +235,10 @@ func assessmentTaskDefinition() taskrunner.Definition {
 }
 
 type repoFake struct {
-	last        postgres.CreateAssessmentParams
+	last        domain.CreateAssessmentParams
 	createCount int
-	created     postgres.CreatedAssessment
-	report      postgres.AssessmentReport
+	created     domain.CreatedAssessment
+	report      domain.AssessmentReport
 	reportErr   error
 }
 
@@ -247,14 +246,14 @@ func newRepoFake() *repoFake {
 	return &repoFake{}
 }
 
-func (r *repoFake) CreateOrReuseAssessment(_ context.Context, params postgres.CreateAssessmentParams) (postgres.CreatedAssessment, error) {
+func (r *repoFake) CreateOrReuseAssessment(_ context.Context, params domain.CreateAssessmentParams) (domain.CreatedAssessment, error) {
 	if r.createCount > 0 && r.last.UserID == params.UserID && r.last.AnalysisInputHash == params.AnalysisInputHash {
 		r.last = params
 		return r.created, nil
 	}
 	r.createCount++
 	r.last = params
-	r.created = postgres.CreatedAssessment{
+	r.created = domain.CreatedAssessment{
 		PhotoSet: domain.PhotoSet{
 			ID: "photoset-1", UserID: params.UserID,
 			ContentHash: params.PhotoSetContentHash, SchemaVersion: params.PhotoSetSchemaVersion,
@@ -266,16 +265,16 @@ func (r *repoFake) CreateOrReuseAssessment(_ context.Context, params postgres.Cr
 	return r.created, nil
 }
 
-func (r *repoFake) GetReport(_ context.Context, _, _ string) (postgres.AssessmentReport, error) {
+func (r *repoFake) GetReport(_ context.Context, _, _ string) (domain.AssessmentReport, error) {
 	if r.reportErr != nil {
-		return postgres.AssessmentReport{}, r.reportErr
+		return domain.AssessmentReport{}, r.reportErr
 	}
 	return r.report, nil
 }
 
-func (r *repoFake) GetCurrentReport(_ context.Context, _ string) (postgres.AssessmentReport, error) {
+func (r *repoFake) GetCurrentReport(_ context.Context, _ string) (domain.AssessmentReport, error) {
 	if r.reportErr != nil {
-		return postgres.AssessmentReport{}, r.reportErr
+		return domain.AssessmentReport{}, r.reportErr
 	}
 	return r.report, nil
 }
@@ -348,13 +347,13 @@ func (mediaFake) Present(_ context.Context, asset domain.MediaAsset) (PresentedM
 
 func stubMedia() MediaPresenter { return mediaFake{} }
 
-func publishedReport() postgres.AssessmentReport {
+func publishedReport() domain.AssessmentReport {
 	items := []domain.PhotoSetItem{
 		{ID: "item-face", Role: domain.PhotoRoleFace, Asset: readyAsset("face", domain.MediaPurposeFace, domain.MediaOriginUserUpload)},
 		{ID: "item-side", Role: domain.PhotoRoleSide, Asset: readyAsset("side", domain.MediaPurposeSide, domain.MediaOriginUserUpload)},
 		{ID: "item-body", Role: domain.PhotoRoleBody, Asset: readyAsset("body", domain.MediaPurposeBody, domain.MediaOriginUserUpload)},
 	}
-	return postgres.AssessmentReport{
+	return domain.AssessmentReport{
 		Report: domain.Report{
 			ID: "report-1", UserID: "user-1", PhotoSetID: "photoset-1", HeroAssetID: "face",
 			SchemaVersion: "report.v1", PriorityTitle: "先整理额前碎发", PriorityCopy: "额前碎发会挡住眉形。",

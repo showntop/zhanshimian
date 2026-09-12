@@ -90,3 +90,26 @@ type ReportDetail struct {
 	Report   Report
 	PhotoSet PhotoSet
 }
+
+type CreateAssessmentParams struct {
+	UserID, PhotoSetSchemaVersion               string
+	PhotoSetContentHash, AnalysisInputHash      string
+	ProfileSnapshot                             json.RawMessage
+	Slots                                       PhotoSlots
+	Assets                                      map[PhotoRole]MediaAsset
+	AnalyzerSchemaVersion, QualityPolicyVersion string
+	MaxTaskAttempts                             int
+}
+
+type CreatedAssessment struct {
+	PhotoSet  PhotoSet
+	Run       AnalysisRun
+	Operation Operation
+	Task      Task
+	Reused    bool
+}
+
+type AssessmentReport struct {
+	Report
+	PhotoSet PhotoSet
+}

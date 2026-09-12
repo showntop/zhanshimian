@@ -11,34 +11,15 @@ import (
 	"github.com/zhanshimian/server/internal/domain"
 )
 
-type CreateAssessmentParams struct {
-	UserID, PhotoSetSchemaVersion               string
-	PhotoSetContentHash, AnalysisInputHash      string
-	ProfileSnapshot                             json.RawMessage
-	Slots                                       domain.PhotoSlots
-	Assets                                      map[domain.PhotoRole]domain.MediaAsset
-	AnalyzerSchemaVersion, QualityPolicyVersion string
-	MaxTaskAttempts                             int
-}
-
-type CreatedAssessment struct {
-	PhotoSet  domain.PhotoSet
-	Run       domain.AnalysisRun
-	Operation domain.Operation
-	Task      domain.Task
-	Reused    bool
-}
+type CreateAssessmentParams = domain.CreateAssessmentParams
+type CreatedAssessment = domain.CreatedAssessment
+type AssessmentReport = domain.AssessmentReport
 
 type PrepareReportParams struct {
 	RunID, UserID string
 	Report        domain.Report
 	Quality       domain.QualityEvaluation
 	Findings      []domain.ReportFinding
-}
-
-type AssessmentReport struct {
-	domain.Report
-	PhotoSet domain.PhotoSet
 }
 
 type AssessmentRunInput struct {

@@ -8,7 +8,6 @@ import (
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
-	"github.com/zhanshimian/server/internal/repository/postgres"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
 )
 
@@ -138,7 +137,7 @@ func (s *Service) GetCurrentReport(ctx context.Context, userID string) (ReportVi
 	return s.presentReport(ctx, report)
 }
 
-func (s *Service) presentReport(ctx context.Context, report postgres.AssessmentReport) (ReportView, error) {
+func (s *Service) presentReport(ctx context.Context, report domain.AssessmentReport) (ReportView, error) {
 	source := ReportSourceMedia{}
 	byItem := make(map[string]domain.PhotoSetItem, len(report.PhotoSet.Items))
 	for _, item := range report.PhotoSet.Items {
@@ -249,8 +248,8 @@ func roleHashes(slots domain.PhotoSlots, byID map[string]domain.MediaAsset) map[
 	}
 }
 
-func buildCreateParams(cmd CreateCommand, byID map[string]domain.MediaAsset, profile json.RawMessage, contentHash, inputHash string) postgres.CreateAssessmentParams {
-	return postgres.CreateAssessmentParams{
+func buildCreateParams(cmd CreateCommand, byID map[string]domain.MediaAsset, profile json.RawMessage, contentHash, inputHash string) domain.CreateAssessmentParams {
+	return domain.CreateAssessmentParams{
 		UserID:                cmd.UserID,
 		PhotoSetSchemaVersion: PhotoSetSchemaVersion,
 		PhotoSetContentHash:   contentHash,

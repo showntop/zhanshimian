@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/zhanshimian/server/internal/domain"
-	"github.com/zhanshimian/server/internal/repository/postgres"
 )
 
 type AssetReader interface {
@@ -17,13 +16,11 @@ type ProfileReader interface {
 }
 
 type Repository interface {
-	CreateOrReuseAssessment(ctx context.Context, params postgres.CreateAssessmentParams) (postgres.CreatedAssessment, error)
-	GetReport(ctx context.Context, userID, reportID string) (postgres.AssessmentReport, error)
-	GetCurrentReport(ctx context.Context, userID string) (postgres.AssessmentReport, error)
+	CreateOrReuseAssessment(ctx context.Context, params domain.CreateAssessmentParams) (domain.CreatedAssessment, error)
+	GetReport(ctx context.Context, userID, reportID string) (domain.AssessmentReport, error)
+	GetCurrentReport(ctx context.Context, userID string) (domain.AssessmentReport, error)
 }
 
 type MediaPresenter interface {
 	Present(ctx context.Context, asset domain.MediaAsset) (PresentedMedia, error)
 }
-
-var _ Repository = (*postgres.Store)(nil)
