@@ -19,21 +19,22 @@ func TestLoadParsesUnifiedAIRouting(t *testing.T) {
 	clearReleaseEnvironment(t)
 	t.Setenv("AI_ROUTING_JSON", `{
 		"models":{"qwen":{"vendor":"aliyun","protocol":"openai_chat_completions","model":"qwen3.7-plus","base_url":"https://example.com/v1","api_key_env":"ALIYUN_API_KEY","structured_mode":"json_schema","parameters":{"enable_thinking":false}}},
-		"routes":{"appearance_analysis":{"primary":"qwen","policy":"quality_first","max_cost_cny":0.08}}
+		"routes":{"appearance_analysis":{"primary":"qwen","policy":"quality_first","max_cost_cny":0.08,"max_input_images":3}}
 	}`)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatal(err)
 	}
 	model := cfg.AIRouting.Models["qwen"]
-	if cfg.AIRoutingSource != "AI_ROUTING_JSON" || model.Protocol != "openai_chat_completions" || model.Parameters["enable_thinking"] != false || cfg.AIRouting.Routes["appearance_analysis"].Primary != "qwen" {
+	route := cfg.AIRouting.Routes["appearance_analysis"]
+	if cfg.AIRoutingSource != "AI_ROUTING_JSON" || model.Protocol != "openai_chat_completions" || model.Parameters["enable_thinking"] != false || route.Primary != "qwen" || route.MaxInputImages != 3 {
 		t.Fatalf("unexpected AI routing config: %#v", cfg.AIRouting)
 	}
 }
 
 func TestLoadRejectsUnknownAIRoutingProtocol(t *testing.T) {
 	clearReleaseEnvironment(t)
-	t.Setenv("AI_ROUTING_JSON", `{"models":{"x":{"vendor":"x","protocol":"unknown","model":"x","base_url":"https://example.com","api_key_env":"X_KEY"}},"routes":{"appearance_analysis":{"primary":"x"}}}`)
+	t.Setenv("AI_ROUTING_JSON", `{"models":{"x":{"vendor":"x","protocol":"unknown","model":"x","base_url":"https://example.com","api_key_env":"X_KEY"}},"routes":{"appearance_analysis":{"primary":"x","max_input_images":3}}}`)
 	if _, err := Load(); err == nil {
 		t.Fatal("expected unsupported AI protocol to be rejected")
 	}
@@ -112,12 +113,15 @@ func TestLoadAcceptsProductionReleaseProviders(t *testing.T) {
 			"image":{"vendor":"aliyun","protocol":"dashscope_wan","model":"wan","base_url":"https://images.example.com/generate","api_key_env":"ALIYUN_API_KEY"}
 		},
 		"routes":{
-			"appearance_analysis":{"primary":"qwen"},
+			"appearance_analysis":{"primary":"qwen","max_input_images":3},
 			"outfit_diagnosis":{"primary":"qwen"},
 			"purchase_diagnosis":{"primary":"qwen"},
 			"advisor_chat":{"primary":"qwen"},
 			"today_plan":{"primary":"qwen"},
-			"hair_edit":{"primary":"image"}
+			"hair_edit":{"primary":"image"},
+			"photo_quality_check":{"primary":"qwen","max_input_images":3},
+			"photo_identity_consistency":{"primary":"qwen","max_input_images":3},
+			"report_evidence_verification":{"primary":"qwen","max_input_images":3}
 		}
 	}`)
 
@@ -152,7 +156,7 @@ func TestLoadAppliesWorkerLeaseDefaultsWithoutWorkerID(t *testing.T) {
 	clearReleaseEnvironment(t)
 	t.Setenv("AI_ROUTING_JSON", `{
 		"models":{"qwen":{"vendor":"aliyun","protocol":"openai_chat_completions","model":"qwen3.7-plus","base_url":"https://example.com/v1","api_key_env":"ALIYUN_API_KEY"}},
-		"routes":{"appearance_analysis":{"primary":"qwen"}}
+		"routes":{"appearance_analysis":{"primary":"qwen","max_input_images":3}}
 	}`)
 	cfg, err := Load()
 	if err != nil {
@@ -182,7 +186,7 @@ func TestLoadRejectsLeaseShorterThanTwiceHeartbeat(t *testing.T) {
 	clearReleaseEnvironment(t)
 	t.Setenv("AI_ROUTING_JSON", `{
 		"models":{"qwen":{"vendor":"aliyun","protocol":"openai_chat_completions","model":"qwen3.7-plus","base_url":"https://example.com/v1","api_key_env":"ALIYUN_API_KEY"}},
-		"routes":{"appearance_analysis":{"primary":"qwen"}}
+		"routes":{"appearance_analysis":{"primary":"qwen","max_input_images":3}}
 	}`)
 	t.Setenv("TASK_LEASE_DURATION_SECONDS", "20")
 	t.Setenv("TASK_HEARTBEAT_SECONDS", "15")

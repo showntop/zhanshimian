@@ -25,10 +25,11 @@ type AIModelConfig struct {
 }
 
 type AIRouteConfig struct {
-	Policy     string   `json:"policy,omitempty"`
-	Primary    string   `json:"primary"`
-	Fallbacks  []string `json:"fallbacks,omitempty"`
-	MaxCostCNY float64  `json:"max_cost_cny,omitempty"`
+	Policy         string   `json:"policy,omitempty"`
+	Primary        string   `json:"primary"`
+	Fallbacks      []string `json:"fallbacks,omitempty"`
+	MaxCostCNY     float64  `json:"max_cost_cny,omitempty"`
+	MaxInputImages int      `json:"max_input_images,omitempty"`
 }
 
 type AIRoutingConfig struct {
@@ -93,7 +94,15 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		"dashscope_wanx_imageedit": true,
 		"ark_image":                true,
 	}
-	structuredCapabilities := map[string]bool{"appearance_analysis": true, "photo_check": true, "outfit_diagnosis": true, "purchase_diagnosis": true, "advisor_chat": true, "today_plan": true}
+	structuredCapabilities := map[string]bool{
+		"appearance_analysis": true, "photo_check": true, "outfit_diagnosis": true,
+		"purchase_diagnosis": true, "advisor_chat": true, "today_plan": true,
+		"photo_quality_check": true, "photo_identity_consistency": true, "report_evidence_verification": true,
+	}
+	assessmentMultiImageCapabilities := map[string]bool{
+		"photo_quality_check": true, "photo_identity_consistency": true,
+		"appearance_analysis": true, "report_evidence_verification": true,
+	}
 	imageCapabilities := map[string]bool{"hair_edit": true, "makeup_edit": true, "full_look_edit": true}
 	for id, model := range routing.Models {
 		if strings.TrimSpace(id) == "" || strings.TrimSpace(model.Vendor) == "" || strings.TrimSpace(model.Model) == "" {
@@ -130,6 +139,9 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		}
 		if route.MaxCostCNY < 0 {
 			return fmt.Errorf("AI route %q contains a negative cost limit", capability)
+		}
+		if assessmentMultiImageCapabilities[capability] && route.MaxInputImages < 3 {
+			return fmt.Errorf("AI route %q requires max_input_images >= 3", capability)
 		}
 		seen := map[string]bool{route.Primary: true}
 		for _, fallback := range route.Fallbacks {

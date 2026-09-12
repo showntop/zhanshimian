@@ -194,7 +194,10 @@ func Load() (Config, error) {
 		if cfg.AIRoutingSource == "" {
 			return Config{}, fmt.Errorf("AI_ROUTING_FILE or AI_ROUTING_JSON is required in production")
 		} else {
-			for _, capability := range []string{"appearance_analysis", "outfit_diagnosis", "purchase_diagnosis", "advisor_chat", "hair_edit", "today_plan"} {
+			for _, capability := range []string{
+				"appearance_analysis", "outfit_diagnosis", "purchase_diagnosis", "advisor_chat", "hair_edit", "today_plan",
+				"photo_quality_check", "photo_identity_consistency", "report_evidence_verification",
+			} {
 				if _, ok := cfg.AIRouting.Routes[capability]; !ok {
 					return Config{}, fmt.Errorf("production AI routing requires %q", capability)
 				}

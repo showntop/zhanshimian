@@ -69,7 +69,35 @@
         "aliyun/qwen3.7-plus",
         "aliyun/qwen3.7-flash"
       ],
-      "max_cost_cny": 0.6
+      "max_cost_cny": 0.6,
+      "max_input_images": 3
+    },
+    "photo_quality_check": {
+      "policy": "value_first",
+      "primary": "aliyun/qwen3.7-flash",
+      "fallbacks": [
+        "aliyun/qwen3.7-plus"
+      ],
+      "max_cost_cny": 0.04,
+      "max_input_images": 3
+    },
+    "photo_identity_consistency": {
+      "policy": "value_first",
+      "primary": "aliyun/qwen3.7-flash",
+      "fallbacks": [
+        "aliyun/qwen3.7-plus"
+      ],
+      "max_cost_cny": 0.04,
+      "max_input_images": 3
+    },
+    "report_evidence_verification": {
+      "policy": "value_first",
+      "primary": "aliyun/qwen3.7-flash",
+      "fallbacks": [
+        "aliyun/qwen3.7-plus"
+      ],
+      "max_cost_cny": 0.04,
+      "max_input_images": 3
     },
     "photo_check": {
       "policy": "value_first",
