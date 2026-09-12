@@ -2,7 +2,6 @@ package planning
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/zhanshimian/server/internal/domain"
 )
@@ -71,62 +70,18 @@ type RenderSpecReader interface {
 	GetRenderSpecForVariant(ctx context.Context, userID, planVariantID string) (domain.RenderSpec, error)
 }
 
-// ReportSnapshot is the immutable report view Planning plans against. The
-// profile snapshot is the one captured at report publication — Planning never
-// re-reads the mutable profile table.
-type ReportSnapshot struct {
-	ID                string
-	UserID            string
-	PhotoSetID        string
-	FaceAssetID       string
-	BodyAssetID       string
-	ProfileSnapshot   json.RawMessage
-	ImpressionTags    []string
-	PriorityTitle     string
-	PriorityCopy      string
-	PriorityFindingID string
-	Findings          []FindingSnapshot
-}
-
-type FindingSnapshot struct {
-	ID                 string
-	Category           string
-	Priority           int
-	Label              string
-	VisibleObservation string
-	Recommendation     string
-}
-
-type StartOperationCommand struct {
-	OperationID    string
-	UserID         string
-	Kind           domain.OperationKind
-	SubjectType    string
-	SubjectID      string
-	IdempotencyKey string
-	DedupeKey      string
-	Task           EnqueueTask
-}
-
-type EnqueueTask struct {
-	Type              domain.TaskType
-	SubjectType       string
-	SubjectID         string
-	SubjectGeneration int
-	PayloadVersion    int
-	Payload           any
-	DedupeKey         string
-}
-
-// PlanSetKey is the semantic identity of one planning request. Equal keys
-// must reuse the same published result without calling AI again.
-type PlanSetKey struct {
-	UserID               string
-	ReportID             string
-	Scene                domain.Scene
-	BriefHash            string
-	PlannerSchemaVersion string
-}
+// The cross-boundary DTOs below live in domain (frozen contract shared with
+// the postgres adapter); planning re-exposes them under the frozen names.
+type (
+	ReportSnapshot       = domain.PlanningReportSnapshot
+	FindingSnapshot      = domain.PlanningFindingSnapshot
+	PlanSetKey           = domain.PlanningPlanSetKey
+	StartOperationCommand = domain.PlanningStartOperationCommand
+	EnqueueTask          = domain.PlanningEnqueueTask
+	EnqueueRetryCommand  = domain.PlanningEnqueueRetryCommand
+	PlanQualityRecord    = domain.PlanningPlanQualityRecord
+	PrepareCommand       = domain.PlanningPrepareCommand
+)
 
 type CreateCommand struct {
 	UserID         string
@@ -147,16 +102,6 @@ type GenerateTaskPayload struct {
 	StyleRuleVersion     string            `json:"style_rule_version"`
 	ContentAttempt       int               `json:"content_attempt"`
 	PriorReasonCodes     []string          `json:"prior_reason_codes"`
-}
-
-type EnqueueRetryCommand struct {
-	UserID        string
-	OperationID   string
-	ProgressBPS   int
-	StageCode     string
-	PublicMessage string
-	Quality       PlanQualityRecord
-	Task          EnqueueTask
 }
 
 type GenerationInput struct {
@@ -209,25 +154,6 @@ type VerificationResult struct {
 	Decision     string
 	ReasonCodes  []string
 	Violations   []string
-}
-
-// PlanQualityRecord is the gate decision persisted with the plan set.
-type PlanQualityRecord struct {
-	ID                    string
-	UserID                string
-	SubjectID             string
-	PolicyVersion         string
-	Decision              string
-	ReasonCodes           []string
-	InternalScores        json.RawMessage
-	EvaluatorInvocationID string
-}
-
-type PrepareCommand struct {
-	UserID      string
-	PlanSet     domain.PlanSet
-	Quality     PlanQualityRecord
-	RenderSpecs []domain.RenderSpec
 }
 
 type CreateResult struct {

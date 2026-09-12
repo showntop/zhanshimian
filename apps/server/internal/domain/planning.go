@@ -2,7 +2,17 @@ package domain
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
+)
+
+// ErrRenderSpecInvalid marks a render spec that violates render_spec.v1.
+var ErrRenderSpecInvalid = errors.New("render spec violates render_spec.v1")
+
+// PlanningOperationKind and shared planning subject type labels.
+const (
+	PlanningSubjectType = "plan_set"
 )
 
 // Scene is one of the six supported scenes. Scene names are stable product
@@ -179,4 +189,150 @@ type RenderOutput struct {
 	MIMEType     string `json:"mime_type"`
 	AspectPolicy string `json:"aspect_policy"`
 	Quality      string `json:"quality"`
+}
+
+// Validate enforces the fail-closed render_spec.v1 rules on a stored spec.
+func (s RenderSpec) Validate() error {
+	if s.SchemaVersion != "render_spec.v1" {
+		return fmt.Errorf("%w: schema version %q", ErrRenderSpecInvalid, s.SchemaVersion)
+	}
+	return s.Spec.Validate()
+}
+
+// Validate enforces the fail-closed preservation and output rules on the
+// directive itself.
+func (d RenderDirective) Validate() error {
+	identity := d.Identity
+	if identity.BodyAssetID == "" || identity.FaceAssetID == "" {
+		return fmt.Errorf("%w: identity assets missing", ErrRenderSpecInvalid)
+	}
+	if !identity.PreserveIdentity || !identity.PreserveBodyProportion || !identity.PreserveSkinTone || !identity.PreserveAgeImpression {
+		return fmt.Errorf("%w: identity preservation must be fail-closed", ErrRenderSpecInvalid)
+	}
+	composition := d.Composition
+	if !composition.PreservePose || !composition.PreserveBackground || !composition.PreserveLighting || !composition.PreserveSourceCrop || composition.AllowOutpaint {
+		return fmt.Errorf("%w: composition preservation must be fail-closed", ErrRenderSpecInvalid)
+	}
+	if err := validateRenderAppearanceStep("hair", d.Hair.Action, d.Hair.Target, d.Hair.Intensity); err != nil {
+		return err
+	}
+	if err := validateRenderAppearanceStep("makeup", d.Makeup.Action, d.Makeup.Target, d.Makeup.Intensity); err != nil {
+		return err
+	}
+	outfit := d.Outfit
+	if len(outfit.Palette) < 1 || len(outfit.Palette) > 8 {
+		return fmt.Errorf("%w: outfit palette wants 1-8 colors, got %d", ErrRenderSpecInvalid, len(outfit.Palette))
+	}
+	if len(outfit.Layers) > 8 || len(outfit.Avoid) > 8 {
+		return fmt.Errorf("%w: outfit layers/avoid exceed 8 items", ErrRenderSpecInvalid)
+	}
+	if outfit.Silhouette == "" {
+		return fmt.Errorf("%w: outfit silhouette required", ErrRenderSpecInvalid)
+	}
+	output := d.Output
+	if output.MIMEType != "image/jpeg" || output.AspectPolicy != "preserve_body_source" || output.Quality != "high" {
+		return fmt.Errorf("%w: unsafe output policy %#v", ErrRenderSpecInvalid, output)
+	}
+	return nil
+}
+
+func validateRenderAppearanceStep(name, action, target, intensity string) error {
+	if action != string(ActionKeep) && action != string(ActionAdjust) {
+		return fmt.Errorf("%w: %s action %q", ErrRenderSpecInvalid, name, action)
+	}
+	if target == "" {
+		return fmt.Errorf("%w: %s target required", ErrRenderSpecInvalid, name)
+	}
+	if intensity != "low" && intensity != "medium" {
+		return fmt.Errorf("%w: %s intensity must be low|medium, got %q", ErrRenderSpecInvalid, name, intensity)
+	}
+	return nil
+}
+
+// ---- cross-boundary planning DTOs (frozen contract; shared by the
+// planning service and the postgres adapter) ----
+
+// PlanningReportSnapshot is the immutable report view Planning plans against.
+// The profile snapshot is the one captured at report publication.
+type PlanningReportSnapshot struct {
+	ID                string
+	UserID            string
+	PhotoSetID        string
+	FaceAssetID       string
+	BodyAssetID       string
+	ProfileSnapshot   json.RawMessage
+	ImpressionTags    []string
+	PriorityTitle     string
+	PriorityCopy      string
+	PriorityFindingID string
+	Findings          []PlanningFindingSnapshot
+}
+
+type PlanningFindingSnapshot struct {
+	ID                 string
+	Category           string
+	Priority           int
+	Label              string
+	VisibleObservation string
+	Recommendation     string
+}
+
+// PlanningPlanSetKey is the semantic identity of one planning request. Equal
+// keys must reuse the same published result without calling AI again.
+type PlanningPlanSetKey struct {
+	UserID               string
+	ReportID             string
+	Scene                Scene
+	BriefHash            string
+	PlannerSchemaVersion string
+}
+
+type PlanningStartOperationCommand struct {
+	OperationID    string
+	UserID         string
+	Kind           OperationKind
+	SubjectType    string
+	SubjectID      string
+	IdempotencyKey string
+	DedupeKey      string
+	Task           PlanningEnqueueTask
+}
+
+type PlanningEnqueueTask struct {
+	Type              TaskType
+	SubjectType       string
+	SubjectID         string
+	SubjectGeneration int
+	PayloadVersion    int
+	Payload           any
+	DedupeKey         string
+}
+
+// PlanningPlanQualityRecord is the gate decision persisted with the plan set.
+type PlanningPlanQualityRecord struct {
+	ID                    string
+	UserID                string
+	SubjectID             string
+	PolicyVersion         string
+	Decision              string
+	ReasonCodes           []string
+	InternalScores        json.RawMessage
+	EvaluatorInvocationID string
+}
+
+type PlanningEnqueueRetryCommand struct {
+	UserID        string
+	OperationID   string
+	ProgressBPS   int
+	StageCode     string
+	PublicMessage string
+	Quality       PlanningPlanQualityRecord
+	Task          PlanningEnqueueTask
+}
+
+type PlanningPrepareCommand struct {
+	UserID      string
+	PlanSet     PlanSet
+	Quality     PlanningPlanQualityRecord
+	RenderSpecs []RenderSpec
 }
