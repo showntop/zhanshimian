@@ -45,12 +45,14 @@ func (s *Service) CreateBodyPresentation(ctx context.Context, userID string, inp
 		}
 		chargeRefs = refs
 	}
-	item, task, err := s.repo.CreateBodyPresentation(ctx, userID, input)
+	item, task, created, err := s.repo.CreateBodyPresentation(ctx, userID, input)
 	if err != nil {
 		s.refundRefs(ctx, chargeRefs)
 		return domain.BodyPresentation{}, nil, err
 	}
-	if task != nil && len(chargeRefs) > 0 {
+	if !created {
+		s.refundRefs(ctx, chargeRefs)
+	} else if task != nil && len(chargeRefs) > 0 {
 		s.bindCharges(ctx, chargeRefs, []string{task.ID})
 	} else {
 		s.refundRefs(ctx, chargeRefs)

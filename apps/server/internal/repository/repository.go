@@ -129,7 +129,8 @@ type Repository interface {
 	SaveHairPreview(ctx context.Context, userID, previewID string) (domain.HairPreview, error)
 
 	// ---- 3D 形象（环绕预览） ----
-	CreateBodyPresentation(ctx context.Context, userID string, input domain.BodyPresentationInput) (domain.BodyPresentation, *domain.Task, error)
+	// created is true only on INSERT; false means the in-flight row was reused.
+	CreateBodyPresentation(ctx context.Context, userID string, input domain.BodyPresentationInput) (domain.BodyPresentation, *domain.Task, bool, error)
 	GetBodyPresentation(ctx context.Context, userID, id string) (domain.BodyPresentation, error)
 	GetBodyOrbitWork(ctx context.Context, userID, id string) (domain.BodyPresentationInput, error)
 	ListBodyPresentationStatus(ctx context.Context, userID string) (active, completed, failed *domain.BodyPresentation, err error)

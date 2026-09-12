@@ -21,8 +21,10 @@ type bodyOrbitRepoStub struct {
 	createCalled bool
 	created      domain.BodyPresentation
 	createdTask  *domain.Task
+	inserted     bool
 	createErr    error
 	applyN       int
+	refundN      int
 }
 
 func (r *bodyOrbitRepoStub) GetMediaAssetsForUser(_ context.Context, _ string, _ []string) ([]domain.MediaAsset, error) {
@@ -32,9 +34,9 @@ func (r *bodyOrbitRepoStub) GetMediaAssetsForUser(_ context.Context, _ string, _
 	return r.assets, nil
 }
 
-func (r *bodyOrbitRepoStub) CreateBodyPresentation(_ context.Context, _ string, _ domain.BodyPresentationInput) (domain.BodyPresentation, *domain.Task, error) {
+func (r *bodyOrbitRepoStub) CreateBodyPresentation(_ context.Context, _ string, _ domain.BodyPresentationInput) (domain.BodyPresentation, *domain.Task, bool, error) {
 	r.createCalled = true
-	return r.created, r.createdTask, r.createErr
+	return r.created, r.createdTask, r.inserted, r.createErr
 }
 
 func (r *bodyOrbitRepoStub) CountActiveTasksByTypes(_ context.Context, _ string, types []string) (int, error) {
@@ -44,6 +46,14 @@ func (r *bodyOrbitRepoStub) CountActiveTasksByTypes(_ context.Context, _ string,
 
 func (r *bodyOrbitRepoStub) ApplyBilling(context.Context, string, time.Time, int, func(domain.BillingSnapshot) (domain.BillingDecision, error)) error {
 	r.applyN++
+	return nil
+}
+
+func (r *bodyOrbitRepoStub) RefundBilling(context.Context, string, string) error {
+	r.refundN++
+	if r.applyN > 0 {
+		r.applyN--
+	}
 	return nil
 }
 
@@ -132,6 +142,40 @@ func TestCreateBodyPresentationSkipsChargeWhenActive(t *testing.T) {
 		t.Fatalf("in-flight body_orbit must not authorize, applyN=%d", repo.applyN)
 	}
 	if item.ID != activeID {
+		t.Fatalf("id=%s", item.ID)
+	}
+}
+
+func TestCreateBodyPresentationRefundsWhenReuseAfterAuthorize(t *testing.T) {
+	const existingID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+	repo := &bodyOrbitRepoStub{
+		assets: []domain.MediaAsset{
+			{ID: "11111111-1111-1111-1111-111111111111", Kind: "body"},
+			{ID: "22222222-2222-2222-2222-222222222222", Kind: "face"},
+		},
+		activeCount: 0,
+		created:     domain.BodyPresentation{ID: existingID},
+		createdTask: &domain.Task{ID: "task-existing", Type: string(domain.TaskTypeBodyOrbit)},
+		inserted:    false,
+	}
+	svc := newBodyOrbitService(repo, &fakeOrbitGen{})
+	item, _, err := svc.CreateBodyPresentation(context.Background(), "user-1", domain.BodyPresentationInput{
+		BodyMediaID: "11111111-1111-1111-1111-111111111111",
+		FaceMediaID: "22222222-2222-2222-2222-222222222222",
+	})
+	if err != nil {
+		t.Fatalf("CreateBodyPresentation: %v", err)
+	}
+	if !repo.createCalled {
+		t.Fatal("expected repo CreateBodyPresentation")
+	}
+	if repo.applyN != 0 {
+		t.Fatalf("reused in-flight must refund charge, applyN=%d refundN=%d", repo.applyN, repo.refundN)
+	}
+	if repo.refundN != 1 {
+		t.Fatalf("expected one refund after authorize+reuse, refundN=%d", repo.refundN)
+	}
+	if item.ID != existingID {
 		t.Fatalf("id=%s", item.ID)
 	}
 }

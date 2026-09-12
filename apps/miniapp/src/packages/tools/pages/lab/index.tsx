@@ -68,6 +68,24 @@ function viewerBadge(presentation: BodyPresentation, bodyDemo?: boolean): string
   return demo ? IMAGE_BADGE_COPY.demo : LAB_COPY.badgeAI
 }
 
+function preferNewerActive(
+  prev: BodyPresentationStatus | null,
+  incoming: BodyPresentationStatus,
+): BodyPresentationStatus {
+  const prevActive = prev?.active
+  if (!prevActive || !isActiveStatus(prevActive.status)) {
+    return incoming
+  }
+  const incomingActive = incoming.active
+  if (!incomingActive || !isActiveStatus(incomingActive.status)) {
+    return { ...incoming, active: prevActive }
+  }
+  if (prevActive.id !== incomingActive.id && (prevActive.created_at || '') > (incomingActive.created_at || '')) {
+    return { ...incoming, active: prevActive }
+  }
+  return incoming
+}
+
 export default function Lab() {
   const [waitlisted, setWaitlisted] = useState<string[]>([])
   const [status, setStatus] = useState<BodyPresentationStatus | null>(null)
@@ -77,9 +95,12 @@ export default function Lab() {
   const [pollFailed, setPollFailed] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
   const lastPresentationRef = useRef<BodyPresentation | null>(null)
+  const statusEpochRef = useRef(0)
+  const busyRef = useRef(false)
   const { pageClass, enter } = usePageShell(true, '', 'lab')
 
   const load = useCallback(async () => {
+    const epoch = ++statusEpochRef.current
     try {
       const [nextStatus, current] = await Promise.all([
         api.getBodyPresentationStatus(),
@@ -107,11 +128,13 @@ export default function Lab() {
           writeStorage(STORAGE_KEYS.activeTaskBodyOrbit, '')
         }
       }
+      if (epoch !== statusEpochRef.current) return
       setStatus(merged)
       setAnalysis(nextAnalysis)
       setPollFailed(false)
       setLoadFailed(false)
     } catch {
+      if (epoch !== statusEpochRef.current) return
       setLoadFailed(true)
     }
   }, [])
@@ -150,7 +173,12 @@ export default function Lab() {
       if (result.status === 'failed') {
         setViewing((current) => (current === 'completed' ? current : 'auto'))
       }
-      void api.getBodyPresentationStatus().then(setStatus).catch(() => {
+      const epoch = statusEpochRef.current
+      void api.getBodyPresentationStatus().then((next) => {
+        if (epoch !== statusEpochRef.current) return
+        setStatus((prev) => preferNewerActive(prev, next))
+      }).catch(() => {
+        if (epoch !== statusEpochRef.current) return
         if (!row || isActiveStatus(row.status)) {
           setPollFailed(true)
         }
@@ -159,7 +187,11 @@ export default function Lab() {
     onFailed: () => {
       setPollFailed(true)
       writeStorage(STORAGE_KEYS.activeTaskBodyOrbit, '')
-      void api.getBodyPresentationStatus().then(setStatus).catch(() => undefined)
+      const epoch = statusEpochRef.current
+      void api.getBodyPresentationStatus().then((next) => {
+        if (epoch !== statusEpochRef.current) return
+        setStatus((prev) => preferNewerActive(prev, next))
+      }).catch(() => undefined)
     },
   })
 
@@ -167,11 +199,12 @@ export default function Lab() {
   const body = mediaOf(analysis, 'body')
 
   const generate = async () => {
-    if (busy || (status?.active && !pollFailed)) return
+    if (busyRef.current || busy || (status?.active && !pollFailed)) return
     if (!face || !body) {
       Taro.navigateTo({ url: '/pages/capture/index' })
       return
     }
+    busyRef.current = true
     setBusy(true)
     setPollFailed(false)
     try {
@@ -180,6 +213,7 @@ export default function Lab() {
         face_media_id: face.id,
       })
       writeStorage(STORAGE_KEYS.activeTaskBodyOrbit, data.id)
+      statusEpochRef.current += 1
       setViewing('auto')
       setStatus((prev) => ({
         available: prev?.available ?? true,
@@ -200,6 +234,7 @@ export default function Lab() {
       }
       Taro.showToast({ title: (error as Error).message || '生成没有开始，请重试', icon: 'none' })
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }

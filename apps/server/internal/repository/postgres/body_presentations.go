@@ -69,14 +69,14 @@ func scanBodyPresentation(row pgx.Row) (domain.BodyPresentation, error) {
 	return item, nil
 }
 
-func (s *Store) CreateBodyPresentation(ctx context.Context, userID string, input domain.BodyPresentationInput) (domain.BodyPresentation, *domain.Task, error) {
+func (s *Store) CreateBodyPresentation(ctx context.Context, userID string, input domain.BodyPresentationInput) (domain.BodyPresentation, *domain.Task, bool, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return domain.BodyPresentation{}, nil, err
+		return domain.BodyPresentation{}, nil, false, err
 	}
 	defer tx.Rollback(ctx)
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "body-orbit:"+userID); err != nil {
-		return domain.BodyPresentation{}, nil, err
+		return domain.BodyPresentation{}, nil, false, err
 	}
 	var existingID string
 	existingErr := tx.QueryRow(ctx, `
@@ -87,16 +87,16 @@ func (s *Store) CreateBodyPresentation(ctx context.Context, userID string, input
 	if existingErr == nil {
 		item, itemErr := scanBodyPresentation(tx.QueryRow(ctx, bodyPresentationSelect+` WHERE id=$1::uuid AND user_id=$2`, existingID, userID))
 		if itemErr != nil {
-			return domain.BodyPresentation{}, nil, itemErr
+			return domain.BodyPresentation{}, nil, false, itemErr
 		}
 		task, taskErr := scanTask(tx.QueryRow(ctx, taskSelect+` WHERE type='body_orbit' AND payload->>'presentation_id'=$1 AND status IN ('queued','processing') ORDER BY created_at DESC LIMIT 1`, existingID))
 		if taskErr != nil {
-			return domain.BodyPresentation{}, nil, taskErr
+			return domain.BodyPresentation{}, nil, false, taskErr
 		}
-		return item, &task, tx.Commit(ctx)
+		return item, &task, false, tx.Commit(ctx)
 	}
 	if !errors.Is(existingErr, pgx.ErrNoRows) {
-		return domain.BodyPresentation{}, nil, existingErr
+		return domain.BodyPresentation{}, nil, false, existingErr
 	}
 	item, err := scanBodyPresentation(tx.QueryRow(ctx, `
 		INSERT INTO body_presentations(user_id,body_media_id,face_media_id)
@@ -104,16 +104,16 @@ func (s *Store) CreateBodyPresentation(ctx context.Context, userID string, input
 		RETURNING id::text,body_media_id::text,face_media_id::text,representation,video_url,duration_ms,frames,mesh,provider_version,created_at,updated_at`,
 		userID, input.BodyMediaID, input.FaceMediaID))
 	if err != nil {
-		return domain.BodyPresentation{}, nil, err
+		return domain.BodyPresentation{}, nil, false, err
 	}
 	task, err := scanTask(tx.QueryRow(ctx, `
 		INSERT INTO tasks(user_id,type,payload,stage)
 		VALUES($1,'body_orbit',$2,'正在排队') `+taskSelectTail,
 		userID, domain.BodyOrbitTaskPayload{PresentationID: item.ID}))
 	if err != nil {
-		return domain.BodyPresentation{}, nil, err
+		return domain.BodyPresentation{}, nil, false, err
 	}
-	return item, &task, tx.Commit(ctx)
+	return item, &task, true, tx.Commit(ctx)
 }
 
 func (s *Store) GetBodyPresentation(ctx context.Context, userID, id string) (domain.BodyPresentation, error) {
