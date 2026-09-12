@@ -835,7 +835,7 @@ paths:
     get:
       operationId: listHairPreviews
       summary: 预览历史列表
-      description: 发型预览历史；saved=true 只返回已保存的记录。
+      description: 发型预览历史；saved=true 只返回已保存的记录，state=active 只返回当前活跃预览。
       tags:
       - Hair
       parameters:
@@ -845,6 +845,14 @@ paths:
         description: 仅返回已保存记录
         schema:
           type: boolean
+      - name: state
+        in: query
+        required: false
+        description: 按状态过滤；active 表示当前活跃预览
+        schema:
+          type: string
+          enum:
+          - active
       responses:
         '200':
           description: 预览列表（新到旧）
@@ -874,7 +882,7 @@ paths:
     get:
       operationId: getHairPreview
       summary: 单个发型预览
-      description: 读取预览状态与结果图（也可通过统一任务端点轮询）；越权访问一律 404。
+      description: 读取预览状态与结果图；异步进度通过关联的公开 Operation 轮询，越权访问一律 404。
       tags:
       - Hair
       parameters:
@@ -1206,7 +1214,7 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '500':
           "$ref": "#/components/responses/InternalError"
-  "/v1/shares/{token}":
+  "/v1/shares/{share_ref}":
     get:
       operationId: getShareByToken
       summary: 公开访问分享快照
@@ -1215,10 +1223,10 @@ paths:
       - Shares
       security: []
       parameters:
-      - name: token
+      - name: share_ref
         in: path
         required: true
-        description: 分享令牌
+        description: GET 语义下为公开分享令牌
         schema:
           type: string
           minLength: 20
@@ -1243,7 +1251,6 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '500':
           "$ref": "#/components/responses/InternalError"
-  "/v1/shares/{id}":
     delete:
       operationId: revokeShare
       summary: 撤销分享
@@ -1251,10 +1258,10 @@ paths:
       tags:
       - Shares
       parameters:
-      - name: id
+      - name: share_ref
         in: path
         required: true
-        description: 分享卡 ID
+        description: DELETE 语义下为分享卡 ID
         schema:
           type: string
       responses:
@@ -1319,7 +1326,7 @@ paths:
     post:
       operationId: createWardrobeItem
       summary: 新建衣橱单品
-      description: 先传图（POST /v1/media，kind=wardrobe）后建档，或 media_id 缺省纯文字建档。
+      description: 先通过 POST /v1/media/upload-intents 获取直传信息，上传后调用 /v1/media/upload-intents/{id}/complete，再使用返回的 media_id 建档；也可缺省 media_id 纯文字建档。
       tags:
       - Wardrobe
       requestBody:
@@ -3604,15 +3611,18 @@ components:
               type: integer
               description: 最近一小时失败任务数
     DisplayMedia:
+      oneOf:
+      - "$ref": "#/components/schemas/UserOriginalDisplayMedia"
+      - "$ref": "#/components/schemas/GeneratedPreviewDisplayMedia"
+      - "$ref": "#/components/schemas/BundledReferenceDisplayMedia"
+      - "$ref": "#/components/schemas/DemoExampleDisplayMedia"
+    DisplayMediaBase:
       type: object
-      additionalProperties: false
       required:
       - asset_id
       - url
       - url_expires_at
       - mime_type
-      - source_kind
-      - display_label
       properties:
         asset_id:
           type: string
@@ -3628,28 +3638,77 @@ components:
           enum:
           - image/jpeg
           - image/png
-        source_kind:
-          type: string
-          enum:
-          - user_original
-          - generated_preview
-          - bundled_reference
-          - demo_example
-        display_label:
-          type: string
-          enum:
-          - 原本
-          - 风格参考
-          - 效果示例
+    UserOriginalDisplayMedia:
+      allOf:
+      - "$ref": "#/components/schemas/DisplayMediaBase"
+      - type: object
+        required:
+        - source_kind
+        - display_label
+        properties:
+          source_kind:
+            type: string
+            const: user_original
+          display_label:
+            type: string
+            const: 原本
+      unevaluatedProperties: false
+    GeneratedPreviewDisplayMedia:
+      allOf:
+      - "$ref": "#/components/schemas/DisplayMediaBase"
+      - type: object
+        required:
+        - source_kind
+        - display_label
+        properties:
+          source_kind:
+            type: string
+            const: generated_preview
+          display_label:
+            type: string
+            const: 风格参考
+      unevaluatedProperties: false
+    BundledReferenceDisplayMedia:
+      allOf:
+      - "$ref": "#/components/schemas/DisplayMediaBase"
+      - type: object
+        required:
+        - source_kind
+        - display_label
+        properties:
+          source_kind:
+            type: string
+            const: bundled_reference
+          display_label:
+            type: string
+            const: 风格参考
+      unevaluatedProperties: false
+    DemoExampleDisplayMedia:
+      allOf:
+      - "$ref": "#/components/schemas/DisplayMediaBase"
+      - type: object
+        required:
+        - source_kind
+        - display_label
+        properties:
+          source_kind:
+            type: string
+            const: demo_example
+          display_label:
+            type: string
+            const: 效果示例
+      unevaluatedProperties: false
     Operation:
+      oneOf:
+      - "$ref": "#/components/schemas/FailedOperation"
+      - "$ref": "#/components/schemas/NonFailedOperation"
+    OperationBase:
       type: object
-      additionalProperties: false
       required:
       - id
       - kind
       - subject_type
       - subject_id
-      - status
       - progress_bps
       - stage_code
       - public_message
@@ -3672,16 +3731,6 @@ components:
         subject_id:
           type: string
           format: uuid
-        status:
-          type: string
-          enum:
-          - accepted
-          - running
-          - retrying
-          - succeeded
-          - failed
-          - cancelled
-          - superseded
         progress_bps:
           type: integer
           minimum: 0
@@ -3693,8 +3742,6 @@ components:
         retryable:
           type: boolean
         error_code:
-          type: string
-        trace_id:
           type: string
         result_type:
           type: string
@@ -3710,19 +3757,39 @@ components:
         finished_at:
           type: string
           format: date-time
+    FailedOperation:
       allOf:
-      - if:
-          properties:
-            status:
-              const: failed
-          required:
-          - status
-        then:
-          required:
-          - trace_id
-          properties:
-            trace_id:
-              type: string
+      - "$ref": "#/components/schemas/OperationBase"
+      - type: object
+        required:
+        - status
+        - trace_id
+        properties:
+          status:
+            type: string
+            const: failed
+          trace_id:
+            type: string
+      unevaluatedProperties: false
+    NonFailedOperation:
+      allOf:
+      - "$ref": "#/components/schemas/OperationBase"
+      - type: object
+        required:
+        - status
+        properties:
+          status:
+            type: string
+            enum:
+            - accepted
+            - running
+            - retrying
+            - succeeded
+            - cancelled
+            - superseded
+          trace_id:
+            type: string
+      unevaluatedProperties: false
     Assessment:
       type: object
       additionalProperties: false

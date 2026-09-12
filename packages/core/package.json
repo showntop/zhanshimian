@@ -12,8 +12,8 @@
     "node": ">=22.6"
   },
   "scripts": {
-    "api:generate": "openapi-typescript ../../contracts/openapi.yaml -o src/api/generated/schema.ts",
-    "api:check": "node scripts/check-openapi.mjs",
+    "api:generate": "pnpm exec openapi-typescript ../../contracts/openapi.yaml -o src/api/generated/schema.ts",
+    "api:check": "node scripts/check-openapi.mjs && pnpm exec redocly lint ../../contracts/openapi.yaml",
     "typecheck": "tsc --noEmit",
     "test": "pnpm api:check && node --test --experimental-strip-types tests/*.mjs"
   },

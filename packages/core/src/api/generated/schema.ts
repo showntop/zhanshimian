@@ -342,7 +342,7 @@ export interface paths {
         };
         /**
          * 预览历史列表
-         * @description 发型预览历史；saved=true 只返回已保存的记录。
+         * @description 发型预览历史；saved=true 只返回已保存的记录，state=active 只返回当前活跃预览。
          */
         get: operations["listHairPreviews"];
         put?: never;
@@ -366,7 +366,7 @@ export interface paths {
         };
         /**
          * 单个发型预览
-         * @description 读取预览状态与结果图（也可通过统一任务端点轮询）；越权访问一律 404。
+         * @description 读取预览状态与结果图；异步进度通过关联的公开 Operation 轮询，越权访问一律 404。
          */
         get: operations["getHairPreview"];
         put?: never;
@@ -517,7 +517,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/shares/{token}": {
+    "/v1/shares/{share_ref}": {
         parameters: {
             query?: never;
             header?: never;
@@ -529,22 +529,6 @@ export interface paths {
          * @description 无需鉴权的公开端点。token 无效、已撤销或已过期一律 404（不泄露存在性）；快照内图片 URL 每次访问重新签名。
          */
         get: operations["getShareByToken"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/shares/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
         put?: never;
         post?: never;
         /**
@@ -572,7 +556,7 @@ export interface paths {
         put?: never;
         /**
          * 新建衣橱单品
-         * @description 先传图（POST /v1/media，kind=wardrobe）后建档，或 media_id 缺省纯文字建档。
+         * @description 先通过 POST /v1/media/upload-intents 获取直传信息，上传后调用 /v1/media/upload-intents/{id}/complete，再使用返回的 media_id 建档；也可缺省 media_id 纯文字建档。
          */
         post: operations["createWardrobeItem"];
         delete?: never;
@@ -1440,7 +1424,8 @@ export interface components {
                 failed_last_hour?: number;
             };
         };
-        DisplayMedia: {
+        DisplayMedia: components["schemas"]["UserOriginalDisplayMedia"] | components["schemas"]["GeneratedPreviewDisplayMedia"] | components["schemas"]["BundledReferenceDisplayMedia"] | components["schemas"]["DemoExampleDisplayMedia"];
+        DisplayMediaBase: {
             /** Format: uuid */
             asset_id: string;
             /** Format: uri */
@@ -1449,12 +1434,33 @@ export interface components {
             url_expires_at: string;
             /** @enum {string} */
             mime_type: "image/jpeg" | "image/png";
-            /** @enum {string} */
-            source_kind: "user_original" | "generated_preview" | "bundled_reference" | "demo_example";
-            /** @enum {string} */
-            display_label: "原本" | "风格参考" | "效果示例";
         };
-        Operation: {
+        UserOriginalDisplayMedia: components["schemas"]["DisplayMediaBase"] & {
+            /** @constant */
+            source_kind: "user_original";
+            /** @constant */
+            display_label: "原本";
+        };
+        GeneratedPreviewDisplayMedia: components["schemas"]["DisplayMediaBase"] & {
+            /** @constant */
+            source_kind: "generated_preview";
+            /** @constant */
+            display_label: "风格参考";
+        };
+        BundledReferenceDisplayMedia: components["schemas"]["DisplayMediaBase"] & {
+            /** @constant */
+            source_kind: "bundled_reference";
+            /** @constant */
+            display_label: "风格参考";
+        };
+        DemoExampleDisplayMedia: components["schemas"]["DisplayMediaBase"] & {
+            /** @constant */
+            source_kind: "demo_example";
+            /** @constant */
+            display_label: "效果示例";
+        };
+        Operation: components["schemas"]["FailedOperation"] | components["schemas"]["NonFailedOperation"];
+        OperationBase: {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
@@ -1462,14 +1468,11 @@ export interface components {
             subject_type: string;
             /** Format: uuid */
             subject_id: string;
-            /** @enum {string} */
-            status: "accepted" | "running" | "retrying" | "succeeded" | "failed" | "cancelled" | "superseded";
             progress_bps: number;
             stage_code: string;
             public_message: string;
             retryable: boolean;
             error_code?: string;
-            trace_id?: string;
             result_type?: string;
             /** Format: uuid */
             result_id?: string;
@@ -1479,7 +1482,17 @@ export interface components {
             updated_at: string;
             /** Format: date-time */
             finished_at?: string;
-        } & unknown;
+        };
+        FailedOperation: components["schemas"]["OperationBase"] & {
+            /** @constant */
+            status: "failed";
+            trace_id: string;
+        };
+        NonFailedOperation: components["schemas"]["OperationBase"] & {
+            /** @enum {string} */
+            status: "accepted" | "running" | "retrying" | "succeeded" | "cancelled" | "superseded";
+            trace_id?: string;
+        };
         Assessment: {
             /** Format: uuid */
             id: string;
@@ -2736,6 +2749,8 @@ export interface operations {
             query?: {
                 /** @description 仅返回已保存记录 */
                 saved?: boolean;
+                /** @description 按状态过滤；active 表示当前活跃预览 */
+                state?: "active";
             };
             header?: never;
             path?: never;
@@ -3072,8 +3087,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description 分享令牌 */
-                token: string;
+                /** @description GET 语义下为公开分享令牌 */
+                share_ref: string;
             };
             cookie?: never;
         };
@@ -3100,8 +3115,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description 分享卡 ID */
-                id: string;
+                /** @description DELETE 语义下为分享卡 ID */
+                share_ref: string;
             };
             cookie?: never;
         };
