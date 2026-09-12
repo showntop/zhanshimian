@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/media"
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/storage"
@@ -36,6 +37,7 @@ type Service struct {
 	planGroupGenerator     provider.PlanGroupGenerator
 	lookGenerator          provider.LookGenerator
 	orbitGenerator         provider.OrbitGenerator
+	orbitExtractor         media.Extractor
 	outfitAdvisor          provider.OutfitAdvisor
 	purchaseAdvisor        provider.OutfitAdvisor
 	advisorChat            provider.AdvisorChat
@@ -140,7 +142,8 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 		repo: repo, storage: objects, analyzer: analyzer, hairGenerator: hairGenerator,
 		planGroupGenerator: planGroupGenerator,
 		lookGenerator:      lookGenerator, orbitGenerator: orbitGenerator,
-		outfitAdvisor: outfitAdvisor, purchaseAdvisor: purchaseAdvisor,
+		orbitExtractor: media.NewFFMPEGExtractor(),
+		outfitAdvisor:  outfitAdvisor, purchaseAdvisor: purchaseAdvisor,
 		advisorChat: advisorChat, todayPlanner: todayPlanner, weather: weather,
 		wechat: wechat, wechatApp: wechatApp, apple: apple, sms: smsSender,
 		smsRatePerPhonePerHour: smsPerPhone,
@@ -152,6 +155,7 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 	service.handlers = map[domain.TaskType]TaskHandler{
 		domain.TaskTypeAnalysis:    analysisTaskHandler{service},
 		domain.TaskTypeHairPreview: hairPreviewTaskHandler{service},
+		domain.TaskTypeBodyOrbit:   bodyOrbitTaskHandler{service},
 		domain.TaskTypePlanGroup:   planGroupTaskHandler{service},
 		domain.TaskTypePlanLook:    planLookTaskHandler{service},
 		domain.TaskTypeTodayLook:   todayLookTaskHandler{service},

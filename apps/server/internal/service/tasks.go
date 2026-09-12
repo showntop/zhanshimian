@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/media"
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
 )
@@ -45,6 +47,10 @@ type todayLookTaskHandler struct{ service *Service }
 
 func (todayLookTaskHandler) TaskType() domain.TaskType { return domain.TaskTypeTodayLook }
 
+type bodyOrbitTaskHandler struct{ service *Service }
+
+func (bodyOrbitTaskHandler) TaskType() domain.TaskType { return domain.TaskTypeBodyOrbit }
+
 // ---- 重试策略（一张表） ----
 
 // taskMaxAttempts is the whole retry budget: content jobs get three runs,
@@ -56,6 +62,7 @@ var taskMaxAttempts = map[domain.TaskType]int{
 	domain.TaskTypePlanGroup:   3,
 	domain.TaskTypePlanLook:    2,
 	domain.TaskTypeTodayLook:   2,
+	domain.TaskTypeBodyOrbit:   2,
 }
 
 var taskTimeouts = map[domain.TaskType]time.Duration{
@@ -64,6 +71,7 @@ var taskTimeouts = map[domain.TaskType]time.Duration{
 	domain.TaskTypePlanGroup:   5 * time.Minute,
 	domain.TaskTypePlanLook:    5 * time.Minute,
 	domain.TaskTypeTodayLook:   5 * time.Minute,
+	domain.TaskTypeBodyOrbit:   5 * time.Minute,
 }
 
 // staleAnalysisTimeout 是 GetAnalysis 读路径兜底的孤儿判定阈：
@@ -82,6 +90,7 @@ var taskTypeOrder = []domain.TaskType{
 	domain.TaskTypePlanGroup,
 	domain.TaskTypePlanLook,
 	domain.TaskTypeTodayLook,
+	domain.TaskTypeBodyOrbit,
 }
 
 // permanentTaskError wraps causes that must never be retried (provider not
@@ -627,6 +636,132 @@ func (s *Service) processTodayLook(ctx context.Context, task domain.Task) (strin
 	return job.PlanID, nil
 }
 
+func (s *Service) processBodyOrbit(ctx context.Context, task domain.Task) (string, error) {
+	var payload domain.BodyOrbitTaskPayload
+	if err := decodeTaskPayload(task, &payload); err != nil {
+		return "", err
+	}
+	work, err := s.repo.GetBodyOrbitWork(ctx, task.UserID, payload.PresentationID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return "", repository.ErrTaskRemoved
+	}
+	if err != nil {
+		return "", err
+	}
+	jobCtx := provider.WithInvocationSource(ctx, "body_orbit:"+payload.PresentationID)
+	_ = s.repo.UpdateTaskProgress(jobCtx, task.ID, 12, "正在读取全身和正脸")
+	body, face, bodyMIME, faceMIME, err := s.loadOrbitPhotos(jobCtx, work)
+	if err != nil {
+		return "", err
+	}
+	if s.orbitGenerator == nil {
+		return "", newPermanentTaskError(errors.New("orbit generator is not configured"))
+	}
+	_ = s.repo.UpdateTaskProgress(jobCtx, task.ID, 40, "正在生成环绕预览")
+	output, err := s.orbitGenerator.Generate(jobCtx, provider.OrbitInput{
+		Body: body, Face: face, BodyMIME: bodyMIME, FaceMIME: faceMIME,
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(output.VideoData) == 0 || output.MIMEType != "video/mp4" {
+		return "", newPermanentTaskError(errors.New("orbit provider returned an unsupported video format"))
+	}
+	_ = s.repo.UpdateTaskProgress(jobCtx, task.ID, 72, "正在抽出转盘静帧")
+	var extracted []media.Frame
+	var extractErr error
+	if s.orbitExtractor != nil {
+		extracted, extractErr = s.orbitExtractor.Extract(jobCtx, output.VideoData, output.Duration, media.OrbitFrameCount)
+	} else {
+		extractErr = errors.New("orbit extractor is not configured")
+	}
+	if extractErr != nil || len(extracted) < media.OrbitMinKeepFrames {
+		s.loggerOrDefault().Warn("body orbit extract degraded; keeping video without frames",
+			"presentation_id", payload.PresentationID, "frames", len(extracted), "error", extractErr)
+		extracted = nil
+	}
+
+	writeCtx, writeCancel := writeContext()
+	defer writeCancel()
+	_ = s.repo.UpdateTaskProgress(writeCtx, task.ID, 95, "正在保存")
+	videoKey := fmt.Sprintf("%s/generated/body-orbit/%s.mp4", task.UserID, payload.PresentationID)
+	storedVideoKey, saveErr := s.storage.Save(writeCtx, videoKey, bytes.NewReader(output.VideoData))
+	if saveErr != nil {
+		return "", saveErr
+	}
+	savedKeys := []string{storedVideoKey}
+	videoURL := "/uploads/" + storedVideoKey
+	orbitFrames := make([]domain.OrbitFrame, 0, len(extracted))
+	frameKeys := make([]string, 0, len(extracted))
+	for i, frame := range extracted {
+		key := fmt.Sprintf("%s/generated/body-orbit/%s/%d.jpg", task.UserID, payload.PresentationID, i)
+		storedKey, frameErr := s.storage.Save(writeCtx, key, bytes.NewReader(frame.JPEG))
+		if frameErr != nil {
+			for _, saved := range savedKeys {
+				_ = s.storage.Delete(writeCtx, saved)
+			}
+			return "", frameErr
+		}
+		savedKeys = append(savedKeys, storedKey)
+		orbitFrames = append(orbitFrames, domain.OrbitFrame{Yaw: frame.Yaw, URL: "/uploads/" + storedKey})
+		frameKeys = append(frameKeys, storedKey)
+	}
+	durationMS := int(output.Duration / time.Millisecond)
+	if err := s.repo.ApplyBodyOrbitResult(writeCtx, payload.PresentationID, videoURL, storedVideoKey, durationMS, orbitFrames, frameKeys, output.ProviderVersion); err != nil {
+		for _, saved := range savedKeys {
+			_ = s.storage.Delete(writeCtx, saved)
+		}
+		if errors.Is(err, repository.ErrTaskRemoved) {
+			return "", repository.ErrTaskRemoved
+		}
+		s.loggerOrDefault().Error("complete body orbit", "presentation_id", payload.PresentationID, "error", err)
+		return "", err
+	}
+	return payload.PresentationID, nil
+}
+
+func (s *Service) loadOrbitPhotos(ctx context.Context, work domain.BodyPresentationInput) (body, face []byte, bodyMIME, faceMIME string, err error) {
+	assets, err := s.repo.GetMediaAssets(ctx, []string{work.BodyMediaID, work.FaceMediaID})
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil, "", "", newPermanentTaskError(errors.New("body orbit photos are missing"))
+	}
+	if err != nil {
+		return nil, nil, "", "", err
+	}
+	byID := make(map[string]domain.MediaAsset, len(assets))
+	for _, asset := range assets {
+		byID[asset.ID] = asset
+	}
+	bodyAsset, hasBody := byID[work.BodyMediaID]
+	faceAsset, hasFace := byID[work.FaceMediaID]
+	if !hasBody || !hasFace {
+		return nil, nil, "", "", newPermanentTaskError(errors.New("body orbit photos are missing"))
+	}
+	body, bodyMIME, err = s.readOrbitPhoto(ctx, bodyAsset)
+	if err != nil {
+		return nil, nil, "", "", err
+	}
+	face, faceMIME, err = s.readOrbitPhoto(ctx, faceAsset)
+	if err != nil {
+		return nil, nil, "", "", err
+	}
+	return body, face, bodyMIME, faceMIME, nil
+}
+
+func (s *Service) readOrbitPhoto(ctx context.Context, asset domain.MediaAsset) ([]byte, string, error) {
+	reader, err := s.storage.Open(ctx, asset.StorageKey)
+	if err != nil {
+		return nil, "", fmt.Errorf("open %s photo: %w", asset.Kind, err)
+	}
+	defer reader.Close()
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, "", fmt.Errorf("read %s photo: %w", asset.Kind, err)
+	}
+	data, mime := constrainEditImage(data, asset.MIMEType)
+	return data, mime, nil
+}
+
 func (h analysisTaskHandler) Handle(ctx context.Context, task domain.Task) (string, error) {
 	return h.service.processAnalysis(ctx, task)
 }
@@ -645,6 +780,10 @@ func (h planLookTaskHandler) Handle(ctx context.Context, task domain.Task) (stri
 
 func (h todayLookTaskHandler) Handle(ctx context.Context, task domain.Task) (string, error) {
 	return h.service.processTodayLook(ctx, task)
+}
+
+func (h bodyOrbitTaskHandler) Handle(ctx context.Context, task domain.Task) (string, error) {
+	return h.service.processBodyOrbit(ctx, task)
 }
 
 // ---- worker 基础设施（沿用已验证语义） ----
