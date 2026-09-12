@@ -5,11 +5,25 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/storage"
 )
+
+type refreshStorageStub struct {
+	storage.ObjectStorage
+	refreshed map[string]string
+}
+
+func (s refreshStorageStub) RefreshURL(value string, _ time.Duration) (string, bool) {
+	if refreshed, ok := s.refreshed[value]; ok {
+		return refreshed, true
+	}
+	return "", false
+}
 
 func TestAdvisorReplyUsesWardrobeAndTodayContext(t *testing.T) {
 	today := domain.TodayPlan{ID: "today-1", Title: "轻薄利落", Context: domain.TodayContext{City: "杭州", Condition: "小雨", Temperature: 22, Schedule: "通勤"}}
@@ -60,8 +74,8 @@ func (r *todayPlanRepoStub) GetUserProfile(context.Context, string) (domain.User
 }
 
 // 未显式指定报告时取最新报告参与 grounding。
-func (r *todayPlanRepoStub) LatestReport(context.Context, string) (domain.Report, error) {
-	return domain.Report{ID: "report-1"}, nil
+func (r *todayPlanRepoStub) LatestReport(context.Context, string) (domain.AssessmentReport, error) {
+	return domain.AssessmentReport{Report: domain.Report{ID: "report-1"}}, nil
 }
 
 // 无已入队的今日搭配图任务：任务投影为空。

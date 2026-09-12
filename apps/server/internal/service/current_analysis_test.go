@@ -40,8 +40,8 @@ func TestGetCurrentAnalysisReturnsInFlightAnalysis(t *testing.T) {
 	}
 	repo := currentAnalysisRepoStub{
 		tasks: []domain.Task{{
-			Type:      string(domain.TaskTypeAnalysis),
-			Status:    domain.TaskProcessing,
+			Type:      domain.TaskTypeAnalysis,
+			Status:    domain.TaskQueued,
 			Payload:   payload,
 			UpdatedAt: time.Now(),
 		}},

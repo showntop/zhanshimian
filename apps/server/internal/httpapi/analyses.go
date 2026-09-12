@@ -45,7 +45,7 @@ func (a *API) getReport(w http.ResponseWriter, r *http.Request) {
 		a.writeServiceError(w, r, err)
 		return
 	}
-	writeData(w, http.StatusOK, item)
+	writeData(w, http.StatusOK, item.Report)
 }
 
 func (a *API) getCurrentReport(w http.ResponseWriter, r *http.Request) {
@@ -54,5 +54,5 @@ func (a *API) getCurrentReport(w http.ResponseWriter, r *http.Request) {
 		a.writeServiceError(w, r, err)
 		return
 	}
-	writeData(w, http.StatusOK, item)
+	writeData(w, http.StatusOK, item.Report)
 }

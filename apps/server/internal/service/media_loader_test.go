@@ -35,8 +35,8 @@ func TestAnalysisMediaLoaderReadsProviderImages(t *testing.T) {
 		}
 	}
 	repo := mediaRepositoryStub{assets: []domain.MediaAsset{
-		{ID: "face-id", Kind: "face", StorageKey: "user/face.jpg", MIMEType: "image/jpeg"},
-		{ID: "side-id", Kind: "side", StorageKey: "user/side.jpg", MIMEType: "image/jpeg"},
+		{ID: "face-id", Purpose: domain.MediaPurposeFace, ObjectKey: "user/face.jpg", MIMEType: "image/jpeg"},
+		{ID: "side-id", Purpose: domain.MediaPurposeSide, ObjectKey: "user/side.jpg", MIMEType: "image/jpeg"},
 	}}
 	loader := NewAnalysisMediaLoader(repo, objects, "https://api.example.test/", 1024, "")
 
@@ -61,7 +61,7 @@ func TestAnalysisMediaLoaderEnforcesProviderLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	loader := NewAnalysisMediaLoader(mediaRepositoryStub{assets: []domain.MediaAsset{
-		{ID: "face-id", Kind: "face", StorageKey: "user/face.jpg", MIMEType: "image/jpeg"},
+		{ID: "face-id", Purpose: domain.MediaPurposeFace, ObjectKey: "user/face.jpg", MIMEType: "image/jpeg"},
 	}}, objects, "http://127.0.0.1:58000", 3, "")
 
 	if _, err := loader.Load(context.Background(), []string{"face-id"}); err == nil {
@@ -82,7 +82,7 @@ func TestAnalysisMediaLoaderReadsDemoAssetFromDisk(t *testing.T) {
 		t.Fatal(err)
 	}
 	loader := NewAnalysisMediaLoader(mediaRepositoryStub{assets: []domain.MediaAsset{
-		{ID: "demo-id", Kind: "outfit", StorageKey: "demo/outfit.png", MIMEType: "image/png"},
+		{ID: "demo-id", Purpose: domain.MediaPurpose("outfit"), ObjectKey: "demo/outfit.png", MIMEType: "image/png"},
 	}}, objects, "https://api.example.test/", 1024, assetDir)
 
 	images, err := loader.Load(context.Background(), []string{"demo-id"})

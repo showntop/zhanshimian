@@ -47,7 +47,7 @@ func TestLatestDiagnosticRejectsUnknownKind(t *testing.T) {
 func TestLatestDiagnosticHydratesImageURL(t *testing.T) {
 	svc := newDiagnosticService(&diagnosticRepoStub{
 		latest: domain.ToolResult{ID: "d1", Kind: "outfit", Conclusion: "先改一处", MediaID: "m1"},
-		assets: []domain.MediaAsset{{ID: "m1", Kind: "outfit", StorageKey: "uploads/outfit.jpg"}},
+		assets: []domain.MediaAsset{{ID: "m1", Purpose: domain.MediaPurpose("outfit"), ObjectKey: "uploads/outfit.jpg"}},
 	})
 	got, err := svc.LatestDiagnostic(context.Background(), "user-1", "outfit")
 	if err != nil {

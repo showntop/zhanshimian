@@ -482,6 +482,24 @@ func (s *Service) processHairPreview(ctx context.Context, task domain.Task) (str
 	return payload.PreviewID, nil
 }
 
+// legacyPlanFindings maps immutable report findings onto the pre-rebuild
+// finding shape still consumed by the legacy plan group generator; the
+// mapping disappears with the legacy planning path at Peripherals/Cutover.
+func legacyPlanFindings(findings []domain.ReportFinding) []domain.Finding {
+	out := make([]domain.Finding, 0, len(findings))
+	for _, finding := range findings {
+		out = append(out, domain.Finding{
+			ID:       finding.ID,
+			Label:    finding.Label,
+			Category: finding.Category,
+			Detail:   finding.VisibleObservation,
+			AnchorX:  finding.Anchor.X,
+			AnchorY:  finding.Anchor.Y,
+		})
+	}
+	return out
+}
+
 // processPlanGroup generates the general plan group from the stored report
 // (analysis no longer authors plans). Idempotent: an existing group completes
 // the task immediately; otherwise AI-authored plans are persisted and their
@@ -513,7 +531,7 @@ func (s *Service) processPlanGroup(ctx context.Context, task domain.Task) (strin
 			ImpressionTags: report.ImpressionTags,
 			PriorityTitle:  report.PriorityTitle,
 			PriorityCopy:   report.PriorityCopy,
-			Findings:       report.Findings,
+			Findings:       legacyPlanFindings(report.Findings),
 		})
 		if err != nil {
 			return "", err

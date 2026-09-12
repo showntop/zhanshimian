@@ -79,10 +79,13 @@ type Repository interface {
 	// FailAnalysisPresentation writes the user-facing failure state onto the
 	// analysis row itself (the queue state lives in tasks).
 	FailAnalysisPresentation(ctx context.Context, analysisID, stage, message string) error
-	GetReport(ctx context.Context, userID, reportID string) (domain.Report, error)
+	// GetReport/LatestReport keep their pre-rebuild names so the legacy
+	// report paths compile until Peripherals/Cutover deletes them; both now
+	// return the immutable assessment report envelope.
+	GetReport(ctx context.Context, userID, reportID string) (domain.AssessmentReport, error)
 	// LatestReport returns the user's most recent report, so clients whose
 	// local cache was wiped (e.g. reinstalled mini-program) can recover it.
-	LatestReport(ctx context.Context, userID string) (domain.Report, error)
+	LatestReport(ctx context.Context, userID string) (domain.AssessmentReport, error)
 
 	// ---- 方案 ----
 	ListPlans(ctx context.Context, userID, reportID, scene string) ([]domain.Plan, error)

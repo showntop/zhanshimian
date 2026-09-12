@@ -3,17 +3,14 @@ package service
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
-	"github.com/zhanshimian/server/internal/storage"
 )
 
 type analysisMediaRepositoryStub struct {
 	repository.Repository
 	analysis domain.Analysis
-	report   domain.Report
 	assets   []domain.MediaAsset
 }
 
@@ -29,9 +26,9 @@ func TestGetAnalysisReturnsOwnedMediaPreview(t *testing.T) {
 	repo := analysisMediaRepositoryStub{
 		analysis: domain.Analysis{ID: "11111111-1111-1111-1111-111111111111", MediaIDs: []string{"face-1", "side-1", "body-1"}},
 		assets: []domain.MediaAsset{
-			{ID: "face-1", Kind: "face", StorageKey: "user/face.jpg"},
-			{ID: "side-1", Kind: "side", StorageKey: "user/side.jpg"},
-			{ID: "body-1", Kind: "body", StorageKey: "user/body.jpg"},
+			{ID: "face-1", Purpose: domain.MediaPurposeFace, ObjectKey: "user/face.jpg"},
+			{ID: "side-1", Purpose: domain.MediaPurposeSide, ObjectKey: "user/side.jpg"},
+			{ID: "body-1", Purpose: domain.MediaPurposeBody, ObjectKey: "user/body.jpg"},
 		},
 	}
 	service := &Service{repo: repo, publicBaseURL: "https://api.example.test"}
@@ -42,14 +39,14 @@ func TestGetAnalysisReturnsOwnedMediaPreview(t *testing.T) {
 	if analysis.PreviewImageURL != "https://api.example.test/uploads/user/body.jpg" {
 		t.Fatalf("unexpected preview image: %q", analysis.PreviewImageURL)
 	}
-	if len(analysis.Media) != 3 || analysis.Media[1].URL != "https://api.example.test/uploads/user/side.jpg" {
+	if len(analysis.Media) != 3 || analysis.Media[1].ID != "side-1" {
 		t.Fatalf("analysis media was not hydrated: %#v", analysis.Media)
 	}
 }
 
 func TestAnalysisMediaUsesBundledDemoAsset(t *testing.T) {
 	service := &Service{publicBaseURL: "https://api.example.test"}
-	url := service.mediaAssetURL(domain.MediaAsset{Kind: "face", StorageKey: "demo/face.png"})
+	url := service.mediaAssetURL(domain.MediaAsset{Purpose: domain.MediaPurposeFace, ObjectKey: "demo/face.png"})
 	if url != "/assets/looks/natural.png" {
 		t.Fatalf("unexpected demo URL: %q", url)
 	}
@@ -58,22 +55,22 @@ func TestAnalysisMediaUsesBundledDemoAsset(t *testing.T) {
 func TestGetAnalysisMarksBundledDemoMedia(t *testing.T) {
 	repo := analysisMediaRepositoryStub{
 		analysis: domain.Analysis{ID: "11111111-1111-1111-1111-111111111111", MediaIDs: []string{"body-1"}},
-		assets:   []domain.MediaAsset{{ID: "body-1", Kind: "body", StorageKey: "demo/body.png"}},
+		assets:   []domain.MediaAsset{{ID: "body-1", Purpose: domain.MediaPurposeBody, ObjectKey: "demo/body.png", Origin: domain.MediaOriginDemo}},
 	}
 	service := &Service{repo: repo, publicBaseURL: "https://api.example.test"}
 	analysis, err := service.GetAnalysis(context.Background(), "user-1", "11111111-1111-1111-1111-111111111111")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(analysis.Media) != 1 || !analysis.Media[0].Demo {
+	if len(analysis.Media) != 1 || analysis.Media[0].Origin != domain.MediaOriginDemo {
 		t.Fatalf("demo media provenance was not preserved: %#v", analysis.Media)
 	}
 }
 
 func TestAnalysisPreviewURLPrefersBodyPhoto(t *testing.T) {
 	repo := analysisMediaRepositoryStub{assets: []domain.MediaAsset{
-		{ID: "body-1", Kind: "body", StorageKey: "user/body.jpg"},
-		{ID: "face-1", Kind: "face", StorageKey: "user/face.jpg"},
+		{ID: "body-1", Purpose: domain.MediaPurposeBody, ObjectKey: "user/body.jpg"},
+		{ID: "face-1", Purpose: domain.MediaPurposeFace, ObjectKey: "user/face.jpg"},
 	}}
 	service := &Service{repo: repo, publicBaseURL: "https://api.example.test"}
 	url, err := service.analysisPreviewURL(context.Background(), "user-1", []string{"body-1", "face-1"})
@@ -87,47 +84,6 @@ func TestAnalysisPreviewURLPrefersBodyPhoto(t *testing.T) {
 	}
 }
 
-type refreshStorageStub struct {
-	storage.ObjectStorage
-	refreshed map[string]string
-}
-
-func (s refreshStorageStub) RefreshURL(value string, _ time.Duration) (string, bool) {
-	if refreshed, ok := s.refreshed[value]; ok {
-		return refreshed, true
-	}
-	return "", false
-}
-
-func (s analysisMediaRepositoryStub) GetReport(_ context.Context, _, _ string) (domain.Report, error) {
-	return s.report, nil
-}
-
-func TestGetReportRefreshesExpiredSignedURL(t *testing.T) {
-	stale := "https://bucket.cos.ap-guangzhou.myqcloud.com/user/face.jpg?sign=expired"
-	repo := analysisMediaRepositoryStub{report: domain.Report{ID: "report-1", CurrentImageURL: stale}}
-	service := &Service{
-		repo:          repo,
-		publicBaseURL: "https://api.example.test",
-		storage:       refreshStorageStub{refreshed: map[string]string{stale: "https://bucket.cos.ap-guangzhou.myqcloud.com/user/face.jpg?sign=fresh"}},
-	}
-	report, err := service.GetReport(context.Background(), "user-1", "report-1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if report.CurrentImageURL != "https://bucket.cos.ap-guangzhou.myqcloud.com/user/face.jpg?sign=fresh" {
-		t.Fatalf("stale signed URL was not refreshed: %q", report.CurrentImageURL)
-	}
-}
-
-func TestGetReportExpandsRelativeStoredURL(t *testing.T) {
-	repo := analysisMediaRepositoryStub{report: domain.Report{ID: "report-1", CurrentImageURL: "/uploads/user/face.jpg"}}
-	service := &Service{repo: repo, publicBaseURL: "https://api.example.test"}
-	report, err := service.GetReport(context.Background(), "user-1", "report-1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if report.CurrentImageURL != "https://api.example.test/uploads/user/face.jpg" {
-		t.Fatalf("relative stored URL was not expanded: %q", report.CurrentImageURL)
-	}
+func (s analysisMediaRepositoryStub) GetReport(_ context.Context, _, _ string) (domain.AssessmentReport, error) {
+	return domain.AssessmentReport{}, repository.ErrNotFound
 }

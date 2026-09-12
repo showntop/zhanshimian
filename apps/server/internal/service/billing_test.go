@@ -179,7 +179,7 @@ func (r *memoryBillingRepo) GetUserProfile(context.Context, string) (domain.User
 }
 
 func (r *memoryBillingRepo) CreateAnalysis(_ context.Context, _ string, input domain.CreateAnalysisInput) (domain.Analysis, *domain.Task, error) {
-	return domain.Analysis{ID: "analysis-1", MediaIDs: input.MediaIDs}, &domain.Task{ID: "task-1", Type: string(domain.TaskTypeAnalysis)}, nil
+	return domain.Analysis{ID: "analysis-1", MediaIDs: input.MediaIDs}, &domain.Task{ID: "task-1", Type: domain.TaskTypeAnalysis}, nil
 }
 
 func (r *memoryBillingRepo) GetMediaAssetsForUser(context.Context, string, []string) ([]domain.MediaAsset, error) {

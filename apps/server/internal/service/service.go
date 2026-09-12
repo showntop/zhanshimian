@@ -643,29 +643,41 @@ func (s *Service) hydrateAnalysisMedia(ctx context.Context, userID string, analy
 	return analysis, nil
 }
 
-// pickReportPreviewImage chooses the full-body photo as the report hero image
-// when available, falling back to face and then to any uploaded photo.
-func (s *Service) pickReportPreviewImage(assets []domain.MediaAsset) string {
-	for _, kind := range []string{"body", "face"} {
+// pickPreviewAsset chooses the full-body photo as the report hero image when
+// available, falling back to face and then to any uploaded photo.
+func pickPreviewAsset(assets []domain.MediaAsset) (domain.MediaAsset, bool) {
+	for _, purpose := range []domain.MediaPurpose{domain.MediaPurposeBody, domain.MediaPurposeFace} {
 		for _, asset := range assets {
-			if string(asset.Purpose) == kind {
-				return s.mediaAssetURL(asset)
+			if asset.Purpose == purpose {
+				return asset, true
 			}
 		}
 	}
 	if len(assets) > 0 {
-		return s.mediaAssetURL(assets[0])
+		return assets[0], true
+	}
+	return domain.MediaAsset{}, false
+}
+
+// pickReportPreviewImage renders the hero asset with a loadable absolute URL
+// for API responses.
+func (s *Service) pickReportPreviewImage(assets []domain.MediaAsset) string {
+	if asset, ok := pickPreviewAsset(assets); ok {
+		return s.mediaAssetURL(asset)
 	}
 	return ""
 }
 
+// analysisPreviewURL returns the storable relative form: the value is
+// persisted on the report row and re-expanded on read, so it must not carry a
+// host or signature that expires.
 func (s *Service) analysisPreviewURL(ctx context.Context, userID string, mediaIDs []string) (string, error) {
 	assets, err := s.repo.GetMediaAssetsForUser(ctx, userID, mediaIDs)
 	if err != nil {
 		return "", err
 	}
-	if url := s.pickReportPreviewImage(assets); url != "" {
-		return url, nil
+	if asset, ok := pickPreviewAsset(assets); ok {
+		return relativeAssetURL(asset), nil
 	}
 	return "", repository.ErrNotFound
 }
@@ -700,23 +712,15 @@ func demoMediaAssetPath(kind string) string {
 	return "/assets/looks/" + assetName
 }
 
-func (s *Service) GetReport(ctx context.Context, userID, id string) (domain.Report, error) {
-	report, err := s.repo.GetReport(ctx, userID, id)
-	if err == nil {
-		report.CurrentImageURL = s.resolveAssetURL(report.CurrentImageURL)
-	}
-	return report, err
+func (s *Service) GetReport(ctx context.Context, userID, id string) (domain.AssessmentReport, error) {
+	return s.repo.GetReport(ctx, userID, id)
 }
 
 // GetCurrentReport returns the user's most recent report. Clients key their
 // local cache by report ID, so a wiped cache (reinstalled mini-program) needs
 // this to rediscover the profile that still lives on the server.
-func (s *Service) GetCurrentReport(ctx context.Context, userID string) (domain.Report, error) {
-	report, err := s.repo.LatestReport(ctx, userID)
-	if err == nil {
-		report.CurrentImageURL = s.resolveAssetURL(report.CurrentImageURL)
-	}
-	return report, err
+func (s *Service) GetCurrentReport(ctx context.Context, userID string) (domain.AssessmentReport, error) {
+	return s.repo.LatestReport(ctx, userID)
 }
 
 func (s *Service) DeleteUserData(ctx context.Context, userID string) error {

@@ -15,10 +15,10 @@ import (
 
 type todayLookRepoStub struct {
 	repository.Repository
-	jobErr   error
-	job      domain.TodayPlanLookJob
-	applied  bool
-	appliedURL string
+	jobErr         error
+	job            domain.TodayPlanLookJob
+	applied        bool
+	appliedURL     string
 	appliedVersion string
 }
 
@@ -61,8 +61,8 @@ func (s *memoryStorageStub) Save(_ context.Context, key string, _ io.Reader) (st
 func todayTask(planID string, attempts int) domain.Task {
 	payload, _ := json.Marshal(domain.TodayLookTaskPayload{PlanID: planID})
 	return domain.Task{
-		ID: "task-today-1", UserID: "user-1", Type: string(domain.TaskTypeTodayLook),
-		Attempts: attempts, Payload: payload,
+		ID: "task-today-1", UserID: "user-1", Type: domain.TaskTypeTodayLook,
+		Attempt: attempts, Payload: payload,
 	}
 }
 
@@ -72,7 +72,7 @@ func TestProcessTodayLookCompletesWithGeneratedImage(t *testing.T) {
 	generator := &capturingLookGenerator{output: provider.LookOutput{ImageData: []byte("png-bytes"), MIMEType: "image/png", ProviderVersion: "stub-look-v1"}}
 	store := &memoryStorageStub{}
 	repo := &todayLookRepoStub{job: domain.TodayPlanLookJob{PlanID: "today-1", ReportID: "report-1", UserID: "user-1", Title: "休息日·利落黑调微整", Summary: "肩线拉合身",
-		Steps: []domain.TodayPlanStep{{Category: "hair", Title: "重心后移", Copy: "头顶发根梳向后面"}, {Category: "outfit", Title: "肩线归位", Copy: "选合肩版型"}},
+		Steps:    []domain.TodayPlanStep{{Category: "hair", Title: "重心后移", Copy: "头顶发根梳向后面"}, {Category: "outfit", Title: "肩线归位", Copy: "选合肩版型"}},
 		MediaIDs: []string{"media-1"}}}
 	service := &Service{repo: repo, storage: store, lookGenerator: generator}
 

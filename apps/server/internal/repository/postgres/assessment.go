@@ -369,6 +369,12 @@ func (s *Store) GetReport(ctx context.Context, userID, reportID string) (Assessm
 		WHERE r.user_id=$1::uuid AND r.id=$2::uuid`, userID, reportID)
 }
 
+// LatestReport adapts the legacy repository reader to the published-report
+// pointer until Peripherals/Cutover removes the legacy path.
+func (s *Store) LatestReport(ctx context.Context, userID string) (AssessmentReport, error) {
+	return s.GetCurrentReport(ctx, userID)
+}
+
 func (s *Store) GetCurrentReport(ctx context.Context, userID string) (AssessmentReport, error) {
 	return s.loadPublishedReport(ctx, `
 		SELECT `+publishedReportColumns+`

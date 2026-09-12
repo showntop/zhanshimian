@@ -114,8 +114,8 @@ func newTaskTestService(repo repository.Repository, analyzer provider.Analyzer, 
 func analysisTask(attempts int) domain.Task {
 	payload, _ := json.Marshal(domain.AnalysisTaskPayload{AnalysisID: "analysis-1"})
 	return domain.Task{
-		ID: "task-1", UserID: "user-1", Type: string(domain.TaskTypeAnalysis),
-		Attempts: attempts, Payload: payload,
+		ID: "task-1", UserID: "user-1", Type: domain.TaskTypeAnalysis,
+		Attempt: attempts, Payload: payload,
 	}
 }
 

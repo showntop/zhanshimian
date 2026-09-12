@@ -24,8 +24,7 @@ func (s *Service) HomeBootstrap(ctx context.Context, user domain.User) (domain.H
 		return bootstrap, err
 	}
 	if report, err := s.repo.LatestReport(ctx, user.ID); err == nil {
-		report.CurrentImageURL = s.resolveAssetURL(report.CurrentImageURL)
-		bootstrap.Report = &report
+		bootstrap.Report = &report.Report
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return bootstrap, err
 	}

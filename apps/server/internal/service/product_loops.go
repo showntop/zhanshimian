@@ -119,7 +119,7 @@ func (s *Service) GenerateTodayPlan(ctx context.Context, userID string, input do
 		}
 		report, reportErr := s.repo.GetReport(ctx, userID, input.ReportID)
 		if reportErr == nil {
-			grounding.Report = &report
+			grounding.Report = &report.Report
 		} else if !errors.Is(reportErr, repository.ErrNotFound) {
 			return domain.TodayPlan{}, nil, reportErr
 		}
@@ -128,7 +128,7 @@ func (s *Service) GenerateTodayPlan(ctx context.Context, userID string, input do
 		if reportErr != nil {
 			return domain.TodayPlan{}, nil, reportErr
 		}
-		grounding.Report = &report
+		grounding.Report = &report.Report
 		input.ReportID = report.ID
 	}
 	// 真实 provider 失败时直接报错，绝不回退到模板假数据；模板内容只由
@@ -478,7 +478,7 @@ func (s *Service) loadAdvisorGrounding(ctx context.Context, userID string, input
 	if reportID != "" {
 		report, err := s.repo.GetReport(ctx, userID, reportID)
 		if err == nil {
-			grounding.Report = &report
+			grounding.Report = &report.Report
 		} else if !errors.Is(err, repository.ErrNotFound) {
 			return grounding, err
 		}
