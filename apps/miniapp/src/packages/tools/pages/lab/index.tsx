@@ -44,7 +44,7 @@ export default function Lab() {
         </View>
         {FEATURES.map((feature, i) => (
           <View key={feature.key} className={`lab__card fade-up delay-${i + 1}`}>
-            <ExampleImage className="lab__card-img" slug={feature.slug} variant="full" badgeText="风格参考" />
+            <ExampleImage className="lab__card-img" slug={feature.slug} variant="full" badgeText="风格参考" anchor="top" />
             <View className="lab__card-copy">
               <View className="lab__card-head">
                 <Text className="lab__card-name">{feature.name}</Text>

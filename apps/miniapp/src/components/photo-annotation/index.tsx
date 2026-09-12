@@ -18,7 +18,8 @@ export function mapAnchorInFrame(
   ax: number,
   ay: number,
   frameW: number,
-  frameH: number
+  frameH: number,
+  objectPosition: 'center' | 'top' = 'center',
 ): { x: number; y: number } {
   if (!dims) return { x: ax * frameW, y: ay * frameH }
   const scale = Math.max(frameW / dims.w, frameH / dims.h)
@@ -26,7 +27,9 @@ export function mapAnchorInFrame(
   const scaledH = dims.h * scale
   return {
     x: (frameW - scaledW) / 2 + ax * scaledW,
-    y: (frameH - scaledH) / 2 + ay * scaledH,
+    y: objectPosition === 'top'
+      ? ay * scaledH
+      : (frameH - scaledH) / 2 + ay * scaledH,
   }
 }
 
@@ -56,6 +59,8 @@ interface PhotoAnnotationLayerProps {
   frameW: number
   frameH: number
   photoDims?: { w: number; h: number }
+  /** 与照片裁切对齐：人像短框用 top，穿搭原图铺满用 center。 */
+  objectPosition?: 'center' | 'top'
   onTap: (item: AnnotationItem) => void
   showDrawer?: boolean
 }
@@ -70,6 +75,7 @@ export default function PhotoAnnotationLayer({
   frameW,
   frameH,
   photoDims,
+  objectPosition = 'center',
   onTap,
   showDrawer = true,
 }: PhotoAnnotationLayerProps) {
@@ -78,7 +84,7 @@ export default function PhotoAnnotationLayer({
 
   const renderTag = (entry: { item: AnnotationItem; topPct: number }, side: 'left' | 'right', index: number) => {
     const { item, topPct } = entry
-    const a = mapAnchorInFrame(photoDims, item.anchorX, item.anchorY, frameW, frameH)
+    const a = mapAnchorInFrame(photoDims, item.anchorX, item.anchorY, frameW, frameH, objectPosition)
     const startX = side === 'left' ? EDGE + CAP_W : frameW - EDGE - CAP_W
     const centerY = (topPct / 100) * frameH + CAP_H / 2
     const dx = a.x - startX

@@ -101,7 +101,7 @@ export default function Feedback() {
         <View className="fb__hero fade-up">
           <View className="fb__shot pressable" onClick={choosePhoto}>
             {photoPath ? (
-              <Image className="fb__shot-img" src={photoPath} mode="aspectFill" />
+              <Image className="fb__shot-img" src={photoPath} mode="widthFix" />
             ) : (
               <View className="fb__shot-empty">
                 <Text className="fb__shot-plus">＋</Text>
@@ -112,7 +112,7 @@ export default function Feedback() {
           <View className="fb__arrow">→</View>
           <View className="fb__ref">
             {referenceImage ? (
-              <Image className="fb__shot-img" src={referenceImage} mode="aspectFill" />
+              <Image className="fb__shot-img" src={referenceImage} mode="widthFix" />
             ) : (
               <View className="fb__shot-empty">
                 <Text className="fb__shot-hint">方案参考图暂不可用</Text>

@@ -22,6 +22,8 @@ const CATEGORIES = [
 ] as const
 
 const NAV = getNavMetrics()
+const { windowWidth = 375, windowHeight = 667 } = Taro.getSystemInfoSync()
+const PLAN_FRAME_ASPECT = windowWidth / windowHeight
 
 /** 发型师参考卡参数（G2）：来自方案步骤 details 的 hair_spec；缺失则隐藏入口。 */
 interface HairSpec {
@@ -159,13 +161,14 @@ export default function PlanDetail() {
           <View className="pd__hero-frame">
             <CompareSlider
               single={!currentImage}
-              current={<ExampleImage className="pd__hero-img" src={currentImage} user mode="aspectFill" />}
+              current={<ExampleImage className="pd__hero-img" src={currentImage} user anchor="top" frameAspect={PLAN_FRAME_ASPECT} />}
               plan={
                 <ExampleImage
                   className="pd__hero-img"
                   src={planImage}
                   badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
-                  mode="aspectFill"
+                  anchor="top"
+                  frameAspect={PLAN_FRAME_ASPECT}
                 />
               }
             />
@@ -234,6 +237,7 @@ export default function PlanDetail() {
             className="pd__sheet-img"
             src={planImage}
             badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
+            anchor="top"
           />
           <View className="pd__spec">
             {hairSpec?.length ? (

@@ -294,6 +294,7 @@ export default function Home() {
                         slug="natural"
                         variant="portrait"
                         badgeText="风格参考"
+                        anchor="top"
                       />
                       <Text className="home__preview-caption">照片</Text>
                     </View>
@@ -303,6 +304,7 @@ export default function Home() {
                         slug="natural"
                         variant="report"
                         badgeText="风格参考"
+                        anchor="top"
                       />
                       <View className="home__preview-focus">
                         <View className="home__preview-focus-dot" />
@@ -315,6 +317,7 @@ export default function Home() {
                         slug="sharp"
                         variant="plan"
                         badgeText="风格参考"
+                        anchor="top"
                       />
                       <Text className="home__preview-caption">方案</Text>
                     </View>
@@ -359,6 +362,7 @@ export default function Home() {
                   className="home__hero-img"
                   src={todayPlan.generated_image_url || todayPlan.image_url}
                   badgeText={lookBadge(todayPlan.look_provider, todayPlan.generated_image_url)}
+                  anchor="top"
                 />
               </View>
             </View>
@@ -379,7 +383,8 @@ export default function Home() {
                       className="home__report-image"
                       src={reportImage}
                       user={!reportImageIsDemo}
-                      mode="aspectFill"
+                      anchor="top"
+                      frameAspect={248 / 314}
                       badgeText={reportImageIsDemo ? '效果示例' : ''}
                     />
                     <View className="home__report-shade" />
@@ -472,6 +477,7 @@ export default function Home() {
                   className="home__recent-img"
                   src={recentPlan.generated_image_url || recentPlan.image_url}
                   badgeText={lookBadge(recentPlan.look_provider, recentPlan.generated_image_url)}
+                  anchor="top"
                 />
                 <View className={`home__recent-copy ${enter(3)}`}>
                   <Text className="home__recent-name">{recentPlan.name}</Text>

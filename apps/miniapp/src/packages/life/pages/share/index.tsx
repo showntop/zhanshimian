@@ -135,7 +135,7 @@ export default function SharePage() {
           <Text className="sh__title">{snapshot.title || '我的形象方案'}</Text>
           {snapshot.summary ? <Text className="sh__summary">{snapshot.summary}</Text> : null}
           {lookImage(snapshot.image_url) ? (
-            <ExampleImage className="sh__image" src={snapshot.image_url} badgeText="风格参考" />
+            <ExampleImage className="sh__image" src={snapshot.image_url} badgeText="风格参考" anchor="top" />
           ) : null}
           <View className="sh__foot">
             <Text className="sh__foot-note">由 AI 形象顾问生成 · 效果仅供参考</Text>

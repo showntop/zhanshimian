@@ -27,8 +27,8 @@ const PHOTO_LABEL: Record<string, string> = { face: '正脸', side: '侧脸', bo
 
 type PhotoKind = (typeof PHOTO_ORDER)[number]
 
-// 照片按 aspectFill 铺满全宽（超出部分上下裁切），切换来源照片时
-// 只有相框内的图片滑动。hero 高度约 72% 视口，给标注与人物留足空间。
+// 照片按宽铺满、顶部锚定（全身照保留头部，多出的从底部裁）。
+// 切换来源照片时只有相框内的图片滑动。hero 高度约 72% 视口。
 const HERO_FULL_W = 750
 const { windowWidth = 375, windowHeight = 667 } = Taro.getSystemInfoSync()
 const HERO_H = Math.round((windowHeight * 0.72 * HERO_FULL_W) / (windowWidth || 375))
@@ -210,7 +210,8 @@ export default function Report() {
                       className="report__hero-img"
                       src={url}
                       user={!demo}
-                      mode="aspectFill"
+                      anchor="top"
+                      frameAspect={HERO_FULL_W / HERO_H}
                       badgeText={demo ? REPORT_COPY.demoMark : ''}
                       onLoad={(e) => {
                         const w = Number(e.detail.width)
@@ -234,6 +235,7 @@ export default function Report() {
                       frameW={HERO_FULL_W}
                       frameH={HERO_H}
                       photoDims={photoDims[kind]}
+                      objectPosition="top"
                       onTap={(item) => {
                         const found = kindFindings.find((f) => f.id === item.id)
                         if (found) tapAnchor(found)
@@ -268,7 +270,7 @@ export default function Report() {
                         className="report__film-img"
                         src={url}
                         user={!photoIsDemo(kind, url)}
-                        mode="aspectFill"
+                        anchor="top"
                       />
                     </View>
                     <Text className="report__film-label">{PHOTO_LABEL[kind]}</Text>

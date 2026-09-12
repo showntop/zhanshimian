@@ -174,6 +174,7 @@ export default function Today() {
               className="today__img"
               src={plan?.generated_image_url || plan?.image_url}
               badgeText={(plan?.look_provider ?? '').startsWith('demo') ? '效果示例' : '风格参考'}
+              anchor="top"
             />
             {aiBadge ? (
               <View className="today__img-badge">

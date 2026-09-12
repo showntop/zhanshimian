@@ -178,6 +178,7 @@ export default function Hair() {
                 slug={asLookSlug(styleId) ?? 'sharp'}
                 variant="hair"
                 badgeText="风格参考"
+                anchor="top"
               />
             )}
             {(mode === 'result' || (!sourceUrl && !running)) && (
@@ -228,6 +229,7 @@ export default function Hair() {
                 src={opt.image_url}
                 slug={!opt.image_url ? asLookSlug(opt.id) : undefined}
                 variant="hair"
+                anchor="top"
               />
               <Text className="hair__style-name">{opt.name}</Text>
             </View>

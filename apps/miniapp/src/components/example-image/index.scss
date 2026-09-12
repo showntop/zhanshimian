@@ -13,6 +13,26 @@
     display: block;
   }
 
+  // 人像顶对齐：衬底与可见图都从顶部起裁，多出的腿/背景从底部切掉。
+  &--anchor-top {
+    background-position: top center;
+  }
+
+  &--fill-width > &__img {
+    width: 100%;
+    height: auto;
+  }
+
+  // 图比相框更扁：按高铺满、水平居中裁侧，整个人仍在框内。
+  &--fill-height > &__img {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: auto;
+    height: 100%;
+    transform: translateX(-50%);
+  }
+
   &--empty {
     display: flex;
     align-items: center;

@@ -176,12 +176,13 @@ export default function Analysis() {
           {failed.media && failed.media.length > 0 ? (
             <View className="analysis-fail__film">
               {failed.media.slice(0, 3).map((media) => (
-                <Image
-                  key={media.kind}
-                  className="analysis-fail__thumb"
-                  src={userImage(media.url) || media.url}
-                  mode="aspectFill"
-                />
+                <View key={media.kind} className="analysis-fail__thumb">
+                  <Image
+                    className="analysis-fail__thumb-img"
+                    src={userImage(media.url) || media.url}
+                    mode="widthFix"
+                  />
+                </View>
               ))}
             </View>
           ) : null}
@@ -212,8 +213,8 @@ export default function Analysis() {
                 key={photos[0].kind}
                 className={`analysis__hero ${photos[0].demo ? 'example-soft' : ''}`}
                 src={photos[0].url}
-                mode="aspectFill"
-              />
+                  mode="widthFix"
+                />
             ) : null}
             {shown < 92 ? <View className="scan-sweep" /> : null}
             {photos.slice(1).map((photo, i) => (
@@ -221,7 +222,7 @@ export default function Analysis() {
                 key={photo.kind}
                 className={`analysis__mini analysis__mini--${i} ${photo.demo ? 'example-soft' : ''} ${shown >= 70 ? 'analysis__mini--rest' : ''}`}
               >
-                <Image className="analysis__mini-img" src={photo.url} mode="aspectFill" />
+                <Image className="analysis__mini-img" src={photo.url} mode="widthFix" />
               </View>
             ))}
             <Text className="analysis__portrait-mark">{shown >= 88 ? '即将完成' : 'AI 分析中'}</Text>

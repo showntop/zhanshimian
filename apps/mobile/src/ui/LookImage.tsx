@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, View, type ImageStyle, type StyleProp } from 'react-native'
+import { StyleSheet, Text, View, type ImageStyle, type StyleProp } from 'react-native'
+import { Image } from 'expo-image'
 import { exampleImage, isBundledAsset, lookImage, userImage } from '@zsm/core'
 import { colors, radius } from './theme'
 
@@ -34,7 +35,12 @@ export function LookImage({ src, slug, variant = 'full', user, badgeText, style 
 
   return (
     <View style={[styles.wrap, style]}>
-      <Image source={{ uri: url }} style={[styles.img, isExample && styles.soft]} resizeMode="cover" />
+      <Image
+        source={{ uri: url }}
+        style={[styles.img, isExample && styles.soft]}
+        contentFit="cover"
+        contentPosition="top"
+      />
       {isExample ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{badgeText || '风格参考'}</Text>

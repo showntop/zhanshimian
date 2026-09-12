@@ -181,10 +181,6 @@
     height: 100%;
     border-radius: 0;
 
-    .example-image__img {
-      transform: scale(1.04);
-    }
-
     .example-badge {
       top: 7rpx;
       right: 7rpx;
@@ -343,14 +339,6 @@
     height: 100%;
     min-height: 314rpx;
     border-radius: 0;
-
-    .example-image__img {
-      transform: scale(1.02);
-
-      &.example-soft {
-        transform: scale(1.1);
-      }
-    }
   }
 
   // 宽幅品牌色交叉渐隐：消除「绿卡旁贴一张矩形照片」的硬接缝；

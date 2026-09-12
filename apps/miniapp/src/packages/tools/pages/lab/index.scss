@@ -13,7 +13,7 @@
     background: var(--surface); border: 1rpx solid var(--line);
 
     &-img { width: 200rpx; height: 260rpx; border-radius: var(--radius-md); flex-shrink: 0; }
-    &-img.example-image, &-img .example-image__img { width: 200rpx; height: 260rpx; }
+    &-img.example-image { width: 200rpx; height: 260rpx; }
     &-copy { flex: 1; display: flex; flex-direction: column; gap: 10rpx; min-width: 0; }
     &-head { display: flex; align-items: center; justify-content: space-between; }
     &-name { font-size: 30rpx; font-weight: 600; color: var(--ink); }

@@ -90,7 +90,7 @@ export default function Profile() {
                   className="me__hero-photo"
                   src={report.current_image_url}
                   user={!isBundledAsset(report.current_image_url) && !report.provider_version?.startsWith('demo')}
-                  mode="aspectFill"
+                  anchor="top"
                 />
               ) : (
                 <View className="me__avatar">{(account?.nickname ?? 'U').slice(0, 1)}</View>
