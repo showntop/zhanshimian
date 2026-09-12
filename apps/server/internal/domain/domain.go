@@ -144,18 +144,6 @@ type Finding struct {
 	AnchorY float64 `json:"anchor_y"`
 }
 
-type Report struct {
-	ID              string    `json:"id"`
-	AnalysisID      string    `json:"analysis_id"`
-	CurrentImageURL string    `json:"current_image_url"`
-	ImpressionTags  []string  `json:"impression_tags"`
-	PriorityTitle   string    `json:"priority_title"`
-	PriorityCopy    string    `json:"priority_copy"`
-	Findings        []Finding `json:"findings"`
-	ProviderVersion string    `json:"provider_version"`
-	GeneratedAt     time.Time `json:"generated_at"`
-}
-
 // ---- 方案 ----
 
 type PlanStep struct {
