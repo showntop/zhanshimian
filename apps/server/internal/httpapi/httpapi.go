@@ -6,8 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -22,35 +20,6 @@ import (
 	"github.com/zhanshimian/server/internal/service/operation"
 	"github.com/zhanshimian/server/internal/storage"
 )
-
-type API struct {
-	service         *service.Service
-	media           *media.Service
-	operations      *operation.Service
-	idempotency     IdempotencyStore
-	logger          *slog.Logger
-	devLoginEnabled bool
-	runtime         RuntimeInfo
-}
-
-var errMediaUnavailable = errors.New("media service unavailable")
-var errOperationUnavailable = errors.New("operation service unavailable")
-
-type RuntimeInfo struct {
-	Environment           string
-	StorageProvider       string
-	WeatherProvider       string
-	WeChatLoginConfigured bool
-	WeChatAppConfigured   bool
-	AppleLoginConfigured  bool
-	SmsProvider           string
-	AIRoutes              map[string]string
-}
-
-type contextKey string
-
-const userKey contextKey = "user"
-const tokenKey contextKey = "token"
 
 // New 注册全部路由（契约见 contracts/openapi.yaml）。
 func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtime RuntimeInfo) http.Handler {
@@ -215,13 +184,6 @@ func (a *API) auth(next http.Handler) http.Handler {
 	})
 }
 
-func currentUser(r *http.Request) domain.User { return r.Context().Value(userKey).(domain.User) }
-
-func currentToken(r *http.Request) string {
-	token, _ := r.Context().Value(tokenKey).(string)
-	return token
-}
-
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
 	payload := map[string]any{
 		"status":                      "ok",
@@ -240,15 +202,6 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 		payload["jobs"] = nil
 	}
 	writeData(w, http.StatusOK, payload)
-}
-
-func decodeJSON(r *http.Request, target any) error {
-	decoder := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		return fmt.Errorf("请求内容格式不正确")
-	}
-	return nil
 }
 
 func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
@@ -298,17 +251,6 @@ func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 	}
 }
 
-func (a *API) internalError(w http.ResponseWriter, r *http.Request, err error) {
-	a.logger.Error("request failed", "path", r.URL.Path, "error", err)
-	writeError(w, r, http.StatusInternalServerError, "internal_error", "服务暂时不可用，请稍后重试")
-}
-
-func writeData(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{"data": value})
-}
-
 // taskRef 是 202/201 顶层附带的任务引用（契约 TaskRef：{id,type}）。
 type taskRef struct {
 	ID   string `json:"id"`
@@ -335,22 +277,4 @@ func domainTaskRef(task *domain.Task) *taskRef {
 
 func viewTaskRef(view domain.TaskView) *taskRef {
 	return &taskRef{ID: view.ID, Type: view.Type}
-}
-
-func writeError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{
-		"code": code, "message": message, "request_id": r.Header.Get("X-Request-ID"), "retryable": errorRetryable(code, status),
-	}})
-}
-
-func errorRetryable(code string, status int) bool {
-	switch code {
-	case "idempotency_in_progress":
-		return true
-	case "idempotency_conflict", "idempotency_key_required":
-		return false
-	}
-	return status >= 500 || status == http.StatusTooManyRequests
 }
