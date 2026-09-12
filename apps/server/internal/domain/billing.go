@@ -1,13 +1,18 @@
 package domain
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 const (
 	LedgerReserve  = "reserve"
+	LedgerSettle   = "settle"
 	LedgerRefund   = "refund"
 	LedgerWelcome  = "welcome"
 	LedgerPurchase = "purchase"
 
+	BillingRefOperation   = "operation"
 	BillingRefReservation = "reservation"
 	BillingRefTask        = "task"
 	BillingRefOrder       = "order"
@@ -35,6 +40,12 @@ const (
 	BillingReserved BillingReservationStatus = "reserved"
 	BillingSettled  BillingReservationStatus = "settled"
 	BillingRefunded BillingReservationStatus = "refunded"
+)
+
+var (
+	ErrInsufficientCredits = errors.New("insufficient credits")
+	ErrAlreadySettled      = errors.New("already settled")
+	ErrInvalidRefundReason = errors.New("invalid refund reason")
 )
 
 type BillingReservation struct {

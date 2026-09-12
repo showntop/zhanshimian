@@ -308,3 +308,200 @@ func (s *Store) FulfillBillingOrder(ctx context.Context, outTradeNo, wxOrderID s
 func scanBillingOrderInto(row *domain.BillingOrderRow, scanner interface{ Scan(dest ...any) error }) error {
 	return scanner.Scan(&row.ID, &row.UserID, &row.SKUID, &row.ProductID, &row.Credits, &row.AmountFen, &row.OutTradeNo, &row.WxOrderID, &row.Status, &row.CreatedAt, &row.UpdatedAt)
 }
+
+const reservationSelect = `
+	SELECT id::text, user_id::text, operation_id::text, kind, units, status,
+	       result_type, result_id::text, version, created_at, updated_at
+	FROM billing_reservations`
+
+func (s *Store) Reserve(ctx context.Context, in domain.ReserveBilling) (domain.BillingReservation, bool, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	var credits int
+	err = tx.QueryRow(ctx, `SELECT credits FROM billing_wallets WHERE user_id=$1::uuid FOR UPDATE`, in.UserID).Scan(&credits)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.BillingReservation{}, false, repository.ErrNotFound
+	}
+	if err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+
+	var owned bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations WHERE id=$1::uuid AND user_id=$2::uuid)`, in.OperationID, in.UserID).Scan(&owned); err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+	if !owned {
+		return domain.BillingReservation{}, false, repository.ErrNotFound
+	}
+
+	existing, err := scanReservation(tx.QueryRow(ctx, reservationSelect+` WHERE user_id=$1::uuid AND operation_id=$2::uuid`, in.UserID, in.OperationID))
+	if err == nil {
+		if existing.Kind == in.Kind && existing.Units == in.Units {
+			return existing, false, tx.Commit(ctx)
+		}
+		return domain.BillingReservation{}, false, repository.ErrConflict
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return domain.BillingReservation{}, false, err
+	}
+
+	if credits < in.Units {
+		return domain.BillingReservation{}, false, domain.ErrInsufficientCredits
+	}
+
+	if _, err = tx.Exec(ctx, `
+		UPDATE billing_wallets SET credits=credits-$2, version=version+1, updated_at=now()
+		WHERE user_id=$1::uuid`, in.UserID, in.Units); err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+
+	reserved, err := scanReservation(tx.QueryRow(ctx, `
+		INSERT INTO billing_reservations(user_id, operation_id, kind, units, status)
+		VALUES ($1::uuid, $2::uuid, $3, $4, 'reserved')`+reservationReturning, in.UserID, in.OperationID, in.Kind, in.Units))
+	if err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO billing_ledger(user_id, delta, reason, reference_type, reference_id, operation_id)
+		VALUES ($1::uuid, $2, $3, $4, $5::uuid, $5::uuid)`,
+		in.UserID, -in.Units, domain.LedgerReserve, domain.BillingRefOperation, in.OperationID); err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+	return reserved, true, tx.Commit(ctx)
+}
+
+func (s *Store) Settle(ctx context.Context, in domain.SettleBilling) (domain.BillingReservation, bool, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	existing, err := scanReservation(tx.QueryRow(ctx, reservationSelect+`
+		WHERE user_id=$1::uuid AND operation_id=$2::uuid FOR UPDATE`, in.UserID, in.OperationID))
+	if err != nil {
+		return domain.BillingReservation{}, false, mapNotFound(err)
+	}
+
+	switch existing.Status {
+	case domain.BillingSettled:
+		if existing.ResultType == in.ResultType && existing.ResultID == in.ResultID {
+			return existing, false, tx.Commit(ctx)
+		}
+		return domain.BillingReservation{}, false, repository.ErrConflict
+	case domain.BillingRefunded:
+		return domain.BillingReservation{}, false, repository.ErrConflict
+	}
+
+	settled, err := scanReservation(tx.QueryRow(ctx, `
+		UPDATE billing_reservations
+		SET status='settled', result_type=$3, result_id=$4::uuid, version=version+1, updated_at=now()
+		WHERE user_id=$1::uuid AND operation_id=$2::uuid AND status='reserved'`+reservationReturning,
+		in.UserID, in.OperationID, in.ResultType, in.ResultID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.BillingReservation{}, false, repository.ErrConflict
+	}
+	if err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO billing_ledger(user_id, delta, reason, reference_type, reference_id, operation_id)
+		VALUES ($1::uuid, 0, $2, $3, $4::uuid, $4::uuid)`,
+		in.UserID, domain.LedgerSettle, domain.BillingRefOperation, in.OperationID); err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+	return settled, true, tx.Commit(ctx)
+}
+
+func (s *Store) Refund(ctx context.Context, in domain.RefundBilling) (domain.BillingReservation, bool, error) {
+	if !validRefundReason(in.Reason) {
+		return domain.BillingReservation{}, false, domain.ErrInvalidRefundReason
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	if err = tx.QueryRow(ctx, `SELECT credits FROM billing_wallets WHERE user_id=$1::uuid FOR UPDATE`, in.UserID).Scan(new(int)); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.BillingReservation{}, false, repository.ErrNotFound
+		}
+		return domain.BillingReservation{}, false, err
+	}
+
+	existing, err := scanReservation(tx.QueryRow(ctx, reservationSelect+`
+		WHERE user_id=$1::uuid AND operation_id=$2::uuid FOR UPDATE`, in.UserID, in.OperationID))
+	if err != nil {
+		return domain.BillingReservation{}, false, mapNotFound(err)
+	}
+
+	switch existing.Status {
+	case domain.BillingSettled:
+		return existing, false, domain.ErrAlreadySettled
+	case domain.BillingRefunded:
+		return existing, false, tx.Commit(ctx)
+	}
+
+	refunded, err := scanReservation(tx.QueryRow(ctx, `
+		UPDATE billing_reservations
+		SET status='refunded', version=version+1, updated_at=now()
+		WHERE user_id=$1::uuid AND operation_id=$2::uuid AND status='reserved'`+reservationReturning,
+		in.UserID, in.OperationID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.BillingReservation{}, false, repository.ErrConflict
+	}
+	if err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+
+	if _, err = tx.Exec(ctx, `
+		UPDATE billing_wallets SET credits=credits+$2, version=version+1, updated_at=now()
+		WHERE user_id=$1::uuid`, in.UserID, refunded.Units); err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO billing_ledger(user_id, delta, reason, reference_type, reference_id, operation_id)
+		VALUES ($1::uuid, $2, $3, $4, $5::uuid, $5::uuid)`,
+		in.UserID, refunded.Units, domain.LedgerRefund, domain.BillingRefOperation, in.OperationID); err != nil {
+		return domain.BillingReservation{}, false, err
+	}
+	return refunded, true, tx.Commit(ctx)
+}
+
+const reservationReturning = `
+	RETURNING id::text, user_id::text, operation_id::text, kind, units, status,
+	          result_type, result_id::text, version, created_at, updated_at`
+
+func scanReservation(row interface{ Scan(dest ...any) error }) (domain.BillingReservation, error) {
+	var item domain.BillingReservation
+	var resultType, resultID *string
+	err := row.Scan(
+		&item.ID, &item.UserID, &item.OperationID, &item.Kind, &item.Units, &item.Status,
+		&resultType, &resultID, &item.Version, &item.CreatedAt, &item.UpdatedAt,
+	)
+	if resultType != nil {
+		item.ResultType = *resultType
+	}
+	if resultID != nil {
+		item.ResultID = *resultID
+	}
+	return item, err
+}
+
+func validRefundReason(reason string) bool {
+	switch reason {
+	case "failed", "cancelled", "superseded":
+		return true
+	default:
+		return false
+	}
+}
