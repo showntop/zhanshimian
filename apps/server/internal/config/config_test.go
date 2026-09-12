@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoadRejectsMissingAIRouting(t *testing.T) {
@@ -147,6 +148,49 @@ func TestLoadRejectsHTTPProductionBaseURL(t *testing.T) {
 	}
 }
 
+func TestLoadAppliesWorkerLeaseDefaultsWithoutWorkerID(t *testing.T) {
+	clearReleaseEnvironment(t)
+	t.Setenv("AI_ROUTING_JSON", `{
+		"models":{"qwen":{"vendor":"aliyun","protocol":"openai_chat_completions","model":"qwen3.7-plus","base_url":"https://example.com/v1","api_key_env":"ALIYUN_API_KEY"}},
+		"routes":{"appearance_analysis":{"primary":"qwen"}}
+	}`)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.WorkerID != "" {
+		t.Fatalf("API load must ignore WORKER_ID, got %q", cfg.WorkerID)
+	}
+	if cfg.TaskPollInterval != 500*time.Millisecond || cfg.TaskLeaseDuration != 30*time.Second || cfg.TaskHeartbeatEvery != 10*time.Second {
+		t.Fatalf("unexpected worker lease defaults: poll=%s lease=%s heartbeat=%s", cfg.TaskPollInterval, cfg.TaskLeaseDuration, cfg.TaskHeartbeatEvery)
+	}
+}
+
+func TestValidateAPIIgnoresWorkerIDButRequiresLeaseRatio(t *testing.T) {
+	cfg := Config{TaskLeaseDuration: 30 * time.Second, TaskHeartbeatEvery: 10 * time.Second}
+	if err := ValidateAPI(cfg); err != nil {
+		t.Fatalf("ValidateAPI should ignore empty WORKER_ID, got %v", err)
+	}
+	cfg.TaskLeaseDuration = 20 * time.Second
+	cfg.TaskHeartbeatEvery = 15 * time.Second
+	if err := ValidateAPI(cfg); err == nil || !strings.Contains(err.Error(), "lease duration") {
+		t.Fatalf("expected lease duration error, got %v", err)
+	}
+}
+
+func TestLoadRejectsLeaseShorterThanTwiceHeartbeat(t *testing.T) {
+	clearReleaseEnvironment(t)
+	t.Setenv("AI_ROUTING_JSON", `{
+		"models":{"qwen":{"vendor":"aliyun","protocol":"openai_chat_completions","model":"qwen3.7-plus","base_url":"https://example.com/v1","api_key_env":"ALIYUN_API_KEY"}},
+		"routes":{"appearance_analysis":{"primary":"qwen"}}
+	}`)
+	t.Setenv("TASK_LEASE_DURATION_SECONDS", "20")
+	t.Setenv("TASK_HEARTBEAT_SECONDS", "15")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "lease duration") {
+		t.Fatalf("expected lease duration error, got %v", err)
+	}
+}
+
 func clearReleaseEnvironment(t *testing.T) {
 	t.Helper()
 	for _, key := range []string{
@@ -154,7 +198,8 @@ func clearReleaseEnvironment(t *testing.T) {
 		"STORAGE_PROVIDER", "COS_BUCKET_URL", "COS_SECRET_ID", "COS_SECRET_KEY",
 		"ASSET_BUCKET", "ASSET_S3_ENDPOINT", "ASSET_REGION", "WEATHER_PROVIDER", "AMAP_WEB_SERVICE_KEY",
 		"AI_ROUTING_FILE", "AI_ROUTING_JSON", "ALIYUN_API_KEY", "VOLCENGINE_API_KEY",
-		"BAILIAN_WORKSPACE_ID",
+		"BAILIAN_WORKSPACE_ID", "WORKER_ID", "TASK_POLL_INTERVAL_MS",
+		"TASK_LEASE_DURATION_SECONDS", "TASK_HEARTBEAT_SECONDS",
 	} {
 		t.Setenv(key, "")
 	}

@@ -9,10 +9,6 @@ import (
 
 	"github.com/zhanshimian/server/internal/bootstrap"
 	"github.com/zhanshimian/server/internal/config"
-	"github.com/zhanshimian/server/internal/database"
-	"github.com/zhanshimian/server/internal/repository/postgres"
-	"github.com/zhanshimian/server/internal/service"
-	"github.com/zhanshimian/server/internal/storage"
 )
 
 func main() {
@@ -22,31 +18,26 @@ func main() {
 		logger.Error("load config", "error", err)
 		os.Exit(1)
 	}
+	if err := config.Validate(cfg); err != nil {
+		logger.Error("validate config", "error", err)
+		os.Exit(1)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	pool, err := database.Open(ctx, cfg.DatabaseURL)
+
+	app, err := bootstrap.BuildWorker(cfg, logger)
 	if err != nil {
-		logger.Error("open database", "error", err)
+		logger.Error("build worker", "error", err)
 		os.Exit(1)
 	}
-	defer pool.Close()
-	objects, err := storage.New(storage.Config{
-		Provider: cfg.StorageProvider, LocalRoot: cfg.UploadDir,
-		COS: storage.COSConfig{BucketURL: cfg.COSBucketURL, SecretID: cfg.COSSecretID, SecretKey: cfg.COSSecretKey, KeyPrefix: cfg.COSKeyPrefix},
-	})
-	if err != nil {
-		logger.Error("create storage", "error", err)
+	defer func() {
+		if err := app.Close(); err != nil {
+			logger.Error("close worker", "error", err)
+		}
+	}()
+
+	if err := app.Run(ctx); err != nil {
+		logger.Error("worker stopped", "error", err)
 		os.Exit(1)
 	}
-	repo := postgres.New(pool)
-	ai, err := bootstrap.BuildAI(cfg, repo, objects, logger)
-	if err != nil {
-		logger.Error("create AI capability providers", "routing_source", cfg.AIRoutingSource, "error", err)
-		os.Exit(1)
-	}
-	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
-	svc := service.New(repo, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
-		Hair: ai.Hair, Look: ai.Look, PlanGroup: ai.PlanGroup, Outfit: ai.Outfit, Purchase: ai.Purchase, Advisor: ai.Advisor, AssetURLTTL: cfg.AssetURLTTL,
-	})
-	svc.RunWorker(ctx, cfg.AnalysisPollTime)
 }

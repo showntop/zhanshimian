@@ -46,10 +46,12 @@ type Config struct {
 	AppleBundleID            string
 	WeChatOpenAppID          string
 	WeChatOpenAppSecret      string
-	RunWorker                bool
+	WorkerID                 string
+	TaskPollInterval         time.Duration
+	TaskLeaseDuration        time.Duration
+	TaskHeartbeatEvery       time.Duration
 	SessionTTL               time.Duration
 	MaxUploadBytes           int64
-	AnalysisPollTime         time.Duration
 	AIRouting                AIRoutingConfig
 	AIRoutingSource          string
 	BillingPaymentEnabled    bool
@@ -103,10 +105,12 @@ func Load() (Config, error) {
 		AppleBundleID:            os.Getenv("APPLE_BUNDLE_ID"),
 		WeChatOpenAppID:          os.Getenv("WECHAT_OPEN_APP_ID"),
 		WeChatOpenAppSecret:      os.Getenv("WECHAT_OPEN_APP_SECRET"),
-		RunWorker:                envBool("RUN_WORKER", true),
+		WorkerID:                 strings.TrimSpace(os.Getenv("WORKER_ID")),
+		TaskPollInterval:         time.Duration(envInt("TASK_POLL_INTERVAL_MS", 500)) * time.Millisecond,
+		TaskLeaseDuration:        time.Duration(envInt("TASK_LEASE_DURATION_SECONDS", 30)) * time.Second,
+		TaskHeartbeatEvery:       time.Duration(envInt("TASK_HEARTBEAT_SECONDS", 10)) * time.Second,
 		SessionTTL:               30 * 24 * time.Hour,
 		MaxUploadBytes:           10 << 20,
-		AnalysisPollTime:         time.Duration(envInt("ANALYSIS_POLL_MS", 700)) * time.Millisecond,
 		AIRouting:                aiRouting,
 		AIRoutingSource:          aiRoutingSource,
 	}
@@ -211,7 +215,28 @@ func Load() (Config, error) {
 			}
 		}
 	}
+	if err := ValidateAPI(cfg); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
+}
+
+// Validate is the Worker process check: WORKER_ID is required and the lease
+// must last at least twice as long as the heartbeat interval.
+func Validate(cfg Config) error {
+	if strings.TrimSpace(cfg.WorkerID) == "" {
+		return fmt.Errorf("WORKER_ID is required")
+	}
+	return ValidateAPI(cfg)
+}
+
+// ValidateAPI is the API process check: it ignores WORKER_ID but still
+// requires lease duration ≥ 2× heartbeat.
+func ValidateAPI(cfg Config) error {
+	if cfg.TaskLeaseDuration < 2*cfg.TaskHeartbeatEvery {
+		return fmt.Errorf("lease duration must be at least twice heartbeat interval")
+	}
+	return nil
 }
 
 func validateHTTPSURL(value string) error {
