@@ -23,7 +23,7 @@ func (s *Service) authorize(ctx context.Context, userID, action, welcomeKind str
 	if action == domainActionLook {
 		var err error
 		activeLooks, err = s.repo.CountActiveTasksByTypes(ctx, userID, []string{
-			string(domain.TaskTypeHairPreview), string(domain.TaskTypePlanLook), string(domain.TaskTypeTodayLook),
+			string(domain.TaskTypeHairPreview), string(domain.TaskTypePlanLook), string(domain.TaskTypeTodayLook), string(domain.TaskTypeBodyOrbit),
 		})
 		if err != nil {
 			return nil, err

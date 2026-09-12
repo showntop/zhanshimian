@@ -24,6 +24,7 @@ import (
 )
 
 var ErrValidation = errors.New("validation error")
+var ErrCapabilityUnavailable = errors.New("capability unavailable")
 var ErrForbidden = errors.New("forbidden")
 var ErrRateLimited = errors.New("rate limited")
 
@@ -34,6 +35,7 @@ type Service struct {
 	hairGenerator          provider.HairPreviewGenerator
 	planGroupGenerator     provider.PlanGroupGenerator
 	lookGenerator          provider.LookGenerator
+	orbitGenerator         provider.OrbitGenerator
 	outfitAdvisor          provider.OutfitAdvisor
 	purchaseAdvisor        provider.OutfitAdvisor
 	advisorChat            provider.AdvisorChat
@@ -59,6 +61,7 @@ type Service struct {
 type ProviderOptions struct {
 	Hair          provider.HairPreviewGenerator
 	Look          provider.LookGenerator
+	Orbit         provider.OrbitGenerator
 	PlanGroup     provider.PlanGroupGenerator
 	Outfit        provider.OutfitAdvisor
 	Purchase      provider.OutfitAdvisor
@@ -90,6 +93,7 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 	var smsSender provider.SmsSender = provider.NewConsoleSms(logger, true)
 	smsPerPhone := int64(5)
 	var lookGenerator provider.LookGenerator
+	var orbitGenerator provider.OrbitGenerator
 	assetURLTTL := 15 * time.Minute
 	billingSKUs := defaultBillingSKUs()
 	var virtualPay provider.VirtualPayer
@@ -122,6 +126,7 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 			smsPerPhone = options[0].SmsPerPhone
 		}
 		lookGenerator = options[0].Look
+		orbitGenerator = options[0].Orbit
 		if options[0].AssetURLTTL > 0 {
 			assetURLTTL = options[0].AssetURLTTL
 		}
@@ -134,7 +139,8 @@ func New(repo repository.Repository, objects storage.ObjectStorage, analyzer pro
 	service := &Service{
 		repo: repo, storage: objects, analyzer: analyzer, hairGenerator: hairGenerator,
 		planGroupGenerator: planGroupGenerator,
-		lookGenerator:      lookGenerator, outfitAdvisor: outfitAdvisor, purchaseAdvisor: purchaseAdvisor,
+		lookGenerator:      lookGenerator, orbitGenerator: orbitGenerator,
+		outfitAdvisor: outfitAdvisor, purchaseAdvisor: purchaseAdvisor,
 		advisorChat: advisorChat, todayPlanner: todayPlanner, weather: weather,
 		wechat: wechat, wechatApp: wechatApp, apple: apple, sms: smsSender,
 		smsRatePerPhonePerHour: smsPerPhone,
