@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
-import { EMPTY_COPY, POLL_INTERVALS, useTaskPolling, type Plan } from '@zsm/core'
+import { EMPTY_COPY, IMAGE_BADGE_COPY, POLL_INTERVALS, useTaskPolling, type Plan } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { analysisPageUrl, isAnalysisRunning, resolveRunningAnalysisId } from '../../services/task-utils'
@@ -331,7 +331,7 @@ export default function Plans() {
                 <ExampleImage
                   className="plans__hero-img"
                   src={planImage}
-                  badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
+                  badgeText={isDemoLook ? IMAGE_BADGE_COPY.demo : IMAGE_BADGE_COPY.aiPreview}
                   mode="widthFix"
                   onLoad={(e) => {
                     const w = Number(e.detail.width)

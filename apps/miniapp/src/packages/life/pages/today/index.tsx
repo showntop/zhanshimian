@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
-import { POLL_INTERVALS, lookImage, shouldStopPolling, useTaskPolling, trackEvent, type TodayContext, type TodayPlan } from '@zsm/core'
+import { IMAGE_BADGE_COPY, POLL_INTERVALS, lookImage, shouldStopPolling, useTaskPolling, trackEvent, type TodayContext, type TodayPlan } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
@@ -129,11 +129,9 @@ export default function Today() {
 
   const generatedUrl = lookImage(plan?.generated_image_url)
   const imageUrl = generatedUrl || lookImage(plan?.image_url)
-  const aiBadge = generatedUrl
-    ? (plan?.look_provider ?? '').startsWith('demo')
-      ? '效果示例'
-      : 'AI 风格预览'
-    : ''
+  const badgeText = (plan?.look_provider ?? '').startsWith('demo')
+    ? IMAGE_BADGE_COPY.demo
+    : IMAGE_BADGE_COPY.bundled
 
   if (loading && !plan) {
     return (
@@ -173,14 +171,9 @@ export default function Today() {
             <ExampleImage
               className="today__img"
               src={plan?.generated_image_url || plan?.image_url}
-              badgeText={(plan?.look_provider ?? '').startsWith('demo') ? '效果示例' : '风格参考'}
+              badgeText={badgeText}
               anchor="top"
             />
-            {aiBadge ? (
-              <View className="today__img-badge layer-on-photo">
-                <Text>{aiBadge}</Text>
-              </View>
-            ) : null}
             {generating ? (
               <View className="today__mask">
                 <View className="scan-sweep" />

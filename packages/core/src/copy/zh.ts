@@ -81,7 +81,7 @@ export const EMPTY_COPY = {
 export const IMAGE_BADGE_COPY = {
   bundled: '风格参考',
   demo: '效果示例',
-  aiPreview: 'AI 风格预览',
+  aiPreview: '风格参考',
   current: '当前'
 } as const
 

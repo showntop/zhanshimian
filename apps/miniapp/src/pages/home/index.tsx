@@ -10,6 +10,7 @@ import {
   APP_SLOGAN,
   HOME_COPY,
   HOME_TITLE,
+  IMAGE_BADGE_COPY,
   OUTFIT_COPY,
   PURCHASE_COPY,
   POLL_INTERVALS,
@@ -103,9 +104,9 @@ function todayLabel(): string {
 }
 
 function lookBadge(lookProvider: string | undefined, generatedUrl: string | undefined): string {
-  if ((lookProvider ?? '').startsWith('demo')) return '效果示例'
-  if (generatedUrl) return 'AI 风格预览'
-  return '风格参考'
+  if ((lookProvider ?? '').startsWith('demo')) return IMAGE_BADGE_COPY.demo
+  if (generatedUrl) return IMAGE_BADGE_COPY.aiPreview
+  return IMAGE_BADGE_COPY.bundled
 }
 
 export default function Home() {

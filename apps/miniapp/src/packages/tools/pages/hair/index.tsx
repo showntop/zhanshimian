@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
-import { LOCAL_LOOK_SLUGS, POLL_INTERVALS, useTaskPolling, lookImage, userImage, type HairPreview, type HairstyleOption, type LookSlug } from '@zsm/core'
+import { IMAGE_BADGE_COPY, LOCAL_LOOK_SLUGS, POLL_INTERVALS, useTaskPolling, lookImage, userImage, type HairPreview, type HairstyleOption, type LookSlug } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { api } from '../../../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
@@ -177,15 +177,15 @@ export default function Hair() {
                 className="hair__hero-img"
                 slug={asLookSlug(styleId) ?? 'sharp'}
                 variant="hair"
-                badgeText="风格参考"
+                badgeText={IMAGE_BADGE_COPY.bundled}
                 anchor="top"
               />
             )}
-            {(mode === 'result' || (!sourceUrl && !running)) && (
+            {mode === 'result' && resultUrl ? (
               <View className="hair__badge layer-on-photo">
-                <Text>{isDemo ? '效果示例，仅供参考' : 'AI 风格预览'}</Text>
+                <Text>{isDemo ? IMAGE_BADGE_COPY.demo : IMAGE_BADGE_COPY.bundled}</Text>
               </View>
-            )}
+            ) : null}
             {preview && (preview.status === 'queued' || preview.status === 'processing') ? (
               <View className="hair__mask">
                 <View className="scan-sweep" />

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro, { useLoad } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
-import { PLAN_DETAIL_COPY, type Plan } from '@zsm/core'
+import { IMAGE_BADGE_COPY, PLAN_DETAIL_COPY, type Plan } from '@zsm/core'
 import { usePageClass } from '../../hooks/use-page-visibility'
 import { api } from '../../services/api'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
@@ -166,7 +166,7 @@ export default function PlanDetail() {
                 <ExampleImage
                   className="pd__hero-img"
                   src={planImage}
-                  badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
+                  badgeText={isDemoLook ? IMAGE_BADGE_COPY.demo : IMAGE_BADGE_COPY.aiPreview}
                   anchor="top"
                   frameAspect={PLAN_FRAME_ASPECT}
                 />
@@ -236,7 +236,7 @@ export default function PlanDetail() {
           <ExampleImage
             className="pd__sheet-img"
             src={planImage}
-            badgeText={isDemoLook ? '效果示例' : 'AI 风格预览'}
+            badgeText={isDemoLook ? IMAGE_BADGE_COPY.demo : IMAGE_BADGE_COPY.aiPreview}
             anchor="top"
           />
           <View className="pd__spec">
