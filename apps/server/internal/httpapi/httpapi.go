@@ -19,18 +19,21 @@ import (
 	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/service"
 	"github.com/zhanshimian/server/internal/service/media"
+	"github.com/zhanshimian/server/internal/service/operation"
 	"github.com/zhanshimian/server/internal/storage"
 )
 
 type API struct {
 	service         *service.Service
 	media           *media.Service
+	operations      *operation.Service
 	logger          *slog.Logger
 	devLoginEnabled bool
 	runtime         RuntimeInfo
 }
 
 var errMediaUnavailable = errors.New("media service unavailable")
+var errOperationUnavailable = errors.New("operation service unavailable")
 
 type RuntimeInfo struct {
 	Environment           string
@@ -50,7 +53,10 @@ const tokenKey contextKey = "token"
 
 // New 注册全部路由（契约见 contracts/openapi.yaml）。
 func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtime RuntimeInfo) http.Handler {
-	api := &API{service: svc, media: mediaFromService(svc), logger: logger, devLoginEnabled: devLoginEnabled, runtime: runtime}
+	api := &API{
+		service: svc, media: mediaFromService(svc), operations: operationsFromService(svc),
+		logger: logger, devLoginEnabled: devLoginEnabled, runtime: runtime,
+	}
 	mux := http.NewServeMux()
 
 	// ---- 公开端点（免 bearer）：healthz、auth/*、分享公开读 ----
@@ -71,8 +77,8 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("PUT /v1/me/profile", api.auth(http.HandlerFunc(api.updateMyProfile)))
 	mux.Handle("DELETE /v1/me/data", api.auth(http.HandlerFunc(api.deleteData)))
 
-	mux.Handle("GET /v1/tasks/{id}", api.auth(http.HandlerFunc(api.getTask)))
-	mux.Handle("GET /v1/tasks", api.auth(http.HandlerFunc(api.getTasks)))
+	mux.Handle("GET /v1/operations/{id}", api.auth(http.HandlerFunc(api.getOperation)))
+	mux.Handle("GET /v1/operations", api.auth(http.HandlerFunc(api.listOperations)))
 	mux.Handle("GET /v1/home/bootstrap", api.auth(http.HandlerFunc(api.homeBootstrap)))
 
 	mux.Handle("POST /v1/media/upload-intents", api.auth(http.HandlerFunc(api.createUploadIntent)))
@@ -147,6 +153,17 @@ func mediaFromService(svc *service.Service) *media.Service {
 		return nil
 	}
 	return media.New(repo, objects, svc.MaxUploadBytes(), 15*time.Minute)
+}
+
+func operationsFromService(svc *service.Service) *operation.Service {
+	if svc == nil {
+		return nil
+	}
+	reader, ok := svc.Repository().(operation.Reader)
+	if !ok {
+		return nil
+	}
+	return operation.New(reader)
 }
 
 func requestMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
@@ -249,6 +266,8 @@ func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), service.ErrValidation.Error()+": "))
 	case errors.Is(err, media.ErrValidation):
 		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), media.ErrValidation.Error()+": "))
+	case errors.Is(err, operation.ErrValidation):
+		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), operation.ErrValidation.Error()+": "))
 	case errors.Is(err, media.ErrUploadMetadataMismatch):
 		writeError(w, r, http.StatusBadRequest, "validation_error", "上传文件与申报信息不一致")
 	case errors.Is(err, storage.ErrDirectUploadUnavailable):
