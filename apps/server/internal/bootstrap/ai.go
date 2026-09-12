@@ -22,6 +22,9 @@ type AIBundle struct {
 	// rendering/today/advisor/diagnostic）都经它调用，bootstrap 用
 	// structuredRuntimeAdapter 把它适配成 ai.StructuredRuntime。
 	Runtime *provider.AIRuntime
+	// Orbit 是 3D 形象 Lite 的环绕生成器：仅当 body_orbit 能力路由配置后
+	// 才挂 Demo 夹具（读资源目录的固定样片，不发外部请求）。
+	Orbit provider.OrbitGenerator
 }
 
 // BuildAI 一律走能力路由（AGENTS.md 红线：AI 只经 ai-routing.*.json）。
@@ -74,7 +77,11 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 			BucketSalt:       cfg.AIRouting.Release.BucketSalt,
 		})
 	}
-	return AIBundle{Routes: runtime.RouteSummary(), Runtime: runtime}, nil
+	bundle := AIBundle{Routes: runtime.RouteSummary(), Runtime: runtime}
+	if runtime.HasRoute(provider.CapabilityBodyOrbit) {
+		bundle.Orbit = provider.NewDemoOrbitGenerator(cfg.AssetDir)
+	}
+	return bundle, nil
 }
 
 // aiRoutingConfigVersion 用路由表内容哈希标识台账里的 routing_config_version：

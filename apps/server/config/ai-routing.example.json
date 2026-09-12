@@ -108,7 +108,14 @@
         "image/jpeg"
       ],
       "data_retention": "zero"
-    }
+    },
+    "demo/body-orbit": {
+      "vendor": "demo",
+      "protocol": "demo_orbit",
+      "model": "body-orbit",
+      "base_url": "http://127.0.0.1/demo-orbit",
+      "api_key_env": "AI_TEST_PRIMARY_KEY",
+      "timeout_seconds": 30    }
   },
   "routes": {
     "appearance_analysis": {
@@ -233,7 +240,10 @@
         "aliyun/qwen3.7-flash"
       ],
       "max_cost_cny": 0.3
-    }
+    },
+    "body_orbit": {
+      "policy": "quality_first",
+      "primary": "demo/body-orbit"    }
   },
   "release": {
     "previous_version": "quality-core-r1",

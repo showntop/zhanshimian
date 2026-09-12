@@ -11,6 +11,7 @@ import (
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/service/assessment"
+	"github.com/zhanshimian/server/internal/service/body"
 	"github.com/zhanshimian/server/internal/service/home"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
@@ -19,6 +20,7 @@ import (
 type API struct {
 	media           *media.Service
 	operations      *operation.Service
+	body            *body.Service
 	assessment      *assessment.Service
 	home            HomeService
 	planning        planSetService
@@ -52,6 +54,7 @@ type HomeService interface {
 type Dependencies struct {
 	Media        *media.Service
 	Operations   *operation.Service
+	Body         *body.Service
 	Home         HomeService
 	Idempotency  IdempotencyStore
 	DeleteObject func(key string) error

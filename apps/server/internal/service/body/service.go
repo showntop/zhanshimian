@@ -54,6 +54,13 @@ func New(repo Repository, assets AssetReader, signer URLSigner, billing Billing,
 	return &Service{repo: repo, assets: assets, signer: signer, billing: billing, generator: generator, maxAttempts: maxAttempts}
 }
 
+// WithBilling 在 API 侧组装时挂上额度预扣（worker 侧共享同一 Service
+// 实例时不需要，与 assessment.WithBilling 同一模式）。
+func (s *Service) WithBilling(b Billing) *Service {
+	s.billing = b
+	return s
+}
+
 // Available 报告 body_orbit 能力是否已配置（实验室启动卡用）。
 func (s *Service) Available() bool { return s.generator != nil }
 

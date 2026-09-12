@@ -12,12 +12,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/zhanshimian/server/internal/config"
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/provider"
 	identitypayment "github.com/zhanshimian/server/internal/provider/payment"
 	"github.com/zhanshimian/server/internal/repository/postgres"
 	"github.com/zhanshimian/server/internal/service/account"
 	"github.com/zhanshimian/server/internal/service/assessment"
+	"github.com/zhanshimian/server/internal/service/body"
 	"github.com/zhanshimian/server/internal/service/today"
 	"github.com/zhanshimian/server/internal/storage"
 )
@@ -196,4 +198,14 @@ type eventWriterAdapter struct{ store *postgres.Store }
 
 func (a eventWriterAdapter) TrackProductEvent(ctx context.Context, userID string, input domain.ProductEventInput) error {
 	return a.store.TrackProductEventRow(ctx, userID, input)
+}
+
+// bodySigner 给 3D 形象 Lite 的读取投影选签名器：COS 走签名 URL，本地
+// 存储退化为 PUBLIC_BASE_URL + /uploads/（开发环境可播）。
+func bodySigner(objects storage.ObjectStorage, cfg config.Config) body.URLSigner {
+	var signer storage.SignedURLStorage
+	if s, ok := objects.(storage.SignedURLStorage); ok {
+		signer = s
+	}
+	return bodyURLSigner{signer: signer, ttl: cfg.AssetURLTTL, publicBaseURL: strings.TrimRight(cfg.PublicBaseURL, "/")}
 }

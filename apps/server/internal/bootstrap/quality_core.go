@@ -5,6 +5,7 @@ import (
 	providerai "github.com/zhanshimian/server/internal/provider/ai"
 	"github.com/zhanshimian/server/internal/repository/postgres"
 	"github.com/zhanshimian/server/internal/service/assessment"
+	"github.com/zhanshimian/server/internal/service/body"
 	"github.com/zhanshimian/server/internal/service/planning"
 	"github.com/zhanshimian/server/internal/service/rendering"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
@@ -16,6 +17,7 @@ type qualityCore struct {
 	Assessment *assessment.Service
 	Planning   *planning.Service
 	Rendering  *rendering.Service
+	Body       *body.Service
 	Registry   *taskrunner.Registry
 }
 
@@ -66,9 +68,12 @@ func wireQualityCore(cfg config.Config, store *postgres.Store, objects storage.O
 		return nil, err
 	}
 
+	// 3D 形象 Lite：计费在 API 侧（WithBilling）挂上，见 api.go。
+	bodyBundle := WireBody(store, objects, bodySigner(objects, cfg), nil, ai.Orbit, 0, nil)
+
 	registry, err := taskrunner.NewRegistry(
-		[]taskrunner.Definition{assessmentBundle.Definition, planningBundle.Definition, renderingBundle.Definition},
-		[]taskrunner.Handler{assessmentBundle.Handler, planningBundle.Handler, renderingBundle.Handler},
+		[]taskrunner.Definition{assessmentBundle.Definition, planningBundle.Definition, renderingBundle.Definition, bodyBundle.Definition},
+		[]taskrunner.Handler{assessmentBundle.Handler, planningBundle.Handler, renderingBundle.Handler, bodyBundle.Handler},
 	)
 	if err != nil {
 		return nil, err
@@ -78,6 +83,7 @@ func wireQualityCore(cfg config.Config, store *postgres.Store, objects storage.O
 		Assessment: assessmentBundle.Service,
 		Planning:   planningBundle.Service,
 		Rendering:  renderingBundle.Service,
+		Body:       bodyBundle.Service,
 		Registry:   registry,
 	}, nil
 }

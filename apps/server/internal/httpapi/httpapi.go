@@ -4,7 +4,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -12,11 +11,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/service/account"
 	"github.com/zhanshimian/server/internal/service/billing"
+	"github.com/zhanshimian/server/internal/service/body"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
 	"github.com/zhanshimian/server/internal/storage"
@@ -26,6 +25,7 @@ import (
 func New(deps Dependencies, logger *slog.Logger, devLoginEnabled bool, runtime RuntimeInfo) http.Handler {
 	api := &API{
 		media: deps.Media, operations: deps.Operations,
+		body:         deps.Body,
 		home:         deps.Home,
 		deleteObject: deps.DeleteObject,
 		assessment:   deps.Assessment,
@@ -121,6 +121,10 @@ func New(deps Dependencies, logger *slog.Logger, devLoginEnabled bool, runtime R
 	mux.Handle("POST /v1/advisor/messages", api.auth(http.HandlerFunc(api.sendAdvisorMessage)))
 	mux.Handle("GET /v1/advisor/conversations/{id}/messages", api.auth(http.HandlerFunc(api.listAdvisorMessages)))
 	mux.Handle("POST /v1/advisor/actions/{id}/apply", api.auth(http.HandlerFunc(api.applyAdvisorAction)))
+
+	mux.Handle("POST /v1/body-presentations", api.auth(http.HandlerFunc(api.createBodyPresentation)))
+	mux.Handle("GET /v1/body-presentations/status", api.auth(http.HandlerFunc(api.getBodyPresentationStatus)))
+	mux.Handle("GET /v1/body-presentations/{id}", api.auth(http.HandlerFunc(api.getBodyPresentation)))
 
 	mux.Handle("POST /v1/events", api.auth(http.HandlerFunc(api.trackProductEvent)))
 
@@ -227,6 +231,11 @@ func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 		writeError(w, r, http.StatusServiceUnavailable, "service_unavailable", "当前存储不支持直传")
 	case errors.Is(err, storage.ErrObjectNotFound):
 		writeError(w, r, http.StatusBadRequest, "validation_error", "还没有收到完整上传")
+	case errors.Is(err, body.ErrCapabilityUnavailable):
+		writeError(w, r, http.StatusServiceUnavailable, "capability_unavailable",
+			strings.TrimPrefix(err.Error(), body.ErrCapabilityUnavailable.Error()+": "))
+	case errors.Is(err, body.ErrValidation):
+		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), body.ErrValidation.Error()+": "))
 	case errors.Is(err, repository.ErrNotFound):
 		writeError(w, r, http.StatusNotFound, "not_found", "没有找到对应内容")
 	case errors.Is(err, repository.ErrConflict):
@@ -236,28 +245,4 @@ func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 	default:
 		a.internalError(w, r, err)
 	}
-}
-
-// taskRef 是 202/201 顶层附带的任务引用（契约 TaskRef：{id,type}）。
-type taskRef struct {
-	ID   string `json:"id"`
-	Type string `json:"type"`
-}
-
-// writeDataTask 写 {data, task} 双字段响应：异步创建（202）与带任务的今日方案（201）。
-func writeDataTask(w http.ResponseWriter, status int, value any, task *taskRef) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	payload := map[string]any{"data": value}
-	if task != nil {
-		payload["task"] = task
-	}
-	_ = json.NewEncoder(w).Encode(payload)
-}
-
-func domainTaskRef(task *domain.Task) *taskRef {
-	if task == nil {
-		return nil
-	}
-	return &taskRef{ID: task.ID, Type: string(task.Type)}
 }

@@ -132,6 +132,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		return nil, err
 	}
 	assessmentSvc := core.Assessment.WithBilling(billingSvc)
+	bodySvc := core.Body.WithBilling(billingSvc)
 	executionSvc := execution.New(store)
 	feedbackSvc := feedback.New(store)
 	todaySvc := today.New(store, store, providerai.NewTodayPlanner(structuredRuntimeAdapter{ai.Runtime}), todayWeatherAdapter{inner: weather}, today.NewClock())
@@ -172,6 +173,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		Account:    accountSvc,
 		Billing:    ordersSvc,
 		Assessment: assessmentSvc,
+		Body:       bodySvc,
 		Planning:   core.Planning,
 		Renders:    core.Rendering,
 		Execution:  executionSvc,

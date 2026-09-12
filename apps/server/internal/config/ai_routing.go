@@ -140,8 +140,7 @@ func validateAIRouting(routing AIRoutingConfig) error {
 	}
 	assessmentMultiImageCapabilities := map[string]bool{
 		"photo_quality_check": true, "photo_identity_consistency": true,
-		"appearance_analysis": true, "report_evidence_verification": true,
-	}
+		"appearance_analysis": true, "report_evidence_verification": true}
 	imageCapabilities := map[string]bool{"hair_edit": true, "makeup_edit": true, "full_look_edit": true}
 	renderingCapabilities := map[string]bool{"full_look_generation": true, "render_quality_evaluation": true}
 	// 实验室 3D 形象 Lite：视频类能力，不经结构化/图像协议校验；Demo 夹具走
@@ -206,6 +205,9 @@ func validateAIRouting(routing AIRoutingConfig) error {
 			}
 			if imageCapabilities[capability] && protocol != "openai_image_edit" && protocol != "dashscope_wan" && protocol != "dashscope_wanx_imageedit" && protocol != "ark_image" {
 				return fmt.Errorf("AI route %q uses structured protocol %q", capability, protocol)
+			}
+			if videoCapabilities[capability] && protocol != "demo_orbit" {
+				return fmt.Errorf("AI route %q uses unsupported video protocol %q", capability, protocol)
 			}
 		}
 	}
