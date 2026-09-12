@@ -1,5 +1,6 @@
 FROM golang:1.24-alpine AS build
 WORKDIR /src
+RUN sed -i 's#https\?://dl-cdn.alpinelinux.org/alpine#https://mirrors.aliyun.com/alpine#g' /etc/apk/repositories
 ENV GOPROXY=https://goproxy.cn,direct \
     GOSUMDB=sum.golang.google.cn
 COPY go.mod go.sum ./
@@ -9,7 +10,8 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/jianwo-api ./cmd/a
 RUN mkdir -p /out/data/uploads
 
 FROM alpine:3.22
-RUN apk add --no-cache ca-certificates ffmpeg \
+RUN sed -i 's#https\?://dl-cdn.alpinelinux.org/alpine#https://mirrors.aliyun.com/alpine#g' /etc/apk/repositories \
+    && apk add --no-cache ca-certificates ffmpeg \
     && addgroup -S jianwo \
     && adduser -S -G jianwo jianwo
 WORKDIR /app
