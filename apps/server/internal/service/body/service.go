@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -155,6 +156,13 @@ func (s *Service) Status(ctx context.Context, userID string) (domain.BodyPresent
 
 // project 签名视频/抽帧 URL 并投影任务状态。无任务（历史数据）时按结果推断。
 func (s *Service) project(ctx context.Context, userID string, item *domain.StoredBodyPresentation) error {
+	if item.Presentation.ProviderVersion != "" {
+		if strings.HasPrefix(item.Presentation.ProviderVersion, "demo") {
+			item.Presentation.SourceKind = string(domain.SourceKindDemoExample)
+		} else {
+			item.Presentation.SourceKind = string(domain.SourceKindGeneratedPreview)
+		}
+	}
 	if s.signer != nil {
 		if item.VideoStorageKey != "" {
 			url, err := s.signer.Sign(ctx, item.VideoStorageKey)

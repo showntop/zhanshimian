@@ -2,6 +2,10 @@
 // 请求与响应一律来自生成的 schema（经 core 桶文件转出）。这里不出现字符串拼 URL，也不出现旧 DTO。
 import type {
   AdvisorAction,
+  BodyPresentation,
+  BodyPresentationAccepted,
+  BodyPresentationStatus,
+  CreateBodyPresentationRequest,
   BillingOrder,
   BillingSummary,
   Diagnosis,
@@ -156,6 +160,17 @@ export const peripherals = {
 
   applyAdvisorAction: (id: string): Promise<AdvisorAction> =>
     client.POST('/v1/advisor/actions/{id}/apply', { params: { path: { id } } }).then(dataOrThrow),
+
+  // ---------- 3D 形象 Lite ----------
+  /** 异步生成：返回受理信封，状态只通过公开 Operation 观察。 */
+  createBodyPresentation: (input: CreateBodyPresentationRequest): Promise<BodyPresentationAccepted> =>
+    client.POST('/v1/body-presentations', { body: input }).then(bodyOrThrow),
+
+  getBodyPresentationStatus: (): Promise<BodyPresentationStatus> =>
+    client.GET('/v1/body-presentations/status').then(dataOrThrow),
+
+  getBodyPresentation: (id: string): Promise<BodyPresentation> =>
+    client.GET('/v1/body-presentations/{id}', { params: { path: { id } } }).then(dataOrThrow),
 
   // ---------- 身份与账单 ----------
   updateMyProfile: (profile: UserProfile): Promise<UserProfile> =>

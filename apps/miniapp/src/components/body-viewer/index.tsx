@@ -2,20 +2,22 @@
 import { useMemo, useRef, useState } from 'react'
 import { Image, Text, Video, View } from '@tarojs/components'
 import type { CommonEvent, ITouchEvent } from '@tarojs/components'
-import { LAB_COPY, lookImage, lookVideo, userImage, type BodyPresentation } from '@zsm/core'
+import { LAB_COPY, lookImage, lookVideo, type BodyPresentation, type DisplayMedia } from '@zsm/core'
 import CompareSlider from '../compare-slider'
-import ExampleImage from '../example-image'
+import SourceImage from '../source-image'
 import './index.scss'
 
 interface BodyViewerProps {
   presentation: BodyPresentation
-  bodyImageURL: string
+  /** 对比滑杆底层「原本」：服务端下发的带类型媒体，角标由投影决定。 */
+  bodyMedia: DisplayMedia | null
+  /** 上层生成帧的说法：demo 供应商 → 效果示例，否则 AI 风格预览。 */
   badgeText: string
 }
 
 const FRAME_STEP_PX = 18
 
-export default function BodyViewer({ presentation, bodyImageURL, badgeText }: BodyViewerProps) {
+export default function BodyViewer({ presentation, bodyMedia, badgeText }: BodyViewerProps) {
   const video = lookVideo(presentation.orbit.video_url)
   const frames = useMemo(
     () =>
@@ -98,8 +100,14 @@ export default function BodyViewer({ presentation, bodyImageURL, badgeText }: Bo
       {showCompare && compareFrame ? (
         <View className="body-viewer__compare">
           <CompareSlider
-            current={<ExampleImage user src={userImage(bodyImageURL)} anchor="top" />}
-            plan={<ExampleImage src={compareFrame.url} badgeText={badgeText} anchor="top" />}
+            single={!bodyMedia}
+            current={bodyMedia ? <SourceImage className="body-viewer__compare-img" media={bodyMedia} anchor="top" /> : null}
+            plan={
+              <View className="body-viewer__plan">
+                <Image className="body-viewer__compare-img" src={compareFrame.url} mode="aspectFill" />
+                <Text className="example-badge">{badgeText}</Text>
+              </View>
+            }
           />
         </View>
       ) : null}

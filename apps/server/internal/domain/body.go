@@ -28,7 +28,8 @@ type BodyMesh struct {
 }
 
 // BodyPresentation 的状态/进度/阶段字段投影自关联的 body_orbit 任务，
-// 不在 body_presentations 表上冗余存储。
+// 不在 body_presentations 表上冗余存储。SourceKind 由服务层按供应商版本
+// 投影（demo → demo_example，否则 generated_preview），客户端角标只认它。
 type BodyPresentation struct {
 	ID              string        `json:"id"`
 	BodyMediaID     string        `json:"body_media_id"`
@@ -37,6 +38,7 @@ type BodyPresentation struct {
 	Orbit           BodyOrbitView `json:"orbit"`
 	Mesh            *BodyMesh     `json:"mesh"`
 	ProviderVersion string        `json:"provider_version,omitempty"`
+	SourceKind      string        `json:"source_kind,omitempty"`
 	Status          string        `json:"status"`
 	Progress        int           `json:"progress"`
 	Stage           string        `json:"stage"`

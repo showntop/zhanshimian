@@ -838,6 +838,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/body-presentations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 创建 3D 形象 Lite 环绕展示
+         * @description 正脸 + 正面全身生成环绕视频与抽帧；异步状态只通过公开 Operation 观察。进行中重复创建复用既有资源，不重复扣费。
+         */
+        post: operations["createBodyPresentation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/body-presentations/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 实验室启动读模型
+         * @description 能力可用性 + 进行中 / 最新成功 / 最新失败，一次读取渲染 3D 卡片。
+         */
+        get: operations["getBodyPresentationStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/body-presentations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取单个 3D 形象 */
+        get: operations["getBodyPresentation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/assessments": {
         parameters: {
             query?: never;
@@ -1361,6 +1418,10 @@ export interface components {
             title: string;
             credits: number;
             price_fen: number;
+            /** @description 划线原价（分），须大于 price_fen，仅用于展示 */
+            original_price_fen?: number;
+            /** @description featured 推荐 / value 超值 */
+            badge?: string;
             product_id: string;
         };
         BillingSummary: {
@@ -1464,7 +1525,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "assessment" | "plan_set" | "render" | "execution_feedback";
+            kind: "assessment" | "plan_set" | "render" | "execution_feedback" | "body_orbit";
             subject_type: string;
             /** Format: uuid */
             subject_id: string;
@@ -1800,7 +1861,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "assessment" | "plan_set" | "render" | "execution_feedback";
+            kind: "assessment" | "plan_set" | "render" | "execution_feedback" | "body_orbit";
             /** @enum {string} */
             status: "accepted" | "running" | "retrying" | "succeeded" | "failed" | "cancelled" | "superseded";
         };
@@ -1808,9 +1869,87 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "assessment" | "plan_set" | "render" | "execution_feedback";
+            kind: "assessment" | "plan_set" | "render" | "execution_feedback" | "body_orbit";
             /** @constant */
             status: "accepted";
+        };
+        CreateBodyPresentationRequest: {
+            /**
+             * Format: uuid
+             * @description 正面全身照媒体 ID
+             */
+            body_media_id: string;
+            /**
+             * Format: uuid
+             * @description 正脸照媒体 ID
+             */
+            face_media_id: string;
+        };
+        OrbitFrame: {
+            /** @description 环绕角度（度） */
+            yaw: number;
+            /**
+             * Format: uri
+             * @description 抽帧签名 URL
+             */
+            url: string;
+        };
+        BodyOrbit: {
+            /**
+             * Format: uri
+             * @description 环绕视频签名 URL（完成后出现）
+             */
+            video_url?: string;
+            duration_ms?: number;
+            frames: components["schemas"]["OrbitFrame"][];
+        };
+        BodyMesh: {
+            format: string;
+            /** Format: uri */
+            url: string;
+            /** Format: uri */
+            texture_url?: string;
+        };
+        BodyPresentation: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            body_media_id: string;
+            /** Format: uuid */
+            face_media_id: string;
+            /** @enum {string} */
+            representation: "orbit" | "mesh";
+            orbit: components["schemas"]["BodyOrbit"];
+            mesh: components["schemas"]["BodyMesh"] | null;
+            provider_version?: string;
+            /**
+             * @description 服务端按供应商版本投影；角标只认它，客户端不得按 provider 判定
+             * @enum {string}
+             */
+            source_kind?: "generated_preview" | "demo_example";
+            /**
+             * @description 投影自关联 body_orbit 任务，不冗余存储
+             * @enum {string}
+             */
+            status: "queued" | "processing" | "completed" | "failed";
+            progress: number;
+            stage: string;
+            error_message?: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        BodyPresentationAccepted: {
+            data: components["schemas"]["BodyPresentation"];
+            operation: components["schemas"]["AcceptedOperationRef"];
+        };
+        BodyPresentationStatus: {
+            /** @description body_orbit 能力是否已配置 */
+            available: boolean;
+            active: components["schemas"]["BodyPresentation"] | null;
+            completed: components["schemas"]["BodyPresentation"] | null;
+            failed: components["schemas"]["BodyPresentation"] | null;
         };
         UploadGrant: {
             /** @constant */
@@ -3700,6 +3839,88 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["Operation"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createBodyPresentation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBodyPresentationRequest"];
+            };
+        };
+        responses: {
+            /** @description 环绕展示已受理 */
+            202: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyPresentationAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getBodyPresentationStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 3D 形象状态 */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["BodyPresentationStatus"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getBodyPresentation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 3D 形象详情 */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["BodyPresentation"];
                     };
                 };
             };

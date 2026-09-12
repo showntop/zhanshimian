@@ -6,8 +6,7 @@ import { setLocalLooksResolver } from '@zsm/core'
 export const STORAGE_KEYS = {
   token: 'zsm_token',
   uiSchemaVersion: 'zsm_ui_schema_version',
-  compareHint: 'zsm_compare_hint',
-  city: 'zsm_city',
+  compareHint: 'zsm_compare_hint',  city: 'zsm_city',
   openCreditSheet: 'zsm_open_credit_sheet',
 } as const
 

@@ -45,6 +45,8 @@ tags:
   description: 穿搭和购买诊断
 - name: Hair
   description: 发型参考与风格预览
+- name: Body
+  description: 3D 形象 Lite（环绕展示）
 - name: Today
   description: 今日造型
 - name: Shares
@@ -2017,6 +2019,101 @@ paths:
         schema:
           type: string
           format: uuid
+  "/v1/body-presentations":
+    post:
+      operationId: createBodyPresentation
+      summary: 创建 3D 形象 Lite 环绕展示
+      description: 正脸 + 正面全身生成环绕视频与抽帧；异步状态只通过公开 Operation 观察。进行中重复创建复用既有资源，不重复扣费。
+      tags:
+      - Body
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateBodyPresentationRequest"
+      responses:
+        '202':
+          description: 环绕展示已受理
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/BodyPresentationAccepted"
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+  "/v1/body-presentations/status":
+    get:
+      operationId: getBodyPresentationStatus
+      summary: 实验室启动读模型
+      description: 能力可用性 + 进行中 / 最新成功 / 最新失败，一次读取渲染 3D 卡片。
+      tags:
+      - Body
+      responses:
+        '200':
+          description: 3D 形象状态
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/Envelope"
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/BodyPresentationStatus"
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+  "/v1/body-presentations/{id}":
+    get:
+      operationId: getBodyPresentation
+      summary: 读取单个 3D 形象
+      tags:
+      - Body
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: 3D 形象详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/Envelope"
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/BodyPresentation"
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
   "/v1/assessments":
     post:
       operationId: createAssessment
@@ -3732,6 +3829,7 @@ components:
           - plan_set
           - render
           - execution_feedback
+          - body_orbit
         subject_type:
           type: string
         subject_id:
@@ -4653,6 +4751,7 @@ components:
           - plan_set
           - render
           - execution_feedback
+          - body_orbit
         status:
           type: string
           enum:
@@ -4681,9 +4780,172 @@ components:
           - plan_set
           - render
           - execution_feedback
+          - body_orbit
         status:
           type: string
           const: accepted
+    CreateBodyPresentationRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - body_media_id
+      - face_media_id
+      properties:
+        body_media_id:
+          type: string
+          format: uuid
+          description: 正面全身照媒体 ID
+        face_media_id:
+          type: string
+          format: uuid
+          description: 正脸照媒体 ID
+    OrbitFrame:
+      type: object
+      additionalProperties: false
+      required:
+      - yaw
+      - url
+      properties:
+        yaw:
+          type: number
+          description: 环绕角度（度）
+        url:
+          type: string
+          format: uri
+          description: 抽帧签名 URL
+    BodyOrbit:
+      type: object
+      additionalProperties: false
+      required:
+      - frames
+      properties:
+        video_url:
+          type: string
+          format: uri
+          description: 环绕视频签名 URL（完成后出现）
+        duration_ms:
+          type: integer
+          minimum: 0
+        frames:
+          type: array
+          items:
+            "$ref": "#/components/schemas/OrbitFrame"
+    BodyMesh:
+      type: object
+      additionalProperties: false
+      required:
+      - format
+      - url
+      properties:
+        format:
+          type: string
+        url:
+          type: string
+          format: uri
+        texture_url:
+          type: string
+          format: uri
+    BodyPresentation:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - body_media_id
+      - face_media_id
+      - representation
+      - orbit
+      - mesh
+      - status
+      - progress
+      - stage
+      - created_at
+      - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        body_media_id:
+          type: string
+          format: uuid
+        face_media_id:
+          type: string
+          format: uuid
+        representation:
+          type: string
+          enum:
+          - orbit
+          - mesh
+        orbit:
+          "$ref": "#/components/schemas/BodyOrbit"
+        mesh:
+          oneOf:
+          - "$ref": "#/components/schemas/BodyMesh"
+          - type: 'null'
+        provider_version:
+          type: string
+        source_kind:
+          type: string
+          description: 服务端按供应商版本投影；角标只认它，客户端不得按 provider 判定
+          enum:
+          - generated_preview
+          - demo_example
+        status:
+          type: string
+          description: 投影自关联 body_orbit 任务，不冗余存储
+          enum:
+          - queued
+          - processing
+          - completed
+          - failed
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        stage:
+          type: string
+        error_message:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    BodyPresentationAccepted:
+      type: object
+      additionalProperties: false
+      required:
+      - data
+      - operation
+      properties:
+        data:
+          "$ref": "#/components/schemas/BodyPresentation"
+        operation:
+          "$ref": "#/components/schemas/AcceptedOperationRef"
+    BodyPresentationStatus:
+      type: object
+      additionalProperties: false
+      required:
+      - available
+      - active
+      - completed
+      - failed
+      properties:
+        available:
+          type: boolean
+          description: body_orbit 能力是否已配置
+        active:
+          oneOf:
+          - "$ref": "#/components/schemas/BodyPresentation"
+          - type: 'null'
+        completed:
+          oneOf:
+          - "$ref": "#/components/schemas/BodyPresentation"
+          - type: 'null'
+        failed:
+          oneOf:
+          - "$ref": "#/components/schemas/BodyPresentation"
+          - type: 'null'
     UploadGrant:
       type: object
       additionalProperties: false
