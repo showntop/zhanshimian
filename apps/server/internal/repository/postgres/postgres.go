@@ -659,17 +659,6 @@ func (s *Store) FailAnalysisPresentation(ctx context.Context, analysisID, stage,
 	return err
 }
 
-// GetReport is a compile stub after the Assessment domain.Report rewrite.
-// The real assessment report reader lands in a later task; do not scan
-// obsolete warehouse columns (analysis_id, current_image_url, generated_at, …).
-func (s *Store) GetReport(context.Context, string, string) (domain.Report, error) {
-	return domain.Report{}, repository.ErrNotFound
-}
-
-func (s *Store) LatestReport(context.Context, string) (domain.Report, error) {
-	return domain.Report{}, repository.ErrNotFound
-}
-
 // ---- 方案 ----
 
 const planSelect = `SELECT p.id::text,p.report_id::text,p.scene,p.name,p.slug,p.image_url,p.recommended,p.descriptor,p.why,p.outcome_tags,p.difference_tags,p.sort_order,(p.selected_at IS NOT NULL),r.current_image_url,p.generated_image_url,p.look_provider FROM plans p JOIN reports r ON r.id=p.report_id`
