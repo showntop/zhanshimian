@@ -65,6 +65,21 @@ func TestDecideAuthorizeWelcomeNotTransferableToHair(t *testing.T) {
 	}
 }
 
+func TestDecideAuthorizeSkipsCreditWhenPaymentOff(t *testing.T) {
+	look := decideAuthorize(billingState{Credits: 0}, authorizeInput{Action: domainActionLook, Count: 1, SkipCreditCharge: true})
+	if look.Err != nil || look.CreditsDelta != 0 || look.DayLooksDelta != 1 {
+		t.Fatalf("look without payment: %#v", look)
+	}
+	analysis := decideAuthorize(billingState{Credits: 0, WelcomeAnalysisUsed: true}, authorizeInput{Action: domainActionAnalysis, Count: 1, SkipCreditCharge: true})
+	if analysis.Err != nil || analysis.CreditsDelta != 0 || analysis.DayAnalysisDelta != 1 {
+		t.Fatalf("analysis without payment: %#v", analysis)
+	}
+	capped := decideAuthorize(billingState{Credits: 0, DayLooks: 8}, authorizeInput{Action: domainActionLook, Count: 1, SkipCreditCharge: true})
+	if !errors.Is(capped.Err, ErrRateLimited) {
+		t.Fatalf("daily cap still applies when payment is off, got %#v", capped)
+	}
+}
+
 func TestDecideAuthorizeDiagnosticAndAdvisor(t *testing.T) {
 	ok := decideAuthorize(billingState{}, authorizeInput{Action: domainActionDiagnostic, Count: 1})
 	if ok.Err != nil || ok.DayDiagnosticsDelta != 1 || ok.CreditsDelta != 0 {

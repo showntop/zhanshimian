@@ -29,9 +29,10 @@ type billingState struct {
 }
 
 type authorizeInput struct {
-	Action      string
-	Count       int
-	WelcomeKind string
+	Action           string
+	Count            int
+	WelcomeKind      string
+	SkipCreditCharge bool
 }
 
 type billingDecision struct {
@@ -88,6 +89,10 @@ func decideAnalysis(state billingState, input authorizeInput) billingDecision {
 		return decision
 	}
 	if state.Credits < input.Count {
+		if input.SkipCreditCharge {
+			decision.LedgerReason = "reserve"
+			return decision
+		}
 		return billingDecision{Err: fmt.Errorf("%w: 额度不足，购买次数后可继续形象分析或形象方案制作", ErrInsufficientCredits)}
 	}
 	decision.CreditsDelta = -input.Count
@@ -113,6 +118,10 @@ func decideLook(state billingState, input authorizeInput) billingDecision {
 		return decision
 	}
 	if state.Credits < input.Count {
+		if input.SkipCreditCharge {
+			decision.LedgerReason = "reserve"
+			return decision
+		}
 		return billingDecision{Err: fmt.Errorf("%w: 额度不足，购买次数后可继续形象分析或形象方案制作", ErrInsufficientCredits)}
 	}
 	decision.CreditsDelta = -input.Count

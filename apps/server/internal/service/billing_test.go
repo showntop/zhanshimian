@@ -242,7 +242,7 @@ func (f *fakeVirtualPay) ParseDeliverNotify(raw []byte, signature string) (provi
 
 func TestAuthorizeConcurrentReserveOnlyOneSucceeds(t *testing.T) {
 	repo := newMemoryBillingRepo()
-	svc := &Service{repo: repo}
+	svc := &Service{repo: repo, virtualPay: &fakeVirtualPay{}}
 	var ok, fail int
 	var countMu sync.Mutex
 	var wg sync.WaitGroup
@@ -266,9 +266,21 @@ func TestAuthorizeConcurrentReserveOnlyOneSucceeds(t *testing.T) {
 	}
 }
 
+func TestAuthorizeLookWithoutPaymentDoesNotCharge(t *testing.T) {
+	repo := newMemoryBillingRepo()
+	repo.wallet.Credits = 0
+	svc := &Service{repo: repo}
+	if _, err := svc.authorize(context.Background(), "user-1", domainActionLook, "", 1); err != nil {
+		t.Fatalf("payment off must not 402: %v", err)
+	}
+	if repo.wallet.Credits != 0 || repo.usage["look"] != 1 {
+		t.Fatalf("should keep 0 credits and count daily look, credits=%d looks=%d", repo.wallet.Credits, repo.usage["look"])
+	}
+}
+
 func TestAuthorizeRefundRestoresCreditsButKeepsDailyUsage(t *testing.T) {
 	repo := newMemoryBillingRepo()
-	svc := &Service{repo: repo}
+	svc := &Service{repo: repo, virtualPay: &fakeVirtualPay{}}
 	refs, err := svc.authorize(context.Background(), "user-1", domainActionLook, "", 1)
 	if err != nil {
 		t.Fatal(err)

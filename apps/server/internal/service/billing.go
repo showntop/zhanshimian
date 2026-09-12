@@ -41,7 +41,7 @@ func (s *Service) authorize(ctx context.Context, userID, action, welcomeKind str
 			HourAdvisor:         snap.HourAdvisor,
 			MinuteOrders:        snap.MinuteOrders,
 			ActiveLooks:         snap.ActiveLooks,
-		}, authorizeInput{Action: action, Count: count, WelcomeKind: welcomeKind})
+		}, authorizeInput{Action: action, Count: count, WelcomeKind: welcomeKind, SkipCreditCharge: !s.paymentEnabled()})
 		if decision.Err != nil {
 			return domain.BillingDecision{}, decision.Err
 		}
