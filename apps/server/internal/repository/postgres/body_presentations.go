@@ -13,21 +13,13 @@ import (
 // yaw 与 COS object key，URL 由服务层在读取时签名投影（库不存签名 URL）。
 type storedOrbitFrame struct {
 	Yaw        float64 `json:"yaw"`
-	StorageKey string `json:"storage_key"`
-}
-
-// StoredBodyPresentation 是仓储层的读取结果：domain 视图 + 存储键，
-// 签名投影留给服务层。
-type StoredBodyPresentation struct {
-	Presentation    domain.BodyPresentation
-	VideoStorageKey string
-	FrameKeys       []string
+	StorageKey string  `json:"storage_key"`
 }
 
 const bodyPresentationSelect = `SELECT id::text,body_media_id::text,face_media_id::text,representation,video_storage_key,duration_ms,frames,mesh,provider_version,created_at,updated_at FROM body_presentations`
 
-func scanStoredBodyPresentation(row pgx.Row) (StoredBodyPresentation, error) {
-	var out StoredBodyPresentation
+func scanStoredBodyPresentation(row pgx.Row) (domain.StoredBodyPresentation, error) {
+	var out domain.StoredBodyPresentation
 	item := &out.Presentation
 	var framesRaw, meshRaw []byte
 	err := row.Scan(
@@ -64,25 +56,16 @@ func scanStoredBodyPresentation(row pgx.Row) (StoredBodyPresentation, error) {
 	return out, nil
 }
 
-// CreatedBodyPresentation 是创建结果：展示资源 + 公开操作 + 队列任务。
-// Reused=true 表示命中进行中的既有资源（不重复扣费）。
-type CreatedBodyPresentation struct {
-	Presentation StoredBodyPresentation
-	Operation    domain.Operation
-	Task         domain.Task
-	Reused       bool
-}
-
 // CreateBodyPresentation 在同一事务里建展示资源、公开操作与 body_orbit 任务；
 // 同一用户已有进行中任务时返回既有资源（咨询锁防并发双建）。
-func (s *Store) CreateBodyPresentation(ctx context.Context, userID string, input domain.BodyPresentationInput, maxAttempts int) (CreatedBodyPresentation, error) {
+func (s *Store) CreateBodyPresentation(ctx context.Context, userID string, input domain.BodyPresentationInput, maxAttempts int) (domain.CreatedBodyPresentation, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return CreatedBodyPresentation{}, err
+		return domain.CreatedBodyPresentation{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "body-orbit:"+userID); err != nil {
-		return CreatedBodyPresentation{}, err
+		return domain.CreatedBodyPresentation{}, err
 	}
 
 	var existingID string
@@ -94,20 +77,20 @@ func (s *Store) CreateBodyPresentation(ctx context.Context, userID string, input
 	if existingErr == nil {
 		item, err := scanStoredBodyPresentation(tx.QueryRow(ctx, bodyPresentationSelect+` WHERE id=$1::uuid AND user_id=$2::uuid`, existingID, userID))
 		if err != nil {
-			return CreatedBodyPresentation{}, err
+			return domain.CreatedBodyPresentation{}, err
 		}
 		task, err := scanBodyOrbitTask(tx.QueryRow(ctx, bodyOrbitTaskSelect+` WHERE user_id=$1::uuid AND subject_id=$2::uuid AND status IN ('queued','leased','retry_wait') ORDER BY created_at DESC LIMIT 1`, userID, existingID))
 		if err != nil {
-			return CreatedBodyPresentation{}, err
+			return domain.CreatedBodyPresentation{}, err
 		}
 		op, err := scanOperation(tx.QueryRow(ctx, operationSelect+` WHERE user_id=$1::uuid AND id=$2::uuid`, userID, task.OperationID))
 		if err != nil {
-			return CreatedBodyPresentation{}, err
+			return domain.CreatedBodyPresentation{}, err
 		}
-		return CreatedBodyPresentation{Presentation: item, Operation: op, Task: task, Reused: true}, tx.Commit(ctx)
+		return domain.CreatedBodyPresentation{Presentation: item, Operation: op, Task: task, Reused: true}, tx.Commit(ctx)
 	}
 	if !errors.Is(existingErr, pgx.ErrNoRows) {
-		return CreatedBodyPresentation{}, existingErr
+		return domain.CreatedBodyPresentation{}, existingErr
 	}
 
 	item, err := scanStoredBodyPresentation(tx.QueryRow(ctx, `
@@ -116,7 +99,7 @@ func (s *Store) CreateBodyPresentation(ctx context.Context, userID string, input
 		RETURNING id::text,body_media_id::text,face_media_id::text,representation,video_storage_key,duration_ms,frames,mesh,provider_version,created_at,updated_at`,
 		userID, input.BodyMediaID, input.FaceMediaID))
 	if err != nil {
-		return CreatedBodyPresentation{}, err
+		return domain.CreatedBodyPresentation{}, err
 	}
 
 	var opID string
@@ -124,16 +107,16 @@ func (s *Store) CreateBodyPresentation(ctx context.Context, userID string, input
 		INSERT INTO operations(user_id,kind,subject_type,subject_id,status,stage_code)
 		VALUES ($1::uuid,'body_orbit','body_presentation',$2::uuid,'accepted','')
 		RETURNING id::text`, userID, item.Presentation.ID).Scan(&opID); err != nil {
-		return CreatedBodyPresentation{}, err
+		return domain.CreatedBodyPresentation{}, err
 	}
 	op, err := scanOperation(tx.QueryRow(ctx, operationSelect+` WHERE user_id=$1::uuid AND id=$2::uuid`, userID, opID))
 	if err != nil {
-		return CreatedBodyPresentation{}, err
+		return domain.CreatedBodyPresentation{}, err
 	}
 
 	payload, err := json.Marshal(domain.BodyOrbitTaskPayload{PresentationID: item.Presentation.ID})
 	if err != nil {
-		return CreatedBodyPresentation{}, err
+		return domain.CreatedBodyPresentation{}, err
 	}
 	task, err := scanBodyOrbitTask(tx.QueryRow(ctx, `
 		INSERT INTO tasks(
@@ -145,12 +128,12 @@ func (s *Store) CreateBodyPresentation(ctx context.Context, userID string, input
 		) RETURNING`+bodyOrbitTaskReturning,
 		userID, op.ID, item.Presentation.ID, payload, "body_orbit:"+item.Presentation.ID, maxAttempts))
 	if err != nil {
-		return CreatedBodyPresentation{}, err
+		return domain.CreatedBodyPresentation{}, err
 	}
-	return CreatedBodyPresentation{Presentation: item, Operation: op, Task: task}, tx.Commit(ctx)
+	return domain.CreatedBodyPresentation{Presentation: item, Operation: op, Task: task}, tx.Commit(ctx)
 }
 
-func (s *Store) GetBodyPresentation(ctx context.Context, userID, id string) (StoredBodyPresentation, error) {
+func (s *Store) GetBodyPresentation(ctx context.Context, userID, id string) (domain.StoredBodyPresentation, error) {
 	item, err := scanStoredBodyPresentation(s.pool.QueryRow(ctx, bodyPresentationSelect+` WHERE id=$1::uuid AND user_id=$2::uuid`, id, userID))
 	return item, mapNotFound(err)
 }
@@ -165,7 +148,7 @@ func (s *Store) GetBodyOrbitWork(ctx context.Context, userID, id string) (domain
 
 // ListBodyPresentationStatus 取实验室启动读模型：进行中 / 最新可播成功 /
 // 比成功更新的最新失败（无则各自为 nil）。
-func (s *Store) ListBodyPresentationStatus(ctx context.Context, userID string) (active, completed, failed *StoredBodyPresentation, err error) {
+func (s *Store) ListBodyPresentationStatus(ctx context.Context, userID string) (active, completed, failed *domain.StoredBodyPresentation, err error) {
 	completedItem, completedErr := scanStoredBodyPresentation(s.pool.QueryRow(ctx, bodyPresentationSelect+`
 		WHERE user_id=$1::uuid AND video_storage_key <> ''
 		ORDER BY created_at DESC LIMIT 1`, userID))

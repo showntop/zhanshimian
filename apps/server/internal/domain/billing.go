@@ -49,6 +49,7 @@ const (
 	ProductAssessment        Product = "assessment"
 	ProductPlanSet           Product = "plan_set"
 	ProductRenderPublication Product = "render_publication"
+	ProductBodyOrbit         Product = "body_orbit"
 )
 
 // ChargeSource 是费用来源;welcome_* 走免费权益,reserve/settle/refund 的 delta 为 0。

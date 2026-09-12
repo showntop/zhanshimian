@@ -58,3 +58,20 @@ type BodyPresentationStatus struct {
 type BodyOrbitTaskPayload struct {
 	PresentationID string `json:"presentation_id"`
 }
+
+// StoredBodyPresentation 是仓储层读取结果：API 视图 + 存储键，
+// 签名投影（VideoURL/Frames[].URL）由服务层在读取时完成。
+type StoredBodyPresentation struct {
+	Presentation    BodyPresentation
+	VideoStorageKey string
+	FrameKeys       []string
+}
+
+// CreatedBodyPresentation 是创建结果：展示资源 + 公开操作 + 队列任务。
+// Reused=true 表示命中进行中的既有资源（不重复扣费）。
+type CreatedBodyPresentation struct {
+	Presentation StoredBodyPresentation
+	Operation    Operation
+	Task         Task
+	Reused       bool
+}
