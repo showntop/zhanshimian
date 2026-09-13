@@ -63,9 +63,6 @@ func New(svc *service.Service, deps Dependencies, logger *slog.Logger, devLoginE
 	mux.Handle("POST /v1/media/upload-intents/{id}/complete", api.auth(api.requireIdempotency(http.HandlerFunc(api.completeUploadIntent))))
 	mux.Handle("POST /v1/media/demo", api.auth(http.HandlerFunc(api.createDemoMedia)))
 
-	mux.Handle("POST /v1/analyses", api.auth(http.HandlerFunc(api.createAnalysis)))
-	mux.Handle("GET /v1/analyses/current", api.auth(http.HandlerFunc(api.getCurrentAnalysis)))
-	mux.Handle("GET /v1/analyses/{id}", api.auth(http.HandlerFunc(api.getAnalysis)))
 	mux.Handle("GET /v1/reports/current", api.auth(http.HandlerFunc(api.getCurrentPublishedReport)))
 	mux.Handle("GET /v1/reports/{id}", api.auth(http.HandlerFunc(api.getPublishedReport)))
 
@@ -81,15 +78,6 @@ func New(svc *service.Service, deps Dependencies, logger *slog.Logger, devLoginE
 	mux.Handle("POST /v1/executions/{id}/events", api.auth(api.requireIfMatch(api.requireIdempotency(http.HandlerFunc(api.appendExecutionEvent)))))
 	mux.Handle("POST /v1/generation-feedback", api.auth(api.requireIdempotency(http.HandlerFunc(api.createGenerationFeedback))))
 	mux.Handle("POST /v1/execution-feedback", api.auth(api.requireIdempotency(http.HandlerFunc(api.createExecutionFeedback))))
-
-	mux.Handle("GET /v1/reports/{id}/plans", api.auth(http.HandlerFunc(api.listPlans)))
-	mux.Handle("PUT /v1/reports/{id}/plans", api.auth(http.HandlerFunc(api.putReportPlans)))
-	mux.Handle("POST /v1/plans/{id}/look/regenerate", api.auth(http.HandlerFunc(api.regeneratePlanLook)))
-	mux.Handle("GET /v1/plans/{id}", api.auth(http.HandlerFunc(api.getPlan)))
-	mux.Handle("POST /v1/plans/{id}/select", api.auth(http.HandlerFunc(api.selectPlan)))
-	mux.Handle("GET /v1/plans/{id}/checklist", api.auth(http.HandlerFunc(api.getChecklist)))
-	mux.Handle("PATCH /v1/plans/{id}/checklist/{itemId}", api.auth(http.HandlerFunc(api.patchChecklistItem)))
-	mux.Handle("POST /v1/plans/{id}/feedback", api.auth(http.HandlerFunc(api.planFeedback)))
 
 	mux.Handle("POST /v1/diagnostics", api.auth(http.HandlerFunc(api.createDiagnostic)))
 	mux.Handle("GET /v1/diagnostics/latest", api.auth(http.HandlerFunc(api.getLatestDiagnostic)))
@@ -304,8 +292,4 @@ func domainTaskRef(task *domain.Task) *taskRef {
 		return nil
 	}
 	return &taskRef{ID: task.ID, Type: string(task.Type)}
-}
-
-func viewTaskRef(view domain.TaskView) *taskRef {
-	return &taskRef{ID: view.ID, Type: view.Type}
 }
