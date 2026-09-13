@@ -127,7 +127,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	root := http.NewServeMux()
 	root.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(cfg.AssetDir))))
 	root.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadDir))))
-	root.Handle("/", httpapi.New(svc, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
+	root.Handle("/", httpapi.New(svc, httpapi.Dependencies{}, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
 		Environment:           cfg.Environment,
 		StorageProvider:       cfg.StorageProvider,
 		WeatherProvider:       cfg.WeatherProvider,

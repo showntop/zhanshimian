@@ -158,7 +158,7 @@ func TestNewWiresOperations(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := newServiceForAPI(t, repo, local)
-	handler := New(svc, discardLogger(), true, RuntimeInfo{})
+	handler := New(svc, Dependencies{}, discardLogger(), true, RuntimeInfo{})
 
 	login := httptest.NewRecorder()
 	loginReq := httptest.NewRequest(http.MethodPost, "/v1/auth/dev", strings.NewReader(`{"nickname":"ops"}`))

@@ -95,7 +95,7 @@ func TestNewWiresMediaAndLoginToken(t *testing.T) {
 	}
 	objects := combinedObjectStore{ObjectStorage: local, ObjectStore: matchingHTTPStore()}
 	svc := newServiceForAPI(t, repo, objects)
-	handler := New(svc, discardLogger(), true, RuntimeInfo{})
+	handler := New(svc, Dependencies{}, discardLogger(), true, RuntimeInfo{})
 
 	login := httptest.NewRecorder()
 	loginReq := httptest.NewRequest(http.MethodPost, "/v1/auth/dev", strings.NewReader(`{"nickname":"wired"}`))

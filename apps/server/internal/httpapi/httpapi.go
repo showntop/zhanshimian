@@ -23,10 +23,15 @@ import (
 )
 
 // New 注册全部路由（契约见 contracts/openapi.yaml）。
-func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtime RuntimeInfo) http.Handler {
+func New(svc *service.Service, deps Dependencies, logger *slog.Logger, devLoginEnabled bool, runtime RuntimeInfo) http.Handler {
 	api := &API{
 		service: svc, media: mediaFromService(svc), operations: operationsFromService(svc),
 		home:        homeFromService(svc),
+		assessment:  deps.Assessment,
+		planning:    deps.Planning,
+		renders:     deps.Renders,
+		execution:   deps.Execution,
+		feedback:    deps.Feedback,
 		idempotency: idempotencyFromService(svc),
 		logger:      logger, devLoginEnabled: devLoginEnabled, runtime: runtime,
 	}
@@ -61,8 +66,21 @@ func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtim
 	mux.Handle("POST /v1/analyses", api.auth(http.HandlerFunc(api.createAnalysis)))
 	mux.Handle("GET /v1/analyses/current", api.auth(http.HandlerFunc(api.getCurrentAnalysis)))
 	mux.Handle("GET /v1/analyses/{id}", api.auth(http.HandlerFunc(api.getAnalysis)))
-	mux.Handle("GET /v1/reports/current", api.auth(http.HandlerFunc(api.getCurrentReport)))
-	mux.Handle("GET /v1/reports/{id}", api.auth(http.HandlerFunc(api.getReport)))
+	mux.Handle("GET /v1/reports/current", api.auth(http.HandlerFunc(api.getCurrentPublishedReport)))
+	mux.Handle("GET /v1/reports/{id}", api.auth(http.HandlerFunc(api.getPublishedReport)))
+
+	mux.Handle("POST /v1/assessments", api.auth(api.requireIdempotency(http.HandlerFunc(api.createAssessment))))
+	mux.Handle("POST /v1/plan-sets", api.auth(api.requireIdempotency(http.HandlerFunc(api.createPlanSet))))
+	mux.Handle("GET /v1/plan-sets", api.auth(http.HandlerFunc(api.listPlanSets)))
+	mux.Handle("GET /v1/plan-sets/{id}", api.auth(http.HandlerFunc(api.getPlanSet)))
+	mux.Handle("POST /v1/plan-variants/{id}/render-runs", api.auth(api.requireIdempotency(http.HandlerFunc(api.createRenderRun))))
+	mux.Handle("GET /v1/render-runs/{id}", api.auth(http.HandlerFunc(api.getRenderRun)))
+	mux.Handle("PUT /v1/plan-sets/{id}/selection", api.auth(api.requireIdempotency(http.HandlerFunc(api.putSelection))))
+	mux.Handle("POST /v1/selections/{id}/executions", api.auth(api.requireIdempotency(http.HandlerFunc(api.createExecution))))
+	mux.Handle("GET /v1/executions/{id}", api.auth(http.HandlerFunc(api.getExecution)))
+	mux.Handle("POST /v1/executions/{id}/events", api.auth(api.requireIfMatch(api.requireIdempotency(http.HandlerFunc(api.appendExecutionEvent)))))
+	mux.Handle("POST /v1/generation-feedback", api.auth(api.requireIdempotency(http.HandlerFunc(api.createGenerationFeedback))))
+	mux.Handle("POST /v1/execution-feedback", api.auth(api.requireIdempotency(http.HandlerFunc(api.createExecutionFeedback))))
 
 	mux.Handle("GET /v1/reports/{id}/plans", api.auth(http.HandlerFunc(api.listPlans)))
 	mux.Handle("PUT /v1/reports/{id}/plans", api.auth(http.HandlerFunc(api.putReportPlans)))

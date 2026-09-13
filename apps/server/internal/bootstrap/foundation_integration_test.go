@@ -150,7 +150,7 @@ func TestFoundationTraceHTTPOwnershipAndIdempotency(t *testing.T) {
 		ObjectStore:   newFoundationObjectStore(),
 	}
 	svc := service.New(&foundationRepo{Store: store, pool: pool}, objects, provider.NewDemoAnalyzer(), "", time.Hour, 10<<20, discardLogger())
-	server := httptest.NewServer(httpapi.New(svc, discardLogger(), true, httpapi.RuntimeInfo{}))
+	server := httptest.NewServer(httpapi.New(svc, httpapi.Dependencies{}, discardLogger(), true, httpapi.RuntimeInfo{}))
 	t.Cleanup(server.Close)
 
 	tokenA := devLogin(t, server.URL, "user-a")

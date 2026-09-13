@@ -38,6 +38,17 @@ type HomeService interface {
 	Bootstrap(context.Context, string) (home.Snapshot, error)
 }
 
+// Dependencies 承载质量核心服务的窄依赖。legacy *service.Service 仍由 New 的
+// 旧参数传入（认证/账单/媒体等），这里只补 quality-core 五件套；旧路由删光后
+// 再彻底移除 legacy 参数。
+type Dependencies struct {
+	Assessment *assessment.Service
+	Planning   planSetService
+	Renders    renderService
+	Execution  executionService
+	Feedback   feedbackService
+}
+
 type RuntimeInfo struct {
 	Environment           string
 	StorageProvider       string
