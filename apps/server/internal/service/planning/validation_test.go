@@ -96,7 +96,7 @@ func TestValidateCandidateRejectsInvalidDetailsAndCategories(t *testing.T) {
 		t.Fatal("high intensity passed")
 	}
 	input = validValidationInput()
-	input.Candidate.Variants[1].Steps[1].Category = domain.CategoryHair
+	input.Candidate.Variants[1].Steps[1].Category = domain.StepCategoryHair
 	input.Candidate.Variants[1].Steps[1].Action = "tweak"
 	if !hasViolation(ValidateCandidate(input), ReasonStepCategorySet) || !hasViolation(ValidateCandidate(input), ReasonStepActionInvalid) {
 		t.Fatalf("violations = %#v", ValidateCandidate(input))
@@ -191,7 +191,7 @@ func validGeneratedVariant(slot int, key domain.PlanVariantKey, name string, rec
 		DifferenceTags: []string{"发型线条", "配色层次"},
 		Steps: []GeneratedPlanStep{
 			{
-				Category: domain.CategoryHair, Action: domain.ActionAdjust,
+				Category: domain.StepCategoryHair, Action: domain.ActionAdjust,
 				Title: "抬高发型重心", Summary: "保持原有长度，只整理颅顶和耳侧线条。",
 				Details: domain.PlanStepDetails{Target: hairTarget, Intensity: intensity, Avoid: []string{"不改变发长"}},
 				Groundings: []GeneratedGrounding{
@@ -199,7 +199,7 @@ func validGeneratedVariant(slot int, key domain.PlanVariantKey, name string, rec
 				},
 			},
 			{
-				Category: domain.CategoryMakeup, Action: domain.ActionKeep,
+				Category: domain.StepCategoryMakeup, Action: domain.ActionKeep,
 				Title: "保持干净眉形", Summary: "现有眉形清晰，无需调整。",
 				Details: domain.PlanStepDetails{Target: "保持眉形清洁", Intensity: "low"},
 				Groundings: []GeneratedGrounding{
@@ -207,7 +207,7 @@ func validGeneratedVariant(slot int, key domain.PlanVariantKey, name string, rec
 				},
 			},
 			{
-				Category: domain.CategoryOutfit, Action: domain.ActionAdjust,
+				Category: domain.StepCategoryOutfit, Action: domain.ActionAdjust,
 				Title: "整理上装轮廓", Summary: "以合肩版型和一层内搭应对空调环境。",
 				Details: domain.PlanStepDetails{Silhouette: silhouette, Palette: palette, Layers: []string{"浅色内搭"}, Avoid: []string{"夸张图案"}, Formality: formality},
 				Groundings: []GeneratedGrounding{

@@ -292,11 +292,11 @@ func publicPlanStep(step domain.PlanStep) planStepPayload {
 		})
 	}
 	switch step.Category {
-	case domain.CategoryMakeup:
+	case domain.StepCategoryMakeup:
 		return makeupPlanStepDTO{planStepCommon: common, Details: makeupStepDetailsDTO{
 			Target: step.Details.Target, Intensity: step.Details.Intensity,
 		}}
-	case domain.CategoryOutfit:
+	case domain.StepCategoryOutfit:
 		return outfitPlanStepDTO{planStepCommon: common, Details: outfitStepDetailsDTO{
 			Silhouette: step.Details.Silhouette,
 			Palette:    nonNilStrings(step.Details.Palette),

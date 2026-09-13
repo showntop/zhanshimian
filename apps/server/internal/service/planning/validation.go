@@ -99,7 +99,7 @@ func ValidateCandidate(input ValidationInput) []Violation {
 		for _, step := range variant.Steps {
 			stepByCategory[step.Category] = step
 		}
-		for _, category := range []domain.StepCategory{domain.CategoryHair, domain.CategoryMakeup, domain.CategoryOutfit} {
+		for _, category := range []domain.StepCategory{domain.StepCategoryHair, domain.StepCategoryMakeup, domain.StepCategoryOutfit} {
 			step, ok := stepByCategory[category]
 			if !ok {
 				add(ReasonStepCategorySet, string(category)+" step missing in "+string(variant.Key))
@@ -255,7 +255,7 @@ func jsonPointerResolves(raw []byte, pointer string) bool {
 
 func validateStepDetails(category domain.StepCategory, details domain.PlanStepDetails) error {
 	switch category {
-	case domain.CategoryHair, domain.CategoryMakeup:
+	case domain.StepCategoryHair, domain.StepCategoryMakeup:
 		if strings.TrimSpace(details.Target) == "" {
 			return errStepDetails("target required")
 		}
@@ -265,7 +265,7 @@ func validateStepDetails(category domain.StepCategory, details domain.PlanStepDe
 		if len(details.Palette) != 0 || len(details.Layers) != 0 || details.Silhouette != "" || details.Formality != "" {
 			return errStepDetails("outfit-only fields present")
 		}
-	case domain.CategoryOutfit:
+	case domain.StepCategoryOutfit:
 		if details.Target != "" || details.Intensity != "" {
 			return errStepDetails("hair/makeup-only fields present")
 		}
@@ -315,9 +315,9 @@ func coversSceneAnswer(candidate GeneratedPlanSet, field string) bool {
 }
 
 func differenceSignatureOf(steps map[domain.StepCategory]GeneratedPlanStep) DifferenceSignature {
-	hair := steps[domain.CategoryHair]
-	makeup := steps[domain.CategoryMakeup]
-	outfit := steps[domain.CategoryOutfit]
+	hair := steps[domain.StepCategoryHair]
+	makeup := steps[domain.StepCategoryMakeup]
+	outfit := steps[domain.StepCategoryOutfit]
 	layers := append([]string(nil), outfit.Details.Layers...)
 	sort.Strings(layers)
 	palette := append([]string(nil), outfit.Details.Palette...)
@@ -376,7 +376,7 @@ func stepCopyPolicy(category domain.StepCategory, step GeneratedPlanStep) (strin
 			return "price claim is never allowed", true
 		}
 	}
-	if category == domain.CategoryOutfit && !hasProfileGrounding(step) {
+	if category == domain.StepCategoryOutfit && !hasProfileGrounding(step) {
 		for _, word := range materialWords {
 			if strings.Contains(joined, word) {
 				return "material claim without profile grounding: " + word, true

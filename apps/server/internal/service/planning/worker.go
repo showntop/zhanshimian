@@ -257,11 +257,11 @@ func (h *Handler) materializePlanSet(report ReportSnapshot, payload GenerateTask
 
 func stepPositionOf(category domain.StepCategory) int {
 	switch category {
-	case domain.CategoryHair:
+	case domain.StepCategoryHair:
 		return 1
-	case domain.CategoryMakeup:
+	case domain.StepCategoryMakeup:
 		return 2
-	case domain.CategoryOutfit:
+	case domain.StepCategoryOutfit:
 		return 3
 	}
 	return 3

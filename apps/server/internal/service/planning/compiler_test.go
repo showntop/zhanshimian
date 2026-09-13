@@ -162,9 +162,9 @@ func variantKeyToID(key domain.PlanVariantKey) string {
 
 func stepPosition(category domain.StepCategory) int {
 	switch category {
-	case domain.CategoryHair:
+	case domain.StepCategoryHair:
 		return 1
-	case domain.CategoryMakeup:
+	case domain.StepCategoryMakeup:
 		return 2
 	default:
 		return 3

@@ -30,15 +30,15 @@ func CompileRenderSpecs(planSet domain.PlanSet, report ReportSnapshot) ([]domain
 		for _, step := range variant.Steps {
 			steps[step.Category] = step
 		}
-		hair, ok := steps[domain.CategoryHair]
+		hair, ok := steps[domain.StepCategoryHair]
 		if !ok {
 			return nil, fmt.Errorf("%w: variant %s misses hair step", ErrRenderSpecInvalid, variant.Key)
 		}
-		makeup, ok := steps[domain.CategoryMakeup]
+		makeup, ok := steps[domain.StepCategoryMakeup]
 		if !ok {
 			return nil, fmt.Errorf("%w: variant %s misses makeup step", ErrRenderSpecInvalid, variant.Key)
 		}
-		outfit, ok := steps[domain.CategoryOutfit]
+		outfit, ok := steps[domain.StepCategoryOutfit]
 		if !ok {
 			return nil, fmt.Errorf("%w: variant %s misses outfit step", ErrRenderSpecInvalid, variant.Key)
 		}

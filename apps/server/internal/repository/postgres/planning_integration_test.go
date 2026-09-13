@@ -255,7 +255,7 @@ func validPrepareCommand(users *planningUsers) domain.PlanningPrepareCommand {
 			Recommended: slot == 0,
 			OutcomeTags: []string{"易执行"}, DifferenceTags: []string{"发型线条"},
 		}
-		categories := []domain.StepCategory{domain.CategoryHair, domain.CategoryMakeup, domain.CategoryOutfit}
+		categories := []domain.StepCategory{domain.StepCategoryHair, domain.StepCategoryMakeup, domain.StepCategoryOutfit}
 		for position, category := range categories {
 			stepID := uuid.NewString()
 			step := domain.PlanStep{

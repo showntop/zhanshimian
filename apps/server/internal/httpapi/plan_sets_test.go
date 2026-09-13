@@ -134,7 +134,7 @@ func planningPublishedPlanSet() domain.PlanSet {
 			Descriptor: "有精神且自然", Rationale: "落实报告优先建议",
 			Recommended: slot == 0, OutcomeTags: []string{"易执行"}, DifferenceTags: []string{"发型线条"},
 		}
-		for _, category := range []domain.StepCategory{domain.CategoryHair, domain.CategoryMakeup, domain.CategoryOutfit} {
+		for _, category := range []domain.StepCategory{domain.StepCategoryHair, domain.StepCategoryMakeup, domain.StepCategoryOutfit} {
 			step := domain.PlanStep{
 				ID: variant.ID + "-" + string(category), Category: category,
 				Action: domain.ActionAdjust, Title: "调整" + string(category),

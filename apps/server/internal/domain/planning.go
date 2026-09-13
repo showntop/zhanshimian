@@ -41,9 +41,9 @@ type GroundingSourceType string
 type PlanVariantKey string
 
 const (
-	CategoryHair   StepCategory = "hair"
-	CategoryMakeup StepCategory = "makeup"
-	CategoryOutfit StepCategory = "outfit"
+	StepCategoryHair   StepCategory = "hair"
+	StepCategoryMakeup StepCategory = "makeup"
+	StepCategoryOutfit StepCategory = "outfit"
 
 	ActionKeep   StepAction = "keep"
 	ActionAdjust StepAction = "adjust"
