@@ -8,6 +8,7 @@ import (
 	"github.com/zhanshimian/server/internal/database"
 	"github.com/zhanshimian/server/internal/repository/postgres"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
+	"github.com/zhanshimian/server/internal/storage"
 )
 
 type WorkerApp struct {
@@ -48,11 +49,25 @@ func BuildWorker(cfg config.Config, logger *slog.Logger) (*WorkerApp, error) {
 		return nil, err
 	}
 	store := postgres.New(pool)
-	registry, err := taskrunner.NewRegistry(nil, nil)
+	objects, err := storage.New(storage.Config{
+		Provider: cfg.StorageProvider, LocalRoot: cfg.UploadDir,
+		COS: storage.COSConfig{BucketURL: cfg.COSBucketURL, SecretID: cfg.COSSecretID, SecretKey: cfg.COSSecretKey, KeyPrefix: cfg.COSKeyPrefix},
+	})
 	if err != nil {
 		pool.Close()
 		return nil, err
 	}
+	ai, err := BuildAI(cfg, store, objects, logger)
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+	core, err := wireQualityCore(cfg, store, objects, ai)
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+	registry := core.Registry
 	opts := taskrunner.Options{
 		Store:        store,
 		Registry:     registry,

@@ -15,13 +15,11 @@ import (
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository/postgres"
 	"github.com/zhanshimian/server/internal/service"
-	"github.com/zhanshimian/server/internal/service/assessment"
 	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/execution"
 	"github.com/zhanshimian/server/internal/service/feedback"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
-	"github.com/zhanshimian/server/internal/service/rendering"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
 	"github.com/zhanshimian/server/internal/storage"
 )
@@ -120,39 +118,14 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	operationSvc := operation.New(store)
 	billingSvc := billing.New(store)
 
-	// 质量核心服务：assessment/execution/feedback 只需要 store + 对象库。
-	// assessment 的 AI providers 与 Handler 属于 Worker 侧（bootstrap/worker），API 侧只挂 Service。
-	var signer storage.SignedURLStorage
-	if s, ok := objects.(storage.SignedURLStorage); ok {
-		signer = s
+	core, err := wireQualityCore(cfg, store, objects, ai)
+	if err != nil {
+		pool.Close()
+		return nil, err
 	}
-	assessmentSvc := assessment.NewService(store, store, store, mediaPresenter{signer: signer, ttl: cfg.AssetURLTTL}, AssessmentDefinition()).
-		WithBilling(billingSvc)
+	assessmentSvc := core.Assessment.WithBilling(billingSvc)
 	executionSvc := execution.New(store)
 	feedbackSvc := feedback.New(store)
-
-	aiRuntime := structuredRuntimeAdapter{runtime: ai.Runtime}
-	planningBundle, err := WirePlanning(cfg, store, aiRuntime)
-	if err != nil {
-		pool.Close()
-		return nil, err
-	}
-	// 渲染质量门禁策略只在生产从磁盘加载（fail-closed）；开发/测试用最小版本，
-	// 避免 cwd 差异导致相对路径解析不到。生产路径由部署约定固定为
-	// config/render-quality-policy.v1.json。
-	qualityPolicy := rendering.QualityPolicy{Version: "render-quality-v1"}
-	if cfg.Environment == "production" {
-		qualityPolicy, err = LoadRenderingQualityPolicy("config/render-quality-policy.v1.json")
-		if err != nil {
-			pool.Close()
-			return nil, err
-		}
-	}
-	renderingBundle, err := WireRendering(cfg, store, objects, runtimeImageCaller{ai.Runtime}, aiRuntime, qualityPolicy)
-	if err != nil {
-		pool.Close()
-		return nil, err
-	}
 
 	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
 	svc := service.New(store, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
@@ -167,8 +140,8 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	root.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadDir))))
 	root.Handle("/", httpapi.New(svc, httpapi.Dependencies{
 		Assessment: assessmentSvc,
-		Planning:   planningBundle.Service,
-		Renders:    renderingBundle.Service,
+		Planning:   core.Planning,
+		Renders:    core.Rendering,
 		Execution:  executionSvc,
 		Feedback:   feedbackSvc,
 	}, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
