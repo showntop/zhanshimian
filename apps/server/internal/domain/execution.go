@@ -34,6 +34,10 @@ var ErrInvalidTransition = errors.New("invalid execution transition")
 // 它驻留在 domain 以便 postgres 适配器在不依赖 service 层的前提下返回同一哨兵。
 var ErrIdempotencyConflict = errors.New("idempotency conflict")
 
+// ErrInvalidSnapshot 表示从 PlanVariant 复制的步骤快照不满足
+// 恰好 hair/makeup/outfit 且 position 唯一的约束。
+var ErrInvalidSnapshot = errors.New("invalid execution snapshot")
+
 // PlanSelection 是独立且追加式的用户选择事实。
 type PlanSelection struct {
 	ID                  string    `json:"id"`
@@ -51,6 +55,14 @@ type CreateSelectionCommand struct {
 	RenderPublicationID *string
 	IdempotencyKey      string
 	RequestHash         string
+}
+
+// CreateExecutionCommand 是跨边界 DTO:从一次 Selection 快照出一次 Execution。
+type CreateExecutionCommand struct {
+	UserID         string
+	SelectionID    string
+	IdempotencyKey string
+	RequestHash    string
 }
 
 // ExecutionStep 是创建 Execution 时从 PlanVariant 复制的不可变快照。

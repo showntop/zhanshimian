@@ -22,6 +22,11 @@ type selectionFingerprint struct {
 	RenderPublicationID *string `json:"render_publication_id,omitempty"`
 }
 
+// executionFingerprint 是 Execution 请求哈希前的固定规范化结构。
+type executionFingerprint struct {
+	SelectionID string `json:"selection_id"`
+}
+
 // normalizeSelection 校验并规范化一次选择请求,产出 trim 后的标识与请求哈希。
 func normalizeSelection(planSetID string, input PutSelectionInput) (string, string, *string, string, error) {
 	planSetID = strings.TrimSpace(planSetID)
@@ -53,6 +58,23 @@ func normalizeSelection(planSetID string, input PutSelectionInput) (string, stri
 	}
 	sum := sha256.Sum256(raw)
 	return planSetID, variantID, publicationID, hex.EncodeToString(sum[:]), nil
+}
+
+// normalizeExecution 校验并规范化一次快照请求,产出 trim 后的 selectionID 与请求哈希。
+func normalizeExecution(selectionID string, input CreateExecutionInput) (string, string, error) {
+	selectionID = strings.TrimSpace(selectionID)
+	if err := requireUUID("selection_id", selectionID); err != nil {
+		return "", "", err
+	}
+	if err := requireIdempotencyKey(input.IdempotencyKey); err != nil {
+		return "", "", err
+	}
+	raw, err := json.Marshal(executionFingerprint{SelectionID: selectionID})
+	if err != nil {
+		return "", "", err
+	}
+	sum := sha256.Sum256(raw)
+	return selectionID, hex.EncodeToString(sum[:]), nil
 }
 
 func requireUUID(field, value string) error {

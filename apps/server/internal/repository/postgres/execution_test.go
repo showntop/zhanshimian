@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
@@ -24,6 +25,11 @@ type executionFixture struct {
 	PlanSetA         string
 	VariantA         string
 	UserBPublication string
+
+	SelectionA    string
+	HairStep      string
+	HairStepTitle string
+	Pool          *pgxpool.Pool
 }
 
 // newExecutionFixture 复用 planning 夹具提交一套已发布的 PlanSet,取其第一个
@@ -174,5 +180,71 @@ func TestCreateSelectionConcurrentReplayProducesOne(t *testing.T) {
 	}
 	if createdCount != 1 {
 		t.Fatalf("created count = %d, want 1", createdCount)
+	}
+}
+
+// newExecutionSnapshotFixture 在已发布 PlanSet 上额外创建一次 Selection,并捕获
+// VariantA 的 hair 源步骤 id 与标题,用于执行快照测试。
+func newExecutionSnapshotFixture(t *testing.T) (*Store, *executionFixture) {
+	t.Helper()
+	store, fx := newExecutionFixture(t)
+	selection, _, err := store.CreateSelection(ctx, domain.CreateSelectionCommand{
+		UserID: fx.UserA, PlanSetID: fx.PlanSetA, PlanVariantID: fx.VariantA,
+		IdempotencyKey: "execution-selection", RequestHash: hashA,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx.SelectionA = selection.ID
+
+	if err := store.pool.QueryRow(ctx, `
+		SELECT id::text, title FROM plan_steps
+		WHERE user_id=$1::uuid AND plan_variant_id=$2::uuid AND category='hair'`,
+		fx.UserA, fx.VariantA).Scan(&fx.HairStep, &fx.HairStepTitle); err != nil {
+		t.Fatal(err)
+	}
+	fx.Pool = store.pool
+	return store, fx
+}
+
+func TestExecutionSnapshotSurvivesSourceDeletionAttempt(t *testing.T) {
+	store, fx := newExecutionSnapshotFixture(t)
+	exec, _, err := store.CreateExecutionFromSelection(ctx, domain.CreateExecutionCommand{
+		UserID: fx.UserA, SelectionID: fx.SelectionA,
+		IdempotencyKey: "execution-snapshot", RequestHash: hashA,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = fx.Pool.Exec(ctx, `UPDATE plan_steps SET title='mutated' WHERE id=$1::uuid`, fx.HairStep); err == nil {
+		t.Fatal("plan_steps are immutable; update must be denied by database trigger")
+	}
+	got, err := store.GetExecution(ctx, fx.UserA, exec.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Steps) != 3 {
+		t.Fatalf("snapshot steps = %d, want 3", len(got.Steps))
+	}
+	if got.Steps[0].Title != fx.HairStepTitle {
+		t.Fatalf("snapshot changed with source: got %q want %q", got.Steps[0].Title, fx.HairStepTitle)
+	}
+}
+
+func TestCreateExecutionFromSelectionDedupesBySelection(t *testing.T) {
+	store, fx := newExecutionSnapshotFixture(t)
+	first, created, err := store.CreateExecutionFromSelection(ctx, domain.CreateExecutionCommand{
+		UserID: fx.UserA, SelectionID: fx.SelectionA,
+		IdempotencyKey: "execution-a", RequestHash: hashA,
+	})
+	if err != nil || !created {
+		t.Fatalf("first: created=%v err=%v", created, err)
+	}
+	second, created, err := store.CreateExecutionFromSelection(ctx, domain.CreateExecutionCommand{
+		UserID: fx.UserA, SelectionID: fx.SelectionA,
+		IdempotencyKey: "execution-b", RequestHash: hashA,
+	})
+	if err != nil || created || second.ID != first.ID {
+		t.Fatalf("selection dedupe: %#v created=%v err=%v", second, created, err)
 	}
 }
