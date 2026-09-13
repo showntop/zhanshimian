@@ -1,24 +1,40 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/service/today"
 )
 
+// TodayService 是今日方案的最小依赖。
+type TodayService interface {
+	Context(ctx context.Context, city string, schedule string) domain.TodayContext
+	Generate(ctx context.Context, userID string, input today.CreateInput) (today.Plan, error)
+	Current(ctx context.Context, userID string) (today.Plan, error)
+	Activate(ctx context.Context, userID string, id string) (today.Plan, error)
+	Feedback(ctx context.Context, userID string, id string, feedback string) (today.Plan, error)
+}
+
+var errTodayUnavailable = errors.New("today service unavailable")
+
 func (a *API) getTodayContext(w http.ResponseWriter, r *http.Request) {
-	item, err := a.service.GetTodayContext(r.Context(), currentUser(r).ID, r.URL.Query().Get("city"), r.URL.Query().Get("schedule"))
-	if err != nil {
-		a.writeServiceError(w, r, err)
+	if a.today == nil {
+		a.internalError(w, r, errTodayUnavailable)
 		return
 	}
-	writeData(w, http.StatusOK, item)
+	writeData(w, http.StatusOK, a.today.Context(r.Context(), r.URL.Query().Get("city"), r.URL.Query().Get("schedule")))
 }
 
 func (a *API) getTodayPlan(w http.ResponseWriter, r *http.Request) {
-	item, err := a.service.GetTodayPlan(r.Context(), currentUser(r).ID)
+	if a.today == nil {
+		a.internalError(w, r, errTodayUnavailable)
+		return
+	}
+	item, err := a.today.Current(r.Context(), currentUser(r).ID)
 	if errors.Is(err, repository.ErrNotFound) {
 		writeData(w, http.StatusOK, nil)
 		return
@@ -30,23 +46,37 @@ func (a *API) getTodayPlan(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, item)
 }
 
-// POST /v1/today/plans —— 201 {data: TodayPlan, task}：今日方案文字即时生成，本人搭配图走任务。
 func (a *API) createTodayPlan(w http.ResponseWriter, r *http.Request) {
-	var input domain.TodayPlanInput
+	if a.today == nil {
+		a.internalError(w, r, errTodayUnavailable)
+		return
+	}
+	var input struct {
+		ReportID string `json:"report_id"`
+		City     string `json:"city"`
+		Schedule string `json:"schedule"`
+		Refresh  bool   `json:"refresh"`
+	}
 	if err := decodeJSON(r, &input); err != nil {
 		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
 		return
 	}
-	item, task, err := a.service.GenerateTodayPlan(r.Context(), currentUser(r).ID, input)
+	item, err := a.today.Generate(r.Context(), currentUser(r).ID, today.CreateInput{
+		City: input.City, Schedule: input.Schedule, ReportID: input.ReportID, Refresh: input.Refresh,
+	})
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
 	}
-	writeDataTask(w, http.StatusCreated, item, domainTaskRef(task))
+	writeData(w, http.StatusCreated, item)
 }
 
 func (a *API) activateTodayPlan(w http.ResponseWriter, r *http.Request) {
-	item, err := a.service.ActivateTodayPlan(r.Context(), currentUser(r).ID, r.PathValue("id"))
+	if a.today == nil {
+		a.internalError(w, r, errTodayUnavailable)
+		return
+	}
+	item, err := a.today.Activate(r.Context(), currentUser(r).ID, r.PathValue("id"))
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
@@ -55,6 +85,10 @@ func (a *API) activateTodayPlan(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) feedbackTodayPlan(w http.ResponseWriter, r *http.Request) {
+	if a.today == nil {
+		a.internalError(w, r, errTodayUnavailable)
+		return
+	}
 	var input struct {
 		Feedback string `json:"feedback"`
 	}
@@ -62,7 +96,7 @@ func (a *API) feedbackTodayPlan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
 		return
 	}
-	item, err := a.service.FeedbackTodayPlan(r.Context(), currentUser(r).ID, r.PathValue("id"), input.Feedback)
+	item, err := a.today.Feedback(r.Context(), currentUser(r).ID, r.PathValue("id"), input.Feedback)
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return

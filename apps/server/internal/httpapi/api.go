@@ -27,6 +27,7 @@ type API struct {
 	renders         renderService
 	execution       executionService
 	feedback        feedbackService
+	today           TodayService
 	idempotency     IdempotencyStore
 	logger          *slog.Logger
 	devLoginEnabled bool
@@ -47,6 +48,7 @@ type Dependencies struct {
 	Renders    renderService
 	Execution  executionService
 	Feedback   feedbackService
+	Today      TodayService
 }
 
 type RuntimeInfo struct {

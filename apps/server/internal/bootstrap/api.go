@@ -13,6 +13,7 @@ import (
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/httpapi"
 	"github.com/zhanshimian/server/internal/provider"
+	providerai "github.com/zhanshimian/server/internal/provider/ai"
 	"github.com/zhanshimian/server/internal/repository/postgres"
 	"github.com/zhanshimian/server/internal/service"
 	"github.com/zhanshimian/server/internal/service/billing"
@@ -21,6 +22,7 @@ import (
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
+	"github.com/zhanshimian/server/internal/service/today"
 	"github.com/zhanshimian/server/internal/storage"
 )
 
@@ -126,6 +128,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	assessmentSvc := core.Assessment.WithBilling(billingSvc)
 	executionSvc := execution.New(store)
 	feedbackSvc := feedback.New(store)
+	todaySvc := today.New(store, store, providerai.NewTodayPlanner(structuredRuntimeAdapter{ai.Runtime}), todayWeatherAdapter{inner: weather}, today.NewClock())
 
 	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
 	svc := service.New(store, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
@@ -144,6 +147,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		Renders:    core.Rendering,
 		Execution:  executionSvc,
 		Feedback:   feedbackSvc,
+		Today:      todaySvc,
 	}, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
 		Environment:           cfg.Environment,
 		StorageProvider:       cfg.StorageProvider,

@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository/postgres"
 	"github.com/zhanshimian/server/internal/service/assessment"
+	"github.com/zhanshimian/server/internal/service/today"
 	"github.com/zhanshimian/server/internal/storage"
 )
 
@@ -64,4 +66,12 @@ type operationProgress struct {
 
 func (p operationProgress) Set(ctx context.Context, operationID string, progressBPS int, stageCode string) error {
 	return p.store.SetOperationProgress(ctx, operationID, progressBPS, stageCode)
+}
+
+// todayWeatherAdapter 把 provider.WeatherProvider 适配到 today.WeatherProvider。
+type todayWeatherAdapter struct{ inner provider.WeatherProvider }
+
+func (a todayWeatherAdapter) Current(ctx context.Context, city string) (today.Weather, error) {
+	w, err := a.inner.Current(ctx, city)
+	return today.Weather{City: w.City, Condition: w.Condition, Temperature: w.Temperature}, err
 }

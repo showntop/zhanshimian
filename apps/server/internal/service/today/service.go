@@ -10,19 +10,19 @@ import (
 // Plan 是持久化的今日方案（OpenAPI TodayPlan 形状）。与旧 domain.TodayPlan 不同：
 // 没有 look_task / generated_image_url / provider 等内部字段，只保留公开状态。
 type Plan struct {
-	ID        string
-	ReportID  string
-	Context   domain.TodayContext
-	Title     string
-	Summary   string
-	Steps     []domain.TodayPlanStep
-	Active    bool
-	State     string
-	Operation domain.OperationRef
-	Media     *domain.RenderMediaView
-	Feedback  *string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID        string                  `json:"id"`
+	ReportID  string                  `json:"-"`
+	Context   domain.TodayContext     `json:"context"`
+	Title     string                  `json:"title"`
+	Summary   string                  `json:"summary"`
+	Steps     []domain.TodayPlanStep  `json:"steps"`
+	Active    bool                    `json:"active"`
+	State     string                  `json:"state"`
+	Operation domain.OperationRef     `json:"operation"`
+	Media     *domain.RenderMediaView `json:"media"`
+	Feedback  *string                 `json:"feedback,omitempty"`
+	CreatedAt time.Time               `json:"created_at"`
+	UpdatedAt time.Time               `json:"updated_at"`
 }
 
 type CreateInput struct {
@@ -114,6 +114,30 @@ func (s *Service) Activate(ctx context.Context, userID string, id string) (Plan,
 
 func (s *Service) Feedback(ctx context.Context, userID string, id string, feedback string) (Plan, error) {
 	return s.writer.RecordTodayPlanFeedback(ctx, userID, id, feedback)
+}
+
+// Context 返回今日的天气/日程上下文（GET /v1/today/context）。
+func (s *Service) Context(ctx context.Context, city string, schedule string) domain.TodayContext {
+	now := s.clock.Now()
+	ctxOut := domain.TodayContext{
+		Date:     now.Format("2006-01-02"),
+		City:     city,
+		Schedule: schedule,
+	}
+	switch now.Weekday() {
+	case time.Saturday, time.Sunday:
+		ctxOut.DayType = "周末"
+	default:
+		ctxOut.DayType = "工作日"
+	}
+	if s.weather != nil {
+		if w, err := s.weather.Current(ctx, city); err == nil {
+			ctxOut.City = w.City
+			ctxOut.Condition = w.Condition
+			ctxOut.Temperature = w.Temperature
+		}
+	}
+	return ctxOut
 }
 
 func mapSteps(steps []TodayPlanStep) []domain.TodayPlanStep {
