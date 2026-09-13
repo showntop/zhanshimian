@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -82,6 +83,10 @@ var generationTags = map[Tag]bool{
 	GenerationUnnatural:        true,
 }
 
+// IsGenerationTag 报告该标签是否属于 Generation 反馈;只有这六个标签能被
+// Generation 反馈接受,Execution 标签一律不得进入生成反馈。
+func IsGenerationTag(t Tag) bool { return generationTags[t] }
+
 // NormalizePreference 只从结构化输入确定性地产生 0 或 1 条偏好记忆;Generation
 // 标签一律返回 ErrPreferenceNotAllowed,自由文本永不进入。
 func NormalizePreference(input StructuredPreference, tags []Tag) ([]PreferenceMemoryDraft, error) {
@@ -147,4 +152,33 @@ func AcknowledgementCodeFor(memories []PreferenceMemoryDraft) AcknowledgementCod
 	default:
 		return AckFeedbackRecorded
 	}
+}
+
+// GenerationFeedback 是已发布 Generation 的一条反馈。Repository 从 publication
+// join candidate 派生 render_run_id/candidate_id/asset_id/generation,客户端只能
+// 提供 publication_id 与可选反馈图片,无法伪造生成链路。
+type GenerationFeedback struct {
+	ID                  string              `json:"id"`
+	PublicationID       string              `json:"publication_id"`
+	RenderRunID         string              `json:"render_run_id"`
+	CandidateID         string              `json:"candidate_id"`
+	AssetID             string              `json:"asset_id"`
+	Generation          int                 `json:"generation"`
+	Tags                []Tag               `json:"tags"`
+	Comment             string              `json:"comment,omitempty"`
+	MediaAssetID        *string             `json:"media_asset_id,omitempty"`
+	AcknowledgementCode AcknowledgementCode `json:"acknowledgement_code"`
+	CreatedAt           time.Time           `json:"created_at"`
+}
+
+// CreateGenerationFeedbackCommand 是 postgres 适配器保存 Generation 反馈所需的
+// 跨边界输入;RequestHash 由 service 规范化后计算,适配器只做重放/冲突判定。
+type CreateGenerationFeedbackCommand struct {
+	UserID         string
+	PublicationID  string
+	Tags           []Tag
+	Comment        string
+	MediaAssetID   *string
+	IdempotencyKey string
+	RequestHash    string
 }
