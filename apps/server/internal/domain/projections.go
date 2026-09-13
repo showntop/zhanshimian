@@ -171,3 +171,13 @@ type DiagnosisOption struct {
 	Reason string          `json:"reason,omitempty"`
 	Tags   []string        `json:"tags,omitempty"`
 }
+
+// HairStyle 是发型目录条目（GET /v1/hairstyles）。
+type HairStyle struct {
+	ID     string          `json:"id"`
+	Name   string          `json:"name"`
+	Media  RenderMediaView `json:"media"`
+	Note   string          `json:"note,omitempty"`
+	Reason string          `json:"reason,omitempty"`
+	Tags   []string        `json:"tags,omitempty"`
+}

@@ -86,3 +86,10 @@ func (s signedURLSigner) SignedURL(ctx context.Context, objectKey string, ttl ti
 	}
 	return url, time.Now().Add(ttl).UTC(), nil
 }
+
+// hairStarterAdapter 把 Store 的 hair 预览 Operation 创建适配到 hair.OperationStarter。
+type hairStarterAdapter struct{ store *postgres.Store }
+
+func (a hairStarterAdapter) StartPreviewOperation(ctx context.Context, userID string, previewID string) (domain.OperationRef, error) {
+	return a.store.StartPreviewOperation(ctx, userID, previewID)
+}

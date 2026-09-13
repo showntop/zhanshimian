@@ -32,6 +32,7 @@ type API struct {
 	advisor         AdvisorService
 	diagnostic      DiagnosticService
 	share           ShareService
+	hair            HairService
 	idempotency     IdempotencyStore
 	logger          *slog.Logger
 	devLoginEnabled bool
@@ -57,6 +58,7 @@ type Dependencies struct {
 	Advisor    AdvisorService
 	Diagnostic DiagnosticService
 	Share      ShareService
+	Hair       HairService
 }
 
 type RuntimeInfo struct {

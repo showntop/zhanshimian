@@ -92,13 +92,3 @@ func (a *API) patchDiagnostic(w http.ResponseWriter, r *http.Request) {
 	}
 	writeData(w, http.StatusOK, result)
 }
-
-// GET /v1/hairstyles?report_id= —— 发型推荐（纯读；缺省取最新报告，无报告 404）。
-func (a *API) listHairstyles(w http.ResponseWriter, r *http.Request) {
-	items, err := a.service.Hairstyles(r.Context(), currentUser(r).ID, r.URL.Query().Get("report_id"))
-	if err != nil {
-		a.writeServiceError(w, r, err)
-		return
-	}
-	writeData(w, http.StatusOK, items)
-}

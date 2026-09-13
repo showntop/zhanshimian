@@ -21,6 +21,7 @@ import (
 	"github.com/zhanshimian/server/internal/service/diagnostic"
 	"github.com/zhanshimian/server/internal/service/execution"
 	"github.com/zhanshimian/server/internal/service/feedback"
+	"github.com/zhanshimian/server/internal/service/hair"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
 	"github.com/zhanshimian/server/internal/service/share"
@@ -136,6 +137,8 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	wardrobeSvc := wardrobe.New(store, store)
 	advisorSvc := advisor.New(store, store, providerai.NewAdvisorChat(structuredRuntimeAdapter{ai.Runtime}))
 	diagnosticSvc := diagnostic.New(store, store, providerai.NewDiagnostic(structuredRuntimeAdapter{ai.Runtime}))
+	hairStarter := hairStarterAdapter{store: store}
+	hairSvc := hair.New(store, store, hairStarter, store)
 	var shareSigner share.URLSigner
 	if cos, ok := objects.(storage.SignedURLStorage); ok {
 		shareSigner = signedURLSigner{inner: cos}
@@ -164,6 +167,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		Advisor:    advisorSvc,
 		Diagnostic: diagnosticSvc,
 		Share:      shareSvc,
+		Hair:       hairSvc,
 	}, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
 		Environment:           cfg.Environment,
 		StorageProvider:       cfg.StorageProvider,
