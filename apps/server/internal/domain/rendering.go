@@ -84,6 +84,7 @@ type RenderMediaView struct {
 	AssetID      string    `json:"asset_id"`
 	URL          string    `json:"url"`
 	URLExpiresAt time.Time `json:"url_expires_at"`
+	MIMEType     string    `json:"mime_type"`
 	SourceKind   string    `json:"source_kind"`
 	DisplayLabel string    `json:"display_label"`
 }

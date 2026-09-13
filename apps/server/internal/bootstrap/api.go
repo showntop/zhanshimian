@@ -23,6 +23,7 @@ import (
 	"github.com/zhanshimian/server/internal/service/operation"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
 	"github.com/zhanshimian/server/internal/service/today"
+	"github.com/zhanshimian/server/internal/service/wardrobe"
 	"github.com/zhanshimian/server/internal/storage"
 )
 
@@ -129,6 +130,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	executionSvc := execution.New(store)
 	feedbackSvc := feedback.New(store)
 	todaySvc := today.New(store, store, providerai.NewTodayPlanner(structuredRuntimeAdapter{ai.Runtime}), todayWeatherAdapter{inner: weather}, today.NewClock())
+	wardrobeSvc := wardrobe.New(store, store)
 
 	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
 	svc := service.New(store, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
@@ -148,6 +150,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		Execution:  executionSvc,
 		Feedback:   feedbackSvc,
 		Today:      todaySvc,
+		Wardrobe:   wardrobeSvc,
 	}, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
 		Environment:           cfg.Environment,
 		StorageProvider:       cfg.StorageProvider,

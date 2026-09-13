@@ -828,9 +828,11 @@ CREATE TABLE wardrobe_outfits (
   note text NOT NULL DEFAULT '',
   context jsonb NOT NULL DEFAULT '{}'::jsonb,
   item_ids uuid[] NOT NULL DEFAULT '{}',
+  selected_plan_id uuid,
   worn boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, id)
+  UNIQUE (user_id, id),
+  FOREIGN KEY (user_id, selected_plan_id) REFERENCES plan_variants(user_id, id) ON DELETE SET NULL
 );
 
 CREATE TABLE advisor_conversations (
