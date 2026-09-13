@@ -71,22 +71,12 @@ function isDisplayableImage(value: unknown): value is string {
   )
 }
 
-// PNG 母版与旧 .webp fixture 不打进小程序包；把内置 look 资产改写到同名 JPEG，
-// 让旧报告的 API 响应保持可用。
-export function shippedAsset(value: unknown): unknown {
-  if (typeof value !== 'string') return value
-  if (/^\/assets\/(looks|plans|portraits|reports|hair)\/[a-z0-9_-]+\.(png|webp)$/i.test(value)) {
-    return value.replace(/\.(png|webp)$/i, '.jpg')
-  }
-  return value
-}
-
-// 严格模式：只返回真实可用的 API/本地图片 URL。空、非法、以及未被
-// shippedAsset 转换的旧 webp 引用一律返回 ''，由调用点决定占位或显式示例图。
+// 严格模式：只返回真实可用的 API/本地图片 URL。空、非法、旧 webp 引用一律返回 ''，
+// 由调用点决定占位或显式示例图。这里不再把 .png/.webp 母版改写成同名 .jpg——
+// 那是给旧 API 响应兜底的兼容行为，已由带类型的 DisplayMedia 取代（见 media/display.ts）。
 export function lookImage(value: unknown): string {
-  const normalized = shippedAsset(value)
-  if (typeof normalized === 'string' && /\.webp(\?\S*)?$/i.test(normalized)) return ''
-  return isDisplayableImage(normalized) ? normalized : ''
+  if (typeof value === 'string' && /\.webp(\?\S*)?$/i.test(value)) return ''
+  return isDisplayableImage(value) ? value : ''
 }
 
 // 显式示例图：仅用于「风格参考」场景，调用点必须叠加
@@ -101,10 +91,10 @@ export function exampleImage(slug: string = 'natural', variant: string = 'full')
 // 服务端下发的 /assets/(looks|plans|portraits|reports|hair)/* 是与包内同源的
 // 内置模特素材（含服务端 demo 数据），不是用户本人照片也不是 AI 生成效果图。
 // 命中时必须按示例图对待（叠「风格参考」角标），不论 URL 是否可渲染。
+// 注意：新代码不要再用它判角标——角标只认 DisplayMedia.source_kind（media/display.ts）。
 export function isBundledAsset(value: unknown): boolean {
-  const normalized = shippedAsset(value)
-  if (typeof normalized !== 'string') return false
-  const assetPath = normalized.replace(/^https?:\/\/[^/]+/i, '')
+  if (typeof value !== 'string') return false
+  const assetPath = value.replace(/^https?:\/\/[^/]+/i, '')
   return /^\/assets\/(looks|plans|portraits|reports|hair)\//i.test(assetPath)
 }
 

@@ -95,10 +95,19 @@ export const EMPTY_COPY = {
 
 // ---------- 图片身份标注（红线 2：AI 生成图像必须显式标识） ----------
 export const IMAGE_BADGE_COPY = {
+  original: '原本',
   bundled: '风格参考',
   demo: '效果示例',
   aiPreview: '风格参考',
   current: '当前'
+} as const
+
+// ---------- 图片空态文案 ----------
+// 投影不出可渲染图片时的兜底文字。绝不在这里放任何"示例图"字样：
+// 空态就是空态，不拿内置模特图冒充用户内容。
+export const SOURCE_IMAGE_COPY = {
+  mediaEmpty: '图片暂不可用',
+  userPhotoEmpty: '照片暂不可用'
 } as const
 
 // ---------- 分析页阶段文案 ----------

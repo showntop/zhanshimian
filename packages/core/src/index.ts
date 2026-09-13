@@ -61,12 +61,16 @@ export {
   isDisplayableImage,
   lookImage,
   setLocalLooksResolver,
-  shippedAsset,
   userImage,
   type LocalLooksResolver,
   type LookSlug,
   type LookVariant
 } from './media/truth.ts'
+export {
+  projectDisplayMedia,
+  type DisplayBadge,
+  type DisplayImage
+} from './media/display.ts'
 export {
   MAX_POLL_FAILURES,
   POLL_INTERVALS,
@@ -95,7 +99,7 @@ export {
   type DisplayProgressHandle,
   type DisplayProgressOptions
 } from './hooks/useDisplayProgress.ts'
-export { APP_NAME, APP_SLOGAN, DEFAULT_NICKNAME, ERROR_COPY, EMPTY_COPY, FEEDBACK_WORDS, FEEDBACK_ACK_COPY, feedbackAcknowledgement, HOME_COPY, HOME_TITLE, PRIVACY_NOTE, PROFILE_SETUP_COPY, REPORT_COPY, SCENES, analysisStageText, analysisTimelineText, ANALYSIS_STAGE_TIMELINE, ANALYSIS_FAIL_COPY, greetingByHour, greetingForNow, IMAGE_BADGE_COPY, PRIVACY_SECTION_TITLE, ANALYSIS_STAGE_COPY, OUTFIT_COPY, PURCHASE_COPY, PLAN_DETAIL_COPY, PLANS_COPY, CHECKLIST_COPY, ADVISOR_COPY, BILLING_COPY, FINDING_TONE_COPY, type SceneCopy, type FeedbackAcknowledgementCode } from './copy/zh.ts'
+export { APP_NAME, APP_SLOGAN, DEFAULT_NICKNAME, ERROR_COPY, EMPTY_COPY, FEEDBACK_WORDS, FEEDBACK_ACK_COPY, feedbackAcknowledgement, HOME_COPY, HOME_TITLE, PRIVACY_NOTE, PROFILE_SETUP_COPY, REPORT_COPY, SCENES, analysisStageText, analysisTimelineText, ANALYSIS_STAGE_TIMELINE, ANALYSIS_FAIL_COPY, greetingByHour, greetingForNow, IMAGE_BADGE_COPY, PRIVACY_SECTION_TITLE, SOURCE_IMAGE_COPY, ANALYSIS_STAGE_COPY, OUTFIT_COPY, PURCHASE_COPY, PLAN_DETAIL_COPY, PLANS_COPY, CHECKLIST_COPY, ADVISOR_COPY, BILLING_COPY, FINDING_TONE_COPY, type SceneCopy, type FeedbackAcknowledgementCode } from './copy/zh.ts'
 export {
   EVENT_NAME_PATTERN,
   MAX_EVENT_PAYLOAD_BYTES,

@@ -6,7 +6,6 @@ import {
   userImage,
   exampleImage,
   isBundledAsset,
-  shippedAsset,
   isDisplayableImage,
   LOCAL_LOOK_SLUGS,
   LOOK_VARIANTS,
@@ -17,10 +16,12 @@ test('lookImage: 空值/非法输入严格返回空串，绝不隐式回退内�
   assert.equal(lookImage(''), '')
   assert.equal(lookImage(null), '')
   assert.equal(lookImage(undefined), '')
-  // webp 一律拦截 —— 除非是内置资产母版（由 shippedAsset 改写成 jpg，见下个用例）
   assert.equal(lookImage('https://cdn.example.com/a.webp'), '')
   assert.equal(lookImage('https://cdn.example.com/a.webp?v=2'), '')
   assert.equal(lookImage('not-a-url'), '')
+  // 旧的 png/webp 母版改写兼容行为已删除：母版名不再被悄悄换成 .jpg
+  assert.equal(lookImage('/assets/looks/natural.png'), '/assets/looks/natural.png')
+  assert.equal(lookImage('/assets/looks/natural.webp'), '')
 })
 
 test('lookImage: 合法 https / 包内 jpg 通过', () => {
@@ -28,20 +29,7 @@ test('lookImage: 合法 https / 包内 jpg 通过', () => {
   assert.equal(lookImage('/assets/looks/natural.jpg'), '/assets/looks/natural.jpg')
 })
 
-test('shippedAsset: 内置资产的 png/webp 母版改写为同名 jpg', () => {
-  assert.equal(shippedAsset('/assets/looks/natural.png'), '/assets/looks/natural.jpg')
-  assert.equal(shippedAsset('/assets/plans/sharp.webp'), '/assets/plans/sharp.jpg')
-  assert.equal(shippedAsset('/assets/portraits/warm.png'), '/assets/portraits/warm.jpg')
-  assert.equal(shippedAsset('/assets/reports/natural.webp'), '/assets/reports/natural.jpg')
-  assert.equal(shippedAsset('/assets/hair/natural.png'), '/assets/hair/natural.jpg')
-  // 非内置路径与已是 jpg 的不改写
-  assert.equal(shippedAsset('https://x/a.png'), 'https://x/a.png')
-  assert.equal(shippedAsset('/assets/looks/natural.jpg'), '/assets/looks/natural.jpg')
-  // 改写后 webp 母版经 lookImage 变为可渲染的 jpg
-  assert.equal(lookImage('/assets/looks/natural.webp'), '/assets/looks/natural.jpg')
-})
-
-test('isBundledAsset: 命中五个内置目录（含改写后的母版）', () => {
+test('isBundledAsset: 命中五个内置目录', () => {
   assert.equal(isBundledAsset('/assets/looks/natural.jpg'), true)
   assert.equal(isBundledAsset('/assets/plans/sharp.jpg'), true)
   assert.equal(isBundledAsset('/assets/portraits/warm.png'), true)

@@ -1,0 +1,79 @@
+// 与旧 example-image 同名同名类，页面里已有的 .example-badge / .example-soft 覆盖继续生效
+// （styleIsolation: apply-shared：页面样式能影响组件内节点）。
+// 区别是这里给出角标与弱化的**基础样式**——旧组件没定义，全靠各页面各自补一份。
+.source-image {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background-color: var(--surface-soft, #edf1ea);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  &__img {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  // 人像顶对齐：衬底与可见图都从顶部起裁，多出的腿/背景从底部切掉。
+  &--anchor-top {
+    background-position: top center;
+  }
+
+  &--fill-width > &__img {
+    width: 100%;
+    height: auto;
+  }
+
+  // 图比相框更扁：按高铺满、水平居中裁侧，整个人仍在框内。
+  &--fill-height > &__img {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: auto;
+    height: 100%;
+    transform: translateX(-50%);
+  }
+
+  &--empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200rpx;
+    background: var(--moss-soft);
+  }
+
+  &__empty-text {
+    font-size: 24rpx;
+    color: var(--ink-2);
+  }
+
+  &__empty-action {
+    margin-top: 12rpx;
+    font-size: 24rpx;
+    color: var(--ink);
+    text-decoration: underline;
+  }
+}
+
+// 角标：内置图与 Demo 必挂；生成图与用户原图也带自己的说法。
+.example-badge {
+  position: absolute;
+  right: 12rpx;
+  bottom: 12rpx;
+  z-index: 2;
+  padding: 5rpx 14rpx;
+  border-radius: 999rpx;
+  background: rgba(30, 35, 29, 0.62);
+  color: #fff;
+  font-size: 20rpx;
+  line-height: 1.5;
+}
+
+// 弱化：示例图 / 内置参考图不能看起来像用户本人的效果。
+.example-soft {
+  filter: blur(1.2rpx);
+  opacity: 0.92;
+}
