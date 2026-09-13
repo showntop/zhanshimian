@@ -23,6 +23,7 @@ type API struct {
 	planning        planSetService
 	renders         renderService
 	execution       executionService
+	feedback        feedbackService
 	idempotency     IdempotencyStore
 	logger          *slog.Logger
 	devLoginEnabled bool

@@ -432,7 +432,9 @@ func listPreferenceMemoriesByFeedback(ctx context.Context, q executionQuerier, u
 		return nil, err
 	}
 	defer rows.Close()
-	var out []domain.PreferenceMemory
+	// 初始化为空切片而非 nil:重放路径也要序列化成 [],不能让 applied_memories
+	// 在首次创建与幂等重放之间从数组变成 null。
+	out := make([]domain.PreferenceMemory, 0)
 	for rows.Next() {
 		row, err := scanPreferenceMemoryRow(rows)
 		if err != nil {

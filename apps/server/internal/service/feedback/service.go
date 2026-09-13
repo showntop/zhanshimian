@@ -2,6 +2,7 @@ package feedback
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/zhanshimian/server/internal/domain"
 )
@@ -13,7 +14,7 @@ func (s *Service) CreateGenerationFeedback(
 ) (feedback GenerationFeedback, created bool, err error) {
 	publicationID, tags, comment, mediaAssetID, requestHash, err := normalizeGenerationFeedback(input)
 	if err != nil {
-		return GenerationFeedback{}, false, err
+		return GenerationFeedback{}, false, fmt.Errorf("%w: %v", ErrValidation, err)
 	}
 	feedback, created, err = s.repo.CreateGenerationFeedback(ctx, CreateGenerationFeedbackCommand{
 		UserID:         userID,
@@ -39,7 +40,7 @@ func (s *Service) CreateExecutionFeedback(
 ) (feedback ExecutionFeedback, created bool, err error) {
 	executionID, tags, comment, mediaAssetID, preference, requestHash, err := normalizeExecutionFeedback(input)
 	if err != nil {
-		return ExecutionFeedback{}, false, err
+		return ExecutionFeedback{}, false, fmt.Errorf("%w: %v", ErrValidation, err)
 	}
 	feedback, created, err = s.repo.CreateExecutionFeedback(ctx, CreateExecutionFeedbackCommand{
 		UserID:         userID,

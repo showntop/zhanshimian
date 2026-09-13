@@ -45,6 +45,22 @@ export function greetingForNow(getHour: () => number = () => new Date().getHours
 // ---------- 方案反馈词（多选 chips） ----------
 export const FEEDBACK_WORDS = ['很像我', '更有精神', '容易做到', '不够自然'] as const
 
+// ---------- 反馈确认文案（服务端 acknowledgement_code 的唯一映射） ----------
+// 只有确实写入偏好记忆时才承诺「下次」；纯记录一律不含任何承诺。
+export const FEEDBACK_ACK_COPY = {
+  feedback_recorded: '反馈已记录。',
+  less_formal_saved: '已记住：下次方案会降低正式度。',
+  simpler_saved: '已记住：下次方案会减少复杂步骤。',
+  avoid_color_saved: '已记住：下次方案会避开你指定的颜色。',
+  preserve_saved: '已记住：下次方案会保留你指定的做法。'
+} as const
+
+export type FeedbackAcknowledgementCode = keyof typeof FEEDBACK_ACK_COPY
+
+export function feedbackAcknowledgement(code: FeedbackAcknowledgementCode): string {
+  return FEEDBACK_ACK_COPY[code]
+}
+
 // ---------- 隐私说明 ----------
 export const PRIVACY_NOTE = '照片仅用于生成分析，可随时删除'
 export const PRIVACY_SECTION_TITLE = '隐私与数据'

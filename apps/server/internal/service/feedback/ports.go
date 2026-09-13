@@ -2,9 +2,15 @@ package feedback
 
 import (
 	"context"
+	"errors"
 
 	"github.com/zhanshimian/server/internal/domain"
 )
+
+// ErrValidation 标记请求本身不合法的失败:标识不是 UUID、标签不属于该反馈类型、
+// 评论超长、幂等键越界等。传输层据此返回 400 而不是 500,消息沿用
+// "<哨兵>: <细节>" 的既有约定。
+var ErrValidation = errors.New("validation error")
 
 // ErrIdempotencyConflict 复用 domain 哨兵,postgres 适配器返回同一指针,
 // 服务侧 errors.Is 能直接命中。
