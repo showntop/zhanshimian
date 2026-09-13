@@ -30,6 +30,10 @@ const (
 // ErrInvalidTransition 表示该事件不允许在当前状态发生。
 var ErrInvalidTransition = errors.New("invalid execution transition")
 
+// ErrIdempotencyConflict 表示同一 Idempotency-Key 下的请求体发生了变化。
+// 它驻留在 domain 以便 postgres 适配器在不依赖 service 层的前提下返回同一哨兵。
+var ErrIdempotencyConflict = errors.New("idempotency conflict")
+
 // PlanSelection 是独立且追加式的用户选择事实。
 type PlanSelection struct {
 	ID                  string    `json:"id"`
@@ -37,6 +41,16 @@ type PlanSelection struct {
 	PlanVariantID       string    `json:"plan_variant_id"`
 	RenderPublicationID *string   `json:"render_publication_id,omitempty"`
 	CreatedAt           time.Time `json:"created_at"`
+}
+
+// CreateSelectionCommand 是跨边界 DTO:postgres 适配器接收它而不依赖 service 层。
+type CreateSelectionCommand struct {
+	UserID              string
+	PlanSetID           string
+	PlanVariantID       string
+	RenderPublicationID *string
+	IdempotencyKey      string
+	RequestHash         string
 }
 
 // ExecutionStep 是创建 Execution 时从 PlanVariant 复制的不可变快照。
