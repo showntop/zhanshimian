@@ -31,6 +31,7 @@ type API struct {
 	wardrobe        WardrobeService
 	advisor         AdvisorService
 	diagnostic      DiagnosticService
+	share           ShareService
 	idempotency     IdempotencyStore
 	logger          *slog.Logger
 	devLoginEnabled bool
@@ -55,6 +56,7 @@ type Dependencies struct {
 	Wardrobe   WardrobeService
 	Advisor    AdvisorService
 	Diagnostic DiagnosticService
+	Share      ShareService
 }
 
 type RuntimeInfo struct {

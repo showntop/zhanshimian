@@ -23,6 +23,7 @@ import (
 	"github.com/zhanshimian/server/internal/service/feedback"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
+	"github.com/zhanshimian/server/internal/service/share"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
 	"github.com/zhanshimian/server/internal/service/today"
 	"github.com/zhanshimian/server/internal/service/wardrobe"
@@ -135,6 +136,11 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	wardrobeSvc := wardrobe.New(store, store)
 	advisorSvc := advisor.New(store, store, providerai.NewAdvisorChat(structuredRuntimeAdapter{ai.Runtime}))
 	diagnosticSvc := diagnostic.New(store, store, providerai.NewDiagnostic(structuredRuntimeAdapter{ai.Runtime}))
+	var shareSigner share.URLSigner
+	if cos, ok := objects.(storage.SignedURLStorage); ok {
+		shareSigner = signedURLSigner{inner: cos}
+	}
+	shareSvc := share.New(store, store, shareSigner, cfg.AssetURLTTL)
 
 	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
 	svc := service.New(store, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
@@ -157,6 +163,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		Wardrobe:   wardrobeSvc,
 		Advisor:    advisorSvc,
 		Diagnostic: diagnosticSvc,
+		Share:      shareSvc,
 	}, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
 		Environment:           cfg.Environment,
 		StorageProvider:       cfg.StorageProvider,

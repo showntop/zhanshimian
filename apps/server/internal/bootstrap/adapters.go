@@ -75,3 +75,14 @@ func (a todayWeatherAdapter) Current(ctx context.Context, city string) (today.We
 	w, err := a.inner.Current(ctx, city)
 	return today.Weather{City: w.City, Condition: w.Condition, Temperature: w.Temperature}, err
 }
+
+// signedURLSigner 把 storage 的双返回值签名适配到 share.URLSigner。
+type signedURLSigner struct{ inner storage.SignedURLStorage }
+
+func (s signedURLSigner) SignedURL(ctx context.Context, objectKey string, ttl time.Duration) (string, time.Time, error) {
+	url, err := s.inner.SignedURL(ctx, objectKey, ttl)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return url, time.Now().Add(ttl).UTC(), nil
+}
