@@ -777,6 +777,135 @@ CREATE UNIQUE INDEX billing_ledger_order_purchase_uniq
   ON billing_ledger(user_id, order_id, entry_type)
   WHERE order_id IS NOT NULL;
 
+-- ============ 外围持久化 ============
+-- 外围用例只读质量核心的稳定投影（report/plan variant/render publication/operation），
+-- 各自的结果落自己的表；任何一张表都不写质量核心表。
+
+CREATE TABLE today_plans (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  report_id uuid,
+  context jsonb NOT NULL DEFAULT '{}'::jsonb,
+  title text NOT NULL DEFAULT '',
+  summary text NOT NULL DEFAULT '',
+  steps jsonb NOT NULL DEFAULT '[]'::jsonb,
+  active boolean NOT NULL DEFAULT false,
+  state text NOT NULL CHECK (state IN ('planning','rendering','ready','ready_partial','failed')),
+  operation_id uuid,
+  render_publication_id uuid,
+  feedback text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, id),
+  FOREIGN KEY (user_id, report_id) REFERENCES reports(user_id, id) ON DELETE SET NULL,
+  FOREIGN KEY (user_id, operation_id) REFERENCES operations(user_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id, render_publication_id) REFERENCES render_publications(user_id, id) ON DELETE SET NULL
+);
+CREATE UNIQUE INDEX today_plans_active_uniq ON today_plans(user_id) WHERE active;
+
+CREATE TABLE wardrobe_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  media_asset_id uuid,
+  name text NOT NULL,
+  category text NOT NULL,
+  color text NOT NULL DEFAULT '',
+  season text NOT NULL DEFAULT '',
+  formality text NOT NULL DEFAULT '',
+  scenes text[] NOT NULL DEFAULT '{}',
+  favorite boolean NOT NULL DEFAULT false,
+  wear_count integer NOT NULL DEFAULT 0 CHECK (wear_count >= 0),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, id),
+  FOREIGN KEY (user_id, media_asset_id) REFERENCES media_assets(user_id, id) ON DELETE SET NULL
+);
+
+CREATE TABLE wardrobe_outfits (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  note text NOT NULL DEFAULT '',
+  context jsonb NOT NULL DEFAULT '{}'::jsonb,
+  item_ids uuid[] NOT NULL DEFAULT '{}',
+  worn boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, id)
+);
+
+CREATE TABLE advisor_conversations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, id)
+);
+
+CREATE TABLE advisor_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  conversation_id uuid NOT NULL,
+  role text NOT NULL CHECK (role IN ('user','assistant')),
+  content text NOT NULL,
+  actions jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, id),
+  FOREIGN KEY (user_id, conversation_id) REFERENCES advisor_conversations(user_id, id) ON DELETE CASCADE
+);
+
+CREATE TABLE hair_previews (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  style_id text NOT NULL,
+  style_name text NOT NULL DEFAULT '',
+  source_media_asset_id uuid,
+  operation_id uuid,
+  render_publication_id uuid,
+  state text NOT NULL DEFAULT 'queued' CHECK (state IN ('queued','generating','checking','ready','failed','unavailable')),
+  retryable boolean NOT NULL DEFAULT false,
+  saved boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, id),
+  FOREIGN KEY (user_id, source_media_asset_id) REFERENCES media_assets(user_id, id) ON DELETE SET NULL,
+  FOREIGN KEY (user_id, operation_id) REFERENCES operations(user_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id, render_publication_id) REFERENCES render_publications(user_id, id) ON DELETE SET NULL
+);
+
+CREATE TABLE diagnostics (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind text NOT NULL CHECK (kind IN ('outfit','purchase')),
+  scene text NOT NULL DEFAULT '',
+  conclusion text NOT NULL DEFAULT '',
+  priority_title text NOT NULL DEFAULT '',
+  priority_copy text NOT NULL DEFAULT '',
+  tags jsonb NOT NULL DEFAULT '[]'::jsonb,
+  findings jsonb NOT NULL DEFAULT '[]'::jsonb,
+  options jsonb NOT NULL DEFAULT '[]'::jsonb,
+  source_media_asset_id uuid,
+  saved boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, id),
+  FOREIGN KEY (user_id, source_media_asset_id) REFERENCES media_assets(user_id, id) ON DELETE SET NULL
+);
+
+CREATE TABLE shares (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token text NOT NULL UNIQUE,
+  source_type text NOT NULL CHECK (source_type IN ('plan_variant','today_plan')),
+  source_id uuid NOT NULL,
+  asset_id uuid,
+  snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
+  include_photo boolean NOT NULL DEFAULT false,
+  revoked boolean NOT NULL DEFAULT false,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, id),
+  FOREIGN KEY (user_id, asset_id) REFERENCES media_assets(user_id, id) ON DELETE CASCADE
+);
+
 CREATE FUNCTION assert_plan_set_complete() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF (SELECT count(*) FROM plan_variants WHERE user_id=NEW.user_id AND plan_set_id=NEW.id) <> 3
