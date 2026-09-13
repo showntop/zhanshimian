@@ -2,6 +2,7 @@ package rendering
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"time"
 
@@ -33,13 +34,17 @@ type (
 	GenerateCandidatePayload = domain.RenderGenerateCandidatePayload
 )
 
-// Repository is the run-creation/read persistence surface. The worker-side
-// candidate and publication methods join in handler.go / policy.go stages.
+// Repository is the rendering persistence surface.
 type Repository interface {
 	GetRenderSpecForVariant(ctx context.Context, userID, planVariantID string) (domain.RenderSpec, error)
 	CreateRun(ctx context.Context, command CreateRunCommand) (CreateRunResult, error)
 	GetRun(ctx context.Context, userID, runID string) (domain.RenderRun, *domain.RenderPublication, domain.Operation, error)
 	ListCurrentByVariantIDs(ctx context.Context, userID string, variantIDs []string) (map[string]CurrentRender, error)
+	GetCandidateJob(ctx context.Context, userID, runID string, ordinal int) (CandidateJob, error)
+	RecordCandidate(ctx context.Context, command RecordCandidateCommand) (domain.RenderCandidate, error)
+	ExpandCandidateBudget(ctx context.Context, command EnqueueNextCandidateCommand) (string, error)
+	FailRun(ctx context.Context, command FailRunCommand) error
+	CommitEvaluation(ctx context.Context, command CommitEvaluationCommand) (CommitEvaluationResult, error)
 }
 
 // ImageGenerator produces candidate bytes from a validated spec.
@@ -101,4 +106,99 @@ type PromoteObjectInput struct {
 	PublicationID  string
 	SourceKey      string
 	ExpectedSHA256 string
+}
+
+// CandidateAsset 是候选对象入库所需的元数据。
+type CandidateAsset struct {
+	ObjectKey string
+	SHA256    string
+	MIMEType  string
+	ByteSize  int64
+	Width     int
+	Height    int
+}
+
+// QualityInput is everything the quality gate may see: normalized candidate
+// bytes, the two references and the validated spec.
+type QualityInput struct {
+	Run       domain.RenderRun
+	Candidate domain.RenderCandidate
+	Image     NormalizedJPEG
+	Body      providerai.ImageInput
+	Face      providerai.ImageInput
+	Spec      domain.RenderDirective
+}
+
+// QualityResult is one immutable quality decision with internal-only scores.
+type QualityResult struct {
+	Decision              string
+	ReasonCodes           []string
+	InternalScores        json.RawMessage
+	EvaluatorInvocationID string
+	CompletedStages       int
+}
+
+// CandidateJob carries everything one candidate generation needs.
+type CandidateJob struct {
+	Run        domain.RenderRun
+	Spec       domain.RenderSpec
+	Body       providerai.ImageInput
+	Face       providerai.ImageInput
+	Previous   *domain.QualityEvaluation
+	RouteState providerai.RouteState
+}
+
+// RecordCandidateCommand atomically persists a quarantined candidate under
+// lease + generation CAS.
+type RecordCandidateCommand struct {
+	TaskID               string
+	LeaseToken           string
+	UserID               string
+	RenderRunID          string
+	SubjectGeneration    int
+	Ordinal              int
+	Asset                CandidateAsset
+	ProviderInvocationID string
+}
+
+// EnqueueNextCandidateCommand expands the budget to 2 and enqueues the
+// second candidate.
+type EnqueueNextCandidateCommand struct {
+	TaskID            string
+	LeaseToken        string
+	UserID            string
+	RenderRunID       string
+	SubjectGeneration int
+	Quality           domain.QualityEvaluation
+}
+
+// FailRunCommand terminally fails a run and its operation.
+type FailRunCommand struct {
+	TaskID            string
+	LeaseToken        string
+	UserID            string
+	RenderRunID       string
+	SubjectGeneration int
+	Outcome           string // failed | unavailable
+	ErrorCode         string
+	Retryable         bool
+}
+
+// CommitEvaluationCommand publishes or rejects in one dual-CAS transaction.
+type CommitEvaluationCommand struct {
+	TaskID            string
+	LeaseToken        string
+	UserID            string
+	RenderRunID       string
+	SubjectGeneration int
+	CandidateID       string
+	Evaluation        QualityResult
+	PublishedObject   *StoredObject
+	PublicationID     string
+}
+
+type CommitEvaluationResult struct {
+	Outcome        string
+	Publication    *domain.RenderPublication
+	EnqueuedTaskID string
 }

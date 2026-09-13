@@ -206,3 +206,21 @@ func validRenderSpec(userID, variantID string) domain.RenderSpec {
 func testConfig() Config {
 	return Config{RoutingPolicyVersion: "render-route-v1", QualityPolicyVersion: "render-quality-v1"}
 }
+
+func (r *repoFake) GetCandidateJob(context.Context, string, string, int) (CandidateJob, error) {
+	return CandidateJob{}, nil
+}
+
+func (r *repoFake) RecordCandidate(context.Context, RecordCandidateCommand) (domain.RenderCandidate, error) {
+	return domain.RenderCandidate{}, nil
+}
+
+func (r *repoFake) ExpandCandidateBudget(context.Context, EnqueueNextCandidateCommand) (string, error) {
+	return "", nil
+}
+
+func (r *repoFake) FailRun(context.Context, FailRunCommand) error { return nil }
+
+func (r *repoFake) CommitEvaluation(context.Context, CommitEvaluationCommand) (CommitEvaluationResult, error) {
+	return CommitEvaluationResult{}, nil
+}
