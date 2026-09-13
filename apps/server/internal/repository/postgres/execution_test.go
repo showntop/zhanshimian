@@ -4,13 +4,16 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/service/execution"
 )
 
 const (
@@ -30,6 +33,10 @@ type executionFixture struct {
 	HairStep      string
 	HairStepTitle string
 	Pool          *pgxpool.Pool
+
+	ExecutionA         string
+	HairExecutionStep  string
+	MakeupExecutionStep string
 }
 
 // newExecutionFixture 复用 planning 夹具提交一套已发布的 PlanSet,取其第一个
@@ -246,5 +253,60 @@ func TestCreateExecutionFromSelectionDedupesBySelection(t *testing.T) {
 	})
 	if err != nil || created || second.ID != first.ID {
 		t.Fatalf("selection dedupe: %#v created=%v err=%v", second, created, err)
+	}
+}
+
+// newExecutionEventsFixture 在已创建 Selection 与 Execution 的基础上,捕获 hair 与
+// makeup 两个 execution_step id,用于事件 CAS 测试。
+func newExecutionEventsFixture(t *testing.T) (*Store, *executionFixture) {
+	t.Helper()
+	store, fx := newExecutionSnapshotFixture(t)
+	exec, _, err := store.CreateExecutionFromSelection(ctx, domain.CreateExecutionCommand{
+		UserID: fx.UserA, SelectionID: fx.SelectionA,
+		IdempotencyKey: "execution-events", RequestHash: hashA,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fx.ExecutionA = exec.ID
+
+	if err := store.pool.QueryRow(ctx, `
+		SELECT id::text FROM execution_steps
+		WHERE user_id=$1::uuid AND execution_id=$2::uuid AND category='hair'`,
+		fx.UserA, fx.ExecutionA).Scan(&fx.HairExecutionStep); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.pool.QueryRow(ctx, `
+		SELECT id::text FROM execution_steps
+		WHERE user_id=$1::uuid AND execution_id=$2::uuid AND category='makeup'`,
+		fx.UserA, fx.ExecutionA).Scan(&fx.MakeupExecutionStep); err != nil {
+		t.Fatal(err)
+	}
+	return store, fx
+}
+
+func TestAppendExecutionEventConcurrentCASAllowsOneWriter(t *testing.T) {
+	store, fx := newExecutionEventsFixture(t)
+	var ok, conflict atomic.Int32
+	var wg sync.WaitGroup
+	for _, stepID := range []string{fx.HairExecutionStep, fx.MakeupExecutionStep} {
+		wg.Add(1)
+		go func(stepID string) {
+			defer wg.Done()
+			_, err := store.AppendExecutionEvent(ctx, domain.AppendEventCommand{
+				UserID: fx.UserA, ExecutionID: fx.ExecutionA,
+				ClientEventID: uuid.NewString(), Type: domain.EventStepCompleted,
+				StepID: &stepID, OccurredAt: time.Now(), ExpectedVersion: 1,
+			})
+			if err == nil {
+				ok.Add(1)
+			} else if errors.Is(err, execution.ErrVersionConflict) {
+				conflict.Add(1)
+			}
+		}(stepID)
+	}
+	wg.Wait()
+	if ok.Load() != 1 || conflict.Load() != 1 {
+		t.Fatalf("ok=%d conflict=%d", ok.Load(), conflict.Load())
 	}
 }

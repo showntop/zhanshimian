@@ -38,6 +38,10 @@ var ErrIdempotencyConflict = errors.New("idempotency conflict")
 // 恰好 hair/makeup/outfit 且 position 唯一的约束。
 var ErrInvalidSnapshot = errors.New("invalid execution snapshot")
 
+// ErrVersionConflict 表示事件的 ExpectedVersion 与当前 Execution 版本不一致,
+// 即并发写入了另一个事件。驻留 domain 以便 postgres 与 service 共享同一哨兵。
+var ErrVersionConflict = errors.New("version conflict")
+
 // PlanSelection 是独立且追加式的用户选择事实。
 type PlanSelection struct {
 	ID                  string    `json:"id"`
@@ -63,6 +67,25 @@ type CreateExecutionCommand struct {
 	SelectionID    string
 	IdempotencyKey string
 	RequestHash    string
+}
+
+// AppendEventCommand 是跨边界 DTO:向一次 Execution 追加一条幂等事件。
+type AppendEventCommand struct {
+	UserID          string
+	ExecutionID     string
+	ClientEventID   string
+	Type            ExecutionEventType
+	StepID          *string
+	OccurredAt      time.Time
+	ExpectedVersion int
+	RequestHash     string
+}
+
+// AppendEventResult 是追加事件后的投影:事件、重新投影的 Execution 与是否重放。
+type AppendEventResult struct {
+	Event     ExecutionEvent
+	Execution Execution
+	Replayed  bool
 }
 
 // ExecutionStep 是创建 Execution 时从 PlanVariant 复制的不可变快照。

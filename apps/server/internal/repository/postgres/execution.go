@@ -545,3 +545,203 @@ func recordExecutionKey(ctx context.Context, tx pgx.Tx, userID, key, requestHash
 		userID, key, requestHash, executionID, body)
 	return err
 }
+
+// executionEventRow 是 execution_events 的完整行。
+type executionEventRow struct {
+	ID            string
+	UserID        string
+	ExecutionID   string
+	ClientEventID string
+	RequestHash   string
+	Type          string
+	StepID        *string
+	OccurredAt    time.Time
+	CreatedAt     time.Time
+}
+
+func (r executionEventRow) public() domain.ExecutionEvent {
+	return domain.ExecutionEvent{
+		ID:            r.ID,
+		ExecutionID:   r.ExecutionID,
+		ClientEventID: r.ClientEventID,
+		Type:          domain.ExecutionEventType(r.Type),
+		StepID:        r.StepID,
+		OccurredAt:    r.OccurredAt,
+		CreatedAt:     r.CreatedAt,
+	}
+}
+
+const executionEventSelect = `
+	SELECT id::text, user_id::text, execution_id::text, client_event_id, request_hash, event_type,
+	       execution_step_id::text, occurred_at, created_at
+	FROM execution_events`
+
+const executionEventReturning = `
+	RETURNING id::text, user_id::text, execution_id::text, client_event_id, request_hash, event_type,
+	          execution_step_id::text, occurred_at, created_at`
+
+func scanExecutionEventRow(row rowScanner) (executionEventRow, error) {
+	var r executionEventRow
+	err := row.Scan(
+		&r.ID, &r.UserID, &r.ExecutionID, &r.ClientEventID, &r.RequestHash, &r.Type,
+		&r.StepID, &r.OccurredAt, &r.CreatedAt,
+	)
+	return r, err
+}
+
+// AppendExecutionEvent 按严格顺序在单个事务里追加一条幂等事件:先按
+// client_event_id 去重(replay/conflict 优先于 CAS),再锁定 Execution 校验版本、
+// 校验 step、从账本投影完成态、ValidateTransition、插入事件、CAS 推进版本。
+func (s *Store) AppendExecutionEvent(ctx context.Context, command domain.AppendEventCommand) (domain.AppendEventResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return domain.AppendEventResult{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	if existing, found, err := findExecutionEventByClientID(ctx, tx, command.UserID, command.ExecutionID, command.ClientEventID); err != nil {
+		return domain.AppendEventResult{}, err
+	} else if found {
+		if existing.RequestHash != command.RequestHash {
+			return domain.AppendEventResult{}, domain.ErrIdempotencyConflict
+		}
+		execution, err := loadExecution(ctx, tx, command.UserID, command.ExecutionID)
+		if err != nil {
+			return domain.AppendEventResult{}, err
+		}
+		return domain.AppendEventResult{Event: existing.public(), Execution: execution, Replayed: true}, nil
+	}
+
+	current, err := lockExecution(ctx, tx, command.UserID, command.ExecutionID)
+	if err != nil {
+		return domain.AppendEventResult{}, err
+	}
+	if current.Version != command.ExpectedVersion {
+		return domain.AppendEventResult{}, domain.ErrVersionConflict
+	}
+
+	if command.StepID != nil {
+		if err := verifyExecutionStep(ctx, tx, command.UserID, command.ExecutionID, *command.StepID); err != nil {
+			return domain.AppendEventResult{}, err
+		}
+	}
+
+	allCompleted, err := allExecutionStepsCompleted(ctx, tx, command.UserID, command.ExecutionID)
+	if err != nil {
+		return domain.AppendEventResult{}, err
+	}
+	next, err := domain.ValidateTransition(domain.ExecutionState(current.State), command.Type, allCompleted)
+	if err != nil {
+		return domain.AppendEventResult{}, err
+	}
+
+	event, err := insertExecutionEvent(ctx, tx, command)
+	if err != nil {
+		if isUniqueViolation(err) {
+			if existing, found, lookupErr := findExecutionEventByClientID(ctx, tx, command.UserID, command.ExecutionID, command.ClientEventID); lookupErr != nil {
+				return domain.AppendEventResult{}, lookupErr
+			} else if found {
+				if existing.RequestHash != command.RequestHash {
+					return domain.AppendEventResult{}, domain.ErrIdempotencyConflict
+				}
+				execution, err := loadExecution(ctx, tx, command.UserID, command.ExecutionID)
+				if err != nil {
+					return domain.AppendEventResult{}, err
+				}
+				return domain.AppendEventResult{Event: existing.public(), Execution: execution, Replayed: true}, nil
+			}
+		}
+		return domain.AppendEventResult{}, err
+	}
+
+	if err := updateExecutionState(ctx, tx, command.UserID, command.ExecutionID, next); err != nil {
+		return domain.AppendEventResult{}, err
+	}
+
+	execution, err := loadExecution(ctx, tx, command.UserID, command.ExecutionID)
+	if err != nil {
+		return domain.AppendEventResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.AppendEventResult{}, err
+	}
+	return domain.AppendEventResult{Event: event.public(), Execution: execution, Replayed: false}, nil
+}
+
+func findExecutionEventByClientID(ctx context.Context, tx pgx.Tx, userID, executionID, clientEventID string) (executionEventRow, bool, error) {
+	row, err := scanExecutionEventRow(tx.QueryRow(ctx, executionEventSelect+`
+		WHERE user_id=$1::uuid AND execution_id=$2::uuid AND client_event_id=$3`, userID, executionID, clientEventID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return executionEventRow{}, false, nil
+	}
+	if err != nil {
+		return executionEventRow{}, false, err
+	}
+	return row, true, nil
+}
+
+func lockExecution(ctx context.Context, tx pgx.Tx, userID, executionID string) (executionRow, error) {
+	row, err := scanExecutionRow(tx.QueryRow(ctx, executionSelect+` WHERE user_id=$1::uuid AND id=$2::uuid FOR UPDATE`, userID, executionID))
+	if err != nil {
+		return executionRow{}, mapNotFound(err)
+	}
+	return row, nil
+}
+
+func verifyExecutionStep(ctx context.Context, tx pgx.Tx, userID, executionID, stepID string) error {
+	var one int
+	err := tx.QueryRow(ctx, `SELECT 1 FROM execution_steps WHERE user_id=$1::uuid AND execution_id=$2::uuid AND id=$3::uuid`,
+		userID, executionID, stepID).Scan(&one)
+	return mapNotFound(err)
+}
+
+// allExecutionStepsCompleted 从事件账本投影:每个 step 最后一条
+// step_completed/step_reopened 事件是否为 step_completed。
+func allExecutionStepsCompleted(ctx context.Context, tx pgx.Tx, userID, executionID string) (bool, error) {
+	var total, incomplete int
+	err := tx.QueryRow(ctx, `
+		SELECT count(*),
+		       count(*) FILTER (WHERE ev.event_type IS DISTINCT FROM 'step_completed')
+		FROM execution_steps es
+		LEFT JOIN LATERAL (
+			SELECT e.event_type
+			FROM execution_events e
+			WHERE e.user_id = es.user_id AND e.execution_id = es.execution_id AND e.execution_step_id = es.id
+			  AND e.event_type IN ('step_completed','step_reopened')
+			ORDER BY e.created_at DESC, e.id DESC
+			LIMIT 1
+		) ev ON true
+		WHERE es.user_id=$1::uuid AND es.execution_id=$2::uuid`, userID, executionID).Scan(&total, &incomplete)
+	if err != nil {
+		return false, err
+	}
+	return total > 0 && incomplete == 0, nil
+}
+
+func insertExecutionEvent(ctx context.Context, tx pgx.Tx, command domain.AppendEventCommand) (executionEventRow, error) {
+	stepID := any(nil)
+	if command.StepID != nil {
+		stepID = *command.StepID
+	}
+	return scanExecutionEventRow(tx.QueryRow(ctx, `
+		INSERT INTO execution_events(user_id, execution_id, client_event_id, request_hash, event_type, execution_step_id, occurred_at)
+		VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid, $7)
+		`+executionEventReturning,
+		command.UserID, command.ExecutionID, command.ClientEventID, command.RequestHash,
+		string(command.Type), stepID, command.OccurredAt))
+}
+
+// updateExecutionState 以 CAS 推进 Execution:version+1,并写入首次 active 的
+// started_at 或 completed/abandoned 的终态时间。
+func updateExecutionState(ctx context.Context, tx pgx.Tx, userID, executionID string, next domain.ExecutionState) error {
+	_, err := tx.Exec(ctx, `
+		UPDATE executions SET
+			state = $3,
+			version = version + 1,
+			started_at = CASE WHEN $3 = 'active' THEN COALESCE(started_at, now()) ELSE started_at END,
+			completed_at = CASE WHEN $3 = 'completed' THEN now() ELSE completed_at END,
+			abandoned_at = CASE WHEN $3 = 'abandoned' THEN now() ELSE abandoned_at END,
+			updated_at = now()
+		WHERE user_id=$1::uuid AND id=$2::uuid`, userID, executionID, string(next))
+	return err
+}

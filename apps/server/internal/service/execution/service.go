@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"strings"
 
 	"github.com/zhanshimian/server/internal/domain"
 )
@@ -43,4 +44,22 @@ func (s *Service) CreateExecution(
 // GetExecution 委托 repository 按租户读取一次执行。
 func (s *Service) GetExecution(ctx context.Context, userID, executionID string) (domain.Execution, error) {
 	return s.repo.GetExecution(ctx, userID, executionID)
+}
+
+// AppendEvent 规范化请求并委托 repository 以 CAS 追加一条执行事件。
+func (s *Service) AppendEvent(ctx context.Context, userID, executionID string, input AppendEventInput) (AppendEventResult, error) {
+	executionID, stepID, occurredAt, requestHash, err := normalizeEvent(executionID, input)
+	if err != nil {
+		return AppendEventResult{}, err
+	}
+	return s.repo.AppendExecutionEvent(ctx, AppendEventCommand{
+		UserID:          userID,
+		ExecutionID:     executionID,
+		ClientEventID:   strings.TrimSpace(input.ClientEventID),
+		Type:            input.Type,
+		StepID:          stepID,
+		OccurredAt:      occurredAt,
+		ExpectedVersion: input.ExpectedVersion,
+		RequestHash:     requestHash,
+	})
 }
