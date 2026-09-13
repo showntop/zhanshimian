@@ -9,22 +9,14 @@ import (
 	"github.com/zhanshimian/server/internal/config"
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository/postgres"
-	"github.com/zhanshimian/server/internal/service"
 	"github.com/zhanshimian/server/internal/storage"
 )
 
 type AIBundle struct {
-	Analyzer  provider.Analyzer
-	Hair      provider.HairPreviewGenerator
-	PlanGroup provider.PlanGroupGenerator
-	Look      provider.LookGenerator
-	Outfit    provider.OutfitAdvisor
-	Purchase  provider.OutfitAdvisor
-	Advisor   provider.AdvisorChat
-	Today     provider.TodayPlanner
-	Routes    map[string]string
-	// Runtime 是 legacy AIRuntime，bootstrap 用它适配出 ai.StructuredRuntime
-	// 供 quality-core 服务（assessment/planning/rendering）使用。
+	Routes map[string]string
+	// Runtime 是能力路由运行时：provider/ai 的全部能力（assessment/planning/
+	// rendering/today/advisor/diagnostic）都经它调用，bootstrap 用
+	// structuredRuntimeAdapter 把它适配成 ai.StructuredRuntime。
 	Runtime *provider.AIRuntime
 }
 
@@ -65,51 +57,5 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 	if err != nil {
 		return AIBundle{}, err
 	}
-	loader := service.NewAnalysisMediaLoader(repo, objects, cfg.PublicBaseURL, cfg.MaxUploadBytes, cfg.AssetDir)
-	analyzer, err := provider.NewRoutedAnalyzer(runtime, loader)
-	if err != nil {
-		return AIBundle{}, err
-	}
-	hair, err := provider.NewRoutedHairGenerator(runtime, loader)
-	if err != nil {
-		return AIBundle{}, err
-	}
-	outfit, err := provider.NewRoutedOutfitAdvisor(runtime, loader)
-	if err != nil {
-		return AIBundle{}, err
-	}
-	bundle := AIBundle{Analyzer: analyzer, Hair: hair, Outfit: outfit, Routes: runtime.RouteSummary(), Runtime: runtime}
-	// 方案组生成与形象分析同用文本结构化能力，报告与方案解耦后由
-	// plan_group 任务调用（报告内容作为输入，保持方案贴合报告）。
-	planGroup, err := provider.NewRoutedPlanGroupGenerator(runtime)
-	if err != nil {
-		return AIBundle{}, err
-	}
-	bundle.PlanGroup = planGroup
-	if runtime.HasRoute(provider.CapabilityFullLookEdit) {
-		look, err := provider.NewRoutedLookGenerator(runtime, loader)
-		if err != nil {
-			return AIBundle{}, err
-		}
-		bundle.Look = look
-	}
-	if runtime.HasRoute(provider.CapabilityPurchaseDiagnosis) {
-		bundle.Purchase, err = provider.NewRoutedPurchaseAdvisor(runtime, loader)
-		if err != nil {
-			return AIBundle{}, err
-		}
-	}
-	if runtime.HasRoute(provider.CapabilityAdvisorChat) {
-		bundle.Advisor, err = provider.NewRoutedAdvisorChat(runtime)
-		if err != nil {
-			return AIBundle{}, err
-		}
-	}
-	if runtime.HasRoute(provider.CapabilityTodayPlan) {
-		bundle.Today, err = provider.NewRoutedTodayPlanner(runtime)
-		if err != nil {
-			return AIBundle{}, err
-		}
-	}
-	return bundle, nil
+	return AIBundle{Routes: runtime.RouteSummary(), Runtime: runtime}, nil
 }

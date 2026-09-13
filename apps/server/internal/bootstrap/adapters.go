@@ -143,3 +143,10 @@ func (a demoMediaAdapter) CreateDemoMedia(ctx context.Context, userID, kind stri
 	}
 	return a.store.CreateMedia(ctx, userID, kind, "demo/"+kind+".png", "image/png", 1)
 }
+
+// eventWriterAdapter 把 Store 的埋点行写入适配到 httpapi.EventWriter。
+type eventWriterAdapter struct{ store *postgres.Store }
+
+func (a eventWriterAdapter) TrackProductEvent(ctx context.Context, userID string, input domain.ProductEventInput) error {
+	return a.store.TrackProductEventRow(ctx, userID, input)
+}

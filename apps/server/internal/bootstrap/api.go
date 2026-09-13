@@ -165,7 +165,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		Home:         home.New(store, home.NewClock()),
 		Idempotency:  store,
 		DeleteObject: deleteObjectAdapter{objects: objects}.Delete,
-		Events:       store,
+		Events:       eventWriterAdapter{store: store},
 		Jobs:         store,
 		Demo:         demoMediaAdapter{store: store},
 
