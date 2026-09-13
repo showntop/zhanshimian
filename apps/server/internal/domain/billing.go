@@ -65,41 +65,38 @@ var (
 	ErrAlreadySettled      = errors.New("already settled")
 	ErrAlreadyRefunded     = errors.New("already refunded")
 	ErrReservationConflict = errors.New("reservation conflict")
-	ErrInvalidRefundReason = errors.New("invalid refund reason")
 )
 
-type BillingReservation struct {
-	ID          string
-	UserID      string
-	OperationID string
-	Kind        string
-	Units       int
-	Status      BillingReservationStatus
-	ResultType  string
-	ResultID    string
-	Version     int
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+// Reservation is one immutable billing reservation bound to an operation. It
+// mirrors billing_reservations: the product names the business artifact whose
+// publication settles the reservation, and charge_source records whether the
+// units were drawn from credits or a welcome entitlement.
+type Reservation struct {
+	ID            string
+	UserID        string
+	OperationID   string
+	Product       Product
+	Units         int
+	ChargeSource  ChargeSource
+	Status        BillingReservationStatus
+	PublicationID *string
+	CreatedAt     time.Time
+	SettledAt     *time.Time
+	RefundedAt    *time.Time
 }
 
-type ReserveBilling struct {
-	UserID      string
+// ReconcileFailure records one reservation that could not be settled or
+// refunded during reconciliation.
+type ReconcileFailure struct {
 	OperationID string
-	Kind        string
-	Units       int
+	Err         error
 }
 
-type SettleBilling struct {
-	UserID      string
-	OperationID string
-	ResultType  string
-	ResultID    string
-}
-
-type RefundBilling struct {
-	UserID      string
-	OperationID string
-	Reason      string
+// ReconcileResult summarizes one reconciliation sweep over terminal operations.
+type ReconcileResult struct {
+	Settled int
+	Refunded int
+	Failed  []ReconcileFailure
 }
 
 type BillingWallet struct {

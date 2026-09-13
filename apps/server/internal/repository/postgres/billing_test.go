@@ -11,20 +11,59 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
-	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/testutil"
 )
 
-func TestReservationInsufficientCreditsChangesNoRow(t *testing.T) {
-	store, pool, ids := newBillingRepo(t, 0)
-	_, created, err := store.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: ids.opID, Kind: "render", Units: 1,
-	})
-	if !errors.Is(err, billing.ErrInsufficientCredits) {
-		t.Fatalf("Reserve error = %v, want ErrInsufficientCredits", err)
+func TestReserveWelcomeAssessmentIsFree(t *testing.T) {
+	store, pool, ids := newBillingRepo(t, 5)
+	reservation, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductAssessment, 1)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if created {
-		t.Fatal("insufficient Reserve created=true")
+	if reservation.ChargeSource != domain.ChargeWelcomeAnalysis {
+		t.Fatalf("charge_source = %s, want welcome_analysis", reservation.ChargeSource)
+	}
+	if reservation.Status != domain.BillingReserved {
+		t.Fatalf("status = %s", reservation.Status)
+	}
+	if got := walletCredits(t, pool, ids.userID); got != 5 {
+		t.Fatalf("credits = %d, want 5 (welcome is free)", got)
+	}
+}
+
+func TestReservePlanSetUsesWelcomePlanSet(t *testing.T) {
+	store, pool, ids := newBillingRepo(t, 5)
+	reservation, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductPlanSet, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reservation.ChargeSource != domain.ChargeWelcomePlanSet {
+		t.Fatalf("charge_source = %s, want welcome_plan_set", reservation.ChargeSource)
+	}
+	if got := walletCredits(t, pool, ids.userID); got != 5 {
+		t.Fatalf("credits = %d, want 5 (welcome is free)", got)
+	}
+}
+
+func TestReserveAssessmentFallsBackToCreditsAfterWelcomeUsed(t *testing.T) {
+	store, pool, ids := newBillingRepoWithFlags(t, 5, true, false)
+	reservation, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductAssessment, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reservation.ChargeSource != domain.ChargeCredits {
+		t.Fatalf("charge_source = %s, want credits", reservation.ChargeSource)
+	}
+	if got := walletCredits(t, pool, ids.userID); got != 4 {
+		t.Fatalf("credits = %d, want 4", got)
+	}
+}
+
+func TestReserveRenderInsufficientCreditsChangesNoRow(t *testing.T) {
+	store, pool, ids := newBillingRepo(t, 0)
+	_, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1)
+	if !errors.Is(err, domain.ErrInsufficientCredits) {
+		t.Fatalf("Reserve error = %v, want ErrInsufficientCredits", err)
 	}
 	if got := walletCredits(t, pool, ids.userID); got != 0 {
 		t.Fatalf("credits = %d, want 0", got)
@@ -37,50 +76,71 @@ func TestReservationInsufficientCreditsChangesNoRow(t *testing.T) {
 	}
 }
 
-func TestReservationConflictOnDifferentKindOrUnits(t *testing.T) {
+func TestReserveRenderDeductsCredits(t *testing.T) {
 	store, pool, ids := newBillingRepo(t, 5)
-	first, created, err := store.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: ids.opID, Kind: "render", Units: 1,
-	})
-	if err != nil || !created {
-		t.Fatalf("first Reserve: created=%v err=%v", created, err)
+	reservation, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1)
+	if err != nil {
+		t.Fatal(err)
 	}
-	_, _, err = store.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: ids.opID, Kind: "assessment", Units: 1,
-	})
-	if !errors.Is(err, repository.ErrConflict) {
-		t.Fatalf("kind mismatch error = %v, want ErrConflict", err)
+	if reservation.ChargeSource != domain.ChargeCredits {
+		t.Fatalf("charge_source = %s, want credits", reservation.ChargeSource)
 	}
-	_, _, err = store.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: ids.opID, Kind: "render", Units: 2,
-	})
-	if !errors.Is(err, repository.ErrConflict) {
-		t.Fatalf("units mismatch error = %v, want ErrConflict", err)
+	if got := walletCredits(t, pool, ids.userID); got != 4 {
+		t.Fatalf("credits = %d, want 4", got)
+	}
+	entry := loadLedger(t, pool, ids.userID, domain.LedgerReserve)
+	if entry.delta != -1 || entry.operationID != ids.opID || entry.product != string(domain.ProductRenderPublication) {
+		t.Fatalf("reserve ledger = %+v", entry)
+	}
+}
+
+func TestReserveIdempotentSameProductAndUnits(t *testing.T) {
+	store, pool, ids := newBillingRepo(t, 5)
+	first, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ID != second.ID {
+		t.Fatalf("replay ids differ: %s vs %s", first.ID, second.ID)
+	}
+	if got := walletCredits(t, pool, ids.userID); got != 4 {
+		t.Fatalf("credits = %d, want 4 (deducted once)", got)
+	}
+	if n := countLedgerByType(t, pool, ids.userID, domain.LedgerReserve); n != 1 {
+		t.Fatalf("reserve ledger rows = %d, want 1", n)
+	}
+}
+
+func TestReserveConflictOnDifferentProductOrUnits(t *testing.T) {
+	store, pool, ids := newBillingRepo(t, 5)
+	if _, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductAssessment, 1); !errors.Is(err, domain.ErrReservationConflict) {
+		t.Fatalf("product mismatch error = %v, want ErrReservationConflict", err)
+	}
+	if _, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 2); !errors.Is(err, domain.ErrReservationConflict) {
+		t.Fatalf("units mismatch error = %v, want ErrReservationConflict", err)
 	}
 	if got := walletCredits(t, pool, ids.userID); got != 4 {
 		t.Fatalf("credits after conflict = %d, want 4", got)
 	}
-	if first.Kind != "render" || first.Units != 1 {
-		t.Fatalf("existing reservation mutated: %#v", first)
-	}
 }
 
-func TestReservationMissingAndCrossUserNotFound(t *testing.T) {
+func TestReserveMissingAndCrossUserNotFound(t *testing.T) {
 	store, pool, ids := newBillingRepo(t, 3)
 	otherID := insertUser(t, store)
 	foreign := seedOperation(t, store, otherID, domain.Operation{
 		Kind: domain.OperationRender, Status: domain.OperationAccepted,
 	})
-	_, _, err := store.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: uuid.NewString(), Kind: "render", Units: 1,
-	})
-	if !errors.Is(err, repository.ErrNotFound) {
+	if _, err := store.Reserve(context.Background(), ids.userID, uuid.NewString(), domain.ProductRenderPublication, 1); !errors.Is(err, repository.ErrNotFound) {
 		t.Fatalf("missing operation error = %v, want ErrNotFound", err)
 	}
-	_, _, err = store.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: foreign.ID, Kind: "render", Units: 1,
-	})
-	if !errors.Is(err, repository.ErrNotFound) {
+	if _, err := store.Reserve(context.Background(), ids.userID, foreign.ID, domain.ProductRenderPublication, 1); !errors.Is(err, repository.ErrNotFound) {
 		t.Fatalf("cross-user operation error = %v, want ErrNotFound", err)
 	}
 	if got := walletCredits(t, pool, ids.userID); got != 3 {
@@ -91,138 +151,151 @@ func TestReservationMissingAndCrossUserNotFound(t *testing.T) {
 	}
 }
 
-func TestSettleIdempotentSameResultAndRejectsMismatch(t *testing.T) {
-	store, pool, ids := newBillingRepo(t, 2)
-	if _, _, err := store.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: ids.opID, Kind: "render", Units: 1,
-	}); err != nil {
+func TestReserveRejectsTerminalOperation(t *testing.T) {
+	store, _, ids := newBillingRepo(t, 3)
+	if _, err := store.pool.Exec(context.Background(), `
+		UPDATE operations SET status='succeeded', result_type='report', result_id=$3::uuid
+		WHERE user_id=$1::uuid AND id=$2::uuid`, ids.userID, ids.opID, uuid.NewString()); err != nil {
 		t.Fatal(err)
 	}
-	first, settled, err := store.Settle(context.Background(), domain.SettleBilling{
-		UserID: ids.userID, OperationID: ids.opID,
-		ResultType: "render_publication", ResultID: ids.resultID,
-	})
-	if err != nil || !settled {
-		t.Fatalf("first Settle: settled=%v err=%v", settled, err)
+	if _, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductAssessment, 1); !errors.Is(err, repository.ErrConflict) {
+		t.Fatalf("terminal operation error = %v, want ErrConflict", err)
 	}
-	if first.ResultType != "render_publication" || first.ResultID != ids.resultID {
-		t.Fatalf("settled result = %#v", first)
+}
+
+func TestSettleAssessmentIdempotent(t *testing.T) {
+	store, pool, ids := newBillingRepo(t, 5)
+	reportID := uuid.NewString()
+	op := seedOperation(t, store, ids.userID, domain.Operation{Kind: domain.OperationAssessment, Status: domain.OperationAccepted})
+	if _, err := store.Reserve(context.Background(), ids.userID, op.ID, domain.ProductAssessment, 1); err != nil {
+		t.Fatal(err)
 	}
-	second, settled, err := store.Settle(context.Background(), domain.SettleBilling{
-		UserID: ids.userID, OperationID: ids.opID,
-		ResultType: "render_publication", ResultID: ids.resultID,
-	})
-	if err != nil {
+	markOperationSucceeded(t, store, ids.userID, op.ID, "report", reportID)
+	if err := store.Settle(context.Background(), ids.userID, op.ID, nil); err != nil {
+		t.Fatalf("first Settle: %v", err)
+	}
+	if err := store.Settle(context.Background(), ids.userID, op.ID, nil); err != nil {
 		t.Fatalf("idempotent Settle: %v", err)
 	}
-	if settled {
-		t.Fatal("second Settle settled=true, want false")
+	row := loadReservation(t, pool, ids.userID, op.ID)
+	if row.status != string(domain.BillingSettled) {
+		t.Fatalf("status = %s, want settled", row.status)
 	}
-	if second.ID != first.ID {
-		t.Fatalf("settle IDs differ: %s vs %s", first.ID, second.ID)
-	}
-	_, _, err = store.Settle(context.Background(), domain.SettleBilling{
-		UserID: ids.userID, OperationID: ids.opID,
-		ResultType: "render_publication", ResultID: uuid.NewString(),
-	})
-	if err == nil {
-		t.Fatal("different result Settle succeeded")
-	}
-	entry := loadLedger(t, pool, ids.userID, "settle")
-	if entry.delta != 0 || entry.refType != "operation" || entry.refID != ids.opID {
+	entry := loadLedger(t, pool, ids.userID, domain.LedgerSettle)
+	if entry.delta != 0 || entry.operationID != op.ID {
 		t.Fatalf("settle ledger = %+v", entry)
 	}
-	if countLedgerByReason(t, pool, ids.userID, "settle") != 1 {
-		t.Fatal("expected one settle ledger row")
+	if n := countLedgerByType(t, pool, ids.userID, domain.LedgerSettle); n != 1 {
+		t.Fatalf("settle ledger rows = %d, want 1", n)
+	}
+}
+
+func TestSettleRequiresSucceededOperation(t *testing.T) {
+	store, _, ids := newBillingRepo(t, 5)
+	if _, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductAssessment, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Settle(context.Background(), ids.userID, ids.opID, nil); !errors.Is(err, repository.ErrConflict) {
+		t.Fatalf("settle while running error = %v, want ErrConflict", err)
+	}
+}
+
+func TestSettleRejectsWrongResultType(t *testing.T) {
+	store, _, ids := newBillingRepo(t, 5)
+	op := seedOperation(t, store, ids.userID, domain.Operation{Kind: domain.OperationAssessment, Status: domain.OperationAccepted})
+	if _, err := store.Reserve(context.Background(), ids.userID, op.ID, domain.ProductAssessment, 1); err != nil {
+		t.Fatal(err)
+	}
+	markOperationSucceeded(t, store, ids.userID, op.ID, "plan_set", uuid.NewString())
+	if err := store.Settle(context.Background(), ids.userID, op.ID, nil); !errors.Is(err, repository.ErrConflict) {
+		t.Fatalf("wrong result_type error = %v, want ErrConflict", err)
+	}
+}
+
+func TestSettleRenderRequiresPublication(t *testing.T) {
+	store, _, ids := newBillingRepo(t, 5)
+	op := seedOperation(t, store, ids.userID, domain.Operation{Kind: domain.OperationRender, Status: domain.OperationAccepted})
+	if _, err := store.Reserve(context.Background(), ids.userID, op.ID, domain.ProductRenderPublication, 1); err != nil {
+		t.Fatal(err)
+	}
+	markOperationSucceeded(t, store, ids.userID, op.ID, "render_publication", uuid.NewString())
+	if err := store.Settle(context.Background(), ids.userID, op.ID, nil); !errors.Is(err, repository.ErrConflict) {
+		t.Fatalf("settle render without publication error = %v, want ErrConflict", err)
 	}
 }
 
 func TestSettleRejectsRefundedReservation(t *testing.T) {
-	store, _, ids := newBillingRepo(t, 1)
-	if _, _, err := store.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: ids.opID, Kind: "render", Units: 1,
-	}); err != nil {
+	store, _, ids := newBillingRepo(t, 5)
+	if _, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := store.Refund(context.Background(), domain.RefundBilling{
-		UserID: ids.userID, OperationID: ids.opID, Reason: "superseded",
-	}); err != nil {
+	markOperationFailed(t, store, ids.userID, ids.opID)
+	if err := store.Refund(context.Background(), ids.userID, ids.opID); err != nil {
 		t.Fatal(err)
 	}
-	_, settled, err := store.Settle(context.Background(), domain.SettleBilling{
-		UserID: ids.userID, OperationID: ids.opID,
-		ResultType: "render_publication", ResultID: ids.resultID,
-	})
-	if err == nil || settled {
-		t.Fatalf("settle after refund: settled=%v err=%v", settled, err)
+	if err := store.Settle(context.Background(), ids.userID, ids.opID, nil); !errors.Is(err, domain.ErrAlreadyRefunded) {
+		t.Fatalf("settle after refund error = %v, want ErrAlreadyRefunded", err)
 	}
 }
 
-func TestRefundRejectsInvalidReasonAndLeavesRowsUnchanged(t *testing.T) {
-	store, pool, ids := newBillingRepo(t, 1)
-	if _, _, err := store.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: ids.opID, Kind: "assessment", Units: 1,
-	}); err != nil {
+func TestRefundRestoresCreditsAndIsIdempotent(t *testing.T) {
+	store, pool, ids := newBillingRepo(t, 5)
+	if _, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1); err != nil {
 		t.Fatal(err)
 	}
-	_, changed, err := store.Refund(context.Background(), domain.RefundBilling{
-		UserID: ids.userID, OperationID: ids.opID, Reason: "timeout",
-	})
-	if err == nil || changed {
-		t.Fatalf("invalid refund: changed=%v err=%v", changed, err)
+	markOperationFailed(t, store, ids.userID, ids.opID)
+	if err := store.Refund(context.Background(), ids.userID, ids.opID); err != nil {
+		t.Fatalf("first Refund: %v", err)
 	}
-	if got := walletCredits(t, pool, ids.userID); got != 0 {
-		t.Fatalf("credits after invalid refund = %d, want 0", got)
+	if err := store.Refund(context.Background(), ids.userID, ids.opID); err != nil {
+		t.Fatalf("idempotent Refund: %v", err)
 	}
-	row := loadReservation(t, pool, ids.userID, ids.opID)
-	if row.status != string(domain.BillingReserved) {
-		t.Fatalf("status = %s, want reserved", row.status)
+	if got := walletCredits(t, pool, ids.userID); got != 5 {
+		t.Fatalf("credits after refund = %d, want 5", got)
 	}
-	if countLedgerByReason(t, pool, ids.userID, "refund") != 0 {
-		t.Fatal("invalid reason wrote a refund ledger row")
+	if n := countLedgerByType(t, pool, ids.userID, domain.LedgerRefund); n != 1 {
+		t.Fatalf("refund ledger rows = %d, want 1", n)
 	}
 }
 
-func TestReservationLedgerReferencesOperationNotTask(t *testing.T) {
-	store, pool, ids := newBillingRepo(t, 2)
-	if _, _, err := store.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: ids.opID, Kind: "render", Units: 1,
-	}); err != nil {
+func TestRefundRejectsSettledReservation(t *testing.T) {
+	store, _, ids := newBillingRepo(t, 5)
+	op := seedOperation(t, store, ids.userID, domain.Operation{Kind: domain.OperationAssessment, Status: domain.OperationAccepted})
+	if _, err := store.Reserve(context.Background(), ids.userID, op.ID, domain.ProductAssessment, 1); err != nil {
 		t.Fatal(err)
 	}
-	entry := loadLedger(t, pool, ids.userID, "reserve")
-	if entry.delta != -1 || entry.refType != "operation" || entry.refID != ids.opID {
-		t.Fatalf("reserve ledger = %+v, want operation/%s delta=-1", entry, ids.opID)
-	}
-	if _, _, err := store.Refund(context.Background(), domain.RefundBilling{
-		UserID: ids.userID, OperationID: ids.opID, Reason: "failed",
-	}); err != nil {
+	markOperationSucceeded(t, store, ids.userID, op.ID, "report", uuid.NewString())
+	if err := store.Settle(context.Background(), ids.userID, op.ID, nil); err != nil {
 		t.Fatal(err)
 	}
-	refund := loadLedger(t, pool, ids.userID, "refund")
-	if refund.delta != 1 || refund.refType != "operation" || refund.refID != ids.opID {
-		t.Fatalf("refund ledger = %+v", refund)
+	if err := store.Refund(context.Background(), ids.userID, op.ID); !errors.Is(err, domain.ErrAlreadySettled) {
+		t.Fatalf("refund after settle error = %v, want ErrAlreadySettled", err)
 	}
 }
 
-func TestReservationConcurrentDeductsOnce(t *testing.T) {
+func TestRefundRejectsNonTerminalOperation(t *testing.T) {
+	store, _, ids := newBillingRepo(t, 5)
+	if _, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Refund(context.Background(), ids.userID, ids.opID); !errors.Is(err, repository.ErrConflict) {
+		t.Fatalf("refund while running error = %v, want ErrConflict", err)
+	}
+}
+
+func TestReserveConcurrentDeductsOnce(t *testing.T) {
 	store, pool, ids := newBillingRepo(t, 20)
-	var created atomic.Int64
+	var successes atomic.Int64
 	var wg sync.WaitGroup
 	errs := make(chan error, 20)
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, ok, err := store.Reserve(context.Background(), domain.ReserveBilling{
-				UserID: ids.userID, OperationID: ids.opID, Kind: "render", Units: 1,
-			})
-			if err != nil {
+			if _, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1); err != nil {
 				errs <- err
-				return
-			}
-			if ok {
-				created.Add(1)
+			} else {
+				successes.Add(1)
 			}
 		}()
 	}
@@ -231,40 +304,36 @@ func TestReservationConcurrentDeductsOnce(t *testing.T) {
 	for err := range errs {
 		t.Fatal(err)
 	}
-	if created.Load() != 1 {
-		t.Fatalf("created = %d, want 1", created.Load())
+	// Every caller replays the same reservation idempotently, so all succeed
+	// while exactly one credit is deducted.
+	if successes.Load() != 20 {
+		t.Fatalf("successes = %d, want 20", successes.Load())
 	}
 	if got := walletCredits(t, pool, ids.userID); got != 19 {
 		t.Fatalf("credits after concurrent reserve = %d, want 19", got)
 	}
-	if n := countLedgerByReason(t, pool, ids.userID, "reserve"); n != 1 {
+	if n := countLedgerByType(t, pool, ids.userID, domain.LedgerReserve); n != 1 {
 		t.Fatalf("reserve ledger rows = %d, want 1", n)
 	}
 }
 
 func TestRefundConcurrentCreditsOnce(t *testing.T) {
-	store, pool, ids := newBillingRepo(t, 1)
-	if _, _, err := store.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: ids.opID, Kind: "assessment", Units: 1,
-	}); err != nil {
+	store, pool, ids := newBillingRepo(t, 5)
+	if _, err := store.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1); err != nil {
 		t.Fatal(err)
 	}
-	var changed atomic.Int64
+	markOperationFailed(t, store, ids.userID, ids.opID)
+	var successes atomic.Int64
 	var wg sync.WaitGroup
 	errs := make(chan error, 20)
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, ok, err := store.Refund(context.Background(), domain.RefundBilling{
-				UserID: ids.userID, OperationID: ids.opID, Reason: "cancelled",
-			})
-			if err != nil {
+			if err := store.Refund(context.Background(), ids.userID, ids.opID); err != nil {
 				errs <- err
-				return
-			}
-			if ok {
-				changed.Add(1)
+			} else {
+				successes.Add(1)
 			}
 		}()
 	}
@@ -273,24 +342,66 @@ func TestRefundConcurrentCreditsOnce(t *testing.T) {
 	for err := range errs {
 		t.Fatal(err)
 	}
-	if changed.Load() != 1 {
-		t.Fatalf("refunded = %d, want 1", changed.Load())
+	// Every caller replays the refund idempotently, so all succeed while the
+	// credit is returned exactly once.
+	if successes.Load() != 20 {
+		t.Fatalf("successes = %d, want 20", successes.Load())
 	}
-	if got := walletCredits(t, pool, ids.userID); got != 1 {
-		t.Fatalf("credits after concurrent refund = %d, want 1", got)
+	if got := walletCredits(t, pool, ids.userID); got != 5 {
+		t.Fatalf("credits after concurrent refund = %d, want 5", got)
 	}
-	if n := countLedgerByReason(t, pool, ids.userID, "refund"); n != 1 {
+	if n := countLedgerByType(t, pool, ids.userID, domain.LedgerRefund); n != 1 {
 		t.Fatalf("refund ledger rows = %d, want 1", n)
 	}
 }
 
+func TestReconcileSettlesSucceededAndRefundsFailed(t *testing.T) {
+	store, pool, ids := newBillingRepo(t, 5)
+
+	succeededOp := seedOperation(t, store, ids.userID, domain.Operation{Kind: domain.OperationAssessment, Status: domain.OperationAccepted})
+	if _, err := store.Reserve(context.Background(), ids.userID, succeededOp.ID, domain.ProductAssessment, 1); err != nil {
+		t.Fatal(err)
+	}
+	markOperationSucceeded(t, store, ids.userID, succeededOp.ID, "report", uuid.NewString())
+
+	failedOp := seedOperation(t, store, ids.userID, domain.Operation{Kind: domain.OperationRender, Status: domain.OperationAccepted})
+	if _, err := store.Reserve(context.Background(), ids.userID, failedOp.ID, domain.ProductRenderPublication, 1); err != nil {
+		t.Fatal(err)
+	}
+	markOperationFailed(t, store, ids.userID, failedOp.ID)
+
+	result, err := store.ReconcileTerminalOperations(context.Background(), 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Settled != 1 || result.Refunded != 1 {
+		t.Fatalf("reconcile = settled %d refunded %d, want 1/1", result.Settled, result.Refunded)
+	}
+	if len(result.Failed) != 0 {
+		t.Fatalf("reconcile failures = %#v", result.Failed)
+	}
+	// The failed render reservation returned its credit.
+	if got := walletCredits(t, pool, ids.userID); got != 5 {
+		t.Fatalf("credits after reconcile = %d, want 5", got)
+	}
+	if status := loadReservation(t, pool, ids.userID, succeededOp.ID).status; status != string(domain.BillingSettled) {
+		t.Fatalf("succeeded reservation status = %s, want settled", status)
+	}
+	if status := loadReservation(t, pool, ids.userID, failedOp.ID).status; status != string(domain.BillingRefunded) {
+		t.Fatalf("failed reservation status = %s, want refunded", status)
+	}
+}
+
 type billingIDs struct {
-	userID   string
-	opID     string
-	resultID string
+	userID string
+	opID   string
 }
 
 func newBillingRepo(t *testing.T, credits int) (*Store, *pgxpool.Pool, billingIDs) {
+	return newBillingRepoWithFlags(t, credits, false, false)
+}
+
+func newBillingRepoWithFlags(t *testing.T, credits int, welcomeAnalysisUsed, welcomePlanSetUsed bool) (*Store, *pgxpool.Pool, billingIDs) {
 	t.Helper()
 	pool := testutil.NewPostgres(t)
 	store := New(pool)
@@ -299,10 +410,29 @@ func newBillingRepo(t *testing.T, credits int) (*Store, *pgxpool.Pool, billingID
 		Kind: domain.OperationRender, Status: domain.OperationAccepted,
 	})
 	if _, err := pool.Exec(context.Background(),
-		`INSERT INTO billing_wallets(user_id, credits) VALUES($1::uuid, $2)`, userID, credits); err != nil {
+		`INSERT INTO billing_wallets(user_id, credits, welcome_analysis_used, welcome_plan_set_used) VALUES($1::uuid, $2, $3, $4)`,
+		userID, credits, welcomeAnalysisUsed, welcomePlanSetUsed); err != nil {
 		t.Fatalf("seed wallet: %v", err)
 	}
-	return store, pool, billingIDs{userID: userID, opID: op.ID, resultID: uuid.NewString()}
+	return store, pool, billingIDs{userID: userID, opID: op.ID}
+}
+
+func markOperationSucceeded(t *testing.T, store *Store, userID, opID, resultType, resultID string) {
+	t.Helper()
+	if _, err := store.pool.Exec(context.Background(), `
+		UPDATE operations SET status='succeeded', result_type=$3, result_id=$4::uuid, finished_at=now(), updated_at=now()
+		WHERE user_id=$1::uuid AND id=$2::uuid`, userID, opID, resultType, resultID); err != nil {
+		t.Fatalf("mark operation succeeded: %v", err)
+	}
+}
+
+func markOperationFailed(t *testing.T, store *Store, userID, opID string) {
+	t.Helper()
+	if _, err := store.pool.Exec(context.Background(), `
+		UPDATE operations SET status='failed', trace_id='test-fail', finished_at=now(), updated_at=now()
+		WHERE user_id=$1::uuid AND id=$2::uuid`, userID, opID); err != nil {
+		t.Fatalf("mark operation failed: %v", err)
+	}
 }
 
 func walletCredits(t *testing.T, pool *pgxpool.Pool, userID string) int {
@@ -335,30 +465,36 @@ func countLedger(t *testing.T, pool *pgxpool.Pool, userID string) int {
 	return n
 }
 
-func countLedgerByReason(t *testing.T, pool *pgxpool.Pool, userID, reason string) int {
+func countLedgerByType(t *testing.T, pool *pgxpool.Pool, userID, entryType string) int {
 	t.Helper()
 	var n int
 	if err := pool.QueryRow(context.Background(),
-		`SELECT count(*) FROM billing_ledger WHERE user_id=$1::uuid AND reason=$2`, userID, reason).Scan(&n); err != nil {
+		`SELECT count(*) FROM billing_ledger WHERE user_id=$1::uuid AND entry_type=$2`, userID, entryType).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
 	return n
 }
 
 type ledgerRow struct {
-	delta   int
-	refType string
-	refID   string
+	delta        int
+	product      string
+	chargeSource string
+	operationID  string
 }
 
-func loadLedger(t *testing.T, pool *pgxpool.Pool, userID, reason string) ledgerRow {
+func loadLedger(t *testing.T, pool *pgxpool.Pool, userID, entryType string) ledgerRow {
 	t.Helper()
 	var row ledgerRow
+	var operationID *string
 	err := pool.QueryRow(context.Background(), `
-		SELECT delta, reference_type, reference_id::text
-		FROM billing_ledger WHERE user_id=$1::uuid AND reason=$2`, userID, reason).Scan(&row.delta, &row.refType, &row.refID)
+		SELECT delta, product, charge_source, operation_id::text
+		FROM billing_ledger WHERE user_id=$1::uuid AND entry_type=$2`, userID, entryType).
+		Scan(&row.delta, &row.product, &row.chargeSource, &operationID)
 	if err != nil {
-		t.Fatalf("load ledger %s: %v", reason, err)
+		t.Fatalf("load ledger %s: %v", entryType, err)
+	}
+	if operationID != nil {
+		row.operationID = *operationID
 	}
 	return row
 }

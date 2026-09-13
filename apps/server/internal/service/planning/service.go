@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/service/billing"
 )
 
 // Dependencies carries the narrow ports a Planning service needs. The
@@ -18,6 +19,7 @@ type Dependencies struct {
 	Store      PlanSetStore
 	Renders    CurrentRenderReader
 	Memories   PreferenceMemoryReader
+	Billing    billing.Reserver
 	IDs        func() string
 }
 
@@ -94,6 +96,11 @@ func (s *Service) CreatePlanSet(ctx context.Context, cmd CreateCommand) (CreateR
 	})
 	if err != nil {
 		return CreateResult{}, err
+	}
+	if created && s.deps.Billing != nil {
+		if _, err := s.deps.Billing.Reserve(ctx, cmd.UserID, ref.ID, domain.ProductPlanSet, 1); err != nil {
+			return CreateResult{}, err
+		}
 	}
 	return CreateResult{PlanSetID: planSetID, Accepted: created, Operation: ref}, nil
 }

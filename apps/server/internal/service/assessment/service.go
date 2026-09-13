@@ -8,6 +8,7 @@ import (
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
 )
 
@@ -23,6 +24,7 @@ type Service struct {
 	profiles       ProfileReader
 	media          MediaPresenter
 	taskDefinition taskrunner.Definition
+	billing        billing.Reserver
 }
 
 type CreateCommand struct {
@@ -88,6 +90,14 @@ func NewService(repo Repository, assets AssetReader, profiles ProfileReader, med
 	}
 }
 
+// WithBilling attaches the reserve-only billing port used to charge a new
+// assessment at creation time. Nil is tolerated so the service still runs
+// without billing wired (the welcome/free path and tests).
+func (s *Service) WithBilling(b billing.Reserver) *Service {
+	s.billing = b
+	return s
+}
+
 func (s *Service) Create(ctx context.Context, cmd CreateCommand) (CreateResult, error) {
 	ids := []string{cmd.Slots.FaceAssetID, cmd.Slots.SideAssetID, cmd.Slots.BodyAssetID}
 	assets, err := s.assets.GetReadyAssets(ctx, cmd.UserID, ids)
@@ -112,6 +122,11 @@ func (s *Service) Create(ctx context.Context, cmd CreateCommand) (CreateResult, 
 	created, err := s.repo.CreateOrReuseAssessment(ctx, params)
 	if err != nil {
 		return CreateResult{}, err
+	}
+	if !created.Reused && s.billing != nil {
+		if _, err := s.billing.Reserve(ctx, cmd.UserID, created.Operation.ID, domain.ProductAssessment, 1); err != nil {
+			return CreateResult{}, err
+		}
 	}
 	return CreateResult{
 		Run:       created.Run,

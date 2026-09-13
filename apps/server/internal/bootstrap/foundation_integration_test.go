@@ -106,11 +106,9 @@ func TestFoundationTraceRefundsFailedOperation(t *testing.T) {
 	op := env.CreateOperation("user-a", "assessment")
 	env.seedWallet("user-a", 1)
 
-	reserved, created, err := env.billing.Reserve(ctx, domain.ReserveBilling{
-		UserID: env.user("user-a"), OperationID: op.ID, Kind: "assessment", Units: 1,
-	})
-	if err != nil || !created {
-		t.Fatalf("Reserve: created=%v err=%v", created, err)
+	reserved, err := env.billing.Reserve(ctx, env.user("user-a"), op.ID, domain.ProductRenderPublication, 1)
+	if err != nil {
+		t.Fatalf("Reserve: %v", err)
 	}
 	if reserved.Status != domain.BillingReserved {
 		t.Fatalf("reservation status = %s", reserved.Status)
@@ -120,23 +118,11 @@ func TestFoundationTraceRefundsFailedOperation(t *testing.T) {
 	}
 
 	env.markOperationTerminal(op, domain.OperationFailed)
-	first, changed, err := env.billing.Refund(ctx, domain.RefundBilling{
-		UserID: env.user("user-a"), OperationID: op.ID, Reason: "failed",
-	})
-	if err != nil || !changed {
-		t.Fatalf("first Refund: changed=%v err=%v", changed, err)
+	if err := env.billing.Refund(ctx, env.user("user-a"), op.ID); err != nil {
+		t.Fatalf("first Refund: %v", err)
 	}
-	if first.Status != domain.BillingRefunded {
-		t.Fatalf("refund status = %s", first.Status)
-	}
-	second, changed, err := env.billing.Refund(ctx, domain.RefundBilling{
-		UserID: env.user("user-a"), OperationID: op.ID, Reason: "failed",
-	})
-	if err != nil || changed {
-		t.Fatalf("second Refund: changed=%v err=%v", changed, err)
-	}
-	if second.ID != first.ID {
-		t.Fatalf("refund ids differ: %s vs %s", second.ID, first.ID)
+	if err := env.billing.Refund(ctx, env.user("user-a"), op.ID); err != nil {
+		t.Fatalf("second Refund: %v", err)
 	}
 	if got := env.walletCredits("user-a"); got != 1 {
 		t.Fatalf("credits after refund-once = %d, want 1", got)
@@ -144,25 +130,15 @@ func TestFoundationTraceRefundsFailedOperation(t *testing.T) {
 
 	settledOp := env.CreateOperation("user-a", "assessment")
 	env.seedWallet("user-a", 1)
-	if _, _, err := env.billing.Reserve(ctx, domain.ReserveBilling{
-		UserID: env.user("user-a"), OperationID: settledOp.ID, Kind: "assessment", Units: 1,
-	}); err != nil {
+	if _, err := env.billing.Reserve(ctx, env.user("user-a"), settledOp.ID, domain.ProductAssessment, 1); err != nil {
 		t.Fatalf("settle-path Reserve: %v", err)
 	}
-	if _, _, err := env.billing.Settle(ctx, domain.SettleBilling{
-		UserID: env.user("user-a"), OperationID: settledOp.ID,
-		ResultType: "task", ResultID: uuid.NewString(),
-	}); err != nil {
+	env.markOperationSucceeded(settledOp, "report", uuid.NewString())
+	if err := env.billing.Settle(ctx, env.user("user-a"), settledOp.ID, nil); err != nil {
 		t.Fatalf("Settle: %v", err)
 	}
-	_, refunded, err := env.billing.Refund(ctx, domain.RefundBilling{
-		UserID: env.user("user-a"), OperationID: settledOp.ID, Reason: "failed",
-	})
-	if !errors.Is(err, billing.ErrAlreadySettled) {
+	if err := env.billing.Refund(ctx, env.user("user-a"), settledOp.ID); !errors.Is(err, billing.ErrAlreadySettled) {
 		t.Fatalf("Refund after settle error = %v, want ErrAlreadySettled", err)
-	}
-	if refunded {
-		t.Fatal("settled reservation was refunded")
 	}
 }
 
@@ -415,6 +391,17 @@ func (e *foundationEnv) markOperationTerminal(op domain.Operation, status domain
 		WHERE user_id=$1::uuid AND id=$2::uuid`,
 		op.UserID, op.ID, status, "foundation-fail-trace"); err != nil {
 		e.t.Fatalf("mark operation terminal: %v", err)
+	}
+}
+
+func (e *foundationEnv) markOperationSucceeded(op domain.Operation, resultType, resultID string) {
+	e.t.Helper()
+	if _, err := e.pool.Exec(context.Background(), `
+		UPDATE operations
+		SET status='succeeded', result_type=$3, result_id=$4::uuid, finished_at=now(), updated_at=now()
+		WHERE user_id=$1::uuid AND id=$2::uuid`,
+		op.UserID, op.ID, resultType, resultID); err != nil {
+		e.t.Fatalf("mark operation succeeded: %v", err)
 	}
 }
 

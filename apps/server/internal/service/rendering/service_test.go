@@ -56,6 +56,28 @@ func TestStartRunReusesSameIdempotencyKey(t *testing.T) {
 	}
 }
 
+func TestStartRunReservesOnceAndNotOnReuse(t *testing.T) {
+	repo := newRepoFake()
+	repo.spec = validRenderSpec("user-1", "variant-1")
+	billing := &billingFake{}
+	svc := New(repo, nil, nil, nil, testConfig()).WithBilling(billing)
+	cmd := StartRunCommand{UserID: "user-1", PlanVariantID: "variant-1", IdempotencyKey: "idem-1"}
+	if _, err := svc.StartRun(context.Background(), cmd); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.StartRun(context.Background(), cmd); err != nil {
+		t.Fatal(err)
+	}
+	if len(billing.calls) != 1 {
+		t.Fatalf("reserve calls = %d, want 1", len(billing.calls))
+	}
+	got := billing.calls[0]
+	if got.userID != "user-1" || got.operationID != "operation-1" ||
+		got.product != domain.ProductRenderPublication || got.units != 1 {
+		t.Fatalf("unexpected reserve call: %#v", got)
+	}
+}
+
 func TestStartRunRejectsInvalidSpecWithoutCreatingAnything(t *testing.T) {
 	repo := newRepoFake()
 	repo.spec = validRenderSpec("user-1", "variant-1")
@@ -223,4 +245,19 @@ func (r *repoFake) FailRun(context.Context, FailRunCommand) error { return nil }
 
 func (r *repoFake) CommitEvaluation(context.Context, CommitEvaluationCommand) (CommitEvaluationResult, error) {
 	return CommitEvaluationResult{}, nil
+}
+
+type billingFake struct {
+	calls []reserveCall
+}
+
+type reserveCall struct {
+	userID, operationID string
+	product             domain.Product
+	units               int
+}
+
+func (b *billingFake) Reserve(_ context.Context, userID, operationID string, product domain.Product, units int) (domain.Reservation, error) {
+	b.calls = append(b.calls, reserveCall{userID: userID, operationID: operationID, product: product, units: units})
+	return domain.Reservation{ID: "reservation-1"}, nil
 }

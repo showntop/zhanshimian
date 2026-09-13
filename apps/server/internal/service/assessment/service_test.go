@@ -133,6 +133,23 @@ func TestCreateCopiesMaxAttemptsFromDefinition(t *testing.T) {
 	}
 }
 
+func TestCreateReservesAssessmentOnce(t *testing.T) {
+	repo := newRepoFake()
+	billing := &billingFake{}
+	svc := NewService(repo, validAssetReader(), stubProfiles(), stubMedia(), assessmentTaskDefinition()).WithBilling(billing)
+	if _, err := svc.Create(ctx, validCreateCommand()); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if len(billing.calls) != 1 {
+		t.Fatalf("reserve calls = %d, want 1", len(billing.calls))
+	}
+	got := billing.calls[0]
+	if got.userID != "user-1" || got.operationID != "op-1" ||
+		got.product != domain.ProductAssessment || got.units != 1 {
+		t.Fatalf("unexpected reserve call: %#v", got)
+	}
+}
+
 func TestGetReportPresentsMediaWithoutInternalFields(t *testing.T) {
 	repo := newRepoFake()
 	repo.report = publishedReport()
@@ -346,6 +363,21 @@ func (mediaFake) Present(_ context.Context, asset domain.MediaAsset) (PresentedM
 }
 
 func stubMedia() MediaPresenter { return mediaFake{} }
+
+type billingFake struct {
+	calls []reserveCall
+}
+
+type reserveCall struct {
+	userID, operationID string
+	product             domain.Product
+	units               int
+}
+
+func (b *billingFake) Reserve(_ context.Context, userID, operationID string, product domain.Product, units int) (domain.Reservation, error) {
+	b.calls = append(b.calls, reserveCall{userID: userID, operationID: operationID, product: product, units: units})
+	return domain.Reservation{ID: "reservation-1"}, nil
+}
 
 func publishedReport() domain.AssessmentReport {
 	items := []domain.PhotoSetItem{

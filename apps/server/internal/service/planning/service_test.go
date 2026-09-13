@@ -103,6 +103,29 @@ func TestCreatePlanSetConvergesOnSameSemanticKey(t *testing.T) {
 	}
 }
 
+func TestCreatePlanSetReservesWhenCreated(t *testing.T) {
+	reportID := "20000000-0000-0000-0000-000000000001"
+	starter := &fakeStarter{}
+	billing := &billingFake{}
+	svc := NewService(Dependencies{
+		Reports:    fakeReports{report: validReport(reportID)},
+		Operations: starter,
+		Store:      &fakeStore{},
+		Billing:    billing,
+	})
+	if _, err := svc.CreatePlanSet(context.Background(), validCreateCommand(reportID)); err != nil {
+		t.Fatal(err)
+	}
+	if len(billing.calls) != 1 {
+		t.Fatalf("reserve calls = %d, want 1", len(billing.calls))
+	}
+	got := billing.calls[0]
+	if got.operationID != "30000000-0000-0000-0000-000000000001" ||
+		got.product != domain.ProductPlanSet || got.units != 1 {
+		t.Fatalf("unexpected reserve call: %#v", got)
+	}
+}
+
 func TestCreatePlanSetRejectsInvalidBriefAndForeignReport(t *testing.T) {
 	reportID := "20000000-0000-0000-0000-000000000001"
 	svc := NewService(Dependencies{
@@ -178,6 +201,21 @@ func (f *fakeStarter) StartWithTask(_ context.Context, command StartOperationCom
 		Kind:   domain.OperationPlanSet,
 		Status: domain.OperationAccepted,
 	}, !f.existing, nil
+}
+
+type billingFake struct {
+	calls []reserveCall
+}
+
+type reserveCall struct {
+	userID, operationID string
+	product             domain.Product
+	units               int
+}
+
+func (b *billingFake) Reserve(_ context.Context, userID, operationID string, product domain.Product, units int) (domain.Reservation, error) {
+	b.calls = append(b.calls, reserveCall{userID: userID, operationID: operationID, product: product, units: units})
+	return domain.Reservation{ID: "reservation-1"}, nil
 }
 
 type fakeStore struct {

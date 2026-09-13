@@ -12,26 +12,16 @@ import (
 	"github.com/zhanshimian/server/internal/testutil"
 )
 
-func TestReservationLifecycleIsIdempotent(t *testing.T) {
+func TestReserveIsIdempotent(t *testing.T) {
 	repo, pool, ids := newBillingRepo(t, 3)
 	service := New(repo)
-	first, created, err := service.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: ids.opID, Kind: "render", Units: 1,
-	})
+	first, err := service.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1)
 	if err != nil {
 		t.Fatalf("first Reserve: %v", err)
 	}
-	if !created {
-		t.Fatal("first Reserve created=false, want true")
-	}
-	second, created, err := service.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: ids.opID, Kind: "render", Units: 1,
-	})
+	second, err := service.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1)
 	if err != nil {
 		t.Fatalf("second Reserve: %v", err)
-	}
-	if created {
-		t.Fatal("second Reserve created=true, want false")
 	}
 	if first.ID != second.ID {
 		t.Fatalf("reservation IDs differ: %s vs %s", first.ID, second.ID)
@@ -39,52 +29,35 @@ func TestReservationLifecycleIsIdempotent(t *testing.T) {
 	if got := walletCredits(t, pool, ids.userID); got != 2 {
 		t.Fatalf("credits after idempotent reserve = %d, want 2", got)
 	}
-	_, settled, err := service.Settle(context.Background(), domain.SettleBilling{
-		UserID: ids.userID, OperationID: ids.opID,
-		ResultType: "render_publication", ResultID: ids.resultID,
-	})
-	if err != nil {
+}
+
+func TestRefundAfterSettleErrors(t *testing.T) {
+	repo, pool, ids := newBillingRepo(t, 3)
+	service := New(repo)
+	if _, err := service.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductAssessment, 1); err != nil {
+		t.Fatalf("Reserve: %v", err)
+	}
+	markOperationSucceeded(t, pool, ids.userID, ids.opID, "report", uuid.NewString())
+	if err := service.Settle(context.Background(), ids.userID, ids.opID, nil); err != nil {
 		t.Fatalf("Settle: %v", err)
 	}
-	if !settled {
-		t.Fatal("Settle settled=false, want true")
-	}
-	_, refunded, err := service.Refund(context.Background(), domain.RefundBilling{
-		UserID: ids.userID, OperationID: ids.opID, Reason: "failed",
-	})
-	if !errors.Is(err, ErrAlreadySettled) {
+	if err := service.Refund(context.Background(), ids.userID, ids.opID); !errors.Is(err, ErrAlreadySettled) {
 		t.Fatalf("Refund after settle error = %v, want ErrAlreadySettled", err)
-	}
-	if refunded {
-		t.Fatal("Refund after settle refunded=true, want false")
 	}
 }
 
 func TestRefundReturnsCreditsExactlyOnce(t *testing.T) {
 	repo, pool, ids := newBillingRepo(t, 1)
 	service := New(repo)
-	if _, _, err := service.Reserve(context.Background(), domain.ReserveBilling{
-		UserID: ids.userID, OperationID: ids.opID, Kind: "assessment", Units: 1,
-	}); err != nil {
+	if _, err := service.Reserve(context.Background(), ids.userID, ids.opID, domain.ProductRenderPublication, 1); err != nil {
 		t.Fatalf("Reserve: %v", err)
 	}
-	_, changed, err := service.Refund(context.Background(), domain.RefundBilling{
-		UserID: ids.userID, OperationID: ids.opID, Reason: "cancelled",
-	})
-	if err != nil {
+	markOperationFailed(t, pool, ids.userID, ids.opID)
+	if err := service.Refund(context.Background(), ids.userID, ids.opID); err != nil {
 		t.Fatalf("first Refund: %v", err)
 	}
-	if !changed {
-		t.Fatal("first Refund changed=false, want true")
-	}
-	_, changed, err = service.Refund(context.Background(), domain.RefundBilling{
-		UserID: ids.userID, OperationID: ids.opID, Reason: "cancelled",
-	})
-	if err != nil {
+	if err := service.Refund(context.Background(), ids.userID, ids.opID); err != nil {
 		t.Fatalf("second Refund: %v", err)
-	}
-	if changed {
-		t.Fatal("second Refund changed=true, want false")
 	}
 	if got := walletCredits(t, pool, ids.userID); got != 1 {
 		t.Fatalf("credits after refund = %d, want 1", got)
@@ -92,12 +65,11 @@ func TestRefundReturnsCreditsExactlyOnce(t *testing.T) {
 }
 
 type billingIDs struct {
-	userID   string
-	opID     string
-	resultID string
+	userID string
+	opID   string
 }
 
-func newBillingRepo(t *testing.T, credits int) (Repository, *pgxpool.Pool, billingIDs) {
+func newBillingRepo(t *testing.T, credits int) (Lifecycle, *pgxpool.Pool, billingIDs) {
 	t.Helper()
 	pool := testutil.NewPostgres(t)
 	store := postgres.New(pool)
@@ -107,7 +79,7 @@ func newBillingRepo(t *testing.T, credits int) (Repository, *pgxpool.Pool, billi
 		`INSERT INTO billing_wallets(user_id, credits) VALUES($1::uuid, $2)`, userID, credits); err != nil {
 		t.Fatalf("seed wallet: %v", err)
 	}
-	return store, pool, billingIDs{userID: userID, opID: opID, resultID: uuid.NewString()}
+	return store, pool, billingIDs{userID: userID, opID: opID}
 }
 
 func insertUser(t *testing.T, pool *pgxpool.Pool) string {
@@ -130,6 +102,24 @@ func insertOperation(t *testing.T, pool *pgxpool.Pool, userID string) string {
 		t.Fatalf("seed operation: %v", err)
 	}
 	return opID
+}
+
+func markOperationSucceeded(t *testing.T, pool *pgxpool.Pool, userID, opID, resultType, resultID string) {
+	t.Helper()
+	if _, err := pool.Exec(context.Background(), `
+		UPDATE operations SET status='succeeded', result_type=$3, result_id=$4::uuid, finished_at=now(), updated_at=now()
+		WHERE user_id=$1::uuid AND id=$2::uuid`, userID, opID, resultType, resultID); err != nil {
+		t.Fatalf("mark operation succeeded: %v", err)
+	}
+}
+
+func markOperationFailed(t *testing.T, pool *pgxpool.Pool, userID, opID string) {
+	t.Helper()
+	if _, err := pool.Exec(context.Background(), `
+		UPDATE operations SET status='failed', trace_id='svc-test-fail', finished_at=now(), updated_at=now()
+		WHERE user_id=$1::uuid AND id=$2::uuid`, userID, opID); err != nil {
+		t.Fatalf("mark operation failed: %v", err)
+	}
 }
 
 func walletCredits(t *testing.T, pool *pgxpool.Pool, userID string) int {

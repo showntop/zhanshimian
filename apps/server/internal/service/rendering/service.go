@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/service/billing"
 )
 
 // ErrValidation marks an invalid render request or spec: nothing was created.
@@ -24,6 +25,7 @@ type Service struct {
 	gate       QualityGate
 	config     Config
 	signer     func(ctx context.Context, key string, ttl time.Duration) (string, error)
+	billing    billing.Reserver
 }
 
 func New(
@@ -51,6 +53,14 @@ func (s *Service) WithQualityGate(gate QualityGate) *Service {
 	return s
 }
 
+// WithBilling attaches the reserve-only billing port used to charge a new
+// render run at creation time. Nil is tolerated so the service still runs
+// without billing wired.
+func (s *Service) WithBilling(b billing.Reserver) *Service {
+	s.billing = b
+	return s
+}
+
 // StartRun validates the variant's RenderSpec and idempotently creates the
 // run plus its first candidate task. An invalid spec creates nothing.
 func (s *Service) StartRun(ctx context.Context, cmd StartRunCommand) (StartRunResult, error) {
@@ -72,7 +82,15 @@ func (s *Service) StartRun(ctx context.Context, cmd StartRunCommand) (StartRunRe
 		RoutingPolicyVersion: s.config.RoutingPolicyVersion,
 		QualityPolicyVersion: s.config.QualityPolicyVersion,
 	})
-	return StartRunResult{Run: created.Run, Operation: created.Operation}, err
+	if err != nil {
+		return StartRunResult{}, err
+	}
+	if created.Created && s.billing != nil {
+		if _, err := s.billing.Reserve(ctx, cmd.UserID, created.Operation.ID, domain.ProductRenderPublication, 1); err != nil {
+			return StartRunResult{}, err
+		}
+	}
+	return StartRunResult{Run: created.Run, Operation: created.Operation}, nil
 }
 
 // validateStartSpec enforces the fail-closed rendering contract before any
