@@ -232,3 +232,47 @@ func validPublishedPlanSet() domain.PlanSet {
 		StyleRuleVersion:     StyleRuleVersion,
 	}
 }
+
+type fakeRenderReader struct {
+	views map[string]domain.RenderRunView
+}
+
+func (f fakeRenderReader) ListCurrentByVariantIDs(context.Context, string, []string) (map[string]domain.RenderRunView, error) {
+	return f.views, nil
+}
+
+func TestGetPlanSetProjectsReadyPartialAcrossVariants(t *testing.T) {
+	store := &fakeStore{planSet: validPublishedPlanSet()}
+	// 造三套 variant 的渲染状态:ready / generating / failed。
+	store.planSet.Variants = []domain.PlanVariant{
+		{ID: "v-1", Key: domain.VariantSharp, Slot: 1, Recommended: true},
+		{ID: "v-2", Key: domain.VariantWarm, Slot: 2},
+		{ID: "v-3", Key: domain.VariantNatural, Slot: 3},
+	}
+	views := map[string]domain.RenderRunView{
+		"v-1": {Render: domain.RenderStatusView{State: domain.RenderStateReady, OperationID: "op-1",
+			Media: &domain.RenderMediaView{SourceKind: domain.SourceKindGeneratedPreview, DisplayLabel: domain.DisplayLabelStyleReference}}},
+		"v-2": {Render: domain.RenderStatusView{State: domain.RenderStateGenerating, OperationID: "op-2"}},
+		"v-3": {Render: domain.RenderStatusView{State: domain.RenderStateFailed, OperationID: "op-3"}},
+	}
+	svc := NewService(Dependencies{
+		Reports: fakeReports{}, Operations: &fakeStarter{}, Store: store,
+		Renders: fakeRenderReader{views: views},
+	})
+	got, err := svc.GetPlanSet(context.Background(), "user-1", store.planSet.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RenderState != "ready_partial" {
+		t.Fatalf("plan set state = %q, want ready_partial", got.RenderState)
+	}
+	if got.Variants[0].RenderState != domain.RenderStateReady || got.Variants[0].RenderOperationID != "op-1" {
+		t.Fatalf("ready variant projection = %#v", got.Variants[0])
+	}
+	if got.Variants[2].HasRenderMedia {
+		t.Fatal("failed variant must not carry media")
+	}
+	if got.Variants[1].RenderState != domain.RenderStateGenerating {
+		t.Fatalf("generating variant state = %q", got.Variants[1].RenderState)
+	}
+}

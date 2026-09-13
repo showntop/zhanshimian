@@ -316,9 +316,25 @@ func planningRenderStatus() renderStatusDTO {
 	return renderStatusDTO{State: "unavailable", Retryable: false}
 }
 
+// renderStatusOf projects the variant's current rendering state from the
+// planning read model merged by the service layer.
+func renderStatusOf(variant domain.PlanVariant) renderStatusDTO {
+	if variant.RenderState == "" {
+		return planningRenderStatus()
+	}
+	return renderStatusDTO{
+		State:       variant.RenderState,
+		Retryable:   false,
+		OperationID: nilIfEmpty(variant.RenderOperationID),
+		// media 由渲染媒体查询单独返回;方案列表内不嵌签名 URL。
+	}
+}
+
 func planSetState(planSet domain.PlanSet) string {
-	// Rendering states arrive with the Rendering plan; a freshly published
-	// plan set is still in the planning stage.
+	if planSet.RenderState != "" {
+		return planSet.RenderState
+	}
+	// 渲染尚未开始:刚发布仍是 planning 阶段。
 	return "planning"
 }
 

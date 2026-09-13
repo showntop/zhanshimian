@@ -75,6 +75,9 @@ type PlanSet struct {
 	QualityEvaluationID  string
 	CreatedAt            time.Time
 	Variants             []PlanVariant
+
+	// 读投影字段:聚合后的整体渲染状态(ready/ready_partial/failed/rendering)。
+	RenderState string
 }
 
 type PlanVariant struct {
@@ -91,6 +94,11 @@ type PlanVariant struct {
 	DifferenceTags []string
 	Steps          []PlanStep
 	CreatedAt      time.Time
+
+	// 读投影字段:由 Planning read model 合并当前渲染状态,不落库。
+	RenderState       string
+	RenderOperationID string
+	HasRenderMedia    bool
 }
 
 type PlanStep struct {

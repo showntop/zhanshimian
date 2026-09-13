@@ -21,6 +21,7 @@ type API struct {
 	operations      *operation.Service
 	assessment      *assessment.Service
 	planning        planSetService
+	renders         renderService
 	idempotency     IdempotencyStore
 	logger          *slog.Logger
 	devLoginEnabled bool

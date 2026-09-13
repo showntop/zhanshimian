@@ -16,6 +16,7 @@ type Dependencies struct {
 	Reports    ReportReader
 	Operations OperationStarter
 	Store      PlanSetStore
+	Renders    CurrentRenderReader
 	IDs        func() string
 }
 
@@ -88,8 +89,57 @@ func (s *Service) CreatePlanSet(ctx context.Context, cmd CreateCommand) (CreateR
 	return CreateResult{PlanSetID: planSetID, Accepted: created, Operation: ref}, nil
 }
 
+// GetPlanSet 返回不可变方案图;若装配了渲染只读端口,则在一次批量读取中
+// 合并各 variant 的当前渲染状态(不逐套 N+1,不写渲染表)。
 func (s *Service) GetPlanSet(ctx context.Context, userID, planSetID string) (domain.PlanSet, error) {
-	return s.deps.Store.Get(ctx, userID, planSetID)
+	planSet, err := s.deps.Store.Get(ctx, userID, planSetID)
+	if err != nil {
+		return domain.PlanSet{}, err
+	}
+	if s.deps.Renders == nil {
+		return planSet, nil
+	}
+	variantIDs := make([]string, 0, len(planSet.Variants))
+	for _, variant := range planSet.Variants {
+		variantIDs = append(variantIDs, variant.ID)
+	}
+	current, err := s.deps.Renders.ListCurrentByVariantIDs(ctx, userID, variantIDs)
+	if err != nil {
+		return domain.PlanSet{}, err
+	}
+	for index := range planSet.Variants {
+		if view, ok := current[planSet.Variants[index].ID]; ok {
+			planSet.Variants[index].RenderState = view.Render.State
+			planSet.Variants[index].RenderOperationID = view.Render.OperationID
+			planSet.Variants[index].HasRenderMedia = view.Render.Media != nil
+		}
+	}
+	planSet.RenderState = planSetRenderState(planSet.Variants)
+	return planSet, nil
+}
+
+// planSetRenderState:全部 ready→ready;至少一个 ready 且其余失败/生成中→
+// ready_partial;全部终态失败→failed;其余→rendering。
+func planSetRenderState(variants []domain.PlanVariant) string {
+	ready, failed, total := 0, 0, len(variants)
+	for _, variant := range variants {
+		switch variant.RenderState {
+		case domain.RenderStateReady:
+			ready++
+		case domain.RenderStateFailed, domain.RenderStateUnavailable:
+			failed++
+		}
+	}
+	switch {
+	case ready == total:
+		return "ready"
+	case ready > 0:
+		return "ready_partial"
+	case failed == total && total > 0:
+		return "failed"
+	default:
+		return "rendering"
+	}
 }
 
 func (s *Service) ListPlanSets(ctx context.Context, userID, reportID string, scene *domain.Scene) ([]domain.PlanSet, error) {

@@ -70,6 +70,11 @@ type RenderSpecReader interface {
 	GetRenderSpecForVariant(ctx context.Context, userID, planVariantID string) (domain.RenderSpec, error)
 }
 
+// CurrentRenderReader 只读各 variant 当前渲染投影(R9 接入 PlanSet 读模型)。
+type CurrentRenderReader interface {
+	ListCurrentByVariantIDs(ctx context.Context, userID string, variantIDs []string) (map[string]domain.RenderRunView, error)
+}
+
 // The cross-boundary DTOs below live in domain (frozen contract shared with
 // the postgres adapter); planning re-exposes them under the frozen names.
 type (
