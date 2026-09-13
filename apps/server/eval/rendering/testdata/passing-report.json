@@ -1,0 +1,16 @@
+{
+  "total_candidates": 300,
+  "published_count": 260,
+  "source_mismatch_count": 0,
+  "webp_publication_count": 0,
+  "old_generation_overwrite_count": 0,
+  "severe_failures": 12,
+  "severe_accepted": 0,
+  "human_identity_passes": 95,
+  "human_identity_total": 100,
+  "semantic_compliant": 90,
+  "semantic_total": 100,
+  "first_candidate_p95_seconds": 60000000000,
+  "second_candidate_p95_seconds": 120000000000,
+  "per_case": []
+}
