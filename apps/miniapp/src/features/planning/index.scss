@@ -1,0 +1,413 @@
+// 方案集三屏（方案 tab / 方案详情 / 场合 Brief）。
+// 页面外壳（.page 内边距、AppHeader）归 pages/*，这里只管内容。
+// ---------- 方案 tab ----------
+.planning-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  padding-top: 20rpx;
+
+  &__tabs {
+    white-space: nowrap;
+  }
+
+  &__tab {
+    display: inline-block;
+    margin-right: 28rpx;
+    padding: 10rpx 4rpx;
+    font-size: 28rpx;
+    color: var(--ink-2);
+  }
+
+  &__tab--active {
+    font-weight: 700;
+    color: var(--ink);
+    border-bottom: 4rpx solid var(--moss);
+  }
+
+  // planning 整屏等待
+  &__wait {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18rpx;
+    padding: 120rpx 32rpx;
+    text-align: center;
+  }
+
+  &__spin {
+    width: 56rpx;
+    height: 56rpx;
+  }
+
+  &__wait-title {
+    font-size: 34rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__wait-body {
+    font-size: 26rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  // 场景空态
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16rpx;
+    padding: 96rpx 32rpx;
+    text-align: center;
+  }
+
+  &__empty-title {
+    font-size: 32rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__empty-body {
+    font-size: 26rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  // 方案卡
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 24rpx;
+  }
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+    padding: 28rpx;
+    border-radius: var(--radius-lg);
+    border: 1rpx solid var(--line);
+    background: var(--surface-strong);
+  }
+
+  &__card--active {
+    border-color: var(--moss);
+    box-shadow: var(--shadow-card);
+  }
+
+  &__card-head {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+  }
+
+  &__card-name {
+    font-size: 32rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__card-badge {
+    padding: 4rpx 16rpx;
+    border-radius: var(--radius-pill);
+    background: var(--moss);
+    color: #ffffff;
+    font-size: 20rpx;
+  }
+
+  &__card-desc {
+    font-size: 26rpx;
+    line-height: 1.65;
+    color: var(--ink-2);
+  }
+
+  &__card-media {
+    width: 100%;
+    height: 360rpx;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--moss-soft);
+  }
+
+  &__card-img {
+    width: 100%;
+    height: 100%;
+  }
+
+  &__card-outcomes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10rpx;
+  }
+
+  &__card-outcome {
+    padding: 6rpx 18rpx;
+    border-radius: var(--radius-pill);
+    background: var(--moss-soft);
+    color: var(--moss-deep);
+    font-size: 22rpx;
+  }
+
+  &__card-why {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    padding-top: 14rpx;
+    border-top: 1rpx solid var(--line);
+  }
+
+  &__card-why-label {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__card-why-text {
+    font-size: 25rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  &__card-foot {
+    padding-top: 4rpx;
+  }
+}
+
+// ---------- 方案详情 ----------
+.plan-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 28rpx;
+  padding-top: 20rpx;
+
+  &__hero {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+  }
+
+  &__frame {
+    position: relative;
+    width: 100%;
+    height: 760rpx;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--moss-soft);
+    border: 1rpx solid var(--line);
+  }
+
+  &__img {
+    width: 100%;
+    height: 100%;
+  }
+
+  &__frame-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__frame-empty-text {
+    font-size: 26rpx;
+    color: var(--ink-2);
+  }
+
+  &__render-state {
+    width: 100%;
+  }
+
+  &__bound-note {
+    font-size: 22rpx;
+    text-align: center;
+    color: var(--ink-3);
+  }
+
+  &__board {
+    display: flex;
+    flex-direction: column;
+    gap: 18rpx;
+    padding: 28rpx;
+    border-radius: var(--radius-lg);
+    border: 1rpx solid var(--line);
+    background: var(--surface-strong);
+  }
+
+  &__name {
+    font-size: 36rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__desc {
+    font-size: 26rpx;
+    line-height: 1.65;
+    color: var(--ink-2);
+  }
+
+  &__why {
+    font-size: 25rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+    padding: 16rpx 20rpx;
+    border-radius: var(--radius-md);
+    background: var(--moss-soft);
+  }
+
+  &__tabs {
+    display: flex;
+    gap: 24rpx;
+    padding-top: 6rpx;
+  }
+
+  &__tab {
+    padding: 8rpx 4rpx;
+    font-size: 27rpx;
+    color: var(--ink-2);
+  }
+
+  &__tab--active {
+    font-weight: 700;
+    color: var(--ink);
+    border-bottom: 4rpx solid var(--moss);
+  }
+
+  &__step {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+    padding: 20rpx;
+    border-radius: var(--radius-md);
+    border: 1rpx solid var(--line);
+  }
+
+  &__step-head {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+  }
+
+  &__step-action {
+    flex: none;
+    padding: 2rpx 14rpx;
+    border-radius: var(--radius-pill);
+    font-size: 20rpx;
+    background: var(--moss-soft);
+    color: var(--moss-deep);
+  }
+
+  &__step-action--keep {
+    background: var(--cream);
+    color: var(--ink-2);
+  }
+
+  &__step-title {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  &__step-summary {
+    font-size: 25rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  &__step-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx 24rpx;
+    padding-top: 8rpx;
+  }
+
+  &__step-detail {
+    display: flex;
+    align-items: baseline;
+    gap: 8rpx;
+  }
+
+  &__step-detail-label {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__step-detail-value {
+    font-size: 24rpx;
+    color: var(--ink);
+  }
+
+  &__empty-step {
+    font-size: 25rpx;
+    color: var(--ink-3);
+  }
+}
+
+// ---------- 场合 Brief ----------
+.scene-brief {
+  display: flex;
+  flex-direction: column;
+  gap: 28rpx;
+  padding-top: 28rpx;
+
+  &--loading {
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
+  }
+
+  &__intro {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+    padding: 0 8rpx;
+  }
+
+  &__intro-head {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+  }
+
+  &__title {
+    font-size: 40rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__badge {
+    padding: 4rpx 16rpx;
+    border-radius: var(--radius-pill);
+    background: var(--moss-soft);
+    color: var(--moss-deep);
+    font-size: 20rpx;
+  }
+
+  &__lede {
+    font-size: 26rpx;
+    line-height: 1.65;
+    color: var(--ink-2);
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+  }
+
+  &__field-label {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  &__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx;
+  }
+
+  &__foot {
+    padding-top: 8rpx;
+  }
+}

@@ -400,13 +400,308 @@ export const PLAN_DETAIL_COPY = {
   emptyStep: '这一步暂无内容',
   specLength: '长度',
   specFringe: '刘海',
-  specTexture: '卷度'
+  specTexture: '卷度',
+  boardHint: '上滑看发型、妆容与穿搭细节',
+  stepActionKeep: '保持',
+  stepActionAdjust: '调整',
+  detailTarget: '部位',
+  detailIntensity: '幅度',
+  detailSilhouette: '版型',
+  detailPalette: '色板',
+  detailLayers: '层次',
+  detailAvoid: '避开',
+  detailFormality: '正式度',
+  loadFailed: '方案没有加载成功，请重试',
+  renderNotePrefix: '形象图'
 } as const
 
 export const PLANS_COPY = {
   cta: '选这套 · 查看执行清单',
   ctaGenerating: '正在生成形象图'
 } as const
+
+// ---------- 方案集（Task 8：分阶段就绪） ----------
+export const PLANNING_COPY = {
+  generalTab: '形象方案',
+  recommended: '推荐',
+  viewDetail: '查看方案',
+  boundNote: '基于你当前的报告与照片',
+  // 方案集五态的页面文案
+  planningTitle: '正在规划你的三套方案',
+  planningBody: '从你的报告出发，通常需要一两分钟。可以先去逛逛。',
+  wander: '先去逛逛，不用守在这里 ›',
+  // 单套渲染的六态（与契约 RenderStatusView.state 一一对应）
+  renderQueued: '排队等待生成',
+  renderGenerating: '正在生成形象图',
+  renderChecking: '正在检查图像质量',
+  renderReady: '形象图已生成',
+  renderFailed: '这一套的形象图没有生成',
+  renderUnavailable: '当前没有可用的同能力生成服务',
+  renderRetry: '重试这一套',
+  renderFailedNote: '文字方案不受影响，可以先照着准备',
+  renderUnavailableNote: '文字方案不受影响；服务恢复后这里会自动可以重试',
+  // 列表为空 / 加载失败
+  generalEmptyTitle: '还没有形象方案',
+  generalEmptyBody: '基于你的形象报告生成三套可执行的方案。',
+  sceneEmptyBody: '回答几个选择（约 30 秒），复用档案不重复要照片。',
+  generateGeneral: '生成形象方案',
+  generateScenePrefix: '生成',
+  generateSceneSuffix: '方案',
+  loadFailed: '方案没有加载成功，请重试',
+  generateFailed: '方案暂时没有生成，请稍后重试',
+  retryFailedTitle: '这一组方案没有生成成功',
+  retryFailedBody: '通常是服务繁忙。重新发起一般就能解决。',
+  regenerateAction: '重新生成',
+  outcomeTitle: '能得到什么',
+  whyLabel: '为什么适合你',
+  whyClose: '收起',
+  currentLabel: '原本',
+  planLabel: '方案',
+  compareHint: '左右拖动，看原本和方案',
+  planOfPrefix: '第',
+  planOfSuffix: '套'
+} as const
+
+/** 方案名 + 序号：「第 2 套 · 暖意」。序号来自 slot，不靠列表位置。 */
+export function planSlotLabel(name: string, slot: number): string {
+  return `第 ${slot} 套 · ${name}`
+}
+
+// ---------- 场合 Brief（Task 8：答案只在页面与 POST body 里） ----------
+// 每个场景的问题与选项。value 必须与契约对应 Brief 的枚举完全一致——
+// sceneBriefRequest 会按这份表校验答案，表错了请求会被服务端 400 拒收。
+export const SCENE_BRIEF_COPY = {
+  title: '场合需求',
+  reuseBadge: '复用档案',
+  lede: '补充几个选择，约 30 秒。不会重复索要照片和身体数据。',
+  generateAction: '生成方案',
+  needArchiveTitle: '还没有形象报告',
+  needArchiveBody: '先完成三图建档，才能生成场合方案。',
+  needArchiveAction: '去建档',
+  loadFailed: '页面没有加载成功，请重试',
+  submitFailed: '方案没有生成成功，请重试',
+  scenes: {
+    interview: {
+      label: '面试',
+      fields: [
+        {
+          key: 'when',
+          label: '什么时候需要',
+          options: [
+            { value: 'today', label: '今天' },
+            { value: 'three_days', label: '3 天内' },
+            { value: 'week', label: '1 周后' },
+            { value: 'later', label: '还没确定' }
+          ]
+        },
+        {
+          key: 'format',
+          label: '面试形式',
+          options: [
+            { value: 'onsite', label: '线下面试' },
+            { value: 'video', label: '视频面试' },
+            { value: 'final', label: '终面 / 见客户' }
+          ]
+        },
+        {
+          key: 'preparation',
+          label: '准备方式',
+          options: [
+            { value: 'closet', label: '只用现有衣橱' },
+            { value: 'key_piece', label: '补一件关键单品' },
+            { value: 'complete', label: '可完整准备' }
+          ]
+        },
+        {
+          key: 'impression',
+          label: '最想呈现',
+          options: [
+            { value: 'energetic', label: '更有精神' },
+            { value: 'reliable', label: '更可信' },
+            { value: 'natural', label: '更自然' },
+            { value: 'memorable', label: '有记忆点' }
+          ]
+        }
+      ]
+    },
+    wedding: {
+      label: '婚礼',
+      fields: [
+        {
+          key: 'role',
+          label: '你的角色',
+          options: [
+            { value: 'guest', label: '普通宾客' },
+            { value: 'bridal_party', label: '伴娘 / 伴郎' },
+            { value: 'family', label: '重要亲友' },
+            { value: 'speaker', label: '需要上台' }
+          ]
+        },
+        {
+          key: 'timing',
+          label: '婚礼时段',
+          options: [
+            { value: 'lunch', label: '午间' },
+            { value: 'afternoon', label: '下午' },
+            { value: 'dinner', label: '晚宴' },
+            { value: 'unknown', label: '还没确定' }
+          ]
+        },
+        {
+          key: 'dress_code',
+          label: '婚礼风格',
+          options: [
+            { value: 'relaxed', label: '轻松婚礼' },
+            { value: 'elegant', label: '得体优雅' },
+            { value: 'formal', label: '正式礼服' }
+          ]
+        },
+        {
+          key: 'impression',
+          label: '最想呈现',
+          options: [
+            { value: 'energetic', label: '更有精神' },
+            { value: 'reliable', label: '更可信' },
+            { value: 'natural', label: '更自然' },
+            { value: 'memorable', label: '有记忆点' }
+          ]
+        }
+      ]
+    },
+    date: {
+      label: '约会',
+      fields: [
+        {
+          key: 'activity',
+          label: '约会活动',
+          options: [
+            { value: 'coffee', label: '咖啡 / 散步' },
+            { value: 'dinner', label: '正餐' },
+            { value: 'exhibition', label: '电影 / 展览' },
+            { value: 'outdoor', label: '户外' }
+          ]
+        },
+        {
+          key: 'timing',
+          label: '什么时候',
+          options: [
+            { value: 'afternoon', label: '下午' },
+            { value: 'evening', label: '傍晚' },
+            { value: 'night', label: '晚上' },
+            { value: 'unknown', label: '还没确定' }
+          ]
+        },
+        {
+          key: 'preparation',
+          label: '准备方式',
+          options: [
+            { value: 'closet', label: '只用现有衣橱' },
+            { value: 'key_piece', label: '补一件关键单品' },
+            { value: 'complete', label: '可完整准备' }
+          ]
+        },
+        {
+          key: 'impression',
+          label: '最想呈现',
+          options: [
+            { value: 'natural', label: '更自然' },
+            { value: 'memorable', label: '有记忆点' },
+            { value: 'energetic', label: '更有精神' }
+          ]
+        }
+      ]
+    },
+    daily: {
+      label: '日常',
+      fields: [
+        {
+          key: 'activity',
+          label: '今天主要做',
+          options: [
+            { value: 'office', label: '上班' },
+            { value: 'weekend', label: '周末休息' },
+            { value: 'friends', label: '朋友小聚' },
+            { value: 'city_walk', label: '出门走走' }
+          ]
+        },
+        {
+          key: 'weather',
+          label: '所处环境',
+          options: [
+            { value: 'air_conditioned', label: '室内空调为主' },
+            { value: 'walking', label: '户外行走为主' },
+            { value: 'rain', label: '下雨天' },
+            { value: 'mild', label: '温和舒适' }
+          ]
+        },
+        {
+          key: 'preparation',
+          label: '准备方式',
+          options: [
+            { value: 'closet', label: '只用现有衣橱' },
+            { value: 'key_piece', label: '补一件关键单品' },
+            { value: 'complete', label: '可完整准备' }
+          ]
+        },
+        {
+          key: 'impression',
+          label: '最想呈现',
+          options: [
+            { value: 'natural', label: '更自然' },
+            { value: 'energetic', label: '更有精神' },
+            { value: 'reliable', label: '更可靠' }
+          ]
+        }
+      ]
+    },
+    gathering: {
+      label: '聚会',
+      fields: [
+        {
+          key: 'activity',
+          label: '聚会类型',
+          options: [
+            { value: 'friends', label: '朋友局' },
+            { value: 'dinner', label: '聚餐' },
+            { value: 'birthday', label: '生日 / 庆祝' },
+            { value: 'drinks', label: '酒会 / 酒吧' }
+          ]
+        },
+        {
+          key: 'timing',
+          label: '什么时候',
+          options: [
+            { value: 'afternoon', label: '下午' },
+            { value: 'evening', label: '傍晚' },
+            { value: 'night', label: '晚上' },
+            { value: 'unknown', label: '还没确定' }
+          ]
+        },
+        {
+          key: 'preparation',
+          label: '准备方式',
+          options: [
+            { value: 'closet', label: '只用现有衣橱' },
+            { value: 'key_piece', label: '补一件关键单品' },
+            { value: 'complete', label: '可完整准备' }
+          ]
+        },
+        {
+          key: 'impression',
+          label: '最想呈现',
+          options: [
+            { value: 'natural', label: '更自然' },
+            { value: 'memorable', label: '有记忆点' },
+            { value: 'energetic', label: '更有精神' }
+          ]
+        }
+      ]
+    }
+  }
+} as const
+
+export type SceneBriefScene = keyof typeof SCENE_BRIEF_COPY.scenes
+
 
 export const BILLING_COPY = {
   section: '权益额度',
