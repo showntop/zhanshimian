@@ -233,6 +233,35 @@ func normalizeStructuredJSON(data []byte) []byte {
 	return normalized
 }
 
+// EditImageOnModel 在指定模型上执行一次图片编辑,不做任何 fallback:
+// 渲染 Router 自管模型切换预算,不经过 runtime 的 route 循环。
+func (r *AIRuntime) EditImageOnModel(ctx context.Context, modelID, capability string, input ImageEditRequest) (ImageEditResult, error) {
+	model, ok := r.models[modelID]
+	if !ok {
+		return ImageEditResult{}, fmt.Errorf("unknown AI model %q", modelID)
+	}
+	var result ImageEditResult
+	var err error
+	switch model.Protocol {
+	case "openai_image_edit":
+		result, err = r.openAIImageEdit(ctx, capability, model, input)
+	case "dashscope_wan":
+		result, err = r.dashScopeImageEdit(ctx, capability, model, input)
+	case "dashscope_wanx_imageedit":
+		result, err = r.dashScopeWanxImageEdit(ctx, capability, model, input)
+	case "ark_image":
+		result, err = r.arkImageEdit(ctx, capability, model, input)
+	default:
+		err = fmt.Errorf("incompatible image protocol %s", model.Protocol)
+	}
+	if err != nil {
+		r.logInvocation(InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model, Source: InvocationSource(ctx)}, err)
+		return ImageEditResult{}, err
+	}
+	r.logInvocation(result.Meta, nil)
+	return result, nil
+}
+
 func (r *AIRuntime) EditImage(ctx context.Context, capability string, input ImageEditRequest) (ImageEditResult, error) {
 	route, ok := r.routes[capability]
 	if !ok {

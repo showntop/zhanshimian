@@ -22,6 +22,16 @@ type AIModelConfig struct {
 	OutputCostPerMillion float64        `json:"output_cost_per_million,omitempty"`
 	InputImageCost       float64        `json:"input_image_cost,omitempty"`
 	OutputImageCost      float64        `json:"output_image_cost,omitempty"`
+
+	// 渲染能力元数据:full_look_generation / render_quality_evaluation 的
+	// 硬性入选条件,校验失败即启动失败,不允许单图降级。
+	InputModalities                 []string `json:"input_modalities,omitempty"`
+	MaxInputImages                  int      `json:"max_input_images,omitempty"`
+	SupportsMultipleReferenceImages bool     `json:"supports_multiple_reference_images,omitempty"`
+	IdentityPreservation            bool     `json:"identity_preservation,omitempty"`
+	IdentityComparison              bool     `json:"identity_comparison,omitempty"`
+	OutputMIMETypes                 []string `json:"output_mime_types,omitempty"`
+	DataRetention                   string   `json:"data_retention,omitempty"`
 }
 
 type AIRouteConfig struct {
@@ -30,6 +40,19 @@ type AIRouteConfig struct {
 	Fallbacks      []string `json:"fallbacks,omitempty"`
 	MaxCostCNY     float64  `json:"max_cost_cny,omitempty"`
 	MaxInputImages int      `json:"max_input_images,omitempty"`
+	MaxSwitches    int      `json:"max_switches,omitempty"`
+
+	Requirements RouteRequirements `json:"requirements,omitempty"`
+}
+
+// RouteRequirements 声明一个渲染 route 对全部候选模型的硬性要求。
+type RouteRequirements struct {
+	MinInputImages       int      `json:"min_input_images,omitempty"`
+	MultipleReferences   bool     `json:"multiple_references,omitempty"`
+	IdentityPreservation bool     `json:"identity_preservation,omitempty"`
+	IdentityComparison   bool     `json:"identity_comparison,omitempty"`
+	OutputMIMETypes      []string `json:"output_mime_types,omitempty"`
+	DataRetention        string   `json:"data_retention,omitempty"`
 }
 
 type AIRoutingConfig struct {
@@ -105,6 +128,7 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		"appearance_analysis": true, "report_evidence_verification": true,
 	}
 	imageCapabilities := map[string]bool{"hair_edit": true, "makeup_edit": true, "full_look_edit": true}
+	renderingCapabilities := map[string]bool{"full_look_generation": true, "render_quality_evaluation": true}
 	for id, model := range routing.Models {
 		if strings.TrimSpace(id) == "" || strings.TrimSpace(model.Vendor) == "" || strings.TrimSpace(model.Model) == "" {
 			return fmt.Errorf("AI model %q requires vendor and model", id)
@@ -126,7 +150,7 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		}
 	}
 	for capability, route := range routing.Routes {
-		if !structuredCapabilities[capability] && !imageCapabilities[capability] {
+		if !structuredCapabilities[capability] && !imageCapabilities[capability] && !renderingCapabilities[capability] {
 			return fmt.Errorf("AI route %q is not a supported capability", capability)
 		}
 		if strings.TrimSpace(capability) == "" || route.Primary == "" {
@@ -135,8 +159,11 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		if _, ok := routing.Models[route.Primary]; !ok {
 			return fmt.Errorf("AI route %q references unknown model %q", capability, route.Primary)
 		}
-		if route.Policy != "" && route.Policy != "quality_first" && route.Policy != "value_first" {
+		if route.Policy != "" && route.Policy != "quality_first" && route.Policy != "value_first" && route.Policy != "balanced" {
 			return fmt.Errorf("AI route %q has unsupported policy %q", capability, route.Policy)
+		}
+		if err := validateRenderingRoute(capability, route, routing.Models); err != nil {
+			return err
 		}
 		if route.MaxCostCNY < 0 {
 			return fmt.Errorf("AI route %q contains a negative cost limit", capability)
@@ -165,4 +192,78 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		}
 	}
 	return nil
+}
+
+// renderingRouteRequirements 是两个渲染能力对候选模型的硬性入选条件;
+// 任一不满足即整体校验失败,绝不静默降级到弱模型。
+var renderingRouteRequirements = map[string]RouteRequirements{
+	"full_look_generation": {
+		MinInputImages: 2, MultipleReferences: true, IdentityPreservation: true,
+		OutputMIMETypes: []string{"image/jpeg"}, DataRetention: "zero",
+	},
+	"render_quality_evaluation": {
+		MinInputImages: 3, MultipleReferences: true, IdentityComparison: true,
+		OutputMIMETypes: []string{"image/jpeg"}, DataRetention: "zero",
+	},
+}
+
+func validateRenderingRoute(capability string, route AIRouteConfig, models map[string]AIModelConfig) error {
+	requirements, ok := renderingRouteRequirements[capability]
+	if !ok {
+		if route.MaxSwitches > 1 {
+			return fmt.Errorf("AI route %q allows at most one model switch", capability)
+		}
+		return nil
+	}
+	if route.MaxSwitches > 1 {
+		return fmt.Errorf("AI route %q allows at most one model switch", capability)
+	}
+	if route.Policy != "" && route.Policy != "balanced" {
+		return fmt.Errorf("AI route %q requires balanced policy, got %q", capability, route.Policy)
+	}
+	modelKeys := append([]string{route.Primary}, route.Fallbacks...)
+	for _, key := range modelKeys {
+		model, ok := models[key]
+		if !ok {
+			return fmt.Errorf("AI route %q references unknown model %q", capability, key)
+		}
+		if model.MaxInputImages < requirements.MinInputImages {
+			return fmt.Errorf("AI route %q model %q requires at least %d input images", capability, key, requirements.MinInputImages)
+		}
+		if requirements.MultipleReferences && !model.SupportsMultipleReferenceImages {
+			return fmt.Errorf("AI route %q model %q must support multiple reference images", capability, key)
+		}
+		if requirements.IdentityPreservation && !model.IdentityPreservation {
+			return fmt.Errorf("AI route %q model %q must preserve identity", capability, key)
+		}
+		if requirements.IdentityComparison && !model.IdentityComparison {
+			return fmt.Errorf("AI route %q model %q must support identity comparison", capability, key)
+		}
+		if requirements.DataRetention != "" && model.DataRetention != requirements.DataRetention {
+			return fmt.Errorf("AI route %q model %q requires data_retention=%q", capability, key, requirements.DataRetention)
+		}
+		if len(requirements.OutputMIMETypes) > 0 && !containsMIME(model.OutputMIMETypes, requirements.OutputMIMETypes) {
+			return fmt.Errorf("AI route %q model %q must deliver %v", capability, key, requirements.OutputMIMETypes)
+		}
+		if strings.HasPrefix(key, "demo") {
+			return fmt.Errorf("AI route %q must not reference demo model %q", capability, key)
+		}
+	}
+	return nil
+}
+
+func containsMIME(values, required []string) bool {
+	for _, want := range required {
+		found := false
+		for _, got := range values {
+			if got == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
