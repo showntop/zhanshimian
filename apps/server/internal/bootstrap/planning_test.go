@@ -68,8 +68,8 @@ func validPlanningConfig(environment string) config.Config {
 				},
 			},
 			Routes: map[string]config.AIRouteConfig{
-				"plan_set_generation":          {Primary: "demo"},
-				"plan_grounding_verification":  {Primary: "demo"},
+				"plan_set_generation":         {Primary: "demo"},
+				"plan_grounding_verification": {Primary: "demo"},
 			},
 		},
 	}

@@ -57,23 +57,39 @@ type StoredObject struct {
 	ByteSize int64
 }
 
+// CandidateObjectInput 是一次隔离写入的输入。
+type CandidateObjectInput struct {
+	UserID      string
+	RunID       string
+	CandidateID string
+	Data        []byte
+	SHA256      string
+}
+
+// PromoteObjectInput 是一次发布提升的输入。
+type PromoteObjectInput struct {
+	UserID         string
+	PublicationID  string
+	SourceKey      string
+	ExpectedSHA256 string
+}
+
 // PutCandidate writes candidate bytes to the quarantine prefix.
-func (s *RenderObjectStore) PutCandidate(ctx context.Context, userID, runID, candidateID string, data []byte) (StoredObject, error) {
-	key := CandidateKey(userID, runID, candidateID)
-	if err := s.writeExclusive(ctx, key, data); err != nil {
+func (s *RenderObjectStore) PutCandidate(ctx context.Context, input CandidateObjectInput) (StoredObject, error) {
+	key := CandidateKey(input.UserID, input.RunID, input.CandidateID)
+	if err := s.writeExclusive(ctx, key, input.Data); err != nil {
 		return StoredObject{}, err
 	}
-	return storedOf(key, data), nil
+	return storedOf(key, input.Data)
 }
 
 // Promote copies a quarantined candidate to the published prefix, verifying
-// the copied bytes against the expected hash. On mismatch the published
-// object is deleted again — the quarantine copy stays for 30-day GC.
-func (s *RenderObjectStore) Promote(ctx context.Context, userID, publicationID, sourceKey, expectedSHA256 string) (StoredObject, error) {
-	if !belongsToFileUser(userID, sourceKey) {
-		return StoredObject{}, renderError(ErrCodeCrossUserObject, fmt.Errorf("source key %q does not belong to user", sourceKey))
+// the copied bytes against the expected hash.
+func (s *RenderObjectStore) Promote(ctx context.Context, input PromoteObjectInput) (StoredObject, error) {
+	if !belongsToFileUser(input.UserID, input.SourceKey) {
+		return StoredObject{}, renderError(ErrCodeCrossUserObject, fmt.Errorf("source key %q does not belong to user", input.SourceKey))
 	}
-	reader, err := s.base.Open(ctx, sourceKey)
+	reader, err := s.base.Open(ctx, input.SourceKey)
 	if err != nil {
 		return StoredObject{}, err
 	}
@@ -84,20 +100,25 @@ func (s *RenderObjectStore) Promote(ctx context.Context, userID, publicationID, 
 	}
 	sum := sha256.Sum256(data)
 	got := hex.EncodeToString(sum[:])
-	if got != expectedSHA256 {
-		return StoredObject{}, renderError(ErrCodeObjectHashMismatch, fmt.Errorf("source hash %s != expected %s", got, expectedSHA256))
+	if got != input.ExpectedSHA256 {
+		return StoredObject{}, renderError(ErrCodeObjectHashMismatch, fmt.Errorf("source hash %s != expected %s", got, input.ExpectedSHA256))
 	}
-	key := PublishedKey(userID, publicationID)
+	key := PublishedKey(input.UserID, input.PublicationID)
 	if err = s.writeExclusive(ctx, key, data); err != nil {
 		return StoredObject{}, err
 	}
-	return storedOf(key, data), nil
+	return storedOf(key, data)
 }
 
 // Delete removes an object; used only by the caller after a failed database
 // CAS to clean up the just-created published object.
 func (s *RenderObjectStore) Delete(ctx context.Context, key string) error {
 	return s.base.Delete(ctx, key)
+}
+
+// Open 读取对象字节(发布媒体签名 URL 之前的读路径)。
+func (s *RenderObjectStore) Open(ctx context.Context, key string) (io.ReadCloser, error) {
+	return s.base.Open(ctx, key)
 }
 
 func (s *RenderObjectStore) writeExclusive(ctx context.Context, key string, data []byte) error {
@@ -113,9 +134,9 @@ func (s *RenderObjectStore) writeExclusive(ctx context.Context, key string, data
 	return nil
 }
 
-func storedOf(key string, data []byte) StoredObject {
+func storedOf(key string, data []byte) (StoredObject, error) {
 	sum := sha256.Sum256(data)
-	return StoredObject{Key: key, SHA256: hex.EncodeToString(sum[:]), ByteSize: int64(len(data))}
+	return StoredObject{Key: key, SHA256: hex.EncodeToString(sum[:]), ByteSize: int64(len(data))}, nil
 }
 
 func belongsToFileUser(userID, key string) bool {

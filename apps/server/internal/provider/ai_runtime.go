@@ -16,6 +16,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	providerai "github.com/zhanshimian/server/internal/provider/ai"
 )
 
 const (
@@ -157,6 +159,30 @@ func (r *AIRuntime) RouteSummary() map[string]string {
 	}
 	return result
 }
+
+// StructuredCompatible 把 provider/ai 的结构化请求适配到 legacy 通道,
+// 供渲染质量评估的 StructuredQualityEvaluator 使用。
+func (r *AIRuntime) StructuredCompatible(ctx context.Context, request providerai.StructuredRequest) (providerai.StructuredResult, error) {
+	images := make([]AnalysisImage, 0, len(request.Images))
+	for _, image := range request.Images {
+		images = append(images, AnalysisImage{ID: image.AssetID, Kind: image.Role, MIMEType: image.MIMEType, Data: image.Data})
+	}
+	result, err := r.Structured(ctx, request.Capability, StructuredRequest{
+		Instructions: request.Instructions, Prompt: request.Prompt, Images: images,
+		SchemaName: request.SchemaName, Schema: request.Schema,
+		MaxOutputTokens: request.MaxOutputTokens, Validate: request.Validate,
+	})
+	if err != nil {
+		return providerai.StructuredResult{}, err
+	}
+	return providerai.StructuredResult{JSON: result.JSON, Meta: providerai.InvocationMeta{
+		InvocationID: result.Meta.RequestID, ModelKey: result.Meta.ModelID, Protocol: result.Meta.Protocol,
+		ProviderRequestID: result.Meta.RequestID, LatencyMS: int(result.Meta.LatencyMS),
+		EstimatedCostCNY:  floatPtr(result.Meta.EstimatedCostCNY),
+	}}, nil
+}
+
+func floatPtr(v float64) *float64 { return &v }
 
 func (r *AIRuntime) Structured(ctx context.Context, capability string, input StructuredRequest) (StructuredResult, error) {
 	route, ok := r.routes[capability]
