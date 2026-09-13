@@ -8,6 +8,7 @@
     "build:weapp": "taro build --type weapp",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-strip-types tests/*.test.mjs",
+    "qa": "node --test --experimental-strip-types qa/*.test.mjs",
     "check": "node scripts/check.mjs"
   },
   "dependencies": {
