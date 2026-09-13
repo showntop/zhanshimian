@@ -15,7 +15,10 @@ import (
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository/postgres"
 	"github.com/zhanshimian/server/internal/service"
+	"github.com/zhanshimian/server/internal/service/assessment"
 	"github.com/zhanshimian/server/internal/service/billing"
+	"github.com/zhanshimian/server/internal/service/execution"
+	"github.com/zhanshimian/server/internal/service/feedback"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
@@ -116,6 +119,17 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	operationSvc := operation.New(store)
 	billingSvc := billing.New(store)
 
+	// 质量核心服务：assessment/execution/feedback 只需要 store + 对象库。
+	// assessment 的 AI providers 与 Handler 属于 Worker 侧（bootstrap/worker），API 侧只挂 Service。
+	var signer storage.SignedURLStorage
+	if s, ok := objects.(storage.SignedURLStorage); ok {
+		signer = s
+	}
+	assessmentSvc := assessment.NewService(store, store, store, mediaPresenter{signer: signer, ttl: cfg.AssetURLTTL}, AssessmentDefinition()).
+		WithBilling(billingSvc)
+	executionSvc := execution.New(store)
+	feedbackSvc := feedback.New(store)
+
 	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
 	svc := service.New(store, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
 		Hair: ai.Hair, Look: ai.Look, PlanGroup: ai.PlanGroup, Outfit: ai.Outfit, Purchase: ai.Purchase, Advisor: ai.Advisor, Today: ai.Today,
@@ -127,7 +141,11 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	root := http.NewServeMux()
 	root.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(cfg.AssetDir))))
 	root.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadDir))))
-	root.Handle("/", httpapi.New(svc, httpapi.Dependencies{}, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
+	root.Handle("/", httpapi.New(svc, httpapi.Dependencies{
+		Assessment: assessmentSvc,
+		Execution:  executionSvc,
+		Feedback:   feedbackSvc,
+	}, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
 		Environment:           cfg.Environment,
 		StorageProvider:       cfg.StorageProvider,
 		WeatherProvider:       cfg.WeatherProvider,

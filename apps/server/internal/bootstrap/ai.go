@@ -23,6 +23,9 @@ type AIBundle struct {
 	Advisor   provider.AdvisorChat
 	Today     provider.TodayPlanner
 	Routes    map[string]string
+	// Runtime 是 legacy AIRuntime，bootstrap 用它适配出 ai.StructuredRuntime
+	// 供 quality-core 服务（assessment/planning/rendering）使用。
+	Runtime *provider.AIRuntime
 }
 
 // BuildAI 一律走能力路由（AGENTS.md 红线：AI 只经 ai-routing.*.json）。
@@ -75,7 +78,7 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 	if err != nil {
 		return AIBundle{}, err
 	}
-	bundle := AIBundle{Analyzer: analyzer, Hair: hair, Outfit: outfit, Routes: runtime.RouteSummary()}
+	bundle := AIBundle{Analyzer: analyzer, Hair: hair, Outfit: outfit, Routes: runtime.RouteSummary(), Runtime: runtime}
 	// 方案组生成与形象分析同用文本结构化能力，报告与方案解耦后由
 	// plan_group 任务调用（报告内容作为输入，保持方案贴合报告）。
 	planGroup, err := provider.NewRoutedPlanGroupGenerator(runtime)
@@ -110,4 +113,3 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 	}
 	return bundle, nil
 }
-

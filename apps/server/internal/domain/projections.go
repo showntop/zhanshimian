@@ -16,6 +16,36 @@ const (
 	MediaSourceDemoExample      MediaSourceKind = "demo_example"
 )
 
+// SourceKindOf 把内部 MediaOrigin 映射为客户端 source_kind。
+func SourceKindOf(origin MediaOrigin) MediaSourceKind {
+	switch origin {
+	case MediaOriginUserUpload:
+		return MediaSourceUserOriginal
+	case MediaOriginProviderOutput:
+		return MediaSourceGeneratedPreview
+	case MediaOriginBundledReference:
+		return MediaSourceBundledReference
+	case MediaOriginDemo:
+		return MediaSourceDemoExample
+	default:
+		return MediaSourceUserOriginal
+	}
+}
+
+// DisplayLabelOf 把内部 DisplayKind 映射为客户端展示角标。
+func DisplayLabelOf(kind DisplayKind) string {
+	switch kind {
+	case DisplayKindOriginal:
+		return "原本"
+	case DisplayKindGeneratedReference, DisplayKindStyleReference:
+		return "风格参考"
+	case DisplayKindEffectExample:
+		return "效果示例"
+	default:
+		return "风格参考"
+	}
+}
+
 // ProfileSummary 是首页的档案摘要投影，形状与 OpenAPI UserProfile 一致。
 // 身体测量（体重/三围）是选填的，指针区分「未填」与「填了 0」。
 type ProfileSummary struct {
