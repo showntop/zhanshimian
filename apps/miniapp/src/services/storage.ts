@@ -4,6 +4,10 @@ import { setLocalLooksResolver } from '@zsm/core'
 
 export const STORAGE_KEYS = {
   token: 'zsm_token',
+  uiSchemaVersion: 'zsm_ui_schema_version',
+  compareHint: 'zsm_compare_hint',
+  // 以下业务 key 在 Task 12 删除（此刻仍有页面在读）。服务端资源改由
+  // src/app/cache 持有，本地只留 UI 偏好。
   reportId: 'zsm_report_id',
   planId: 'zsm_plan_id',
   savedPlanId: 'zsm_saved_plan_id',
@@ -20,6 +24,26 @@ export const STORAGE_KEYS = {
   city: 'zsm_city',
   openCreditSheet: 'zsm_open_credit_sheet',
 } as const
+
+/** UI 偏好 key：schema 版本变化时只清这些，不迁移任何业务值。 */
+const UI_PREFERENCE_KEYS = [
+  'compareHint',
+  'city',
+  'openCreditSheet',
+] as const satisfies readonly (keyof typeof STORAGE_KEYS)[]
+
+/** 与 UI 偏好结构绑定的版本号；改动偏好语义时手动 +1。 */
+export const UI_SCHEMA_VERSION = '1'
+
+/**
+ * 结构版本不匹配时只重置 UI 偏好：旧版本留下的值可能语义已经变了，
+ * 与其猜怎么迁移，不如回到默认值——业务数据本来就在服务端。
+ */
+export function syncUiSchemaVersion(): void {
+  if (readStorage(STORAGE_KEYS.uiSchemaVersion) === UI_SCHEMA_VERSION) return
+  for (const key of UI_PREFERENCE_KEYS) removeStorage(STORAGE_KEYS[key])
+  writeStorage(STORAGE_KEYS.uiSchemaVersion, UI_SCHEMA_VERSION)
+}
 
 export function readStorage(key: string): string {
   try {
