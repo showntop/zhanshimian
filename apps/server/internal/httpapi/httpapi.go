@@ -34,6 +34,7 @@ func New(svc *service.Service, deps Dependencies, logger *slog.Logger, devLoginE
 		feedback:    deps.Feedback,
 		today:       deps.Today,
 		wardrobe:    deps.Wardrobe,
+		advisor:     deps.Advisor,
 		idempotency: idempotencyFromService(svc),
 		logger:      logger, devLoginEnabled: devLoginEnabled, runtime: runtime,
 	}

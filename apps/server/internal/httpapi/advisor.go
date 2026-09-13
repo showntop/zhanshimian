@@ -1,18 +1,36 @@
 package httpapi
 
 import (
+	"context"
+	"errors"
 	"net/http"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/service/advisor"
 )
 
+// AdvisorService 是顾问对话的最小依赖。
+type AdvisorService interface {
+	Send(ctx context.Context, userID string, input advisor.SendInput) (domain.AdvisorMessage, error)
+	List(ctx context.Context, userID string) ([]domain.AdvisorMessage, error)
+	ApplyAction(ctx context.Context, userID string, actionID string) (domain.AdvisorAction, error)
+}
+
+var errAdvisorUnavailable = errors.New("advisor service unavailable")
+
 func (a *API) sendAdvisorMessage(w http.ResponseWriter, r *http.Request) {
-	var input domain.AdvisorMessageInput
+	if a.advisor == nil {
+		a.internalError(w, r, errAdvisorUnavailable)
+		return
+	}
+	var input struct {
+		Content string `json:"content"`
+	}
 	if err := decodeJSON(r, &input); err != nil {
 		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
 		return
 	}
-	item, err := a.service.SendAdvisorMessage(r.Context(), currentUser(r).ID, input)
+	item, err := a.advisor.Send(r.Context(), currentUser(r).ID, advisor.SendInput{Content: input.Content})
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
@@ -21,7 +39,11 @@ func (a *API) sendAdvisorMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) listAdvisorMessages(w http.ResponseWriter, r *http.Request) {
-	items, err := a.service.ListAdvisorMessages(r.Context(), currentUser(r).ID, r.PathValue("id"))
+	if a.advisor == nil {
+		a.internalError(w, r, errAdvisorUnavailable)
+		return
+	}
+	items, err := a.advisor.List(r.Context(), currentUser(r).ID)
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
@@ -30,23 +52,14 @@ func (a *API) listAdvisorMessages(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) applyAdvisorAction(w http.ResponseWriter, r *http.Request) {
-	item, err := a.service.ApplyAdvisorAction(r.Context(), currentUser(r).ID, r.PathValue("id"))
+	if a.advisor == nil {
+		a.internalError(w, r, errAdvisorUnavailable)
+		return
+	}
+	item, err := a.advisor.ApplyAction(r.Context(), currentUser(r).ID, r.PathValue("id"))
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
 	}
 	writeData(w, http.StatusOK, item)
-}
-
-func (a *API) trackProductEvent(w http.ResponseWriter, r *http.Request) {
-	var input domain.ProductEventInput
-	if err := decodeJSON(r, &input); err != nil {
-		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
-		return
-	}
-	if err := a.service.TrackProductEvent(r.Context(), currentUser(r).ID, input); err != nil {
-		a.writeServiceError(w, r, err)
-		return
-	}
-	writeData(w, http.StatusAccepted, map[string]bool{"accepted": true})
 }

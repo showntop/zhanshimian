@@ -29,6 +29,7 @@ type API struct {
 	feedback        feedbackService
 	today           TodayService
 	wardrobe        WardrobeService
+	advisor         AdvisorService
 	idempotency     IdempotencyStore
 	logger          *slog.Logger
 	devLoginEnabled bool
@@ -51,6 +52,7 @@ type Dependencies struct {
 	Feedback   feedbackService
 	Today      TodayService
 	Wardrobe   WardrobeService
+	Advisor    AdvisorService
 }
 
 type RuntimeInfo struct {

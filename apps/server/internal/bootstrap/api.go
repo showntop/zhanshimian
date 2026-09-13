@@ -16,6 +16,7 @@ import (
 	providerai "github.com/zhanshimian/server/internal/provider/ai"
 	"github.com/zhanshimian/server/internal/repository/postgres"
 	"github.com/zhanshimian/server/internal/service"
+	"github.com/zhanshimian/server/internal/service/advisor"
 	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/execution"
 	"github.com/zhanshimian/server/internal/service/feedback"
@@ -131,6 +132,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	feedbackSvc := feedback.New(store)
 	todaySvc := today.New(store, store, providerai.NewTodayPlanner(structuredRuntimeAdapter{ai.Runtime}), todayWeatherAdapter{inner: weather}, today.NewClock())
 	wardrobeSvc := wardrobe.New(store, store)
+	advisorSvc := advisor.New(store, store, providerai.NewAdvisorChat(structuredRuntimeAdapter{ai.Runtime}))
 
 	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
 	svc := service.New(store, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
@@ -151,6 +153,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		Feedback:   feedbackSvc,
 		Today:      todaySvc,
 		Wardrobe:   wardrobeSvc,
+		Advisor:    advisorSvc,
 	}, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
 		Environment:           cfg.Environment,
 		StorageProvider:       cfg.StorageProvider,
