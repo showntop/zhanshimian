@@ -51,7 +51,11 @@ type CallResult struct {
 
 type InvocationMeta struct {
 	InvocationID      string
+	ModelKey          string
+	Protocol          string
 	ProviderRequestID string
+	InputImages       int
+	OutputImages      int
 	LatencyMS         int
 	EstimatedCostCNY  *float64
 }

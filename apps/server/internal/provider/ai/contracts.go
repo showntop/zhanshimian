@@ -10,8 +10,11 @@ const (
 )
 
 type ImageInput struct {
+	AssetID  string
 	Role     string
 	MIMEType string
+	Width    int
+	Height   int
 	Data     []byte
 }
 

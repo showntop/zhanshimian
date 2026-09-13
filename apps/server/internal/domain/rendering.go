@@ -1,17 +1,20 @@
 package domain
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
 // Rendering outcome/state vocabulary. Outcomes are the run's terminal facts;
 // states are the public projection the API serves.
 const (
-	RenderOutcomePublished  = "published"
+	RenderOutcomePublished   = "published"
 	RenderOutcomeUnavailable = "unavailable"
-	RenderOutcomeFailed     = "failed"
-	RenderOutcomeSuperseded = "superseded"
+	RenderOutcomeFailed      = "failed"
+	RenderOutcomeSuperseded  = "superseded"
 
 	RenderStateQueued      = "queued"
 	RenderStateGenerating  = "generating"
@@ -193,4 +196,53 @@ func (s RenderEvaluationScores) RawMessage() json.RawMessage {
 		return json.RawMessage(`{}`)
 	}
 	return encoded
+}
+
+// RenderRunIdempotencyKey derives the semantic dedupe key of a render run's
+// first candidate task from the API idempotency key.
+func RenderRunIdempotencyKey(userID, variantID, idempotencyKey string) string {
+	sum := sha256.Sum256([]byte("render:" + userID + ":" + variantID + ":" + idempotencyKey))
+	return "render:" + hex.EncodeToString(sum[:])
+}
+
+// RenderCandidateDedupeKey is the fixed dedupe key of one candidate task.
+func RenderCandidateDedupeKey(runID string, ordinal int) string {
+	return fmt.Sprintf("render:%s:candidate:%d", runID, ordinal)
+}
+
+// ---- cross-boundary rendering DTOs (shared with the postgres adapter) ----
+
+type RenderCreateRunCommand struct {
+	UserID               string
+	PlanVariantID        string
+	RenderSpecID         string
+	IdempotencyKey       string
+	RoutingPolicyVersion string
+	QualityPolicyVersion string
+}
+
+type RenderCreateRunResult struct {
+	Run       RenderRun
+	Operation OperationRef
+	Created   bool
+}
+
+type CurrentRender struct {
+	Run         RenderRun
+	Publication *RenderPublication
+	Operation   Operation
+}
+
+// RenderRouteState carries the model-switch budget across task retries.
+type RenderRouteState struct {
+	AttemptedModelKeys []string `json:"attempted_model_keys"`
+	SwitchesUsed       int      `json:"switches_used"`
+}
+
+// RenderGenerateCandidatePayload is the versioned render task payload; the
+// RenderSpec itself is never copied into the task.
+type RenderGenerateCandidatePayload struct {
+	RenderRunID string           `json:"render_run_id"`
+	Ordinal     int              `json:"ordinal"`
+	RouteState  RenderRouteState `json:"route_state"`
 }
