@@ -16,18 +16,25 @@ func newMemoryObjectStore(t *testing.T) ObjectStorage {
 	return local
 }
 
+func candidateInput(userID, runID, candidateID string, data []byte) CandidateObjectInput {
+	return CandidateObjectInput{UserID: userID, RunID: runID, CandidateID: candidateID, Data: data}
+}
+
 func TestRenderObjectStoreSeparatesQuarantineAndPublishedPrefixes(t *testing.T) {
 	base := newMemoryObjectStore(t)
 	store := NewRenderObjectStore(base)
 	ctx := context.Background()
-	candidate, err := store.PutCandidate(ctx, "user-1", "run-1", "candidate-1", []byte("jpeg"))
+	candidate, err := store.PutCandidate(ctx, candidateInput("user-1", "run-1", "candidate-1", []byte("jpeg")))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if candidate.Key != "users/user-1/render-quarantine/run-1/candidate-1.jpg" {
 		t.Fatalf("candidate key = %q", candidate.Key)
 	}
-	published, err := store.Promote(ctx, "user-1", "publication-1", candidate.Key, candidate.SHA256)
+	published, err := store.Promote(ctx, PromoteObjectInput{
+		UserID: "user-1", PublicationID: "publication-1",
+		SourceKey: candidate.Key, ExpectedSHA256: candidate.SHA256,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,10 +49,10 @@ func TestRenderObjectStoreSeparatesQuarantineAndPublishedPrefixes(t *testing.T) 
 func TestRenderObjectStoreRejectsOverwrite(t *testing.T) {
 	store := NewRenderObjectStore(newMemoryObjectStore(t))
 	ctx := context.Background()
-	if _, err := store.PutCandidate(ctx, "user-1", "run-1", "candidate-1", []byte("first")); err != nil {
+	if _, err := store.PutCandidate(ctx, candidateInput("user-1", "run-1", "candidate-1", []byte("first"))); err != nil {
 		t.Fatal(err)
 	}
-	_, err := store.PutCandidate(ctx, "user-1", "run-1", "candidate-1", []byte("second"))
+	_, err := store.PutCandidate(ctx, candidateInput("user-1", "run-1", "candidate-1", []byte("second")))
 	if !hasRenderCode(err, ErrCodeObjectExists) {
 		t.Fatalf("overwrite err = %v, want object_exists", err)
 	}
@@ -54,11 +61,14 @@ func TestRenderObjectStoreRejectsOverwrite(t *testing.T) {
 func TestRenderObjectStoreRejectsCrossUserPromote(t *testing.T) {
 	store := NewRenderObjectStore(newMemoryObjectStore(t))
 	ctx := context.Background()
-	candidate, err := store.PutCandidate(ctx, "user-a", "run-1", "candidate-1", []byte("jpeg"))
+	candidate, err := store.PutCandidate(ctx, candidateInput("user-a", "run-1", "candidate-1", []byte("jpeg")))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = store.Promote(ctx, "user-b", "publication-1", candidate.Key, candidate.SHA256)
+	_, err = store.Promote(ctx, PromoteObjectInput{
+		UserID: "user-b", PublicationID: "publication-1",
+		SourceKey: candidate.Key, ExpectedSHA256: candidate.SHA256,
+	})
 	if !hasRenderCode(err, ErrCodeCrossUserObject) {
 		t.Fatalf("err = %v, want cross_user_object", err)
 	}
@@ -68,7 +78,7 @@ func TestRenderObjectStorePromoteHashMismatchCleansPublishedKey(t *testing.T) {
 	base := newMemoryObjectStore(t)
 	store := NewRenderObjectStore(base)
 	ctx := context.Background()
-	candidate, err := store.PutCandidate(ctx, "user-1", "run-1", "candidate-1", []byte("jpeg"))
+	candidate, err := store.PutCandidate(ctx, candidateInput("user-1", "run-1", "candidate-1", []byte("jpeg")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +89,10 @@ func TestRenderObjectStorePromoteHashMismatchCleansPublishedKey(t *testing.T) {
 	if _, err := base.Save(ctx, candidate.Key, bytes.NewReader([]byte("tampered"))); err != nil {
 		t.Fatal(err)
 	}
-	_, err = store.Promote(ctx, "user-1", "publication-1", candidate.Key, candidate.SHA256)
+	_, err = store.Promote(ctx, PromoteObjectInput{
+		UserID: "user-1", PublicationID: "publication-1",
+		SourceKey: candidate.Key, ExpectedSHA256: candidate.SHA256,
+	})
 	if !hasRenderCode(err, ErrCodeObjectHashMismatch) {
 		t.Fatalf("err = %v, want object_hash_mismatch", err)
 	}
