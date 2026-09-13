@@ -18,6 +18,7 @@ import (
 	"github.com/zhanshimian/server/internal/service"
 	"github.com/zhanshimian/server/internal/service/advisor"
 	"github.com/zhanshimian/server/internal/service/billing"
+	"github.com/zhanshimian/server/internal/service/diagnostic"
 	"github.com/zhanshimian/server/internal/service/execution"
 	"github.com/zhanshimian/server/internal/service/feedback"
 	"github.com/zhanshimian/server/internal/service/media"
@@ -133,6 +134,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	todaySvc := today.New(store, store, providerai.NewTodayPlanner(structuredRuntimeAdapter{ai.Runtime}), todayWeatherAdapter{inner: weather}, today.NewClock())
 	wardrobeSvc := wardrobe.New(store, store)
 	advisorSvc := advisor.New(store, store, providerai.NewAdvisorChat(structuredRuntimeAdapter{ai.Runtime}))
+	diagnosticSvc := diagnostic.New(store, store, providerai.NewDiagnostic(structuredRuntimeAdapter{ai.Runtime}))
 
 	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
 	svc := service.New(store, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
@@ -154,6 +156,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		Today:      todaySvc,
 		Wardrobe:   wardrobeSvc,
 		Advisor:    advisorSvc,
+		Diagnostic: diagnosticSvc,
 	}, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
 		Environment:           cfg.Environment,
 		StorageProvider:       cfg.StorageProvider,

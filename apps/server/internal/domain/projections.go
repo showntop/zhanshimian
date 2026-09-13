@@ -152,3 +152,22 @@ type MediaInput struct {
 	ObjectKey string
 	MIMEType  string
 }
+
+// DiagnosisFinding 是诊断的可提升点（tone 是建议语气，不是缺陷严重度）。
+type DiagnosisFinding struct {
+	Label    string   `json:"label"`
+	Category string   `json:"category"`
+	Tone     string   `json:"tone"`
+	AnchorX  *float64 `json:"anchor_x,omitempty"`
+	AnchorY  *float64 `json:"anchor_y,omitempty"`
+}
+
+// DiagnosisOption 是诊断给出的可选方向及其参考媒体。
+type DiagnosisOption struct {
+	ID     string          `json:"id"`
+	Name   string          `json:"name"`
+	Media  RenderMediaView `json:"media"`
+	Note   string          `json:"note,omitempty"`
+	Reason string          `json:"reason,omitempty"`
+	Tags   []string        `json:"tags,omitempty"`
+}

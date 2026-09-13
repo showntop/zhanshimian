@@ -30,6 +30,7 @@ type API struct {
 	today           TodayService
 	wardrobe        WardrobeService
 	advisor         AdvisorService
+	diagnostic      DiagnosticService
 	idempotency     IdempotencyStore
 	logger          *slog.Logger
 	devLoginEnabled bool
@@ -53,6 +54,7 @@ type Dependencies struct {
 	Today      TodayService
 	Wardrobe   WardrobeService
 	Advisor    AdvisorService
+	Diagnostic DiagnosticService
 }
 
 type RuntimeInfo struct {
