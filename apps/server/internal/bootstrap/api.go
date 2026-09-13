@@ -21,6 +21,7 @@ import (
 	"github.com/zhanshimian/server/internal/service/feedback"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
+	"github.com/zhanshimian/server/internal/service/rendering"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
 	"github.com/zhanshimian/server/internal/storage"
 )
@@ -130,6 +131,29 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	executionSvc := execution.New(store)
 	feedbackSvc := feedback.New(store)
 
+	aiRuntime := structuredRuntimeAdapter{runtime: ai.Runtime}
+	planningBundle, err := WirePlanning(cfg, store, aiRuntime)
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+	// 渲染质量门禁策略只在生产从磁盘加载（fail-closed）；开发/测试用最小版本，
+	// 避免 cwd 差异导致相对路径解析不到。生产路径由部署约定固定为
+	// config/render-quality-policy.v1.json。
+	qualityPolicy := rendering.QualityPolicy{Version: "render-quality-v1"}
+	if cfg.Environment == "production" {
+		qualityPolicy, err = LoadRenderingQualityPolicy("config/render-quality-policy.v1.json")
+		if err != nil {
+			pool.Close()
+			return nil, err
+		}
+	}
+	renderingBundle, err := WireRendering(cfg, store, objects, runtimeImageCaller{ai.Runtime}, aiRuntime, qualityPolicy)
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+
 	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
 	svc := service.New(store, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
 		Hair: ai.Hair, Look: ai.Look, PlanGroup: ai.PlanGroup, Outfit: ai.Outfit, Purchase: ai.Purchase, Advisor: ai.Advisor, Today: ai.Today,
@@ -143,6 +167,8 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	root.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadDir))))
 	root.Handle("/", httpapi.New(svc, httpapi.Dependencies{
 		Assessment: assessmentSvc,
+		Planning:   planningBundle.Service,
+		Renders:    renderingBundle.Service,
 		Execution:  executionSvc,
 		Feedback:   feedbackSvc,
 	}, logger, cfg.DevLoginEnabled, httpapi.RuntimeInfo{
