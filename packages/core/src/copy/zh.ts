@@ -110,6 +110,52 @@ export const SOURCE_IMAGE_COPY = {
   userPhotoEmpty: '照片暂不可用'
 } as const
 
+// ---------- 三图建档 ----------
+// 建档页只说拍摄本身：补充资料归 pages/profile，这里再放一遍身份/预算表单
+// 会造出第二个编辑入口，用户改哪边生效将无从判断。
+export const CAPTURE_COPY = {
+  headerTitle: '创建形象档案',
+  eyebrow: '三张自然光照片',
+  headline: '先有真实照片，再有可靠建议',
+  lede: '不用化妆，也不需要刻意摆姿势；每一张都可以重拍。',
+  shots: {
+    face: { label: '正脸', desc: '自然表情，看清五官与肤色' },
+    side: { label: '45° 侧脸', desc: '头发不挡轮廓，判断发型空间' },
+    body: { label: '正面全身', desc: '全身入镜，看清头肩与比例' }
+  },
+  slotEmptyHint: '轻触拍摄',
+  slotReadyHint: '已上传',
+  slotDemoHint: '示例已选',
+  phaseHashing: '读取中',
+  phaseUploading: '上传中',
+  slotFailedLabel: '上传失败 · 轻触重试',
+  slotFailed: '这张没有上传成功，可以重试或换一张。',
+  pickerFailed: '没有打开相机或相册，请再试一次。',
+  batchPartialFailure: '部分照片未上传成功，请在对应照片上重试',
+  actionRetry: '重试',
+  actionReplace: '换一张',
+  actionViewLarge: '查看大图',
+  actionShootAgain: '重新拍摄',
+  actionFromAlbum: '从相册换一张',
+  actionContinuousShoot: '连续拍摄',
+  actionBatchPick: '从相册批量选择',
+  demoAction: '先用「效果示例」体验完整流程 ›',
+  demoUnavailable: '示例照片暂时不可用，请重试',
+  submitAction: '开始形象分析',
+  submitFailed: '提交没有成功，请重试',
+  privacy: '照片与建议只对你可见，可随时删除'
+} as const
+
+/** 主按钮上的「已选 N / 3 张」。数字与量词都在文案里，页面不拼字符串。 */
+export function captureSelectedText(done: number, total: number): string {
+  return `已选 ${done} / ${total} 张`
+}
+
+/** 空槽快捷补齐入口上的「补齐剩余 N 张 ›」。 */
+export function captureFillMissingText(missing: number): string {
+  return `补齐剩余 ${missing} 张 ›`
+}
+
 // ---------- 分析页阶段文案 ----------
 export const ANALYSIS_STAGE_COPY = {
   queued: '已提交，排队中',

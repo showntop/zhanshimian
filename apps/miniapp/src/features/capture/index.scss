@@ -1,10 +1,12 @@
 // 建档页：三联横排槽位（一屏见全貌）+ 页面与导航的呼吸间距。
-.capture {
+// 页面外壳（.page 内边距、AppHeader）归 pages/capture，这里只管内容。
+.capture-screen {
   display: flex;
   flex-direction: column;
   gap: 28rpx;
   padding-top: 28rpx;
 
+  // ---------- 开场 ----------
   &__intro {
     display: flex;
     flex-direction: column;
@@ -50,25 +52,12 @@
     background: var(--surface-strong);
     border: 1rpx solid var(--line);
 
-    // 成功落位 pop（checkPop 250ms 节奏）
-    &--pop {
-      animation: capture-slot-pop 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
     &--focus {
       transform: scale(1.04);
       z-index: 2;
       border-color: var(--moss);
       box-shadow: var(--shadow-float);
     }
-  }
-
-  &__viewfinder {
-    position: absolute;
-    inset: 16rpx;
-    border: 2rpx solid rgba(88, 115, 68, 0.55);
-    border-radius: 12rpx;
-    pointer-events: none;
   }
 
   &__photo {
@@ -84,6 +73,7 @@
       border: 2rpx dashed rgba(88, 115, 68, 0.4);
     }
 
+    // SourceImage 根节点与指导图都铺满相框
     &-img,
     &-guide {
       width: 100%;
@@ -95,6 +85,7 @@
       position: absolute;
       top: 10rpx;
       left: 10rpx;
+      z-index: 2;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -105,16 +96,12 @@
       color: var(--cream);
       font-size: 18rpx;
       font-weight: 700;
-
-      // 完成态：moss 实底对勾
-      &--done {
-        background: var(--moss);
-      }
     }
 
     &-mask {
       position: absolute;
       inset: 0;
+      z-index: 3;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -127,10 +114,10 @@
       }
 
       &-text {
+        padding: 0 10rpx;
         color: var(--cream);
         font-size: 18rpx;
         text-align: center;
-        padding: 0 10rpx;
       }
     }
   }
@@ -146,6 +133,13 @@
     color: var(--ink);
   }
 
+  &__slot-desc {
+    font-size: 20rpx;
+    line-height: 1.45;
+    text-align: center;
+    color: var(--ink-3);
+  }
+
   &__slot-state {
     padding: 4rpx 14rpx;
     border-radius: 999rpx;
@@ -159,144 +153,43 @@
     font-size: 22rpx;
     color: var(--ink-3);
   }
-}
 
-@keyframes capture-slot-pop {
-  0% {
-    transform: scale(0.95);
-  }
-
-  55% {
-    transform: scale(1.02);
-  }
-
-  100% {
-    transform: scale(1);
-  }
-}
-
-// ---------- 补充资料（选填，合并自 profile-setup 页） ----------
-.capture__profile {
-  display: flex;
-  flex-direction: column;
-  gap: 28rpx;
-  padding: 30rpx 28rpx;
-
-  &-head {
+  // ---------- 底部（主按钮 + 次级入口 + 隐私） ----------
+  &__foot {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: center;
+    gap: 14rpx;
+    margin-top: 8rpx;
+
+    // 三张齐了：主按钮弹一下，给一个「可以提交了」的瞬间提示
+    &--ready .primary-button--solid {
+      animation: check-pop 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
   }
 
-  &-title {
-    font-size: 26rpx;
-    font-weight: 700;
-    color: var(--ink);
-  }
-
-  &-note {
-    font-size: 22rpx;
+  &__alt-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 80rpx;
+    font-size: 23rpx;
     color: var(--moss);
   }
-}
 
-.capture__field {
-  display: flex;
-  flex-direction: column;
-  gap: 14rpx;
-
-  &-head {
+  &__demo {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-  }
-
-  &-name {
-    font-size: 24rpx;
-    font-weight: 650;
-    color: var(--ink);
-  }
-
-  &-note {
+    align-items: center;
+    justify-content: center;
+    min-height: 72rpx;
     font-size: 22rpx;
+    color: var(--ink-2);
+  }
+
+  &__privacy {
+    text-align: center;
+    font-size: 20rpx;
+    line-height: 1.5;
     color: var(--ink-3);
   }
-}
-
-.capture__height {
-  font-size: 40rpx;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.capture__slider {
-  margin: 4rpx 6rpx;
-}
-
-.capture__stepper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.capture__step {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 88rpx;
-  min-height: 64rpx;
-  border-radius: 999rpx;
-  background: var(--moss-soft);
-  color: var(--moss);
-  font-size: 30rpx;
-  font-weight: 650;
-}
-
-.capture__range {
-  font-size: 22rpx;
-  color: var(--ink-3);
-}
-
-.capture__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-}
-
-// ---------- 底部（主按钮 + 居中次级入口 + 隐私） ----------
-.capture__foot {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14rpx;
-  margin-top: 8rpx;
-
-  &--ready .primary-button--solid {
-    animation: check-pop 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-}
-
-.capture__alt-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 80rpx;
-  font-size: 23rpx;
-  color: var(--moss);
-}
-
-.capture__demo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 72rpx;
-  font-size: 22rpx;
-  color: var(--ink-2);
-}
-
-.capture__privacy {
-  text-align: center;
-  font-size: 20rpx;
-  line-height: 1.5;
-  color: var(--ink-3);
 }

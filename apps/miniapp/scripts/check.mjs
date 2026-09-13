@@ -2,7 +2,8 @@
 /**
  * 小程序静态门禁（CI 必跑）：
  *  1. app.config.ts 的 pages/subPackages ↔ src 目录一一对应
- *  2. 每页三件套（index.tsx/.scss/.config.ts）齐全
+ *  2. 每页 index.tsx/.config.ts 齐全，且样式有明确归属：
+ *     自带 index.scss，或整页迁进 features/<x>（该 feature 必须自己带 index.scss）
  *  3. 引用的 /assets/ 本地资源在 src 与 dist 中存在
  *  4. dist/assets 无 .webp；模特图目录无 .png 母版
  *  5. .scss 禁止裸 px（rpx / CSS 变量 / 1rpx 发丝线除外；注释行忽略）
@@ -37,11 +38,28 @@ for (const root of subRoots) {
   for (const m of body.matchAll(/^\s+'([\w/-]+\/index)',?\s*$/gm)) subPages.push(`${root}/${m[1]}`)
 }
 
+/** 页面 index.tsx 引用的第一个 features/<x>；没有则返回 null。 */
+function featureOf(pageFile) {
+  const text = readFileSync(pageFile, 'utf8')
+  const m = /from\s+'[^']*\/features\/([\w-]+)/.exec(text)
+  return m ? m[1] : null
+}
+
 for (const page of [...mainPages, ...subPages]) {
   // Taro 页面路径即文件基名（pages/home/index → src/pages/home/index.tsx）
-  if (!existsSync(join(src, `${page}.tsx`))) problems.push(`页面缺 index.tsx: ${page}`)
-  if (!existsSync(join(src, `${page}.scss`))) problems.push(`页面缺 index.scss: ${page}`)
+  const pageFile = join(src, `${page}.tsx`)
+  if (!existsSync(pageFile)) problems.push(`页面缺 index.tsx: ${page}`)
   if (!existsSync(join(src, `${page}.config.ts`))) problems.push(`页面缺 index.config.ts: ${page}`)
+  // 样式必须有一处归属：页面自带，或整页迁到的 feature 自己带。
+  // 只检查"有 import"会放过"feature 里根本没有样式"的页面——那等于页面裸奔。
+  if (!existsSync(join(src, `${page}.scss`)) && existsSync(pageFile)) {
+    const feature = featureOf(pageFile)
+    if (!feature) {
+      problems.push(`页面缺 index.scss，也未迁到 features/（样式不知归属）: ${page}`)
+    } else if (!existsSync(join(src, 'features', feature, 'index.scss'))) {
+      problems.push(`页面样式迁到 features/${feature}，但那里没有 index.scss: ${page}`)
+    }
+  }
 }
 
 const tabPages = [...configText.matchAll(/pagePath:\s*'([^']+)'/g)].map((m) => m[1])

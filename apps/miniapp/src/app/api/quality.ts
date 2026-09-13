@@ -8,6 +8,7 @@ import type {
   CreateGenerationFeedbackRequest,
   CreatePlanSetRequest,
   CreateRenderRunRequest,
+  DisplayMedia,
   Execution,
   ExecutionEventResult,
   ExecutionFeedback,
@@ -21,8 +22,12 @@ import type {
   Report,
   Selection,
 } from '@zsm/core'
+import { CAPTURE_COPY } from '@zsm/core'
 import { client } from './client'
-import { bodyOrThrow, dataOrThrow } from './result'
+import { bodyOrThrow, dataOrThrow, PublicApiError } from './result'
+
+/** 契约里 `/v1/media/demo` 的 role 枚举；与建档页的槽位角色同形但不互相依赖。 */
+export type DemoMediaRole = 'face' | 'side' | 'body'
 
 /**
  * 创建方案集有两种成功：200 复用已发布方案集，202 受理异步规划。
@@ -38,6 +43,31 @@ export const qualityApi = {
         params: { header: { 'Idempotency-Key': idempotencyKey } },
       })
       .then(bodyOrThrow),
+
+  /**
+   * Demo 媒体：服务端返回带类型的 DisplayMedia，`source_kind` 必须是 `demo_example`。
+   * 别的来源混进来就抛错——「拿内置模特图充当用户照片」正是这道类型闸门要挡的事，
+   * 所以校验放在唯一允许碰客户端的这一层，页面拿到的永远是验过的。
+   */
+  createDemoMedia: (role: DemoMediaRole, idempotencyKey: string): Promise<DisplayMedia> =>
+    client
+      .POST('/v1/media/demo', {
+        body: { role },
+        params: { header: { 'Idempotency-Key': idempotencyKey } },
+      })
+      .then(dataOrThrow)
+      .then((media) => {
+        if (media.source_kind !== 'demo_example') {
+          throw new PublicApiError(
+            'demo_media_unexpected_kind',
+            CAPTURE_COPY.demoUnavailable,
+            0,
+            '',
+            false,
+          )
+        }
+        return media
+      }),
 
   getOperation: (id: string): Promise<Operation> =>
     client.GET('/v1/operations/{id}', { params: { path: { id } } }).then(dataOrThrow),
