@@ -61,6 +61,46 @@ export function feedbackAcknowledgement(code: FeedbackAcknowledgementCode): stri
   return FEEDBACK_ACK_COPY[code]
 }
 
+// ---------- 两条反馈闭环的固定标签（value 即契约枚举） ----------
+export const GENERATION_FEEDBACK_TAGS = [
+  { value: 'identity_mismatch', label: '不像本人' },
+  { value: 'hair_mismatch', label: '发型不符' },
+  { value: 'makeup_mismatch', label: '妆容不符' },
+  { value: 'outfit_mismatch', label: '穿搭不符' },
+  { value: 'anatomy_issue', label: '肢体异常' },
+  { value: 'unnatural', label: '不够自然' }
+] as const
+
+export const EXECUTION_FEEDBACK_TAGS = [
+  { value: 'easy_to_execute', label: '容易执行' },
+  { value: 'too_formal', label: '太正式' },
+  { value: 'too_complex', label: '太复杂' },
+  { value: 'dislike_color', label: '颜色不喜欢' },
+  { value: 'want_to_keep', label: '希望保留' }
+] as const
+
+// ---------- 反馈页 ----------
+export const FEEDBACK_SCREEN_COPY = {
+  generationEntry: '这张形象图像你吗',
+  generationTitle: '这张形象图的反馈',
+  generationNote: '反馈会用于改进生成质量',
+  executionTitle: '这次执行感觉怎么样',
+  tagsTitle: '选几个符合的（可多选）',
+  commentTitle: '想说点什么（选填）',
+  commentPlaceholder: '比如：刘海比想象中难打理',
+  photoTitle: '拍一张实际效果（选填）',
+  addPhoto: '添加实拍',
+  retakePhoto: '重拍一张',
+  photoUploading: '上传中',
+  photoFailedNote: '照片没有上传成功，可以重试上传，或先提交文字和标签',
+  submitWithoutPhoto: '先提交文字和标签',
+  submitAction: '提交反馈',
+  submitFailed: '反馈没有提交成功，请重试',
+  needCompleted: '完成执行后才能反馈',
+  loadFailed: '页面没有加载成功，请重试'
+} as const
+
+
 // ---------- 隐私说明 ----------
 export const PRIVACY_NOTE = '照片仅用于生成分析，可随时删除'
 export const PRIVACY_SECTION_TITLE = '隐私与数据'

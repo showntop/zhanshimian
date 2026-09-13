@@ -9,6 +9,7 @@ import { qualityApi } from '../../app/api/quality'
 import { PublicApiError } from '../../app/api/result'
 import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
 import { selectAndCreateExecution } from '../execution/start'
+import GenerationFeedback from '../feedback/GenerationFeedback'
 import ErrorState from '../../components/error-state'
 import RenderState from '../../components/render-state'
 import SourceImage from '../../components/source-image'
@@ -208,6 +209,11 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
             text={PLANS_COPY.cta}
             loading={selecting}
             onClick={() => void selectThis()}
+          />
+          {/* 反馈绑定用户真正看到的那张 publication；没发布就没有入口 */}
+          <GenerationFeedback
+            publicationId={variant.render.publication_id}
+            className="plan-detail__feedback-entry"
           />
         </View>
       </View>
