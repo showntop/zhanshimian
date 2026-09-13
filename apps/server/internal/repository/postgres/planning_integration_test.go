@@ -52,6 +52,57 @@ func TestPrepareAndCommitPlanSetIsAtomicImmutableAndTenantScoped(t *testing.T) {
 	}
 }
 
+// FindPublished 是"新增明确偏好后不复用旧 PlanSet"的唯一守卫:它必须按
+// planning_input_hash 精确匹配。planning_input_hash 折入了偏好记忆,所以同一份
+// 报告在写入新记忆后必然落空,必须重新规划而不是把旧方案端回去。
+func TestFindPublishedKeysOnPlanningInputHash(t *testing.T) {
+	store, users := newPlanningStore(t)
+	lease := validDatabaseLease(t, store, users)
+	command := validPrepareCommand(users)
+	got, err := store.Prepare(context.Background(), lease, command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.CommitPrepared(context.Background(), lease, domain.TaskResult{
+		Disposition: domain.TaskPublish, ResultType: "plan_set", ResultID: got.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	key := domain.PlanningPlanSetKey{
+		UserID:               users.A,
+		ReportID:             users.reportID,
+		Scene:                domain.SceneDaily,
+		BriefHash:            command.PlanSet.BriefHash,
+		PlanningInputHash:    command.PlanSet.PlanningInputHash,
+		PlannerSchemaVersion: command.PlanSet.PlannerSchemaVersion,
+	}
+	published, found, err := store.FindPublished(context.Background(), key)
+	if err != nil || !found {
+		t.Fatalf("same planning input must reuse published result: found=%v err=%v", found, err)
+	}
+	if published.ID != got.ID {
+		t.Fatalf("reused plan set = %s, want %s", published.ID, got.ID)
+	}
+
+	// 写入一条偏好记忆后 planning_input_hash 改变,旧结果必须不可见。
+	key.PlanningInputHash = "ff7d1c0b3e2f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8091"
+	if _, found, err := store.FindPublished(context.Background(), key); err != nil {
+		t.Fatal(err)
+	} else if found {
+		t.Fatal("a new preference memory reused the stale published plan set")
+	}
+
+	// 租户隔离:同一 hash 换用户也必须落空。
+	key.PlanningInputHash = command.PlanSet.PlanningInputHash
+	key.UserID = users.B
+	if _, found, err := store.FindPublished(context.Background(), key); err != nil {
+		t.Fatal(err)
+	} else if found {
+		t.Fatal("cross-tenant FindPublished leaked a published plan set")
+	}
+}
+
 func TestPreparePlanSetRejectsIncompleteGraph(t *testing.T) {
 	store, users := newPlanningStore(t)
 	lease := validDatabaseLease(t, store, users)

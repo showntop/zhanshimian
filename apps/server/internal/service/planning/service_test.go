@@ -78,6 +78,46 @@ func TestCreatePlanSetFoldsPreferenceMemoriesIntoPlanningInputHash(t *testing.T)
 	}
 }
 
+// 新增一条明确偏好后,服务必须用新的 planning_input_hash 去查已发布结果,并派生出
+// 新的方案身份——否则用户会拿回写入偏好之前的旧方案。
+func TestCreatePlanSetYieldsNewIdentityAfterNewMemory(t *testing.T) {
+	reportID := "20000000-0000-0000-0000-000000000001"
+	report := validReport(reportID)
+	store := &fakeStore{}
+	starter := &fakeStarter{}
+	memories := &fakeMemories{}
+	svc := NewService(Dependencies{
+		Reports: fakeReports{report: report}, Operations: starter, Store: store, Memories: memories,
+		IDs: func() string { return "10000000-0000-0000-0000-000000000001" },
+	})
+
+	before, err := svc.CreatePlanSet(context.Background(), validCreateCommand(reportID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	memories.memories = []domain.PreferenceMemory{{
+		ID: "90000000-0000-0000-0000-000000000001", Key: "formality",
+		Category: domain.CategoryOverall, Value: "less", SourceTag: domain.ExecutionTooFormal,
+	}}
+	after, err := svc.CreatePlanSet(context.Background(), validCreateCommand(reportID))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(store.findKeys) != 2 {
+		t.Fatalf("FindPublished calls = %d, want 2", len(store.findKeys))
+	}
+	if store.findKeys[0].PlanningInputHash == store.findKeys[1].PlanningInputHash {
+		t.Fatal("planning input hash did not change after a new preference memory")
+	}
+	if before.PlanSetID == after.PlanSetID {
+		t.Fatalf("plan set identity was reused after new memory: %s", before.PlanSetID)
+	}
+	if starter.command.Task.Payload.(GenerateTaskPayload).PlanningInputHash != store.findKeys[1].PlanningInputHash {
+		t.Fatal("task payload hash diverged from the lookup key")
+	}
+}
+
 func TestCreatePlanSetConvergesOnSameSemanticKey(t *testing.T) {
 	reportID := "20000000-0000-0000-0000-000000000001"
 	starter := &fakeStarter{existing: true}
@@ -227,9 +267,14 @@ type fakeStore struct {
 	prepareCalls int
 	commitCalls  int
 	command      PrepareCommand
+	findKeys     []PlanSetKey
 }
 
-func (f *fakeStore) FindPublished(_ context.Context, _ PlanSetKey) (domain.PlanSet, bool, error) {
+// FindPublished 记录每次查询用的语义键。查找分支本身由 postgres
+// 的 TestFindPublishedKeysOnPlanningInputHash 覆盖,这里只断言服务把折入了
+// 偏好记忆的 hash 交给了它。
+func (f *fakeStore) FindPublished(_ context.Context, key PlanSetKey) (domain.PlanSet, bool, error) {
+	f.findKeys = append(f.findKeys, key)
 	return f.planSet, f.found, nil
 }
 
