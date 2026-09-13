@@ -19,13 +19,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/httpapi"
-	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/provider/ai"
 	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/repository/postgres"
-	"github.com/zhanshimian/server/internal/service"
+	"github.com/zhanshimian/server/internal/service/account"
 	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/media"
+	"github.com/zhanshimian/server/internal/service/operation"
 	"github.com/zhanshimian/server/internal/storage"
 	"github.com/zhanshimian/server/internal/testutil"
 )
@@ -149,8 +149,15 @@ func TestFoundationTraceHTTPOwnershipAndIdempotency(t *testing.T) {
 		ObjectStorage: mustLocalStore(t),
 		ObjectStore:   newFoundationObjectStore(),
 	}
-	svc := service.New(&foundationRepo{Store: store, pool: pool}, objects, provider.NewDemoAnalyzer(), "", time.Hour, 10<<20, discardLogger())
-	server := httptest.NewServer(httpapi.New(svc, httpapi.Dependencies{}, discardLogger(), true, httpapi.RuntimeInfo{}))
+	frepo := &foundationRepo{Store: store, pool: pool}
+	deps := httpapi.Dependencies{
+		Idempotency: frepo,
+		Operations:  operation.New(store),
+		Account: account.New(frepo, frepo, frepo, frepo, frepo, nil, nil, nil, nil,
+			foundationAvatarResolver{}, nil, account.Config{SessionTTL: time.Hour}),
+	}
+	deps.Media = media.New(frepo, objects, 10<<20, time.Hour)
+	server := httptest.NewServer(httpapi.New(deps, discardLogger(), true, httpapi.RuntimeInfo{}))
 	t.Cleanup(server.Close)
 
 	tokenA := devLogin(t, server.URL, "user-a")
@@ -619,3 +626,8 @@ func jsonString(t *testing.T, raw string, keys ...string) string {
 	text, _ := current.(string)
 	return text
 }
+
+// foundationAvatarResolver 集成测试头像解析：key 原样返回。
+type foundationAvatarResolver struct{}
+
+func (foundationAvatarResolver) ResolveAssetURL(objectKey string) string { return objectKey }

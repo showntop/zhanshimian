@@ -16,9 +16,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/zhanshimian/server/internal/domain"
-	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
-	"github.com/zhanshimian/server/internal/service"
+	"github.com/zhanshimian/server/internal/service/account"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/storage"
 )
@@ -94,8 +93,7 @@ func TestNewWiresMediaAndLoginToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	objects := combinedObjectStore{ObjectStorage: local, ObjectStore: matchingHTTPStore()}
-	svc := newServiceForAPI(t, repo, objects)
-	handler := New(svc, Dependencies{}, discardLogger(), true, RuntimeInfo{})
+	handler := New(newTestDependencies(repo, objects), discardLogger(), true, RuntimeInfo{})
 
 	login := httptest.NewRecorder()
 	loginReq := httptest.NewRequest(http.MethodPost, "/v1/auth/dev", strings.NewReader(`{"nickname":"wired"}`))
@@ -337,7 +335,25 @@ func (r *sessionMediaRepo) UserByTokenDigest(_ context.Context, digest []byte) (
 	return user, nil
 }
 
-func newServiceForAPI(t *testing.T, repo repository.Repository, objects storage.ObjectStorage) *service.Service {
-	t.Helper()
-	return service.New(repo, objects, provider.NewDemoAnalyzer(), "", time.Hour, 10<<20, discardLogger())
+// newTestDependencies 供 httpapi 测试构造最小 Dependencies：
+// 登录走 account（repo 提供 identity/session 端口），媒体走 media.Service。
+func newTestDependencies(repo interface {
+	repository.Repository
+	media.Repository
+	IdempotencyStore
+}, objects storage.ObjectStorage) Dependencies {
+	deps := Dependencies{
+		Idempotency: repo,
+		Account: account.New(repo, repo, repo, repo, repo, nil, nil, nil, nil,
+			stubAvatarResolver{}, nil, account.Config{SessionTTL: time.Hour}),
+	}
+	if objectStore, ok := objects.(media.ObjectStore); ok {
+		deps.Media = media.New(repo, objectStore, 10<<20, time.Hour)
+	}
+	return deps
 }
+
+// stubAvatarResolver 测试头像解析：key 原样返回。
+type stubAvatarResolver struct{}
+
+func (stubAvatarResolver) ResolveAssetURL(objectKey string) string { return objectKey }

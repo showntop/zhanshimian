@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -97,6 +98,10 @@ func (a *API) completeUploadIntent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) createDemoMedia(w http.ResponseWriter, r *http.Request) {
+	if a.demo == nil {
+		a.internalError(w, r, errDemoUnavailable)
+		return
+	}
 	var input struct {
 		Role string `json:"role"`
 		Kind string `json:"kind"`
@@ -109,7 +114,7 @@ func (a *API) createDemoMedia(w http.ResponseWriter, r *http.Request) {
 	if kind == "" {
 		kind = input.Kind
 	}
-	asset, err := a.service.CreateDemoMedia(r.Context(), currentUser(r).ID, kind)
+	asset, err := a.demo.CreateDemoMedia(r.Context(), currentUser(r).ID, kind)
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
@@ -128,3 +133,5 @@ func publicMediaAsset(asset domain.MediaAsset) mediaAssetDTO {
 		CreatedAt: asset.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
 	}
 }
+
+var errDemoUnavailable = errors.New("demo media creator unavailable")

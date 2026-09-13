@@ -403,5 +403,5 @@ func newWiredMediaHandler(t *testing.T, repo *sessionMediaRepo) http.Handler {
 		t.Fatal(err)
 	}
 	objects := combinedObjectStore{ObjectStorage: local, ObjectStore: matchingHTTPStore()}
-	return New(newServiceForAPI(t, repo, objects), Dependencies{}, discardLogger(), true, RuntimeInfo{})
+	return New(newTestDependencies(repo, objects), discardLogger(), true, RuntimeInfo{})
 }

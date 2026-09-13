@@ -10,7 +10,6 @@ import (
 	"net/http"
 
 	"github.com/zhanshimian/server/internal/domain"
-	"github.com/zhanshimian/server/internal/service"
 	"github.com/zhanshimian/server/internal/service/assessment"
 	"github.com/zhanshimian/server/internal/service/home"
 	"github.com/zhanshimian/server/internal/service/media"
@@ -18,7 +17,6 @@ import (
 )
 
 type API struct {
-	service         *service.Service
 	media           *media.Service
 	operations      *operation.Service
 	assessment      *assessment.Service
@@ -33,6 +31,12 @@ type API struct {
 	diagnostic      DiagnosticService
 	share           ShareService
 	hair            HairService
+	account         AccountService
+	billing         BillingService
+	events          EventWriter
+	jobs            JobsReader
+	demo            DemoMediaCreator
+	deleteObject    func(key string) error
 	idempotency     IdempotencyStore
 	logger          *slog.Logger
 	devLoginEnabled bool
@@ -44,10 +48,14 @@ type HomeService interface {
 	Bootstrap(context.Context, string) (home.Snapshot, error)
 }
 
-// Dependencies 承载质量核心服务的窄依赖。legacy *service.Service 仍由 New 的
-// 旧参数传入（认证/账单/媒体等），这里只补 quality-core 五件套；旧路由删光后
-// 再彻底移除 legacy 参数。
+// Dependencies 承载全部 HTTP 依赖；New 只做路由注册与协议翻译。
 type Dependencies struct {
+	Media        *media.Service
+	Operations   *operation.Service
+	Home         HomeService
+	Idempotency  IdempotencyStore
+	DeleteObject func(key string) error
+
 	Assessment *assessment.Service
 	Planning   planSetService
 	Renders    renderService
@@ -59,6 +67,11 @@ type Dependencies struct {
 	Diagnostic DiagnosticService
 	Share      ShareService
 	Hair       HairService
+	Account    AccountService
+	Billing    BillingService
+	Events     EventWriter
+	Jobs       JobsReader
+	Demo       DemoMediaCreator
 }
 
 type RuntimeInfo struct {

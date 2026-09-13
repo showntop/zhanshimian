@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/provider"
+	identitypayment "github.com/zhanshimian/server/internal/provider/payment"
 	"github.com/zhanshimian/server/internal/repository/postgres"
+	"github.com/zhanshimian/server/internal/service/account"
 	"github.com/zhanshimian/server/internal/service/assessment"
 	"github.com/zhanshimian/server/internal/service/today"
 	"github.com/zhanshimian/server/internal/storage"
@@ -92,4 +95,51 @@ type hairStarterAdapter struct{ store *postgres.Store }
 
 func (a hairStarterAdapter) StartPreviewOperation(ctx context.Context, userID string, previewID string) (domain.OperationRef, error) {
 	return a.store.StartPreviewOperation(ctx, userID, previewID)
+}
+
+// avatarURLResolver 把头像 object key 解析为可加载 URL：
+// 支持签名的存储走短时签名，否则回退公网前缀拼接。
+type avatarURLResolver struct {
+	objects       storage.ObjectStorage
+	publicBaseURL string
+	ttl           time.Duration
+}
+
+func (r avatarURLResolver) ResolveAssetURL(objectKey string) string {
+	if signer, ok := r.objects.(storage.SignedURLStorage); ok {
+		if signed, err := signer.SignedURL(context.Background(), objectKey, r.ttl); err == nil {
+			return signed
+		}
+	}
+	return r.publicBaseURL + "/" + strings.TrimPrefix(objectKey, "/")
+}
+
+// billingSessionExchanger 把 identity 的会话换发适配到 billing 所需形状。
+type billingSessionExchanger struct {
+	inner provider.WeChatSessionExchanger
+}
+
+func (a billingSessionExchanger) ExchangeSession(ctx context.Context, code string) (identitypayment.WeChatSession, error) {
+	session, err := a.inner.ExchangeSession(ctx, code)
+	return identitypayment.WeChatSession{OpenID: session.OpenID, SessionKey: session.SessionKey}, err
+}
+
+// deleteObjectAdapter 把 storage.Delete 包成回调供 account 删除数据后回收对象。
+type deleteObjectAdapter struct{ objects storage.ObjectStorage }
+
+func (a deleteObjectAdapter) Delete(key string) error {
+	return a.objects.Delete(context.Background(), key)
+}
+
+// demoMediaAdapter 提供 Demo 媒体行（POST /v1/media/demo）：
+// 与 legacy CreateDemoMedia 同一实现——内置 demo/<kind>.png，.origin=demo。
+type demoMediaAdapter struct{ store *postgres.Store }
+
+var demoKinds = map[string]bool{"face": true, "side": true, "body": true, "outfit": true, "product": true, "wardrobe": true}
+
+func (a demoMediaAdapter) CreateDemoMedia(ctx context.Context, userID, kind string) (domain.MediaAsset, error) {
+	if !demoKinds[kind] {
+		return domain.MediaAsset{}, fmt.Errorf("%w: unsupported photo kind", account.ErrValidation)
+	}
+	return a.store.CreateMedia(ctx, userID, kind, "demo/"+kind+".png", "image/png", 1)
 }

@@ -15,31 +15,37 @@ import (
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
-	"github.com/zhanshimian/server/internal/service"
-	"github.com/zhanshimian/server/internal/service/home"
+	"github.com/zhanshimian/server/internal/service/account"
+	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
 	"github.com/zhanshimian/server/internal/storage"
 )
 
 // New 注册全部路由（契约见 contracts/openapi.yaml）。
-func New(svc *service.Service, deps Dependencies, logger *slog.Logger, devLoginEnabled bool, runtime RuntimeInfo) http.Handler {
+func New(deps Dependencies, logger *slog.Logger, devLoginEnabled bool, runtime RuntimeInfo) http.Handler {
 	api := &API{
-		service: svc, media: mediaFromService(svc), operations: operationsFromService(svc),
-		home:        homeFromService(svc),
-		assessment:  deps.Assessment,
-		planning:    deps.Planning,
-		renders:     deps.Renders,
-		execution:   deps.Execution,
-		feedback:    deps.Feedback,
-		today:       deps.Today,
-		wardrobe:    deps.Wardrobe,
-		advisor:     deps.Advisor,
-		diagnostic:  deps.Diagnostic,
-		share:       deps.Share,
-		hair:        deps.Hair,
-		idempotency: idempotencyFromService(svc),
-		logger:      logger, devLoginEnabled: devLoginEnabled, runtime: runtime,
+		media: deps.Media, operations: deps.Operations,
+		home:         deps.Home,
+		deleteObject: deps.DeleteObject,
+		assessment:   deps.Assessment,
+		planning:     deps.Planning,
+		renders:      deps.Renders,
+		execution:    deps.Execution,
+		feedback:     deps.Feedback,
+		today:        deps.Today,
+		wardrobe:     deps.Wardrobe,
+		advisor:      deps.Advisor,
+		diagnostic:   deps.Diagnostic,
+		share:        deps.Share,
+		hair:         deps.Hair,
+		account:      deps.Account,
+		billing:      deps.Billing,
+		events:       deps.Events,
+		jobs:         deps.Jobs,
+		demo:         deps.Demo,
+		idempotency:  deps.Idempotency,
+		logger:       logger, devLoginEnabled: devLoginEnabled, runtime: runtime,
 	}
 	mux := http.NewServeMux()
 
@@ -125,54 +131,6 @@ func New(svc *service.Service, deps Dependencies, logger *slog.Logger, devLoginE
 	return requestMiddleware(logger, mux)
 }
 
-func mediaFromService(svc *service.Service) *media.Service {
-	if svc == nil {
-		return nil
-	}
-	repo, ok := svc.Repository().(media.Repository)
-	if !ok {
-		return nil
-	}
-	objects, ok := svc.ObjectStorage().(media.ObjectStore)
-	if !ok {
-		return nil
-	}
-	return media.New(repo, objects, svc.MaxUploadBytes(), 15*time.Minute)
-}
-
-func operationsFromService(svc *service.Service) *operation.Service {
-	if svc == nil {
-		return nil
-	}
-	reader, ok := svc.Repository().(operation.Reader)
-	if !ok {
-		return nil
-	}
-	return operation.New(reader)
-}
-
-func homeFromService(svc *service.Service) *home.Service {
-	if svc == nil {
-		return nil
-	}
-	reader, ok := svc.Repository().(home.Reader)
-	if !ok {
-		return nil
-	}
-	return home.New(reader, home.NewClock())
-}
-
-func idempotencyFromService(svc *service.Service) IdempotencyStore {
-	if svc == nil {
-		return nil
-	}
-	store, ok := svc.Repository().(IdempotencyStore)
-	if !ok {
-		return nil
-	}
-	return store
-}
-
 func requestMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
@@ -198,7 +156,7 @@ func requestMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
 func (a *API) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
-		user, err := a.service.Authenticate(r.Context(), token)
+		user, err := a.account.Authenticate(r.Context(), token)
 		if err != nil {
 			writeError(w, r, http.StatusUnauthorized, "unauthorized", "登录已失效，请重新进入应用")
 			return
@@ -221,8 +179,12 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 		"sms_provider":                a.runtime.SmsProvider,
 		"ai_routes":                   a.runtime.AIRoutes,
 	}
-	if jobs, err := a.service.HealthJobs(r.Context()); err == nil {
-		payload["jobs"] = jobs
+	if a.jobs != nil {
+		if jobs, err := a.jobs.HealthJobs(r.Context()); err == nil {
+			payload["jobs"] = jobs
+		} else {
+			payload["jobs"] = nil
+		}
 	} else {
 		payload["jobs"] = nil
 	}
@@ -247,14 +209,14 @@ func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 		writeError(w, r, http.StatusBadGateway, "sms_unavailable", "短信服务暂时不可用，请稍后再试")
 	case errors.Is(err, provider.ErrSmsConfig):
 		a.internalError(w, r, err)
-	case errors.Is(err, service.ErrRateLimited):
-		writeError(w, r, http.StatusTooManyRequests, "rate_limited", strings.TrimPrefix(err.Error(), service.ErrRateLimited.Error()+": "))
-	case errors.Is(err, service.ErrInsufficientCredits):
-		writeError(w, r, http.StatusPaymentRequired, "insufficient_credits", strings.TrimPrefix(err.Error(), service.ErrInsufficientCredits.Error()+": "))
-	case errors.Is(err, service.ErrPaymentUnavailable):
+	case errors.Is(err, account.ErrRateLimited):
+		writeError(w, r, http.StatusTooManyRequests, "rate_limited", strings.TrimPrefix(err.Error(), account.ErrRateLimited.Error()+": "))
+	case errors.Is(err, billing.ErrInsufficientCredits):
+		writeError(w, r, http.StatusPaymentRequired, "insufficient_credits", strings.TrimPrefix(err.Error(), billing.ErrInsufficientCredits.Error()+": "))
+	case errors.Is(err, billing.ErrPaymentUnavailable):
 		writeError(w, r, http.StatusServiceUnavailable, "payment_unavailable", "购买暂未开通")
-	case errors.Is(err, service.ErrValidation):
-		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), service.ErrValidation.Error()+": "))
+	case errors.Is(err, account.ErrValidation):
+		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), account.ErrValidation.Error()+": "))
 	case errors.Is(err, media.ErrValidation):
 		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), media.ErrValidation.Error()+": "))
 	case errors.Is(err, operation.ErrValidation):
@@ -269,7 +231,7 @@ func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 		writeError(w, r, http.StatusNotFound, "not_found", "没有找到对应内容")
 	case errors.Is(err, repository.ErrConflict):
 		writeError(w, r, http.StatusConflict, "conflict", "上传意图已失效")
-	case errors.Is(err, service.ErrForbidden):
+	case errors.Is(err, account.ErrForbidden):
 		writeError(w, r, http.StatusForbidden, "forbidden", "没有访问权限")
 	default:
 		a.internalError(w, r, err)

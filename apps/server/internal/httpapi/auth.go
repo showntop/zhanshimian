@@ -5,10 +5,19 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/zhanshimian/server/internal/provider"
+	"github.com/zhanshimian/server/internal/provider/identity"
+	"github.com/zhanshimian/server/internal/service/account"
 )
 
+var errAccountUnavailable = errors.New("account service unavailable")
+
+var _ AccountService = (*account.Service)(nil)
+
 func (a *API) devLogin(w http.ResponseWriter, r *http.Request) {
+	if a.account == nil {
+		a.internalError(w, r, errAccountUnavailable)
+		return
+	}
 	if !a.devLoginEnabled {
 		writeError(w, r, http.StatusNotFound, "not_found", "接口不存在")
 		return
@@ -20,7 +29,7 @@ func (a *API) devLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
 		return
 	}
-	session, err := a.service.DevLogin(r.Context(), input.Nickname)
+	session, err := a.account.DevLogin(r.Context(), input.Nickname)
 	if err != nil {
 		a.internalError(w, r, err)
 		return
@@ -29,6 +38,10 @@ func (a *API) devLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) wechatLogin(w http.ResponseWriter, r *http.Request) {
+	if a.account == nil {
+		a.internalError(w, r, errAccountUnavailable)
+		return
+	}
 	var input struct {
 		Code     string `json:"code"`
 		Nickname string `json:"nickname"`
@@ -37,9 +50,9 @@ func (a *API) wechatLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "validation_error", "微信登录 code 不能为空")
 		return
 	}
-	session, err := a.service.WeChatLogin(r.Context(), input.Code, input.Nickname)
-	if errors.Is(err, provider.ErrWeChatUnavailable) && a.devLoginEnabled {
-		session, err = a.service.DevLogin(r.Context(), input.Nickname)
+	session, err := a.account.WeChatLogin(r.Context(), input.Code, input.Nickname)
+	if errors.Is(err, identity.ErrWeChatUnavailable) && a.devLoginEnabled {
+		session, err = a.account.DevLogin(r.Context(), input.Nickname)
 	}
 	if err != nil {
 		a.writeServiceError(w, r, err)
@@ -49,6 +62,10 @@ func (a *API) wechatLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) wechatAppLogin(w http.ResponseWriter, r *http.Request) {
+	if a.account == nil {
+		a.internalError(w, r, errAccountUnavailable)
+		return
+	}
 	var input struct {
 		Code     string `json:"code"`
 		Nickname string `json:"nickname"`
@@ -57,7 +74,7 @@ func (a *API) wechatAppLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "validation_error", "微信登录 code 不能为空")
 		return
 	}
-	session, err := a.service.WeChatAppLogin(r.Context(), input.Code, input.Nickname)
+	session, err := a.account.WeChatAppLogin(r.Context(), input.Code, input.Nickname)
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
@@ -66,6 +83,10 @@ func (a *API) wechatAppLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) appleLogin(w http.ResponseWriter, r *http.Request) {
+	if a.account == nil {
+		a.internalError(w, r, errAccountUnavailable)
+		return
+	}
 	var input struct {
 		IdentityToken string `json:"identity_token"`
 		Nickname      string `json:"nickname"`
@@ -74,7 +95,7 @@ func (a *API) appleLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "validation_error", "Apple 登录 identity_token 不能为空")
 		return
 	}
-	session, err := a.service.AppleLogin(r.Context(), input.IdentityToken, input.Nickname)
+	session, err := a.account.AppleLogin(r.Context(), input.IdentityToken, input.Nickname)
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
@@ -83,6 +104,10 @@ func (a *API) appleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) smsRequest(w http.ResponseWriter, r *http.Request) {
+	if a.account == nil {
+		a.internalError(w, r, errAccountUnavailable)
+		return
+	}
 	var input struct {
 		Phone string `json:"phone"`
 	}
@@ -90,7 +115,7 @@ func (a *API) smsRequest(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "validation_error", "手机号不能为空")
 		return
 	}
-	devCode, err := a.service.RequestSmsCode(r.Context(), input.Phone, clientIP(r))
+	devCode, err := a.account.RequestSmsCode(r.Context(), input.Phone, clientIP(r))
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
@@ -104,6 +129,10 @@ func (a *API) smsRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) smsVerify(w http.ResponseWriter, r *http.Request) {
+	if a.account == nil {
+		a.internalError(w, r, errAccountUnavailable)
+		return
+	}
 	var input struct {
 		Phone    string `json:"phone"`
 		Code     string `json:"code"`
@@ -113,7 +142,7 @@ func (a *API) smsVerify(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "validation_error", "手机号与验证码不能为空")
 		return
 	}
-	session, err := a.service.VerifySmsCode(r.Context(), input.Phone, input.Code, input.Nickname)
+	session, err := a.account.VerifySmsCode(r.Context(), input.Phone, input.Code, input.Nickname)
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
@@ -122,7 +151,11 @@ func (a *API) smsVerify(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) logout(w http.ResponseWriter, r *http.Request) {
-	if err := a.service.Logout(r.Context(), currentToken(r)); err != nil {
+	if a.account == nil {
+		a.internalError(w, r, errAccountUnavailable)
+		return
+	}
+	if err := a.account.Logout(r.Context(), currentToken(r)); err != nil {
 		a.internalError(w, r, err)
 		return
 	}

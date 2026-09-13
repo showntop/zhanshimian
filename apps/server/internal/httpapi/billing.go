@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -8,8 +9,14 @@ import (
 	"github.com/google/uuid"
 )
 
+var errBillingUnavailable = errors.New("billing service unavailable")
+
 func (a *API) getBillingMe(w http.ResponseWriter, r *http.Request) {
-	summary, err := a.service.BillingSummary(r.Context(), currentUser(r).ID)
+	if a.billing == nil {
+		a.internalError(w, r, errBillingUnavailable)
+		return
+	}
+	summary, err := a.billing.BillingSummary(r.Context(), currentUser(r).ID)
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
@@ -18,6 +25,10 @@ func (a *API) getBillingMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) createBillingOrder(w http.ResponseWriter, r *http.Request) {
+	if a.billing == nil {
+		a.internalError(w, r, errBillingUnavailable)
+		return
+	}
 	var input struct {
 		SKUID string `json:"sku_id"`
 		Code  string `json:"code"`
@@ -26,7 +37,7 @@ func (a *API) createBillingOrder(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
 		return
 	}
-	order, err := a.service.CreateBillingOrder(r.Context(), currentUser(r).ID, strings.TrimSpace(input.SKUID), strings.TrimSpace(input.Code))
+	order, err := a.billing.CreateBillingOrder(r.Context(), currentUser(r).ID, strings.TrimSpace(input.SKUID), strings.TrimSpace(input.Code))
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
@@ -35,12 +46,16 @@ func (a *API) createBillingOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) syncBillingOrder(w http.ResponseWriter, r *http.Request) {
+	if a.billing == nil {
+		a.internalError(w, r, errBillingUnavailable)
+		return
+	}
 	orderID := r.PathValue("id")
 	if _, err := uuid.Parse(orderID); err != nil {
 		writeError(w, r, http.StatusNotFound, "not_found", "没有找到对应内容")
 		return
 	}
-	order, err := a.service.SyncBillingOrder(r.Context(), currentUser(r).ID, orderID)
+	order, err := a.billing.SyncBillingOrder(r.Context(), currentUser(r).ID, orderID)
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
@@ -49,12 +64,16 @@ func (a *API) syncBillingOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) billingNotify(w http.ResponseWriter, r *http.Request) {
+	if a.billing == nil {
+		a.internalError(w, r, errBillingUnavailable)
+		return
+	}
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		writeError(w, r, http.StatusBadRequest, "validation_error", "通知内容无法读取")
 		return
 	}
-	if err := a.service.HandleBillingNotify(r.Context(), raw, notifySignature(r)); err != nil {
+	if err := a.billing.HandleBillingNotify(r.Context(), raw, notifySignature(r)); err != nil {
 		a.writeServiceError(w, r, err)
 		return
 	}

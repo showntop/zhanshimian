@@ -15,13 +15,14 @@ import (
 	"github.com/zhanshimian/server/internal/provider"
 	providerai "github.com/zhanshimian/server/internal/provider/ai"
 	"github.com/zhanshimian/server/internal/repository/postgres"
-	"github.com/zhanshimian/server/internal/service"
+	"github.com/zhanshimian/server/internal/service/account"
 	"github.com/zhanshimian/server/internal/service/advisor"
 	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/diagnostic"
 	"github.com/zhanshimian/server/internal/service/execution"
 	"github.com/zhanshimian/server/internal/service/feedback"
 	"github.com/zhanshimian/server/internal/service/hair"
+	"github.com/zhanshimian/server/internal/service/home"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
 	"github.com/zhanshimian/server/internal/service/share"
@@ -146,17 +147,30 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	shareSvc := share.New(store, store, shareSigner, cfg.AssetURLTTL)
 
 	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
-	svc := service.New(store, objects, ai.Analyzer, cfg.PublicBaseURL, cfg.SessionTTL, cfg.MaxUploadBytes, logger, service.ProviderOptions{
-		Hair: ai.Hair, Look: ai.Look, PlanGroup: ai.PlanGroup, Outfit: ai.Outfit, Purchase: ai.Purchase, Advisor: ai.Advisor, Today: ai.Today,
-		Weather: weather, WeChat: wechat, WeChatApp: wechatApp, Apple: apple, Sms: sms,
-		SmsPerPhone: cfg.SmsRatePerPhonePerHour, AssetURLTTL: cfg.AssetURLTTL,
-		BillingSKUs: billingSKUsFromConfig(cfg), VirtualPay: virtualPay, WeChatSession: wechatSession,
+
+	// 账户 + 购买订单：替换旧全能 Service 的登录/会话/账号/计费 HTTP 面。
+	ordersSvc := billing.NewOrders(store, virtualPay, billingSessionExchanger{inner: wechatSession}, billing.OrdersConfig{
+		SKUs: billingSKUsFromConfig(cfg), PaymentEnabled: virtualPay != nil,
 	})
+	accountSvc := account.New(store, store, store, store, store, wechat, wechatApp, apple, sms,
+		avatarURLResolver{objects: objects, publicBaseURL: cfg.PublicBaseURL, ttl: cfg.AssetURLTTL},
+		ordersSvc, account.Config{SessionTTL: cfg.SessionTTL, SmsRatePerPhonePerHour: cfg.SmsRatePerPhonePerHour})
 
 	root := http.NewServeMux()
 	root.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(cfg.AssetDir))))
 	root.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadDir))))
-	root.Handle("/", httpapi.New(svc, httpapi.Dependencies{
+	root.Handle("/", httpapi.New(httpapi.Dependencies{
+		Media:        mediaSvc,
+		Operations:   operationSvc,
+		Home:         home.New(store, home.NewClock()),
+		Idempotency:  store,
+		DeleteObject: deleteObjectAdapter{objects: objects}.Delete,
+		Events:       store,
+		Jobs:         store,
+		Demo:         demoMediaAdapter{store: store},
+
+		Account:    accountSvc,
+		Billing:    ordersSvc,
 		Assessment: assessmentSvc,
 		Planning:   core.Planning,
 		Renders:    core.Rendering,
