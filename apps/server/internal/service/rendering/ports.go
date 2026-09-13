@@ -47,6 +47,11 @@ type Repository interface {
 	CommitEvaluation(ctx context.Context, command CommitEvaluationCommand) (CommitEvaluationResult, error)
 }
 
+// QualityGate turns a candidate into one immutable quality decision.
+type QualityGate interface {
+	Evaluate(ctx context.Context, input QualityInput) (QualityResult, error)
+}
+
 // ImageGenerator produces candidate bytes from a validated spec.
 type ImageGenerator interface {
 	Generate(ctx context.Context, request providerai.GenerationRequest) (providerai.GenerationResult, error)

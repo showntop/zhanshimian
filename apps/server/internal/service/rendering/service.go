@@ -21,6 +21,7 @@ type Service struct {
 	generator  ImageGenerator
 	normalizer JPEGNormalizer
 	objects    RenderObjectStore
+	gate       QualityGate
 	config     Config
 	signer     func(ctx context.Context, key string, ttl time.Duration) (string, error)
 }
@@ -42,6 +43,12 @@ func New(
 		config.NewIDs = uuid.NewString
 	}
 	return &Service{repo: repo, generator: generator, normalizer: normalizer, objects: objects, config: config}
+}
+
+// WithQualityGate attaches the worker-side quality gate.
+func (s *Service) WithQualityGate(gate QualityGate) *Service {
+	s.gate = gate
+	return s
 }
 
 // StartRun validates the variant's RenderSpec and idempotently creates the
