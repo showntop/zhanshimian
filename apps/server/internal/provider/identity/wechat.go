@@ -1,4 +1,4 @@
-package provider
+package identity
 
 import (
 	"context"
@@ -17,6 +17,18 @@ var (
 	ErrWeChatRateLimited  = errors.New("wechat login rate limited")
 	ErrWeChatUnavailable  = errors.New("wechat login unavailable")
 )
+
+// WeChatSession 是登录换发的会话材料（open 系标识），payment 包的
+// WeChatSession 与之同形；identity 不反向依赖 payment。
+type WeChatSession struct {
+	OpenID     string
+	SessionKey string
+}
+
+// WeChatSessionExchanger 由集成层提供（payment 包的实现满足它）。
+type WeChatSessionExchanger interface {
+	ExchangeSession(ctx context.Context, code string) (WeChatSession, error)
+}
 
 type WeChatIdentity struct {
 	OpenID  string
