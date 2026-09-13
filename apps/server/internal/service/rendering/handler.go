@@ -83,12 +83,14 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 		}}, fmt.Errorf("%w: ordinal %d not allowed", ErrQualityRejected, payload.Ordinal)
 	}
 
+	bodyInput := mediaToProviderImage(job.Body, "body")
+	faceInput := mediaToProviderImage(job.Face, "face")
 	generated, err := s.generator.Generate(ctx, providerai.GenerationRequest{
 		RenderRunID:      job.Run.ID,
 		Ordinal:          payload.Ordinal,
 		Spec:             job.Spec.Spec,
-		Body:             job.Body,
-		Face:             job.Face,
+		Body:             bodyInput,
+		Face:             faceInput,
 		RetryReasonCodes: previousReasonCodes(job.Previous),
 		RouteState:       payload.RouteState,
 	})
@@ -140,7 +142,7 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 	// 质量门禁(隔离候选已入库后)。
 	quality, err := s.gate.Evaluate(ctx, QualityInput{
 		Run: job.Run, Candidate: candidate, Image: normalized,
-		Body: job.Body, Face: job.Face, Spec: job.Spec.Spec,
+		Body: bodyInput, Face: faceInput, Spec: job.Spec.Spec,
 	})
 	if err != nil {
 		return domain.TaskResult{}, classifyGateError(err)
@@ -194,8 +196,8 @@ func (h *Handler) Commit(ctx context.Context, lease domain.TaskLease, result dom
 			UserID: lease.Task.UserID, RenderRunID: work.run.ID,
 			SubjectGeneration: int(lease.Task.SubjectGeneration),
 			CandidateID:       work.candidate.ID,
-			Evaluation:        work.quality,
-			PublishedObject:   work.published,
+			Evaluation:        evaluationOf(work.quality, s.config.QualityPolicyVersion),
+			PublishedObject:   publishedObjectOf(work.published),
 			PublicationID:     work.publicationID,
 		})
 		if err != nil {
@@ -216,17 +218,7 @@ func (h *Handler) Commit(ctx context.Context, lease domain.TaskLease, result dom
 			TaskID: lease.Task.ID, LeaseToken: lease.LeaseToken,
 			UserID: lease.Task.UserID, RenderRunID: work.run.ID,
 			SubjectGeneration: int(lease.Task.SubjectGeneration),
-			Quality: domain.QualityEvaluation{
-				ID:                    s.config.NewIDs(),
-				UserID:                lease.Task.UserID,
-				SubjectType:           domain.QualitySubjectRenderCandidate,
-				SubjectID:             work.candidate.ID,
-				Policy:                domain.QualityPolicyRef{Version: s.config.QualityPolicyVersion},
-				Decision:              domain.QualityDecision(work.quality.Decision),
-				ReasonCodes:           work.quality.ReasonCodes,
-				InternalScores:        work.quality.InternalScores,
-				EvaluatorInvocationID: work.quality.EvaluatorInvocationID,
-			},
+			Quality:           evaluationOf(work.quality, s.config.QualityPolicyVersion),
 		})
 		if err != nil {
 			if errors.Is(err, repository.ErrLeaseLost) || errors.Is(err, ErrRenderSuperseded) {
@@ -248,7 +240,7 @@ func (h *Handler) Commit(ctx context.Context, lease domain.TaskLease, result dom
 			UserID: lease.Task.UserID, RenderRunID: work.run.ID,
 			SubjectGeneration: int(lease.Task.SubjectGeneration),
 			CandidateID:       work.candidate.ID,
-			Evaluation:        work.quality,
+			Evaluation:        evaluationOf(work.quality, s.config.QualityPolicyVersion),
 		}); err != nil && !errors.Is(err, repository.ErrLeaseLost) && !errors.Is(err, ErrRenderSuperseded) {
 			return domain.CommitSuperseded, err
 		}
@@ -267,6 +259,32 @@ func (h *Handler) Commit(ctx context.Context, lease domain.TaskLease, result dom
 		}
 		return domain.CommitApplied, nil
 	}
+}
+
+// mediaToProviderImage 把 MediaAsset 映射为 provider 图片输入。
+func mediaToProviderImage(asset domain.MediaAsset, role string) providerai.ImageInput {
+	return providerai.ImageInput{AssetID: asset.ID, Role: role, MIMEType: asset.MIMEType}
+}
+
+// evaluationOf 把 gate 的结果映射到不可变质量评估行。
+func evaluationOf(quality QualityResult, policyVersion string) domain.QualityEvaluation {
+	return domain.QualityEvaluation{
+		UserID:                "",
+		SubjectType:           domain.QualitySubjectRenderCandidate,
+		Policy:                domain.QualityPolicyRef{Version: policyVersion},
+		Decision:              domain.QualityDecision(quality.Decision),
+		ReasonCodes:           quality.ReasonCodes,
+		InternalScores:        quality.InternalScores,
+		EvaluatorInvocationID: quality.EvaluatorInvocationID,
+	}
+}
+
+// publishedObjectOf 把存储结果映射为 domain 形状。
+func publishedObjectOf(stored *StoredObject) *domain.RenderPublishedObject {
+	if stored == nil {
+		return nil
+	}
+	return &domain.RenderPublishedObject{Key: stored.Key, SHA256: stored.SHA256, ByteSize: stored.ByteSize}
 }
 
 // previousReasonCodes 提取上一候选的排序去重 reason codes 作为 Candidate 2

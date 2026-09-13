@@ -143,8 +143,8 @@ func (r *workerRepoFake) GetCandidateJob(_ context.Context, _, _ string, ordinal
 	r.jobOrdinal = ordinal
 	return CandidateJob{
 		Run: r.run, Spec: r.spec,
-		Body:     providerai.ImageInput{AssetID: "asset-body", Role: "body", MIMEType: "image/jpeg"},
-		Face:     providerai.ImageInput{AssetID: "asset-face", Role: "face", MIMEType: "image/jpeg"},
+		Body:     domain.MediaAsset{ID: "asset-body", MIMEType: "image/jpeg"},
+		Face:     domain.MediaAsset{ID: "asset-face", MIMEType: "image/jpeg"},
 		Previous: r.jobPrevious,
 	}, nil
 }

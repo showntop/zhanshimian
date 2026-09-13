@@ -246,3 +246,84 @@ type RenderGenerateCandidatePayload struct {
 	Ordinal     int              `json:"ordinal"`
 	RouteState  RenderRouteState `json:"route_state"`
 }
+
+// RenderCandidateJob 组装一次候选生成所需的一切。
+type RenderCandidateJob struct {
+	Run      RenderRun
+	Spec     RenderSpec
+	Body     MediaAsset
+	Face     MediaAsset
+	Previous *QualityEvaluation
+}
+
+// RenderCandidateAsset 是候选对象入库所需的元数据。
+type RenderCandidateAsset struct {
+	ObjectKey string
+	SHA256    string
+	MIMEType  string
+	ByteSize  int64
+	Width     int
+	Height    int
+}
+
+// RenderRecordCandidateCommand 在 lease CAS 下记录一个隔离候选。
+type RenderRecordCandidateCommand struct {
+	TaskID            string
+	LeaseToken        string
+	UserID            string
+	RenderRunID       string
+	SubjectGeneration int
+	Ordinal           int
+	Asset             RenderCandidateAsset
+	ProviderInvocationID string
+}
+
+// RenderEnqueueNextCandidateCommand 扩预算并入队 Candidate 2。
+type RenderEnqueueNextCandidateCommand struct {
+	TaskID            string
+	LeaseToken        string
+	UserID            string
+	RenderRunID       string
+	SubjectGeneration int
+	Quality           QualityEvaluation
+}
+
+// RenderFailRunCommand 终态失败 run 和 operation。
+type RenderFailRunCommand struct {
+	TaskID            string
+	LeaseToken        string
+	UserID            string
+	PlanVariantID     string
+	RenderRunID       string
+	SubjectGeneration int
+	Outcome           string
+	ErrorCode         string
+	Retryable         bool
+}
+
+// RenderCommitEvaluationCommand 是 pass 分支的原子发布输入。
+type RenderCommitEvaluationCommand struct {
+	TaskID            string
+	LeaseToken        string
+	UserID            string
+	RenderRunID       string
+	SubjectGeneration int
+	CandidateID       string
+	Evaluation        QualityEvaluation
+	PublishedObject *RenderPublishedObject
+	PublicationID   string
+}
+
+// RenderPublishedObject 是提升后的发布对象。
+type RenderPublishedObject struct {
+	Key      string
+	SHA256   string
+	ByteSize int64
+}
+
+// RenderCommitEvaluationResult 是发布事务的结果。
+type RenderCommitEvaluationResult struct {
+	Outcome        string
+	Publication    *RenderPublication
+	EnqueuedTaskID string
+}

@@ -34,6 +34,16 @@ type (
 	GenerateCandidatePayload = domain.RenderGenerateCandidatePayload
 )
 
+type (
+	CandidateAsset              = domain.RenderCandidateAsset
+	CandidateJob                = domain.RenderCandidateJob
+	RecordCandidateCommand      = domain.RenderRecordCandidateCommand
+	EnqueueNextCandidateCommand = domain.RenderEnqueueNextCandidateCommand
+	FailRunCommand              = domain.RenderFailRunCommand
+	CommitEvaluationCommand     = domain.RenderCommitEvaluationCommand
+	CommitEvaluationResult      = domain.RenderCommitEvaluationResult
+)
+
 // Repository is the rendering persistence surface.
 type Repository interface {
 	GetRenderSpecForVariant(ctx context.Context, userID, planVariantID string) (domain.RenderSpec, error)
@@ -113,16 +123,6 @@ type PromoteObjectInput struct {
 	ExpectedSHA256 string
 }
 
-// CandidateAsset 是候选对象入库所需的元数据。
-type CandidateAsset struct {
-	ObjectKey string
-	SHA256    string
-	MIMEType  string
-	ByteSize  int64
-	Width     int
-	Height    int
-}
-
 // QualityInput is everything the quality gate may see: normalized candidate
 // bytes, the two references and the validated spec.
 type QualityInput struct {
@@ -143,66 +143,11 @@ type QualityResult struct {
 	CompletedStages       int
 }
 
-// CandidateJob carries everything one candidate generation needs.
-type CandidateJob struct {
-	Run        domain.RenderRun
-	Spec       domain.RenderSpec
-	Body       providerai.ImageInput
-	Face       providerai.ImageInput
-	Previous   *domain.QualityEvaluation
-	RouteState providerai.RouteState
-}
-
 // RecordCandidateCommand atomically persists a quarantined candidate under
-// lease + generation CAS.
-type RecordCandidateCommand struct {
-	TaskID               string
-	LeaseToken           string
-	UserID               string
-	RenderRunID          string
-	SubjectGeneration    int
-	Ordinal              int
-	Asset                CandidateAsset
-	ProviderInvocationID string
-}
 
 // EnqueueNextCandidateCommand expands the budget to 2 and enqueues the
-// second candidate.
-type EnqueueNextCandidateCommand struct {
-	TaskID            string
-	LeaseToken        string
-	UserID            string
-	RenderRunID       string
-	SubjectGeneration int
-	Quality           domain.QualityEvaluation
-}
 
-// FailRunCommand terminally fails a run and its operation.
-type FailRunCommand struct {
-	TaskID            string
-	LeaseToken        string
-	UserID            string
-	RenderRunID       string
-	SubjectGeneration int
-	Outcome           string // failed | unavailable
-	ErrorCode         string
-	Retryable         bool
-}
-
-// CommitEvaluationCommand publishes or rejects in one dual-CAS transaction.
-type CommitEvaluationCommand struct {
-	TaskID            string
-	LeaseToken        string
-	UserID            string
-	RenderRunID       string
-	SubjectGeneration int
-	CandidateID       string
-	Evaluation        QualityResult
-	PublishedObject   *StoredObject
-	PublicationID     string
-}
-
-type CommitEvaluationResult struct {
+type CommitEvaluationResultDeprecated struct {
 	Outcome        string
 	Publication    *domain.RenderPublication
 	EnqueuedTaskID string
