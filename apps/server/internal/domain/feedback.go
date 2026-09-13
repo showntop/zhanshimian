@@ -74,6 +74,9 @@ const (
 // ErrPreferenceNotAllowed 表示 Generation 反馈不得形成偏好记忆。
 var ErrPreferenceNotAllowed = errors.New("preference memory not allowed for this feedback")
 
+// ErrExecutionNotCompleted 表示 Execution 反馈只允许落在已完成(completed)的执行上。
+var ErrExecutionNotCompleted = errors.New("execution not completed")
+
 var generationTags = map[Tag]bool{
 	GenerationIdentityMismatch: true,
 	GenerationHairMismatch:     true,
@@ -83,9 +86,21 @@ var generationTags = map[Tag]bool{
 	GenerationUnnatural:        true,
 }
 
+var executionTags = map[Tag]bool{
+	ExecutionEasy:         true,
+	ExecutionTooFormal:    true,
+	ExecutionTooComplex:   true,
+	ExecutionDislikeColor: true,
+	ExecutionWantToKeep:   true,
+}
+
 // IsGenerationTag 报告该标签是否属于 Generation 反馈;只有这六个标签能被
 // Generation 反馈接受,Execution 标签一律不得进入生成反馈。
 func IsGenerationTag(t Tag) bool { return generationTags[t] }
+
+// IsExecutionTag 报告该标签是否属于 Execution 反馈;只有这五个标签能被
+// Execution 反馈接受,Generation 标签一律不得进入执行反馈。
+func IsExecutionTag(t Tag) bool { return executionTags[t] }
 
 // NormalizePreference 只从结构化输入确定性地产生 0 或 1 条偏好记忆;Generation
 // 标签一律返回 ErrPreferenceNotAllowed,自由文本永不进入。
@@ -179,6 +194,45 @@ type CreateGenerationFeedbackCommand struct {
 	Tags           []Tag
 	Comment        string
 	MediaAssetID   *string
+	IdempotencyKey string
+	RequestHash    string
+}
+
+// PreferenceMemory 是已持久化的一条偏好记忆;Repository 从偏好偏好草稿写入后回填。
+type PreferenceMemory struct {
+	ID        string             `json:"id"`
+	Key       string             `json:"key"`
+	Category  PreferenceCategory `json:"category"`
+	Value     string             `json:"value"`
+	SourceTag Tag                `json:"source_tag"`
+	CreatedAt time.Time          `json:"created_at"`
+}
+
+// ExecutionFeedback 是已完成执行上的一条反馈。Repository 从 execution join
+// selection join plan_set 派生 selection_id/plan_set_id,客户端只能提供
+// execution_id 与可选反馈图片,无法伪造执行链路。
+type ExecutionFeedback struct {
+	ID                  string              `json:"id"`
+	ExecutionID         string              `json:"execution_id"`
+	SelectionID         string              `json:"selection_id"`
+	PlanSetID           string              `json:"plan_set_id"`
+	Tags                []Tag               `json:"tags"`
+	Comment             string              `json:"comment,omitempty"`
+	MediaAssetID        *string             `json:"media_asset_id,omitempty"`
+	AppliedMemories     []PreferenceMemory  `json:"applied_memories"`
+	AcknowledgementCode AcknowledgementCode `json:"acknowledgement_code"`
+	CreatedAt           time.Time           `json:"created_at"`
+}
+
+// CreateExecutionFeedbackCommand 是 postgres 适配器保存 Execution 反馈所需的
+// 跨边界输入;RequestHash 由 service 规范化后计算,适配器只做重放/冲突判定。
+type CreateExecutionFeedbackCommand struct {
+	UserID         string
+	ExecutionID    string
+	Tags           []Tag
+	Comment        string
+	MediaAssetID   *string
+	Preference     StructuredPreference
 	IdempotencyKey string
 	RequestHash    string
 }

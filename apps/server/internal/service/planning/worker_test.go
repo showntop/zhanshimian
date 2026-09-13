@@ -185,6 +185,7 @@ func (b handlerDepsBundle) toDeps() HandlerDeps {
 		Operations: b.operations,
 		Tasks:      b.enqueuer,
 		Store:      b.store,
+		Memories:   &fakeMemories{},
 		NewIDs:     func() string { return "70000000-0000-0000-0000-000000000099" },
 	}
 }

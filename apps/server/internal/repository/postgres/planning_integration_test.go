@@ -229,6 +229,7 @@ func validPrepareCommand(users *planningUsers) domain.PlanningPrepareCommand {
 			Scene:                domain.SceneDaily,
 			SceneBrief:           brief,
 			BriefHash:            "ab7d1c0b3e2f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8091",
+			PlanningInputHash:    "cd7d1c0b3e2f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8091",
 			PlannerSchemaVersion: "plan-set.v1",
 			StyleRuleVersion:     "style-rules.v1",
 			ProviderInvocationID: users.invocation,

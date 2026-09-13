@@ -131,6 +131,42 @@ func BriefHash(brief domain.SceneBrief) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// planningInputFingerprint is the deterministic structure PlanningInputHash
+// serializes. Memory items are sorted by ID so the digest is order independent.
+type planningInputFingerprint struct {
+	ReportID             string                      `json:"report_id"`
+	ProfileSnapshot      json.RawMessage             `json:"profile_snapshot"`
+	BriefHash            string                      `json:"brief_hash"`
+	Memories             []domain.FeedbackMemoryItem `json:"memories"`
+	PlannerSchemaVersion string                      `json:"planner_schema_version"`
+	StyleRuleVersion     string                      `json:"style_rule_version"`
+}
+
+// PlanningInputHash folds the report identity, profile snapshot, brief hash,
+// recent preference memories and both schema versions into one digest. Unlike
+// BriefHash (which only canonicalizes the SceneBrief), a new preference memory
+// changes this hash, so the same report/scene/answers yields a new PlanSet
+// identity instead of reusing stale published content.
+func PlanningInputHash(reportID string, profileSnapshot json.RawMessage, briefHash string, memories []domain.PreferenceMemory) string {
+	items := make([]domain.FeedbackMemoryItem, 0, len(memories))
+	for _, memory := range memories {
+		items = append(items, domain.FeedbackMemoryItem{
+			ID: memory.ID, Key: memory.Key, Category: string(memory.Category), Value: memory.Value,
+		})
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
+	raw, err := json.Marshal(planningInputFingerprint{
+		ReportID: reportID, ProfileSnapshot: profileSnapshot, BriefHash: briefHash,
+		Memories: items, PlannerSchemaVersion: PlannerSchemaVersion, StyleRuleVersion: StyleRuleVersion,
+	})
+	if err != nil {
+		// The fingerprint shape is plain strings and raw JSON; marshal cannot fail.
+		return ""
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:])
+}
+
 // IsStyleRuleID reports whether sourceID is one of the frozen style rules.
 func IsStyleRuleID(sourceID string) bool {
 	return contains(StyleRuleIDs, sourceID)

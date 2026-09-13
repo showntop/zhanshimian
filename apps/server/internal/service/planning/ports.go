@@ -25,6 +25,12 @@ type ReportReader interface {
 	GetPlanningReport(ctx context.Context, userID, reportID string) (ReportSnapshot, error)
 }
 
+// PreferenceMemoryReader reads the user's recent preference memories to seed the
+// next planning run's feedback_memory groundings.
+type PreferenceMemoryReader interface {
+	ListPreferenceMemories(ctx context.Context, userID string, limit int) ([]domain.PreferenceMemory, error)
+}
+
 // OperationStarter inserts the public operation and its initial content task
 // in one transaction, idempotent on (user_id, kind, dedupe_key). The bool
 // reports whether this call created the pair.
@@ -103,6 +109,7 @@ type GenerateTaskPayload struct {
 	Scene                domain.Scene      `json:"scene"`
 	Brief                domain.SceneBrief `json:"brief"`
 	BriefHash            string            `json:"brief_hash"`
+	PlanningInputHash    string            `json:"planning_input_hash"`
 	PlannerSchemaVersion string            `json:"planner_schema_version"`
 	StyleRuleVersion     string            `json:"style_rule_version"`
 	ContentAttempt       int               `json:"content_attempt"`

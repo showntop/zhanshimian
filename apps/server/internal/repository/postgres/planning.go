@@ -82,9 +82,8 @@ func (s *Store) FindPublished(ctx context.Context, key domain.PlanningPlanSetKey
 	var id string
 	err := s.pool.QueryRow(ctx, `
 		SELECT ps.id::text FROM plan_sets ps
-		WHERE ps.user_id=$1::uuid AND ps.report_id=$2::uuid AND ps.scene=$3
-		  AND ps.brief_hash=$4 AND ps.planner_schema_version=$5 AND `+planningPublishedGuard+`
-		LIMIT 1`, key.UserID, key.ReportID, string(key.Scene), key.BriefHash, key.PlannerSchemaVersion).Scan(&id)
+		WHERE ps.user_id=$1::uuid AND ps.planning_input_hash=$2 AND `+planningPublishedGuard+`
+		LIMIT 1`, key.UserID, key.PlanningInputHash).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.PlanSet{}, false, nil
 	}
@@ -155,12 +154,12 @@ func (s *Store) loadPlanningGraph(ctx context.Context, q planningQuerier, userID
 	var briefRaw, profileRaw []byte
 	err := q.QueryRow(ctx, `
 		SELECT id::text, user_id::text, report_id::text, profile_snapshot, scene,
-		       scene_brief, brief_hash, planner_schema_version, style_rule_version,
+		       scene_brief, brief_hash, planning_input_hash, planner_schema_version, style_rule_version,
 		       provider_invocation_id::text, quality_evaluation_id::text, created_at
 		FROM plan_sets WHERE user_id=$1::uuid AND id=$2::uuid`,
 		userID, planSetID).Scan(
 		&planSet.ID, &planSet.UserID, &planSet.ReportID, &profileRaw, &planSet.Scene,
-		&briefRaw, &planSet.BriefHash, &planSet.PlannerSchemaVersion, &planSet.StyleRuleVersion,
+		&briefRaw, &planSet.BriefHash, &planSet.PlanningInputHash, &planSet.PlannerSchemaVersion, &planSet.StyleRuleVersion,
 		&planSet.ProviderInvocationID, &planSet.QualityEvaluationID, &planSet.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.PlanSet{}, repository.ErrNotFound
@@ -281,10 +280,10 @@ func (s *Store) Prepare(ctx context.Context, lease domain.TaskLease, command dom
 		return domain.PlanSet{}, err
 	}
 	if _, err = tx.Exec(ctx, `
-		INSERT INTO plan_sets(id, user_id, report_id, profile_snapshot, scene, scene_brief, brief_hash, planner_schema_version, style_rule_version, provider_invocation_id, quality_evaluation_id)
-		VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7,$8,$9,$10::uuid,$11::uuid)`,
+		INSERT INTO plan_sets(id, user_id, report_id, profile_snapshot, scene, scene_brief, brief_hash, planning_input_hash, planner_schema_version, style_rule_version, provider_invocation_id, quality_evaluation_id)
+		VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7,$8,$9,$10,$11::uuid,$12::uuid)`,
 		planSet.ID, planSet.UserID, planSet.ReportID, defaultJSONB(planSet.ProfileSnapshot),
-		string(planSet.Scene), briefEncoded, planSet.BriefHash, planSet.PlannerSchemaVersion,
+		string(planSet.Scene), briefEncoded, planSet.BriefHash, planSet.PlanningInputHash, planSet.PlannerSchemaVersion,
 		planSet.StyleRuleVersion, planSet.ProviderInvocationID, quality.ID); err != nil {
 		return domain.PlanSet{}, err
 	}

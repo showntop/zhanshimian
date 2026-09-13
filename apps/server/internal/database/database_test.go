@@ -296,10 +296,10 @@ func insertCompletePlanSet(t *testing.T, pool *pgxpool.Pool, userID, reportID, p
 	evalID := insertEval(t, pool, userID, "plan_set", uuid.New())
 	err = tx.QueryRow(ctx, `
 		INSERT INTO plan_sets(
-			user_id,report_id,profile_snapshot,scene,scene_brief,brief_hash,
+			user_id,report_id,profile_snapshot,scene,scene_brief,brief_hash,planning_input_hash,
 			planner_schema_version,style_rule_version,provider_invocation_id,quality_evaluation_id
-		) VALUES ($1,$2,'{}'::jsonb,'daily','{}'::jsonb,$3,'v1','v1',$4,$5)
-		RETURNING id`, userID, reportID, hex64(), invID, evalID).Scan(&planSetID)
+		) VALUES ($1,$2,'{}'::jsonb,'daily','{}'::jsonb,$3,$4,'v1','v1',$5,$6)
+		RETURNING id`, userID, reportID, hex64(), hex64(), invID, evalID).Scan(&planSetID)
 	if err != nil {
 		t.Fatalf("insert plan set: %v", err)
 	}

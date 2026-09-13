@@ -200,6 +200,11 @@ func groundingReferenceResolves(input ValidationInput, grounding GeneratedGround
 			return "", true
 		}
 		return "unknown style rule", false
+	case domain.SourceFeedbackMemory:
+		if feedbackMemoryIDResolves(input.Report.ProfileSnapshot, grounding.SourceID) {
+			return "", true
+		}
+		return "unknown feedback memory id", false
 	default:
 		return "unknown source type", false
 	}
@@ -207,14 +212,38 @@ func groundingReferenceResolves(input ValidationInput, grounding GeneratedGround
 
 func groundingUnknownSource(sourceType domain.GroundingSourceType) bool {
 	switch sourceType {
-	case domain.SourceReportFinding, domain.SourceSceneAnswer, domain.SourceProfilePreference, domain.SourceStyleRule:
+	case domain.SourceReportFinding, domain.SourceSceneAnswer, domain.SourceProfilePreference,
+		domain.SourceStyleRule, domain.SourceFeedbackMemory:
 		return false
 	default:
-		// feedback_memory is not enabled this phase: without an explicit
-		// memory snapshot it is unverifiable, so it reads as an unknown
-		// source.
 		return true
 	}
+}
+
+// feedbackMemoryIDResolves checks whether sourceID names an item in the
+// deterministic feedback_memory snapshot embedded in the profile snapshot.
+func feedbackMemoryIDResolves(profileSnapshot json.RawMessage, sourceID string) bool {
+	if len(profileSnapshot) == 0 {
+		return false
+	}
+	root := map[string]json.RawMessage{}
+	if err := json.Unmarshal(profileSnapshot, &root); err != nil {
+		return false
+	}
+	encoded, ok := root["feedback_memory"]
+	if !ok {
+		return false
+	}
+	var snapshot domain.FeedbackMemorySnapshot
+	if err := json.Unmarshal(encoded, &snapshot); err != nil {
+		return false
+	}
+	for _, item := range snapshot.Items {
+		if item.ID == sourceID {
+			return true
+		}
+	}
+	return false
 }
 
 // jsonPointerResolves walks an RFC 6901 pointer through the profile JSON.

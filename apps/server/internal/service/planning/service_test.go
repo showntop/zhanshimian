@@ -54,6 +54,30 @@ func TestCreatePlanSetReturnsPublishedResultWithoutStartingAI(t *testing.T) {
 	}
 }
 
+func TestCreatePlanSetFoldsPreferenceMemoriesIntoPlanningInputHash(t *testing.T) {
+	reportID := "20000000-0000-0000-0000-000000000001"
+	report := validReport(reportID)
+	memories := &fakeMemories{memories: []domain.PreferenceMemory{
+		{ID: "90000000-0000-0000-0000-000000000001", Key: "outfit.palette", Category: domain.CategoryOutfit, Value: "偏爱低饱和"},
+	}}
+	starter := &fakeStarter{}
+	svc := NewService(Dependencies{
+		Reports: fakeReports{report: report}, Operations: starter, Store: &fakeStore{}, Memories: memories,
+		IDs: func() string { return "10000000-0000-0000-0000-000000000001" },
+	})
+	if _, err := svc.CreatePlanSet(context.Background(), validCreateCommand(reportID)); err != nil {
+		t.Fatal(err)
+	}
+	if memories.calls != 1 || memories.limit != planningMemoryLimit {
+		t.Fatalf("memories read = %d calls limit=%d, want 1/%d", memories.calls, memories.limit, planningMemoryLimit)
+	}
+	payload := starter.command.Task.Payload.(GenerateTaskPayload)
+	want := PlanningInputHash(report.ID, report.ProfileSnapshot, payload.BriefHash, memories.memories)
+	if payload.PlanningInputHash == "" || payload.PlanningInputHash != want {
+		t.Fatalf("planning_input_hash = %q, want %q", payload.PlanningInputHash, want)
+	}
+}
+
 func TestCreatePlanSetConvergesOnSameSemanticKey(t *testing.T) {
 	reportID := "20000000-0000-0000-0000-000000000001"
 	starter := &fakeStarter{existing: true}
@@ -126,6 +150,18 @@ type fakeReports struct {
 
 func (f fakeReports) GetPlanningReport(context.Context, string, string) (ReportSnapshot, error) {
 	return f.report, f.err
+}
+
+type fakeMemories struct {
+	memories []domain.PreferenceMemory
+	calls    int
+	limit    int
+}
+
+func (f *fakeMemories) ListPreferenceMemories(_ context.Context, _ string, limit int) ([]domain.PreferenceMemory, error) {
+	f.calls++
+	f.limit = limit
+	return f.memories, nil
 }
 
 type fakeStarter struct {

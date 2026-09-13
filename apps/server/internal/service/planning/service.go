@@ -17,6 +17,7 @@ type Dependencies struct {
 	Operations OperationStarter
 	Store      PlanSetStore
 	Renders    CurrentRenderReader
+	Memories   PreferenceMemoryReader
 	IDs        func() string
 }
 
@@ -39,14 +40,21 @@ func (s *Service) CreatePlanSet(ctx context.Context, cmd CreateCommand) (CreateR
 	}
 	// The read doubles as the tenant check: a foreign report reads as
 	// not-found before anything is created.
-	if _, err := s.deps.Reports.GetPlanningReport(ctx, cmd.UserID, cmd.ReportID); err != nil {
+	report, err := s.deps.Reports.GetPlanningReport(ctx, cmd.UserID, cmd.ReportID)
+	if err != nil {
 		return CreateResult{}, err
 	}
+	memories, err := s.listMemories(ctx, cmd.UserID)
+	if err != nil {
+		return CreateResult{}, err
+	}
+	briefHash := BriefHash(brief)
 	key := PlanSetKey{
 		UserID:               cmd.UserID,
 		ReportID:             cmd.ReportID,
 		Scene:                brief.Scene,
-		BriefHash:            BriefHash(brief),
+		BriefHash:            briefHash,
+		PlanningInputHash:    PlanningInputHash(report.ID, report.ProfileSnapshot, briefHash, memories),
 		PlannerSchemaVersion: PlannerSchemaVersion,
 	}
 	if published, found, err := s.deps.Store.FindPublished(ctx, key); err != nil {
@@ -75,6 +83,7 @@ func (s *Service) CreatePlanSet(ctx context.Context, cmd CreateCommand) (CreateR
 				Scene:                brief.Scene,
 				Brief:                brief,
 				BriefHash:            key.BriefHash,
+				PlanningInputHash:    key.PlanningInputHash,
 				PlannerSchemaVersion: PlannerSchemaVersion,
 				StyleRuleVersion:     StyleRuleVersion,
 				ContentAttempt:       1,
@@ -153,11 +162,22 @@ func (s *Service) newID() string {
 	return uuid.NewString()
 }
 
+// listMemories reads the user's recent preference memories, tolerating a
+// nil reader so callers that never wired memories still behave correctly.
+func (s *Service) listMemories(ctx context.Context, userID string) ([]domain.PreferenceMemory, error) {
+	if s.deps.Memories == nil {
+		return nil, nil
+	}
+	return s.deps.Memories.ListPreferenceMemories(ctx, userID, planningMemoryLimit)
+}
+
 // generationDedupeKey is the semantic dedupe key shared by the operation and
-// every content task of one plan set identity.
+// every content task of one plan set identity. It keys on the planning input
+// hash so a new preference memory yields a new identity rather than reusing
+// stale published content.
 func generationDedupeKey(key PlanSetKey) string {
-	return fmt.Sprintf("plan-set:%s:%s:%s:%s",
-		key.ReportID, key.Scene, key.BriefHash, key.PlannerSchemaVersion)
+	return fmt.Sprintf("plan-set:%s:%s:%s",
+		key.ReportID, key.PlanningInputHash, key.PlannerSchemaVersion)
 }
 
 // semanticPlanSetID derives a stable UUID from the semantic key so duplicate

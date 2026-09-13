@@ -51,10 +51,10 @@ func TestValidateCandidateRejectsUnknownGroundingReferences(t *testing.T) {
 		t.Fatal("unknown finding id passed")
 	}
 	input.Candidate.Variants[1].Steps[2].Groundings = []GeneratedGrounding{
-		{SourceType: domain.SourceFeedbackMemory, SourceID: "memory-1", Reason: "本阶段不允许"},
+		{SourceType: domain.SourceFeedbackMemory, SourceID: "memory-1", Reason: "不存在的记忆"},
 	}
-	if !hasViolation(ValidateCandidate(input), ReasonGroundingUnknownSrc) {
-		t.Fatal("feedback_memory passed this phase")
+	if !hasViolation(ValidateCandidate(input), ReasonGroundingUnknownID) {
+		t.Fatal("unknown feedback memory id passed")
 	}
 	input.Candidate.Variants[2].Steps[2].Groundings = []GeneratedGrounding{
 		{SourceType: domain.SourceProfilePreference, SourceID: "/nonexistent", Reason: "指针不存在"},

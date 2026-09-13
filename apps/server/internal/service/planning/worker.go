@@ -46,6 +46,7 @@ type HandlerDeps struct {
 	Operations OperationWriter
 	Tasks      TaskEnqueuer
 	Store      PlanSetStore
+	Memories   PreferenceMemoryReader
 	NewIDs     func() string
 }
 
@@ -68,6 +69,16 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 	report, err := h.deps.Reports.GetPlanningReport(ctx, lease.Task.UserID, payload.ReportID)
 	if err != nil {
 		return domain.TaskResult{}, err
+	}
+	memories, err := h.listMemories(ctx, lease.Task.UserID)
+	if err != nil {
+		return domain.TaskResult{}, err
+	}
+	if memories != nil {
+		report.ProfileSnapshot, err = embedFeedbackMemory(report.ProfileSnapshot, memories)
+		if err != nil {
+			return domain.TaskResult{}, err
+		}
 	}
 	_, _ = h.deps.Operations.MarkRunning(ctx, lease, ProgressPlanReading, StagePlanReadingReport, "正在阅读你的形象报告")
 	generated, err := h.deps.Generator.Generate(ctx, GenerationInput{
@@ -194,8 +205,8 @@ func contentRetryTask(payload GenerateTaskPayload, reasonCodes []string) Enqueue
 }
 
 func contentRetryDedupeKey(payload GenerateTaskPayload) string {
-	return fmt.Sprintf("plan-set:%s:%s:%s:%s:content:2",
-		payload.ReportID, payload.Scene, payload.BriefHash, payload.PlannerSchemaVersion)
+	return fmt.Sprintf("plan-set:%s:%s:%s:content:2",
+		payload.ReportID, payload.PlanningInputHash, payload.PlannerSchemaVersion)
 }
 
 // materializePlanSet assigns final row IDs to the accepted candidate.
@@ -208,6 +219,7 @@ func (h *Handler) materializePlanSet(report ReportSnapshot, payload GenerateTask
 		Scene:                payload.Scene,
 		SceneBrief:           payload.Brief,
 		BriefHash:            payload.BriefHash,
+		PlanningInputHash:    payload.PlanningInputHash,
 		PlannerSchemaVersion: payload.PlannerSchemaVersion,
 		StyleRuleVersion:     payload.StyleRuleVersion,
 		ProviderInvocationID: generated.InvocationID,
@@ -286,6 +298,15 @@ func (h *Handler) newID() string {
 		return h.deps.NewIDs()
 	}
 	return uuid.NewString()
+}
+
+// listMemories reads the user's recent preference memories, tolerating a
+// nil reader so callers that never wired memories still behave correctly.
+func (h *Handler) listMemories(ctx context.Context, userID string) ([]domain.PreferenceMemory, error) {
+	if h.deps.Memories == nil {
+		return nil, nil
+	}
+	return h.deps.Memories.ListPreferenceMemories(ctx, userID, planningMemoryLimit)
 }
 
 func (h *Handler) stage(lease domain.TaskLease, decision pendingDecision) {

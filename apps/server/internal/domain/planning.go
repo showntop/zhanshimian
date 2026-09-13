@@ -69,6 +69,7 @@ type PlanSet struct {
 	Scene                Scene
 	SceneBrief           SceneBrief
 	BriefHash            string
+	PlanningInputHash    string
 	PlannerSchemaVersion string
 	StyleRuleVersion     string
 	ProviderInvocationID string
@@ -292,7 +293,23 @@ type PlanningPlanSetKey struct {
 	ReportID             string
 	Scene                Scene
 	BriefHash            string
+	PlanningInputHash    string
 	PlannerSchemaVersion string
+}
+
+// FeedbackMemoryItem is one preference memory carried into the next planning
+// run; it is the source_id a feedback_memory grounding points at.
+type FeedbackMemoryItem struct {
+	ID       string `json:"id"`
+	Key      string `json:"key"`
+	Category string `json:"category"`
+	Value    string `json:"value"`
+}
+
+// FeedbackMemorySnapshot is the deterministic structure embedded under
+// profile_snapshot.feedback_memory when Planning consumes preference memories.
+type FeedbackMemorySnapshot struct {
+	Items []FeedbackMemoryItem `json:"items"`
 }
 
 type PlanningStartOperationCommand struct {
