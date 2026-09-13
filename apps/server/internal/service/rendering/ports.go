@@ -102,13 +102,3 @@ type PromoteObjectInput struct {
 	SourceKey      string
 	ExpectedSHA256 string
 }
-
-// NormalizedJPEG is clean, re-encoded JPEG without provider metadata.
-type NormalizedJPEG struct {
-	Data     []byte
-	MIMEType string
-	SHA256   string
-	ByteSize int64
-	Width    int
-	Height   int
-}

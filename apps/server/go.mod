@@ -8,6 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/tencentyun/cos-go-sdk-v5 v0.7.75
+	golang.org/x/image v0.30.0
 )
 
 require (
