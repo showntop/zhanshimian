@@ -2,10 +2,16 @@ package execution
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 )
+
+// ErrValidation 标记请求本身不合法的失败:标识不是 UUID、幂等键长度越界、
+// step 事件缺少 step_id、occurred_at 超出允许窗口等。传输层据此返回 400
+// 而不是 500,消息沿用 "<哨兵>: <细节>" 的既有约定。
+var ErrValidation = errors.New("validation error")
 
 // ErrIdempotencyConflict 复用 domain 哨兵,postgres 适配器返回同一指针,
 // 服务侧 errors.Is 能直接命中。

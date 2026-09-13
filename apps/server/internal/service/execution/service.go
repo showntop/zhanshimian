@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/zhanshimian/server/internal/domain"
@@ -13,7 +14,7 @@ func (s *Service) PutSelection(
 ) (selection domain.PlanSelection, created bool, err error) {
 	planSetID, variantID, publicationID, requestHash, err := normalizeSelection(planSetID, input)
 	if err != nil {
-		return domain.PlanSelection{}, false, err
+		return domain.PlanSelection{}, false, fmt.Errorf("%w: %v", ErrValidation, err)
 	}
 	return s.repo.CreateSelection(ctx, CreateSelectionCommand{
 		UserID:              userID,
@@ -31,7 +32,7 @@ func (s *Service) CreateExecution(
 ) (execution domain.Execution, created bool, err error) {
 	selectionID, requestHash, err := normalizeExecution(selectionID, input)
 	if err != nil {
-		return domain.Execution{}, false, err
+		return domain.Execution{}, false, fmt.Errorf("%w: %v", ErrValidation, err)
 	}
 	return s.repo.CreateExecutionFromSelection(ctx, CreateExecutionCommand{
 		UserID:         userID,
@@ -50,7 +51,7 @@ func (s *Service) GetExecution(ctx context.Context, userID, executionID string) 
 func (s *Service) AppendEvent(ctx context.Context, userID, executionID string, input AppendEventInput) (AppendEventResult, error) {
 	executionID, stepID, occurredAt, requestHash, err := normalizeEvent(executionID, input)
 	if err != nil {
-		return AppendEventResult{}, err
+		return AppendEventResult{}, fmt.Errorf("%w: %v", ErrValidation, err)
 	}
 	return s.repo.AppendExecutionEvent(ctx, AppendEventCommand{
 		UserID:          userID,

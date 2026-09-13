@@ -22,6 +22,7 @@ type API struct {
 	assessment      *assessment.Service
 	planning        planSetService
 	renders         renderService
+	execution       executionService
 	idempotency     IdempotencyStore
 	logger          *slog.Logger
 	devLoginEnabled bool
@@ -96,6 +97,9 @@ func errorRetryable(code string, status int) bool {
 		return true
 	case "idempotency_conflict", "idempotency_key_required":
 		return false
+	case "version_conflict":
+		// 只有 CAS 版本冲突是"重读后重试即可成功"的冲突。
+		return true
 	}
 	return status >= 500 || status == http.StatusTooManyRequests
 }
