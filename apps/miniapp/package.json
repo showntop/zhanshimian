@@ -7,6 +7,7 @@
     "dev:weapp": "taro build --type weapp --watch",
     "build:weapp": "taro build --type weapp",
     "typecheck": "tsc --noEmit",
+    "test": "node --test --experimental-strip-types tests/",
     "check": "node scripts/check.mjs"
   },
   "dependencies": {

@@ -18,18 +18,39 @@ export {
   type GeneratedApiClient
 } from './api/client.ts'
 export type {
+  AcceptedOperationRef,
   Assessment,
+  AssessmentAccepted,
+  CreateAssessmentRequest,
+  CreateExecutionEventRequest,
+  CreateExecutionFeedbackRequest,
+  CreateGenerationFeedbackRequest,
+  CreatePlanSetRequest,
+  CreateRenderRunRequest,
   DisplayMedia,
   Execution,
+  ExecutionEvent,
+  ExecutionEventResult,
+  ExecutionFeedback,
   ExecutionStep,
+  GenerationFeedback,
   HomeBootstrap,
+  // 旧的 types/index.ts 里还留着一个同名但形状完全不同的 MediaAsset（kind/url/demo），
+  // 显式导出会盖掉 `export *`。等 Task 12 删掉旧类型后即可改回 MediaAsset。
+  MediaAsset as UploadedMediaAsset,
   Operation,
   PlanSet,
+  PlanSetAccepted,
   PlanStep,
   PlanVariant,
+  PutSelectionRequest,
+  RenderRun,
+  RenderRunAccepted,
   Report,
   ReportFinding,
-  Selection
+  Selection,
+  UploadGrant,
+  UploadIntent
 } from './api/types.ts'
 export {
   LOCAL_LOOK_SLUGS,

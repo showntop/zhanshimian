@@ -12,3 +12,32 @@ export type Selection = components['schemas']['Selection']
 export type Execution = components['schemas']['Execution']
 export type ExecutionStep = components['schemas']['ExecutionStep']
 export type HomeBootstrap = components['schemas']['HomeBootstrap']
+
+// 受理信封：异步写入返回 202 + operation 引用，客户端据此进入唯一 polling 路径。
+export type AcceptedOperationRef = components['schemas']['AcceptedOperationRef']
+export type AssessmentAccepted = components['schemas']['AssessmentAccepted']
+export type PlanSetAccepted = components['schemas']['PlanSetAccepted']
+export type RenderRunAccepted = components['schemas']['RenderRunAccepted']
+
+// 渲染与执行
+export type RenderRun = components['schemas']['RenderRun']
+export type ExecutionEvent = components['schemas']['ExecutionEvent']
+export type ExecutionEventResult = components['schemas']['ExecutionEventResult']
+
+// 反馈
+export type GenerationFeedback = components['schemas']['GenerationFeedback']
+export type ExecutionFeedback = components['schemas']['ExecutionFeedback']
+
+// 上传事务：intent 只负责直传授权，complete 之后才拿得到 MediaAsset。
+export type UploadIntent = components['schemas']['UploadIntent']
+export type UploadGrant = components['schemas']['UploadGrant']
+export type MediaAsset = components['schemas']['MediaAsset']
+
+// 请求体：与生成 schema 同源，禁止在小程序里手写第二份。
+export type CreateAssessmentRequest = components['schemas']['CreateAssessmentRequest']
+export type CreatePlanSetRequest = components['schemas']['CreatePlanSetRequest']
+export type PutSelectionRequest = components['schemas']['PutSelectionRequest']
+export type CreateRenderRunRequest = Record<string, never>
+export type CreateExecutionEventRequest = components['schemas']['CreateExecutionEventRequest']
+export type CreateGenerationFeedbackRequest = components['schemas']['CreateGenerationFeedbackRequest']
+export type CreateExecutionFeedbackRequest = components['schemas']['CreateExecutionFeedbackRequest']
