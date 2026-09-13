@@ -44,9 +44,9 @@ import './index.scss'
  * 给引导图套上「风格参考」角标只会让人以为那是别人拍的效果。
  */
 const GUIDE_IMAGE: Record<CaptureRole, string> = {
-  face: '/assets/capture/face.png',
-  side: '/assets/capture/side.png',
-  body: '/assets/capture/body.png',
+  face: '/assets/capture/face.jpg',
+  side: '/assets/capture/side.jpg',
+  body: '/assets/capture/body.jpg',
 }
 
 /**

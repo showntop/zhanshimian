@@ -1,0 +1,44 @@
+.operation-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  padding: 24rpx;
+  border-radius: var(--radius-md);
+  text-align: center;
+
+  &__spin {
+    width: 40rpx;
+    height: 40rpx;
+  }
+
+  &__text {
+    font-size: 26rpx;
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+
+  &__note {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__retry {
+    font-size: 25rpx;
+    font-weight: 600;
+    color: var(--moss);
+    text-decoration: underline;
+  }
+
+  &--working {
+    background: var(--moss-soft);
+  }
+
+  &--failed {
+    background: var(--cream);
+  }
+
+  &--ended {
+    background: var(--cream);
+  }
+}

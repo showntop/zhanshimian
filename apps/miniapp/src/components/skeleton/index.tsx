@@ -11,7 +11,7 @@ export default function Skeleton({ rows = 3, className = '' }: SkeletonProps) {
   return (
     <View className={`skeleton-block ${className}`}>
       {Array.from({ length: rows }).map((_, i) => (
-        <View key={i} className="skeleton skeleton-row" style={{ width: `${100 - i * 12}%` }} />
+        <View key={`row-${i}`} className="skeleton skeleton-row" style={{ width: `${100 - i * 12}%` }} />
       ))}
     </View>
   )

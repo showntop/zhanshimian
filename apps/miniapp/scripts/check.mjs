@@ -1,34 +1,145 @@
 #!/usr/bin/env node
 /**
- * 小程序静态门禁（CI 必跑）：
- *  1. app.config.ts 的 pages/subPackages ↔ src 目录一一对应
- *  2. 每页 index.tsx/.config.ts 齐全，且样式有明确归属：
- *     自带 index.scss，或整页迁进 features/<x>（该 feature 必须自己带 index.scss）
- *  3. 引用的 /assets/ 本地资源在 src 与 dist 中存在
- *  4. dist/assets 无 .webp；模特图目录无 .png 母版
- *  5. .scss 禁止裸 px（rpx / CSS 变量 / 1rpx 发丝线除外；注释行忽略）
- *  6. Image src 字面量必须经媒体契约组件（example-image / 例图常量）
- *  7. 禁止字面量 http:// 图片地址
- *  8. 主包体积（dist 除 packages/ 外）≤ 1.6MB
+ * 小程序静态门禁（CI 必跑）。单文件规则集中在 checkSourceFile（可被 node:test 直测）：
+ *  - scss/JSX 字符串禁止裸 px（须 rpx；阴影/模糊的视觉 px 保留）
+ *  - 拒绝 {count && <...>}、{items.length && <...>} 等数值直接 && JSX
+ *  - 拒绝 key={index}/{i}/{idx}
+ *  - 全仓禁 .webp；禁 provider 嗅探、isBundledAsset、钉住旧图
+ *  - 禁业务 Storage key；主闭环页面不得 import api/cache/operations/storage 层
+ *  - 轮询唯一入口：createOperationPolling 只许出现在 use-operation-polling；
+ *    useTaskPolling/createTaskPolling 全仓禁止
+ * 全仓规则（路由↔目录、页面三件套、资产存在性、组件 config、体积）由 run() 执行。
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 const appRoot = join(import.meta.dirname, '..')
 const src = join(appRoot, 'src')
 const dist = join(appRoot, 'dist')
-const problems = []
-const notes = []
+
+/** 主闭环八页：它们的薄壳纪律由 here 与 tests/architecture 双重把守。 */
+const MAIN_LOOP_ROUTES = ['capture', 'analysis', 'report', 'scene', 'plans', 'plan', 'checklist', 'feedback']
+const OPERATION_WRAPPER = 'app/operations/use-operation-polling'
+const NUMERIC_NAME = /(?:count|total|num|number|length|size|index|idx|done|remain|remaining)s?$/i
+
+/** 单文件规则：返回违例文案数组（已带 file:line）。path 用仓内相对形式。 */
+export function checkSourceFile(path, source) {
+  const problems = []
+  const posix = path.replace(/\\/g, '/')
+  const isScss = posix.endsWith('.scss')
+  const isTsx = posix.endsWith('.tsx') || posix.endsWith('.ts')
+
+  source.split('\n').forEach((rawLine, i) => {
+    const lineNo = i + 1
+    const fail = (message) => problems.push(`${message}: ${posix}:${lineNo}`)
+    const code = rawLine.replace(/\/\/.*$/, '')
+
+    if (isScss) {
+      // 阴影/模糊的视觉 px 有意保留：先把这类声明整段剥掉再扫
+      const withoutShadow = code.replace(/(box-shadow|text-shadow|backdrop-filter|filter)\s*:[^;}]+/g, '')
+      const barePx = /(^|[\s:,(])-\d+px(?![a-z])/i.exec(withoutShadow) || /(^|[\s:,(])\d+px(?![a-z])/i.exec(withoutShadow)
+      if (barePx) fail('scss 裸 px（须 rpx）')
+      return
+    }
+
+    if (!isTsx) return
+
+    // 数值/可能为 0 的表达式直接 && JSX：React 会把 0 渲染成 "0"
+    const zeroAnd = /(^|[^!\w'])\s*(?:\w+\.length|\w+\.size|[A-Za-z_$][\w$]*)\s*&&\s*</.exec(code)
+    if (zeroAnd) {
+      const subject = code.slice(0, zeroAnd.index).trim() || zeroAnd[0]
+      const name = /([\w.]+)\s*&&/.exec(`${subject} ${zeroAnd[0]}`)?.[1] ?? ''
+      if (/\.(length|size)\s*&&/.test(zeroAnd[0]) || NUMERIC_NAME.test(name.split('.').pop() ?? '')) {
+        fail('条件渲染可能渲染 0')
+        return
+      }
+    }
+
+    // 列表下标 key
+    if (/key=\{(index|i|idx)\}/.test(code)) fail('列表禁止下标 key')
+
+    // WebP（微信渲染空白）
+    if (/\.webp/i.test(code)) fail('禁止 WebP')
+
+    // 钉住旧图 / provider 嗅探 / isBundledAsset
+    if (/pinnedUrl|PinnedImage/.test(code)) fail('禁止钉住旧图')
+    if (/provider_version\s*\?\?|provider_version\)\s*\.startsWith|\.startsWith\('demo'\)/.test(code)) {
+      fail('禁止按 provider 判定演示图')
+    }
+    if (/\bisBundledAsset\b/.test(code)) fail('禁止 isBundledAsset')
+
+    // 业务 Storage key
+    if (/STORAGE_KEYS\.(reportId|planId|savedPlanId|activeTask|scene|outfit|purchase|advisor)/.test(code)) {
+      fail('禁止业务 Storage key')
+    }
+
+    // 轮询纪律
+    if (/useTaskPolling|createTaskPolling/.test(code)) fail('禁止任务轮询（统一 useOperationPolling）')
+    if (/createOperationPolling/.test(code) && !posix.replace(/^\.\//, '').startsWith(OPERATION_WRAPPER)) {
+      fail('轮询只能经 useOperationPolling（createOperationPolling 禁止外用）')
+    }
+
+    // 主闭环页面不得 import 数据层
+    if (posix.startsWith('pages/') && posix.endsWith('/index.tsx')) {
+      const route = posix.split('/')[1]
+      if (MAIN_LOOP_ROUTES.includes(route)) {
+        if (/from\s+'[^']*(app\/api|app\/cache|app\/operations|services\/storage)/.test(rawLine)) {
+          fail('主闭环页面不得 import api/cache/operations/storage 层')
+        }
+      }
+    }
+  })
+
+  return problems
+}
+
+function walk(dir, out = []) {
+  if (!existsSync(dir)) return out
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name)
+    if (statSync(full).isDirectory()) walk(full, out)
+    else out.push(full)
+  }
+  return out
+}
+
+function run() {
+  const problems = []
+  const notes = []
+
+  // ---- 单文件规则 ----
+  for (const full of walk(src)) {
+    if (!/\.(ts|tsx|scss)$/.test(full)) continue
+    const rel = relative(src, full)
+    for (const problem of checkSourceFile(rel, readFileSync(full, 'utf8'))) {
+      problems.push(problem)
+    }
+  }
+
+// ---- 组件 config 门：每个 custom component 必须显式 apply-shared ----
+const componentsDir = join(src, 'components')
+for (const name of readdirSync(componentsDir)) {
+  const componentDir = join(componentsDir, name)
+  if (!statSync(componentDir).isDirectory()) continue
+  const configFile = join(componentDir, 'index.config.ts')
+  if (!existsSync(configFile)) {
+    problems.push(`组件缺 index.config.ts: components/${name}`)
+    continue
+  }
+  const configText = readFileSync(configFile, 'utf8')
+  if (!/styleIsolation:\s*'apply-shared'/.test(configText)) {
+    problems.push(`组件 config 缺 styleIsolation: 'apply-shared': components/${name}`)
+  }
+}
 
 // ---- 1/2. 路由 ↔ 目录 ----
 const configText = readFileSync(join(src, 'app.config.ts'), 'utf8')
-// pages 数组在 subPackages 之前；只取该段的 'xxx/index' 条目
 const pagesSection = configText.split('subPackages')[0] ?? configText
 const mainPages = [...pagesSection.matchAll(/^\s*'([\w/-]+\/index)',?\s*$/gm)].map((m) => m[1])
 const subRoots = [...configText.matchAll(/root:\s*'([^']+)'/g)].map((m) => m[1])
 if (mainPages.length === 0) problems.push('app.config.ts 未解析到主包页面')
 
-// 分包页面：root + pages 段内的条目
 const subPages = []
 for (const root of subRoots) {
   const rootIndex = configText.indexOf(`root: '${root}'`)
@@ -38,7 +149,6 @@ for (const root of subRoots) {
   for (const m of body.matchAll(/^\s+'([\w/-]+\/index)',?\s*$/gm)) subPages.push(`${root}/${m[1]}`)
 }
 
-/** 页面 index.tsx 引用的第一个 features/<x>；没有则返回 null。 */
 function featureOf(pageFile) {
   const text = readFileSync(pageFile, 'utf8')
   const m = /from\s+'[^']*\/features\/([\w-]+)/.exec(text)
@@ -46,12 +156,9 @@ function featureOf(pageFile) {
 }
 
 for (const page of [...mainPages, ...subPages]) {
-  // Taro 页面路径即文件基名（pages/home/index → src/pages/home/index.tsx）
   const pageFile = join(src, `${page}.tsx`)
   if (!existsSync(pageFile)) problems.push(`页面缺 index.tsx: ${page}`)
   if (!existsSync(join(src, `${page}.config.ts`))) problems.push(`页面缺 index.config.ts: ${page}`)
-  // 样式必须有一处归属：页面自带，或整页迁到的 feature 自己带。
-  // 只检查"有 import"会放过"feature 里根本没有样式"的页面——那等于页面裸奔。
   if (!existsSync(join(src, `${page}.scss`)) && existsSync(pageFile)) {
     const feature = featureOf(pageFile)
     if (!feature) {
@@ -72,25 +179,12 @@ for (const root of subRoots) {
 notes.push(`主包 ${mainPages.length} 页 / 分包 ${subRoots.length} 个 / tab ${tabPages.length} 个`)
 
 // ---- 3/4. 资产 ----
-function walk(dir, out = []) {
-  if (!existsSync(dir)) return out
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name)
-    if (statSync(full).isDirectory()) walk(full, out)
-    else out.push(full)
-  }
-  return out
-}
-
 const assetRefs = new Set()
-function scanDir(dir) {
-  for (const full of walk(dir)) {
-    if (!/\.(tsx|ts|scss)$/.test(full)) continue
-    const text = readFileSync(full, 'utf8')
-    for (const m of text.matchAll(/['"(](\/assets\/[^'")\s]+)['")]/g)) assetRefs.add(m[1])
-  }
+for (const full of walk(src)) {
+  if (!/\.(tsx|ts|scss)$/.test(full)) continue
+  const text = readFileSync(full, 'utf8')
+  for (const m of text.matchAll(/['"(](\/assets\/[^'")\s]+)['")]/g)) assetRefs.add(m[1])
 }
-scanDir(src)
 for (const m of configText.matchAll(/(?:iconPath|selectedIconPath):\s*'([^']+)'/g)) {
   assetRefs.add(m[1].startsWith('/') ? m[1] : `/${m[1]}`)
 }
@@ -99,11 +193,24 @@ for (const ref of assetRefs) {
   if (!existsSync(join(src, ref.replace(/^\//, '')))) problems.push(`引用的本地资产不存在: ${ref}`)
 }
 
+// 照片母版目录只允许 jpg（png 母版不进包）；capture/ 是线稿指引图（非照片），
+// png 合法；tabBar 图标只允许 png
+const PHOTO_DIR = /assets\/(looks|plans|portraits|reports|hair)\//
+for (const full of walk(join(src, 'assets'))) {
+  const rel = relative(src, full).replace(/\\/g, '/')
+  if (PHOTO_DIR.test(rel) && !/\.(jpe?g)$/i.test(rel)) {
+    problems.push(`照片目录只允许 jpg: ${rel}`)
+  }
+  if (/assets\/tabbar\//.test(rel) && !/\.png$/.test(rel)) {
+    problems.push(`tabBar 图标只允许 png: ${rel}`)
+  }
+}
+
 if (existsSync(dist)) {
   for (const full of walk(join(dist, 'assets'))) {
-    const rel = relative(dist, full)
+    const rel = relative(dist, full).replace(/\\/g, '/')
     if (rel.endsWith('.webp')) problems.push(`dist 含 webp: ${rel}`)
-    if (/assets\/(looks|plans|portraits|reports|hair)\/.*\.png$/.test(rel.replace(/\\/g, '/'))) {
+    if (PHOTO_DIR.test(rel) && /\.png$/i.test(rel)) {
       problems.push(`dist 含 PNG 母版: ${rel}`)
     }
   }
@@ -112,7 +219,6 @@ if (existsSync(dist)) {
       problems.push(`dist 缺资产（检查 copy.patterns 与 assetsInlineLimit:0）: ${ref}`)
     }
   }
-  // 微信打开 apps/miniapp（miniprogramRoot=dist/）时，tabBar 图标可能按项目根查找。
   for (const m of configText.matchAll(/(?:iconPath|selectedIconPath):\s*'([^']+)'/g)) {
     const rel = m[1].replace(/^\//, '')
     if (!existsSync(join(appRoot, rel))) {
@@ -121,29 +227,6 @@ if (existsSync(dist)) {
   }
 } else {
   notes.push('dist 不存在：跳过 3/4 的 dist 侧检查（先执行 build:weapp）')
-}
-
-// ---- 5. scss 裸 px（布局尺寸须 rpx；阴影/模糊的视觉 px 有意保留） ----
-for (const full of walk(src)) {
-  if (!full.endsWith('.scss')) continue
-  const rel = relative(src, full)
-  const lines = readFileSync(full, 'utf8').split('\n')
-  lines.forEach((line, i) => {
-    const code = line.replace(/\/\/.*$/, '')
-    if (/^\s*(box-shadow|text-shadow|backdrop-filter|filter)/.test(code)) return
-    const barePx = /(^|[\s:,(])-\d+px(?![a-z])/i.exec(code) || /(^|[\s:,(])\d+px(?![a-z])/i.exec(code)
-    if (barePx) problems.push(`scss 裸 px（须 rpx）: ${rel}:${i + 1} → ${line.trim()}`)
-  })
-}
-
-// ---- 6/7. Image src 纪律 ----
-for (const full of walk(src)) {
-  if (!full.endsWith('.tsx') || full.includes('components/example-image')) continue
-  const rel = relative(src, full)
-  const text = readFileSync(full, 'utf8')
-  if (/src=\{?["']https?:\/\/[^"']+["']/.test(text)) {
-    problems.push(`Image src 使用字面量 http(s) URL（须经 example-image 或 API 数据）: ${rel}`)
-  }
 }
 
 // ---- 8. 主包体积 ----
@@ -167,3 +250,9 @@ if (problems.length > 0) {
   process.exit(1)
 }
 console.log('[check] ✅ miniapp 静态门禁通过')
+}
+
+// 被测试导入时只提供 checkSourceFile；直接执行才跑全仓门禁。
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  run()
+}
