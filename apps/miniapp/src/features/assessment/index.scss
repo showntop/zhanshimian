@@ -1,0 +1,176 @@
+// 分析进度页：三张来源照片 + 服务端进度 + 三步指示器。
+// 页面外壳（.page 内边距、AppHeader）归 pages/analysis，这里只管内容。
+.assessment-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 32rpx;
+  padding-top: 28rpx;
+
+  // ---------- 本次分析用的三张照片 ----------
+  &__photos {
+    display: flex;
+    gap: 12rpx;
+  }
+
+  &__photo {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10rpx;
+  }
+
+  &__photo-img {
+    width: 100%;
+    height: 240rpx;
+    border-radius: var(--radius-md);
+  }
+
+  // 缺图就空着：这里是「这张不可用」，不是「这张暂时用别的顶上」
+  &__photo-empty {
+    width: 100%;
+    height: 240rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 16rpx;
+    border-radius: var(--radius-md);
+    border: 1rpx dashed var(--line);
+    background: var(--moss-soft);
+  }
+
+  &__photo-empty-text {
+    font-size: 22rpx;
+    line-height: 1.5;
+    text-align: center;
+    color: var(--ink-2);
+  }
+
+  &__photo-label {
+    font-size: 24rpx;
+    color: var(--ink-2);
+  }
+
+  // ---------- 阶段文案（服务端 public_message / stage_code） ----------
+  &__stage {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    align-items: center;
+    text-align: center;
+  }
+
+  &__stage-text {
+    font-size: 34rpx;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--ink);
+  }
+
+  &__stage-note {
+    font-size: 24rpx;
+    color: var(--ink-2);
+  }
+
+  // ---------- 进度 ----------
+  &__progress {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+  }
+
+  &__track {
+    flex: 1;
+    height: 12rpx;
+    border-radius: var(--radius-pill);
+    background: var(--moss-soft);
+    overflow: hidden;
+  }
+
+  // 宽度由服务端 progress_bps 直接决定，没有补间：数字停着就是真的停着
+  &__fill {
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--moss);
+    transition: width 0.3s ease-out;
+  }
+
+  &__percent {
+    min-width: 84rpx;
+    text-align: right;
+    font-size: 26rpx;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+  }
+
+  // ---------- 三步指示器 ----------
+  &__steps {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+  }
+
+  &__step {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10rpx;
+  }
+
+  &__step-dot {
+    width: 14rpx;
+    height: 14rpx;
+    border-radius: 50%;
+    background: var(--disabled);
+  }
+
+  &__step-label {
+    font-size: 24rpx;
+    color: var(--ink-3);
+  }
+
+  &__step--done &__step-dot {
+    background: var(--moss);
+  }
+
+  &__step--done &__step-label {
+    color: var(--ink-2);
+  }
+
+  &__step--active &__step-dot {
+    background: var(--moss);
+    box-shadow: 0 0 0 6rpx var(--moss-soft);
+  }
+
+  &__step--active &__step-label {
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  // ---------- 页脚 ----------
+  &__foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16rpx;
+    padding-top: 16rpx;
+  }
+
+  &__request-id {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__privacy {
+    font-size: 22rpx;
+    text-align: center;
+    color: var(--ink-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assessment-screen__fill {
+    transition: none;
+  }
+}

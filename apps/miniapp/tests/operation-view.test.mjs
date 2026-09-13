@@ -26,6 +26,7 @@ test('accepted, running and retrying all read as working', () => {
     assert.equal(view.kind, 'working')
     assert.equal(view.progress, 42)
     assert.equal(view.message, '正在生成')
+    assert.equal(view.stageCode, 'rendering')
     assert.equal(view.retrying, status === 'retrying')
   }
 })
@@ -67,11 +68,11 @@ test('failed exposes the public message, retryability and request id only', () =
   }
 })
 
-test('cancelled and superseded are failures without a retry promise', () => {
+test('cancelled and superseded are ended, not failures', () => {
+  // 契约把这两个状态放在 NonFailedOperation 一侧：没有错误、没有 trace_id、
+  // 也没有"重试"可承诺——把它们折进失败视图等于替服务端编一个它没说的结论。
   for (const status of ['cancelled', 'superseded']) {
     const view = operationView({ ...base, status, public_message: '已取消', trace_id: 'req-1' })
-    assert.equal(view.kind, 'failed')
-    assert.equal(view.retryable, false)
-    assert.equal(view.requestId, 'req-1')
+    assert.deepEqual(view, { kind: 'ended', reason: status })
   }
 })

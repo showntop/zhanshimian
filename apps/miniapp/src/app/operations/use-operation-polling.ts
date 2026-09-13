@@ -17,6 +17,12 @@ export interface UseOperationPollingOptions {
   operationIds: readonly string[]
   /** false 时不启动（例如页面还没拿到 id） */
   enabled?: boolean
+  /**
+   * 变化即拆掉重装一轮轮询。用于「连续失败后用户点重试」：
+   * 达到失败上限时控制器会自行 stop，而 stop 之后 refresh() 是空操作，
+   * 页面必须有一个显式的方式把它重新装起来。平时不要传，别拿它当刷新按钮。
+   */
+  restartKey?: string | number
   /** 整批进入终态时回调一次，随后轮询停止 */
   onSettled?: (operations: readonly Operation[]) => void
   /** 连续拉取失败达到上限时回调一次，随后轮询停止 */
@@ -44,7 +50,7 @@ async function fetchOperations(ids: readonly string[]): Promise<Operation[]> {
 }
 
 export function useOperationPolling(options: UseOperationPollingOptions): UseOperationPollingResult {
-  const { operationIds, enabled = true } = options
+  const { operationIds, enabled = true, restartKey } = options
   const idsKey = idsKeyOf(operationIds)
   const subscribeVisibility = usePageVisibility()
   const [operations, setOperations] = useState<Operation[]>([])
@@ -100,7 +106,8 @@ export function useOperationPolling(options: UseOperationPollingOptions): UseOpe
       if (handleRef.current === handle) handleRef.current = null
     }
     // idsKey 而不是 operationIds：数组字面量每次渲染都是新引用
-  }, [idsKey, enabled])
+    // restartKey：显式重装（见它的说明），平时不变，所以不会多跑
+  }, [idsKey, enabled, restartKey])
 
   const refresh = useCallback(async (): Promise<void> => {
     await handleRef.current?.refresh()

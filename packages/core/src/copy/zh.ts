@@ -174,35 +174,6 @@ export function analysisStageText(stage: string | undefined): string {
   return ANALYSIS_STAGE_COPY.fallback
 }
 
-// 分析页细粒度阶段时间线：at 为进度百分比，页面按补间进度取「at <= 进度」的最后一条。
-// 覆盖服务端各上报点（15/22/32/42/48/56/64/72/82/95），中间档让文案持续细粒度推进。
-export const ANALYSIS_STAGE_TIMELINE: ReadonlyArray<{ at: number; text: string }> = [
-  { at: 0, text: '正在安全上传照片' },
-  { at: 8, text: '正在核对照片清晰度' },
-  { at: 15, text: '正在排队等待分析' },
-  { at: 22, text: '正在读取三张照片' },
-  { at: 30, text: '正在确认照片是否符合要求' },
-  { at: 38, text: '正在提取面部轮廓' },
-  { at: 46, text: '正在分析正脸比例' },
-  { at: 54, text: '正在分析侧脸线条' },
-  { at: 62, text: '正在分析全身比例' },
-  { at: 70, text: '正在整理你的形象特点' },
-  { at: 78, text: '正在匹配场景与预算' },
-  { at: 86, text: '正在组合发型、妆容与穿搭' },
-  { at: 94, text: '正在保存形象档案' },
-  { at: 100, text: '形象报告已经准备好' }
-] as const
-
-/** 按显示进度取时间线文案；进度越界时取首/末条。 */
-export function analysisTimelineText(progress: number): string {
-  let text = ANALYSIS_STAGE_TIMELINE[0]?.text ?? ''
-  for (const item of ANALYSIS_STAGE_TIMELINE) {
-    if (progress >= item.at) text = item.text
-    else break
-  }
-  return text
-}
-
 // ---------- 分析失败态（照片被拒 vs 超时未完成，标题与安抚文案分开） ----------
 export const ANALYSIS_FAIL_COPY = {
   photoTitle: '照片没有通过检查',
@@ -210,6 +181,50 @@ export const ANALYSIS_FAIL_COPY = {
   timeoutBody: '这次分析没有完成，重新发起通常就能解决。',
   photoFallback: '请按拍摄指引重新提交'
 } as const
+
+// ---------- 分析进度页（事件驱动，只有服务端说的三件事） ----------
+export const ASSESSMENT_COPY = {
+  headerTitle: '形象分析',
+  // 三步指示器：与服务端阶段码一一对应，见 ASSESSMENT_STAGE_STEPS
+  steps: ['检查照片', '分析形象', '整理报告'],
+  photosTitle: '这次分析用的照片',
+  photosMissing: '这张照片暂不可用',
+  openingReport: '报告已经准备好，正在打开…',
+  retryingNote: '服务端正在重试这一步',
+  privacy: '照片全程加密，只有你能看到',
+  wander: '先去逛逛，不用守在这里 ›',
+  requestIdLabel: '请求编号',
+  retryAction: '重新发起',
+  reshootAction: '重新拍摄',
+  homeAction: '返回首页',
+  endedTitle: '这次分析已结束',
+  endedCancelled: '你已经取消了这次分析，可以重新提交照片。',
+  endedSuperseded: '这次分析已经被新的分析替代，去看最新的一次吧。',
+  noResultTitle: '分析完成了，但没有拿到报告',
+  noResultBody: '报告可能已经被替换。返回首页可以看到最新的形象报告。',
+  networkTitle: '网络连接不上',
+  networkBody: '连续几次都没有连上服务，请检查网络后重试。',
+  stageFallback: '正在分析，请稍候'
+} as const
+
+// 服务端阶段码 → 中文。键必须与 apps/server 的 assessment policy 完全一致：
+// 这里列不出某个码时宁可退回兜底文案，也不猜它大概在哪一步。
+export const ASSESSMENT_STAGE_COPY: Record<string, string> = {
+  'photo.technical_check': '正在核对照片清晰度',
+  'photo.content_check': '正在确认照片是否符合要求',
+  'photo.identity_check': '正在确认三张照片是同一个人',
+  'report.generating': '正在分析形象并撰写报告',
+  'report.evidence_check': '正在核对每条建议的来源照片',
+  'report.publishing': '正在保存形象报告'
+}
+
+/** 阶段码 → 进度页文案；服务端没给或给了不认识的码时用兜底文案。 */
+export function assessmentStageText(stageCode: string | undefined): string {
+  if (stageCode && stageCode in ASSESSMENT_STAGE_COPY) {
+    return ASSESSMENT_STAGE_COPY[stageCode] as string
+  }
+  return ASSESSMENT_COPY.stageFallback
+}
 
 // ---------- 首页工作台 ----------
 export const HOME_COPY = {
@@ -287,8 +302,32 @@ export const REPORT_COPY = {
   viewPlansNote: '方案基于你的照片与现实条件生成',
   noReportTitle: '还没有形象报告',
   noReportBody: '拍三张照片，几分钟拿到你的第一份形象分析。',
-  goArchive: '去建档'
+  noReportAction: '重新拍摄',
+  goArchive: '去建档',
+  // 证据缺失时的空位说明：报告宁可留缺口，也不拿别的照片顶上
+  evidenceEmpty: '这张来源照片暂不可用',
+  evidenceEmptyHint: '锚点是在这张照片上量出来的，换一张就不作数',
+  findingAnchorNote: '标在来源照片上的位置',
+  loadFailed: '报告没有加载成功，请重试',
+  planFailed: '方案没有生成成功，请重试',
+  // finding.category 的中文标签。键集合与契约的六类一致；
+  // 出现表外值时调用方显示原值（uuid 级别的兜底），不抛错。
+  categoryLabels: {
+    hair: '发型',
+    makeup: '妆容',
+    outfit: '穿搭',
+    proportion: '比例',
+    color: '色彩',
+    overall: '整体'
+  },
+  findingsObservationTitle: '看得到的现状',
+  findingsAdviceTitle: '建议这样做'
 } as const
+
+/** finding.category → 中文标签；表外值显示原值，不抛错。 */
+export function reportCategoryLabel(category: string): string {
+  return REPORT_COPY.categoryLabels[category as keyof typeof REPORT_COPY.categoryLabels] ?? category
+}
 
 // ---------- 工具页：穿搭诊断 / 购买判断 ----------
 export const OUTFIT_COPY = {

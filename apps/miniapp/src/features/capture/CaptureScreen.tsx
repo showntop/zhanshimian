@@ -21,8 +21,7 @@ import {
 import { uploadMedia } from '../../app/api/media-upload'
 import { mediaUpload } from '../../app/api/client'
 import { qualityApi } from '../../app/api/quality'
-import { PublicApiError } from '../../app/api/result'
-import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
+import { submitAssessment, assessmentSubmitErrorText } from '../assessment/start'
 import PrimaryButton from '../../components/primary-button'
 import SourceImage from '../../components/source-image'
 import { mimeTypeOf, readLocalImage } from './local-file'
@@ -32,7 +31,6 @@ import {
   captureReady,
   createSlots,
   photosByRole,
-  toAssessmentInput,
   updateSlot,
   type CaptureRole,
   type CaptureSlot,
@@ -84,12 +82,6 @@ function localPreview(role: CaptureRole, localPath: string, assetId: string): Di
     source_kind: 'user_original',
     display_label: IMAGE_BADGE_COPY.original,
   }
-}
-
-/** 提交失败时优先说服务端愿意公开的话，没有就用自己的兜底文案。 */
-function submitErrorText(error: unknown): string {
-  if (error instanceof PublicApiError && error.message) return error.message
-  return CAPTURE_COPY.submitFailed
 }
 
 export default function CaptureScreen() {
@@ -250,25 +242,18 @@ export default function CaptureScreen() {
   }
 
   /**
-   * 提交固定流程：createAssessment → 把受理返回的 Operation 放进 resourceCache →
-   * redirectTo 分析页。建档是一次正向流程，redirectTo 清栈，返回不会回到拍摄页。
+   * 提交固定流程：createAssessment → 落缓存 → redirectTo 分析页，
+   * 全在 features/assessment/start 的 submitAssessment 里——进度页的「重新发起」
+   * 走同一条路径，两处不会只改一处。
+   * 建档是一次正向流程，redirectTo 清栈，返回不会回到拍摄页。
    */
   const submit = async () => {
     if (!ready || busy) return
     setBusy(true)
     try {
-      const accepted = await qualityApi.createAssessment(
-        toAssessmentInput(photos),
-        assessmentIdempotencyKey(photos),
-      )
-      resourceCache.write(resourceKey('operation', accepted.operation.id), accepted.operation)
-      await Taro.redirectTo({
-        url:
-          `/pages/analysis/index?assessment_id=${encodeURIComponent(accepted.data.id)}` +
-          `&operation_id=${encodeURIComponent(accepted.operation.id)}`,
-      })
+      await submitAssessment(photos, assessmentIdempotencyKey(photos))
     } catch (error) {
-      Taro.showToast({ title: submitErrorText(error), icon: 'none' })
+      Taro.showToast({ title: assessmentSubmitErrorText(error), icon: 'none' })
     } finally {
       setBusy(false)
     }

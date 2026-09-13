@@ -10,6 +10,11 @@ export type ResourceKind =
   | 'selection'
   | 'execution'
   | 'home'
+  // 建档提交时客户端手里的三张照片，按 assessment id 存。
+  // 契约里 Assessment 只回状态、不回媒体，也没有按 id 读媒体的接口，
+  // 所以这三张图在冷启动/换设备后拿不回来——那时分析页渲染空位，
+  // 而不是拿别的图顶上（见 features/assessment/model）。
+  | 'assessment-photos'
 
 export function resourceKey(kind: ResourceKind, id: string): string {
   return `${kind}:${id}`

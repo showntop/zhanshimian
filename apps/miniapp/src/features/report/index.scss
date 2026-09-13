@@ -1,0 +1,242 @@
+// 形象报告页：来源照片 + 空间标注 + 文字建议。锚点几何全在 features/report/model。
+// 页面外壳（.page 内边距、AppHeader）归 pages/report，这里只管内容。
+.report-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 32rpx;
+  padding-top: 20rpx;
+
+  &--loading {
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
+    color: var(--ink-3);
+  }
+
+  &__section-title {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  // ---------- 来源照片 ----------
+  &__hero {
+    display: flex;
+    flex-direction: column;
+    gap: 20rpx;
+  }
+
+  &__hero-frame {
+    position: relative;
+    width: 100%;
+    height: 820rpx;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--moss-soft);
+    border: 1rpx solid var(--line);
+  }
+
+  &__hero-img {
+    width: 100%;
+    height: 100%;
+  }
+
+  // 缺来源照片就空着：锚点是在那张照片上量出来的，换一张画就是伪造证据
+  &__hero-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12rpx;
+    padding: 0 64rpx;
+    text-align: center;
+  }
+
+  &__hero-empty-title {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+
+  &__hero-empty-hint {
+    font-size: 24rpx;
+    line-height: 1.6;
+    color: var(--ink-3);
+  }
+
+  &__hero-label {
+    position: absolute;
+    left: 20rpx;
+    bottom: 20rpx;
+    padding: 8rpx 20rpx;
+    border-radius: var(--radius-pill);
+    background: var(--glass-on-photo);
+    color: var(--on-photo);
+    font-size: 22rpx;
+  }
+
+  // ---------- 换片胶卷 ----------
+  &__film {
+    display: flex;
+    gap: 12rpx;
+  }
+
+  &__film-item {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8rpx;
+    padding: 10rpx;
+    border-radius: var(--radius-md);
+    border: 1rpx solid transparent;
+  }
+
+  &__film-item--active {
+    border-color: var(--moss);
+    background: var(--surface-strong);
+  }
+
+  &__film-img,
+  &__film-empty {
+    width: 100%;
+    height: 140rpx;
+    border-radius: var(--radius-sm);
+  }
+
+  &__film-empty {
+    border: 1rpx dashed var(--line);
+    background: var(--moss-soft);
+  }
+
+  &__film-label {
+    font-size: 22rpx;
+    color: var(--ink-2);
+  }
+
+  // ---------- 综合印象 ----------
+  &__tags {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+  }
+
+  &__tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx;
+  }
+
+  &__tag {
+    padding: 10rpx 24rpx;
+    border-radius: var(--radius-pill);
+    background: var(--moss-soft);
+    color: var(--moss-deep);
+    font-size: 24rpx;
+  }
+
+  // ---------- 综合建议 ----------
+  &__priority {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+    padding: 28rpx;
+    border-radius: var(--radius-lg);
+    background: var(--moss-deep);
+  }
+
+  &__priority .report-screen__section-title {
+    color: var(--cream-muted);
+  }
+
+  &__priority-title {
+    font-size: 34rpx;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--cream);
+  }
+
+  &__priority-copy {
+    font-size: 26rpx;
+    line-height: 1.7;
+    color: var(--cream-muted);
+  }
+
+  // ---------- 可提升点 ----------
+  &__findings {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+  }
+
+  &__empty-findings {
+    font-size: 26rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  &__finding {
+    border-radius: var(--radius-lg);
+    border: 1rpx solid var(--line);
+    background: var(--surface-strong);
+    padding: 24rpx;
+  }
+
+  &__finding--active {
+    border-color: var(--moss);
+    box-shadow: var(--shadow-card);
+  }
+
+  &__finding-head {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+  }
+
+  &__finding-cat {
+    flex: none;
+    padding: 4rpx 16rpx;
+    border-radius: var(--radius-pill);
+    background: var(--moss-soft);
+    color: var(--moss-deep);
+    font-size: 22rpx;
+  }
+
+  &__finding-label {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  &__finding-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+    margin-top: 16rpx;
+    padding-top: 16rpx;
+    border-top: 1rpx solid var(--line);
+  }
+
+  &__finding-line {
+    font-size: 25rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  // ---------- 下一步 ----------
+  &__cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14rpx;
+    padding-top: 8rpx;
+  }
+
+  &__cta-note {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+}

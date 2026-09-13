@@ -4,9 +4,12 @@ import type { Operation } from '@zsm/core'
 
 export type OperationView =
   | { kind: 'idle' }
-  | { kind: 'working'; progress: number; message: string; retrying: boolean }
+  | { kind: 'working'; progress: number; message: string; stageCode: string; retrying: boolean }
   | { kind: 'succeeded'; resultType: string; resultId: string }
   | { kind: 'failed'; message: string; retryable: boolean; requestId: string }
+  // 取消与被取代不是失败：契约把 cancelled/superseded 放在 NonFailedOperation 一侧，
+  // 它们没有错误、没有 trace_id，也不该出现"重试"这个承诺。
+  | { kind: 'ended'; reason: 'cancelled' | 'superseded' }
 
 export function operationView(operation: Operation | null | undefined): OperationView {
   if (!operation) return { kind: 'idle' }
@@ -20,6 +23,8 @@ export function operationView(operation: Operation | null | undefined): Operatio
       // bps → 0–100 的百分比，越界一律钳住：进度条不接受超范围的输入。
       progress: Math.min(100, Math.max(0, operation.progress_bps / 100)),
       message: operation.public_message,
+      // 阶段码原样带出：页面拿它查文案表，但判定仍然只认这个视图。
+      stageCode: operation.stage_code,
       retrying: operation.status === 'retrying',
     }
   }
@@ -29,6 +34,9 @@ export function operationView(operation: Operation | null | undefined): Operatio
       resultType: operation.result_type ?? '',
       resultId: operation.result_id ?? '',
     }
+  }
+  if (operation.status === 'cancelled' || operation.status === 'superseded') {
+    return { kind: 'ended', reason: operation.status }
   }
   return {
     kind: 'failed',
