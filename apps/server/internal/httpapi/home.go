@@ -3,9 +3,13 @@ package httpapi
 import "net/http"
 
 // GET /v1/home/bootstrap —— 首页一屏聚合：
-// 档案摘要 + 最新报告 + 今日方案 + 进行中任务 + 最近方案，替代客户端 4 次并发请求。
+// 档案摘要 + 最新报告 + 今日方案 + 进行中操作 + 最近方案，一次读模型调用。
 func (a *API) homeBootstrap(w http.ResponseWriter, r *http.Request) {
-	payload, err := a.service.HomeBootstrap(r.Context(), currentUser(r))
+	if a.home == nil {
+		a.internalError(w, r, errHomeUnavailable)
+		return
+	}
+	payload, err := a.home.Bootstrap(r.Context(), currentUser(r).ID)
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return

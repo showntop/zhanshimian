@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/service"
 	"github.com/zhanshimian/server/internal/service/assessment"
+	"github.com/zhanshimian/server/internal/service/home"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
 )
@@ -20,6 +22,7 @@ type API struct {
 	media           *media.Service
 	operations      *operation.Service
 	assessment      *assessment.Service
+	home            HomeService
 	planning        planSetService
 	renders         renderService
 	execution       executionService
@@ -28,6 +31,11 @@ type API struct {
 	logger          *slog.Logger
 	devLoginEnabled bool
 	runtime         RuntimeInfo
+}
+
+// HomeService 是首页聚合的最小依赖：只读模型一次调用。
+type HomeService interface {
+	Bootstrap(context.Context, string) (home.Snapshot, error)
 }
 
 type RuntimeInfo struct {
@@ -43,6 +51,7 @@ type RuntimeInfo struct {
 
 var errMediaUnavailable = errors.New("media service unavailable")
 var errOperationUnavailable = errors.New("operation service unavailable")
+var errHomeUnavailable = errors.New("home service unavailable")
 
 type contextKey string
 

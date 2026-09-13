@@ -16,6 +16,7 @@ import (
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/service"
+	"github.com/zhanshimian/server/internal/service/home"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
 	"github.com/zhanshimian/server/internal/storage"
@@ -25,6 +26,7 @@ import (
 func New(svc *service.Service, logger *slog.Logger, devLoginEnabled bool, runtime RuntimeInfo) http.Handler {
 	api := &API{
 		service: svc, media: mediaFromService(svc), operations: operationsFromService(svc),
+		home:        homeFromService(svc),
 		idempotency: idempotencyFromService(svc),
 		logger:      logger, devLoginEnabled: devLoginEnabled, runtime: runtime,
 	}
@@ -135,6 +137,17 @@ func operationsFromService(svc *service.Service) *operation.Service {
 		return nil
 	}
 	return operation.New(reader)
+}
+
+func homeFromService(svc *service.Service) *home.Service {
+	if svc == nil {
+		return nil
+	}
+	reader, ok := svc.Repository().(home.Reader)
+	if !ok {
+		return nil
+	}
+	return home.New(reader, home.NewClock())
 }
 
 func idempotencyFromService(svc *service.Service) IdempotencyStore {
