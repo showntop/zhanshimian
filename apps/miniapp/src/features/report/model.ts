@@ -160,7 +160,7 @@ export function anchorBoxInFrame(
 /**
  * 「查看方案」的请求体：一份绑定当前报告、选项全默认的日常方案集。
  *
- * 默认值是刻意的——报告页不是选场景的地方（那是 Task 8 的 Brief 页），
+ * 默认值是刻意的——报告页不是选场景的地方（那是场合 Brief 页的职责），
  * 这里只是把"看完报告"这个动作接上规划；用户想换场合，去方案页再换。
  */
 export function reportPlanSetRequest(reportId: string): CreatePlanSetRequest {

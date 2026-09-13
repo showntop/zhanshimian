@@ -1,126 +1,85 @@
-// 我的（Tab）：账户与身份、档案摘要（me/profile 持久化展示）、
-// 任务中心（进行中任务的聚合列表，无任务不占位）、
-// 报告/方案入口、体验实验室、删除我的数据。
-import { useCallback, useRef, useState } from 'react'
+// 我的：全部内容来自服务端 HomeBootstrap——档案、权益、报告入口。
+// 与旧页的差别：不再读任务接口与业务存储；「删除我的数据」仍走服务端，
+// 清掉的本地内容只有 UI 偏好。
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
-import { Input, Text, View } from '@tarojs/components'
-import { BILLING_COPY, DEFAULT_NICKNAME, PROFILE_SETUP_COPY, isBundledAsset, type Account, type BillingSummary, type Report, type Task, type UserProfile } from '@zsm/core'
+import { Text, View } from '@tarojs/components'
+import {
+  BILLING_COPY,
+  DEFAULT_NICKNAME,
+  ERROR_COPY,
+  HOME_COPY,
+  PRIVACY_SECTION_TITLE,
+  PROFILE_SETUP_COPY,
+  REPORT_COPY,
+} from '@zsm/core'
+import type { HomeBootstrap } from '@zsm/core'
+import { qualityApi } from '../../app/api/quality'
+import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
+import { clearAllLocalState } from '../../services/storage'
 import { usePageShell } from '../../hooks/use-page-visibility'
-import { api } from '../../services/api'
-import { groupTasksByType, openTask, taskTitle } from '../../services/task-utils'
-import { clearAllLocalState, STORAGE_KEYS, readStorage, removeStorage } from '../../services/storage'
-import { globalData } from '../../app'
 import AppHeader from '../../components/app-header'
-import BottomSheet from '../../components/bottom-sheet'
-import CreditSheet from '../../components/credit-sheet'
-import ProfileSheet from '../../components/profile-sheet'
-import ExampleImage from '../../components/example-image'
-import PrimaryButton from '../../components/primary-button'
 import Skeleton from '../../components/skeleton'
+import ErrorState from '../../components/error-state'
 import './index.scss'
 
-export default function Profile() {
-  const [account, setAccount] = useState<Account | null>(null)
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [report, setReport] = useState<Report | null>(null)
-  const [billing, setBilling] = useState<BillingSummary | null>(null)
-  const [buyOpen, setBuyOpen] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
-  const [nameOpen, setNameOpen] = useState(false)
-  const [nicknameDraft, setNicknameDraft] = useState('')
-  const [nameBusy, setNameBusy] = useState(false)
-  const [avatarBusy, setAvatarBusy] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const hasCacheRef = useRef(false)
-  const { pageClass, enter } = usePageShell(!loading, 'page--tab', 'profile')
+const HOME_CACHE_KEY = resourceKey('home', 'current')
 
-  const load = useCallback(async () => {
-    if (!hasCacheRef.current) setLoading(true)
+export default function Profile() {
+  const { pageClass, enter } = usePageShell(false, 'page--tab', 'profile')
+  const [boot, setBoot] = useState<HomeBootstrap | null>(
+    () => resourceCache.read<HomeBootstrap>(HOME_CACHE_KEY) ?? null,
+  )
+  const [loading, setLoading] = useState(!boot)
+  const [failed, setFailed] = useState(false)
+  const firstShow = useRef(true)
+
+  const load = useCallback(async (background: boolean) => {
+    if (!background) setLoading(true)
+    setFailed(false)
     try {
-      const [me, myProfile, bootstrap] = await Promise.all([
-        api.getMe().catch(() => null),
-        api.getMyProfile().catch(() => null),
-        api.getHomeBootstrap().catch(() => null),
-      ])
-      setAccount(me)
-      setProfile(myProfile)
-      setTasks(bootstrap?.active_tasks ?? [])
-      setReport(bootstrap?.report ?? null)
-      const nextBilling = bootstrap?.billing ?? me?.billing ?? null
-      setBilling(nextBilling)
-      hasCacheRef.current = true
-      return nextBilling
+      const next = await resourceCache.revalidate(HOME_CACHE_KEY, () => qualityApi.getHomeBootstrap())
+      setBoot(next)
+    } catch {
+      setFailed(true)
     } finally {
       setLoading(false)
     }
   }, [])
 
+  useEffect(() => {
+    void load(false)
+  }, [load])
+
   useDidShow(() => {
-    load().then((nextBilling) => {
-      if (!readStorage(STORAGE_KEYS.openCreditSheet)) return
-      removeStorage(STORAGE_KEYS.openCreditSheet)
-      if (nextBilling?.payment_enabled) setBuyOpen(true)
-    })
+    if (firstShow.current) {
+      firstShow.current = false
+      return
+    }
+    void load(true)
   })
 
-  const hasReport = Boolean(readStorage(STORAGE_KEYS.reportId))
-
-  // 任务中心：按类型聚合同类任务（一次方案生成 = 3 个 plan_look），分组逻辑与 task-utils 单源
-  const activeTasks = tasks.filter(
-    (t) => t.status === 'queued' || t.status === 'processing' || t.status === 'failed',
-  )
-  const taskGroups = groupTasksByType(activeTasks)
-
-  const avatarUrl = account?.avatar_url || report?.current_image_url || ''
-  const avatarIsUser = Boolean(account?.avatar_url) || (
-    Boolean(report?.current_image_url) &&
-    !isBundledAsset(report?.current_image_url) &&
-    !report?.provider_version?.startsWith('demo')
-  )
-
-  const pickAvatar = () => {
-    if (avatarBusy) return
-    Taro.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['album', 'camera'],
-      success: async (res) => {
-        const file = res.tempFiles[0]
-        if (!file) return
-        setAvatarBusy(true)
-        try {
-          const asset = await api.uploadMedia({ kind: 'face', filePath: file.tempFilePath })
-          const next = await api.updateMe({ avatar_media_id: asset.id })
-          setAccount(next)
-          Taro.showToast({ title: PROFILE_SETUP_COPY.saved, icon: 'success' })
-        } catch (error) {
-          Taro.showToast({ title: (error as Error).message || '头像没有更新成功，请重试', icon: 'none' })
-        } finally {
-          setAvatarBusy(false)
-        }
-      },
-    })
-  }
+  const summary = boot?.profile_summary
+  const billing = boot?.billing
 
   const deleteData = () => {
     Taro.showModal({
-      title: '删除我的数据',
-      content: '将删除你的全部照片、分析、方案、衣橱与分享记录，且无法恢复。确定继续吗？',
-      confirmText: '删除',
+      title: ERROR_COPY.deleteConfirmTitle,
+      content: ERROR_COPY.deleteConfirmBody,
       confirmColor: '#9B4B45',
       success: (res) => {
         if (!res.confirm) return
-        api
-          .deleteMyData()
-          .then(() => {
+        void (async () => {
+          try {
+            await qualityApi.deleteMyData()
             clearAllLocalState()
-            globalData.reportId = ''
-            globalData.planId = ''
-            Taro.showToast({ title: '已删除', icon: 'success' })
-            load()
-          })
-          .catch(() => Taro.showToast({ title: '删除没有成功，请重试', icon: 'none' }))
+            Taro.showToast({ title: PROFILE_SETUP_COPY.deleteDone, icon: 'success' })
+            resourceCache.remove(HOME_CACHE_KEY)
+            await load(false)
+          } catch {
+            Taro.showToast({ title: PROFILE_SETUP_COPY.deleteFailed, icon: 'none' })
+          }
+        })()
       },
     })
   }
@@ -129,253 +88,84 @@ export default function Profile() {
     <View className={pageClass}>
       <AppHeader />
       <View className="me">
-        {loading ? (
+        {loading && !boot ? (
           <Skeleton rows={4} />
+        ) : failed && !boot ? (
+          <ErrorState onRetry={() => void load(false)} />
         ) : (
           <>
-            <View className={`me__hero ${enter()}`}>
-              <View className="me__avatar-wrap pressable" onClick={pickAvatar}>
-                {avatarUrl ? (
-                  <ExampleImage
-                    className="me__hero-photo"
-                    src={avatarUrl}
-                    user={avatarIsUser}
-                    anchor="top"
-                    frameAspect={1}
-                  />
-                ) : (
-                  <View className="me__avatar">{(account?.nickname ?? 'U').slice(0, 1)}</View>
-                )}
-              </View>
-              <View className="me__meta">
-                <View className="me__name-row">
-                  <Text className="me__nickname">{account?.nickname ?? DEFAULT_NICKNAME}</Text>
-                  <Text
-                    className="me__edit pressable"
-                    onClick={() => {
-                      setNicknameDraft(account?.nickname ?? DEFAULT_NICKNAME)
-                      setNameOpen(true)
-                    }}
-                  >
-                    {PROFILE_SETUP_COPY.editAction}
+            <View className={`me__card ${enter()}`}>
+              <Text className="me__nickname">{DEFAULT_NICKNAME}</Text>
+              {summary ? (
+                <View className="me__facts">
+                  <Text className="me__fact">
+                    {`${PROFILE_SETUP_COPY.height} ${summary.height_cm}`}
                   </Text>
+                  <Text className="me__fact">{summary.role}</Text>
+                  <Text className="me__fact">
+                    {`${PROFILE_SETUP_COPY.budget} ${summary.budget}`}
+                  </Text>
+                  {summary.weight_kg ? (
+                    <Text className="me__fact">
+                      {`${PROFILE_SETUP_COPY.weight} ${summary.weight_kg}`}
+                    </Text>
+                  ) : null}
                 </View>
-                <Text className="me__identities">
-                  {report?.priority_title || report?.priority_copy || '你的形象档案'}
-                </Text>
+              ) : (
                 <Text
-                  className="me__hero-link pressable"
-                  onClick={() =>
-                    Taro.navigateTo({
-                      url: hasReport ? '/pages/report/index' : '/pages/capture/index',
-                    })
-                  }
+                  className="me__archive pressable"
+                  onClick={() => void Taro.navigateTo({ url: '/pages/capture/index' })}
                 >
-                  {hasReport ? '查看最近报告 ›' : '开始建档 ›'}
+                  {HOME_COPY.startArchive} ›
                 </Text>
-              </View>
+              )}
             </View>
 
-            {activeTasks.length > 0 ? (
-              <View className={`me__card ${enter(1)}`}>
-                <Text className="me__section">进行中的任务</Text>
-                {taskGroups.map((group) => {
-                  const first = group[0]
-                  if (!first) return null
-                  const activeCount = group.filter(
-                    (t) => t.status === 'queued' || t.status === 'processing',
-                  ).length
-                  const failedCount = group.length - activeCount
-                  const failed = activeCount === 0
-                  return (
-                    <View
-                      key={first.type}
-                      className="me__row pressable"
-                      onClick={() => openTask(first)}
-                    >
-                      <View className="me__row-main">
-                        <Text className="me__row-label">{taskTitle(first)}</Text>
-                        {!failed ? (
-                          <View className="me__task-track">
-                            <View
-                              className="me__task-fill"
-                              style={{ width: `${Math.min(100, Math.max(8, first.progress ?? 0))}%` }}
-                            />
-                          </View>
-                        ) : null}
-                      </View>
-                      <Text className={`me__row-value ${failed ? 'me__row-value--warn' : 'me__row-value--moss'}`}>
-                        {failed
-                          ? `${failedCount} 个未完成`
-                          : group.length === 1
-                            ? `${Math.min(100, Math.max(0, first.progress ?? 0))}%`
-                            : `${activeCount} 个生成中`}
-                      </Text>
-                    </View>
-                  )
-                })}
+            {billing ? (
+              <View className={`me__card me__card--quiet ${enter(1)}`}>
+                <Text className="me__section">{BILLING_COPY.section}</Text>
+                <Text className="me__credits">
+                  {`${BILLING_COPY.remaining} ${billing.credits} ${BILLING_COPY.packUnit}`}
+                </Text>
+                <Text className="me__hint">{BILLING_COPY.hint}</Text>
               </View>
             ) : null}
 
-            <View className={`me__card ${enter(1)}`}>
-              <Text className="me__section">{BILLING_COPY.section}</Text>
-              <View className="me__row">
-                <Text className="me__row-label">{BILLING_COPY.remaining}</Text>
-                <Text className="me__row-value me__row-value--moss">{billing?.credits ?? 0} {BILLING_COPY.packUnit}</Text>
-              </View>
-              <Text className="me__note">{BILLING_COPY.hint}</Text>
-              {billing?.welcome_analysis_available ? (
-                <Text className="me__note">{BILLING_COPY.welcomeAnalysis}</Text>
+            <View className={`me__rows ${enter(2)}`}>
+              {boot?.report ? (
+                <View
+                  className="me__row pressable"
+                  onClick={() =>
+                    void Taro.navigateTo({
+                      url: `/pages/report/index?id=${encodeURIComponent(boot.report!.id)}`,
+                    })
+                  }
+                >
+                  <Text className="me__row-label">{REPORT_COPY.title}</Text>
+                  <Text className="me__row-arrow">›</Text>
+                </View>
               ) : null}
-              {billing?.welcome_plan_set_available ? (
-                <Text className="me__note">{BILLING_COPY.welcomePlanSet}</Text>
-              ) : null}
-              <View className="me__row pressable" onClick={() => setBuyOpen(true)}>
-                <Text className="me__row-label">{BILLING_COPY.buyAction}</Text>
-                <Text className="me__row-value">
-                  {billing?.payment_enabled ? BILLING_COPY.buyNow : BILLING_COPY.paymentUnavailable}
-                </Text>
+              <View
+                className="me__row pressable"
+                onClick={() => void Taro.switchTab({ url: '/pages/plans/index' })}
+              >
+                <Text className="me__row-label">{HOME_COPY.recentTitle}</Text>
+                <Text className="me__row-arrow">›</Text>
               </View>
             </View>
 
-            <View className={`me__card ${enter(1)}`}>
-              <Text className="me__section">形象档案</Text>
-              <View className="me__row pressable" onClick={() => Taro.navigateTo({ url: '/pages/report/index' })}>
-                <Text className="me__row-label">最近的分析报告</Text>
-                <Text className="me__row-value">{hasReport ? '查看' : '未建档'}</Text>
-              </View>
-              <View className="me__row pressable" onClick={() => Taro.switchTab({ url: '/pages/plans/index' })}>
-                <Text className="me__row-label">我的方案</Text>
-                <Text className="me__row-value">查看</Text>
-              </View>
-              <View className="me__row" onClick={() => Taro.navigateTo({ url: '/pages/capture/index?replace=1' })}>
-                <Text className="me__row-label">更新形象档案</Text>
-                <Text className="me__row-value">重拍三张</Text>
-              </View>
-            </View>
-
-            <View className={`me__card ${enter(2)}`}>
-              <Text className="me__section">基本资料</Text>
-              <View className="me__row pressable" onClick={() => setProfileOpen(true)}>
-                <Text className="me__row-label">{PROFILE_SETUP_COPY.height}</Text>
-                <Text className="me__row-value">{profile?.height_cm ? `${profile.height_cm} cm` : '未填写'}</Text>
-              </View>
-              <View className="me__row pressable" onClick={() => setProfileOpen(true)}>
-                <Text className="me__row-label">{PROFILE_SETUP_COPY.role}</Text>
-                <Text className="me__row-value">{profile?.role && profile.role !== '未填写' ? profile.role : '未填写'}</Text>
-              </View>
-              <View className="me__row pressable" onClick={() => setProfileOpen(true)}>
-                <Text className="me__row-label">{PROFILE_SETUP_COPY.budget}</Text>
-                <Text className="me__row-value">{profile?.budget && profile.budget !== '未填写' ? profile.budget : '未填写'}</Text>
-              </View>
-              <View className="me__row pressable" onClick={() => setProfileOpen(true)}>
-                <Text className="me__row-label">{PROFILE_SETUP_COPY.weight}</Text>
-                <Text className="me__row-value">{profile?.weight_kg ? `${profile.weight_kg} kg` : '未填写'}</Text>
-              </View>
-              <View className="me__row pressable" onClick={() => setProfileOpen(true)}>
-                <Text className="me__row-label">三围</Text>
-                <Text className="me__row-value">
-                  {profile?.bust_cm || profile?.waist_cm || profile?.hip_cm
-                    ? `${profile?.bust_cm ?? '—'} / ${profile?.waist_cm ?? '—'} / ${profile?.hip_cm ?? '—'}`
-                    : '未填写'}
-                </Text>
-              </View>
-            </View>
-
-            <View className={`me__card ${enter(2)}`}>
-              <Text className="me__section">更多</Text>
-              <View className="me__row pressable" onClick={() => Taro.navigateTo({ url: '/packages/tools/pages/lab/index' })}>
-                <Text className="me__row-label">体验实验室</Text>
-                <Text className="me__row-value">AR / 3D / 试衣</Text>
-              </View>
-              <View className="me__row pressable" onClick={() => Taro.navigateTo({ url: '/packages/life/pages/wardrobe/index' })}>
-                <Text className="me__row-label">我的衣橱</Text>
-                <Text className="me__row-value">轻量版</Text>
-              </View>
+            <View className={`me__privacy ${enter(3)}`}>
+              <Text className="me__section">{PRIVACY_SECTION_TITLE}</Text>
               <View className="me__row pressable" onClick={deleteData}>
-                <Text className="me__row-label me__row-label--danger">删除我的数据</Text>
-                <Text className="me__row-value">全部删除</Text>
+                <Text className="me__row-label me__row-label--danger">
+                  {PROFILE_SETUP_COPY.deleteAction}
+                </Text>
+                <Text className="me__row-arrow">›</Text>
               </View>
             </View>
-
-            <Text className={`me__privacy ${enter(3)}`}>照片与建议只对你可见</Text>
           </>
         )}
       </View>
-      <BottomSheet
-        open={nameOpen}
-        title={PROFILE_SETUP_COPY.editName}
-        onClose={() => setNameOpen(false)}
-      >
-        <View className="me__name-sheet">
-          <Input
-            className="me__name-input"
-            maxlength={20}
-            value={nicknameDraft}
-            onInput={(event) => setNicknameDraft(event.detail.value)}
-          />
-          <PrimaryButton
-            text={PROFILE_SETUP_COPY.save}
-            loading={nameBusy}
-            onClick={async () => {
-              const nickname = nicknameDraft.trim()
-              if (!nickname) {
-                Taro.showToast({ title: '请填写称呼', icon: 'none' })
-                return
-              }
-              setNameBusy(true)
-              try {
-                const next = await api.updateMe({ nickname })
-                setAccount(next)
-                setNameOpen(false)
-                Taro.showToast({ title: PROFILE_SETUP_COPY.saved, icon: 'success' })
-              } catch (error) {
-                Taro.showToast({ title: (error as Error).message || '保存没有成功，请重试', icon: 'none' })
-              } finally {
-                setNameBusy(false)
-              }
-            }}
-          />
-          <Text
-            className="me__hero-link pressable"
-            onClick={() => {
-              setNameOpen(false)
-              pickAvatar()
-            }}
-          >
-            {PROFILE_SETUP_COPY.changePhoto} ›
-          </Text>
-        </View>
-      </BottomSheet>
-      <BottomSheet
-        open={profileOpen}
-        title={PROFILE_SETUP_COPY.editTitle}
-        description={PROFILE_SETUP_COPY.editBody}
-        tall
-        onClose={() => setProfileOpen(false)}
-      >
-        <ProfileSheet
-          profile={profile}
-          onSaved={(next) => {
-            setProfile(next)
-            setProfileOpen(false)
-          }}
-        />
-      </BottomSheet>
-      <BottomSheet
-        open={buyOpen}
-        title={BILLING_COPY.buyAction}
-        description={BILLING_COPY.insufficientBody}
-        onClose={() => setBuyOpen(false)}
-      >
-        <CreditSheet
-          billing={billing}
-          onPurchased={() => {
-            setBuyOpen(false)
-            load()
-          }}
-        />
-      </BottomSheet>
     </View>
   )
 }

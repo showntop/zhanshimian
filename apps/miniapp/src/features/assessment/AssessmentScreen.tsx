@@ -66,6 +66,11 @@ export default function AssessmentScreen({ assessmentId, operationId }: Assessme
     onFetchFailure: () => setOffline(true),
   })
 
+  // 没有 operation id 就没有可轮询的东西：本页不猜「当前任务」，回首页重新走。
+  useEffect(() => {
+    if (!operationId) void Taro.switchTab({ url: HOME_ROUTE })
+  }, [operationId])
+
   const operation = operations[0]
   const view = operationView(operation)
   const route = reportRouteAfterOperation(operation)
@@ -106,7 +111,7 @@ export default function AssessmentScreen({ assessmentId, operationId }: Assessme
   }
 
   // 一、拉取连续失败：这一屏只说网络，不冒充业务失败。
-  if (offline) {
+  if (offline || !operationId) {
     return (
       <View className="assessment-screen">
         <ErrorState

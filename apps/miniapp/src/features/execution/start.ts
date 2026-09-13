@@ -10,7 +10,7 @@ import type { Execution } from '@zsm/core'
  * 选中一套方案并开一份执行。
  *
  * Selection 记录"用户当时看到的是哪一个 publication"（render 没发布就没有），
- * 这是 Task 10 生成反馈追责链的锚点，客户端不猜、不补。
+ * 这是生成反馈追责链的锚点，客户端不猜、不补。
  * Execution 是不可变快照：创建之后清单只跟着事件走，不再回头请求方案。
  */
 export async function selectAndCreateExecution(

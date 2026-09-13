@@ -176,4 +176,10 @@ export const qualityApi = {
       .then(dataOrThrow),
 
   getHomeBootstrap: (): Promise<HomeBootstrap> => client.GET('/v1/home/bootstrap').then(dataOrThrow),
+
+  /** 「删除我的数据」：服务端清空全部业务数据；客户端随后清本地 UI 偏好。 */
+  deleteMyData: async (): Promise<void> => {
+    const result = await client.DELETE('/v1/me/data')
+    bodyOrThrow(result)
+  },
 }

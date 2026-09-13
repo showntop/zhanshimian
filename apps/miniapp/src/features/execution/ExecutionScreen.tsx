@@ -60,6 +60,11 @@ export default function ExecutionScreen({ executionId }: ExecutionScreenProps) {
     void load()
   }, [load])
 
+  // 没有 execution id 就没有快照可执行：回方案 tab，不猜「上次选的那套」
+  useEffect(() => {
+    if (!executionId) void Taro.switchTab({ url: '/pages/plans/index' })
+  }, [executionId])
+
   const applyServer = (server: Execution) => {
     const replaced = replaceExecutionFromServer(executionRef.current ?? server, server)
     setExecution(replaced)
@@ -140,7 +145,7 @@ export default function ExecutionScreen({ executionId }: ExecutionScreenProps) {
     )
   }
 
-  if (!execution) return null
+  if (!execution || !executionId) return null
 
   const steps = [...execution.steps].sort((a, b) => a.position - b.position)
   const done = steps.filter((step) => step.completed).length

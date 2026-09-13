@@ -6,20 +6,14 @@ export const STORAGE_KEYS = {
   token: 'zsm_token',
   uiSchemaVersion: 'zsm_ui_schema_version',
   compareHint: 'zsm_compare_hint',
-  // 以下业务 key 在 Task 12 删除（此刻仍有页面在读）。服务端资源改由
-  // src/app/cache 持有，本地只留 UI 偏好。
+  // 以下外围 key 在 Task 12 随外围页迁移一并删除。主闭环已不再持有任何
+  // 业务 id（服务端资源归 src/app/cache，本地只留 UI 偏好）。
   reportId: 'zsm_report_id',
-  planId: 'zsm_plan_id',
-  savedPlanId: 'zsm_saved_plan_id',
-  activeTaskAnalysis: 'zsm_active_task_analysis',
-  activeTaskPlanLook: 'zsm_active_task_plan_look',
   activeTaskHairPreview: 'zsm_active_task_hair_preview',
   outfitSession: 'zsm_outfit_session',
   lastOutfitDiagnosis: 'zsm_last_outfit_diagnosis',
   purchaseSession: 'zsm_purchase_session',
   lastPurchaseDiagnosis: 'zsm_last_purchase_diagnosis',
-  scenePending: 'zsm_scene_pending',
-  sceneBrief: 'zsm_scene_brief',
   advisorConversationId: 'zsm_advisor_conversation_id',
   city: 'zsm_city',
   openCreditSheet: 'zsm_open_credit_sheet',

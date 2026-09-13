@@ -1,7 +1,6 @@
-// 分析进度页外壳：页面只负责外壳（.page 内边距 / 导航 / 路由参数），
-// 进度、失败、恢复动作全在 features/assessment。
+// 分析进度页外壳：进度、失败与恢复动作全在 features/assessment。
 import { useState } from 'react'
-import Taro, { useLoad } from '@tarojs/taro'
+import { useLoad } from '@tarojs/taro'
 import { View } from '@tarojs/components'
 import { ASSESSMENT_COPY } from '@zsm/core'
 import { usePageClass } from '../../hooks/use-page-visibility'
@@ -10,25 +9,14 @@ import AssessmentScreen from '../../features/assessment/AssessmentScreen'
 
 export default function Analysis() {
   const pageClass = usePageClass(true)
-  const [assessmentId, setAssessmentId] = useState('')
-  const [operationId, setOperationId] = useState('')
+  const [ids, setIds] = useState({ assessmentId: '', operationId: '' })
 
-  useLoad((options) => {
-    setAssessmentId(options?.assessment_id ?? '')
-    setOperationId(options?.operation_id ?? '')
-  })
-
-  // 没有 operation id 就没有可轮询的东西：这一页不猜「当前任务」，回首页重新走。
-  // 旧的「Storage 里存当前任务 id」就是在这里长出来的，不再恢复它。
-  if (!operationId) {
-    void Taro.switchTab({ url: '/pages/home/index' })
-    return <View className={pageClass} />
-  }
+  useLoad((options) => { setIds({ assessmentId: options?.assessment_id ?? '', operationId: options?.operation_id ?? '' }) })
 
   return (
     <View className={pageClass}>
       <AppHeader title={ASSESSMENT_COPY.headerTitle} back={false} />
-      <AssessmentScreen assessmentId={assessmentId} operationId={operationId} />
+      <AssessmentScreen assessmentId={ids.assessmentId} operationId={ids.operationId} />
     </View>
   )
 }

@@ -1,5 +1,5 @@
-// 方案 tab 外壳：页面只负责外壳（.page / 导航），方案集状态全在 features/planning。
-// tab 页不接受 query（switchTab 限制），入口由 app/plan-set-handoff 交接或问服务端。
+// 方案 tab 外壳：方案集状态全在 features/planning；
+// tab 页不接受 query，入口由内存交接条或服务端「最近方案集」决定。
 import { View } from '@tarojs/components'
 import { usePageClass } from '../../hooks/use-page-visibility'
 import AppHeader from '../../components/app-header'

@@ -58,6 +58,11 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
     void load()
   }, [load])
 
+  // 没有完整参数就无法定位一套方案：回方案 tab，不猜「最近在看的那套」
+  useEffect(() => {
+    if (!planSetId || !variantId) void Taro.switchTab({ url: '/pages/plans/index' })
+  }, [planSetId, variantId])
+
   const variant = planSet ? sortedVariants(planSet).find((v) => v.id === variantId) ?? null : null
   const render = variant ? variantRenderView(variant) : null
 
@@ -112,7 +117,7 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
     )
   }
 
-  if (!variant || !render) {
+  if (!variant || !render || !planSetId || !variantId) {
     return (
       <ErrorState
         title={PLAN_DETAIL_COPY.loadFailed}

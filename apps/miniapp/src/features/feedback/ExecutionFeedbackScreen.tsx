@@ -66,6 +66,11 @@ export default function ExecutionFeedbackScreen({ executionId }: ExecutionFeedba
     void load()
   }, [load])
 
+  // 反馈只对某一次具体的执行存在：没有 id 就回方案 tab
+  useEffect(() => {
+    if (!executionId) void Taro.switchTab({ url: '/pages/plans/index' })
+  }, [executionId])
+
   const toggleTag = (value: ExecutionTag) => {
     setTags((prev) =>
       prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
@@ -135,7 +140,7 @@ export default function ExecutionFeedbackScreen({ executionId }: ExecutionFeedba
     )
   }
 
-  if (!execution) return null
+  if (!execution || !executionId) return null
 
   if (!canSubmitExecutionFeedback(execution)) {
     return (
