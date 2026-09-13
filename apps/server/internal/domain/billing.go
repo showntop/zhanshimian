@@ -42,9 +42,29 @@ const (
 	BillingRefunded BillingReservationStatus = "refunded"
 )
 
+// Product 是计费绑定到的业务产物,与 billing_reservations.product 对应。
+type Product string
+
+const (
+	ProductAssessment        Product = "assessment"
+	ProductPlanSet           Product = "plan_set"
+	ProductRenderPublication Product = "render_publication"
+)
+
+// ChargeSource 是费用来源;welcome_* 走免费权益,reserve/settle/refund 的 delta 为 0。
+type ChargeSource string
+
+const (
+	ChargeCredits         ChargeSource = "credits"
+	ChargeWelcomeAnalysis ChargeSource = "welcome_analysis"
+	ChargeWelcomePlanSet  ChargeSource = "welcome_plan_set"
+)
+
 var (
 	ErrInsufficientCredits = errors.New("insufficient credits")
 	ErrAlreadySettled      = errors.New("already settled")
+	ErrAlreadyRefunded     = errors.New("already refunded")
+	ErrReservationConflict = errors.New("reservation conflict")
 	ErrInvalidRefundReason = errors.New("invalid refund reason")
 )
 

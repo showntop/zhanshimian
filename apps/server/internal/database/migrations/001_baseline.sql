@@ -679,40 +679,102 @@ CREATE TABLE execution_feedback (
   FOREIGN KEY (user_id, media_asset_id) REFERENCES media_assets(user_id, id) ON DELETE CASCADE
 );
 
+CREATE TABLE preference_memories (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  execution_feedback_id uuid NOT NULL,
+  memory_key text NOT NULL CHECK (memory_key IN
+    ('formality','complexity','avoid_color','preserve_hair','preserve_makeup','preserve_outfit')),
+  category text NOT NULL CHECK (category IN ('overall','hair','makeup','outfit','color')),
+  value text NOT NULL CHECK (char_length(value) BETWEEN 1 AND 40),
+  source_tag text NOT NULL CHECK (source_tag IN
+    ('too_formal','too_complex','dislike_color','want_to_keep')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, id),
+  UNIQUE (user_id, execution_feedback_id, memory_key, value),
+  FOREIGN KEY (user_id, execution_feedback_id)
+    REFERENCES execution_feedback(user_id, id) ON DELETE CASCADE
+);
+CREATE INDEX preference_memories_user_recent_idx
+  ON preference_memories(user_id, created_at DESC, id DESC);
+
 CREATE TABLE billing_reservations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   operation_id uuid NOT NULL,
-  kind text NOT NULL,
-  units int NOT NULL CHECK (units > 0),
+  product text NOT NULL CHECK (product IN ('assessment','plan_set','render_publication')),
+  units integer NOT NULL CHECK (units > 0),
+  charge_source text NOT NULL CHECK (charge_source IN
+    ('credits','welcome_analysis','welcome_plan_set')),
   status text NOT NULL CHECK (status IN ('reserved','settled','refunded')),
-  result_type text,
-  result_id uuid,
-  version int NOT NULL DEFAULT 1 CHECK (version > 0),
+  publication_id uuid,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
+  settled_at timestamptz,
+  refunded_at timestamptz,
   UNIQUE (user_id, id),
   UNIQUE (user_id, operation_id),
   FOREIGN KEY (user_id, operation_id) REFERENCES operations(user_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id, publication_id) REFERENCES render_publications(user_id, id) ON DELETE CASCADE,
   CHECK (
-    (status = 'settled' AND result_type IS NOT NULL AND result_id IS NOT NULL)
-    OR status <> 'settled'
+    (product='render_publication' AND status='settled' AND publication_id IS NOT NULL)
+    OR (product='render_publication' AND status<>'settled')
+    OR (product<>'render_publication' AND publication_id IS NULL)
   )
+);
+
+CREATE TABLE billing_orders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  sku_id text NOT NULL,
+  product_id text NOT NULL,
+  credits int NOT NULL CHECK (credits > 0),
+  amount_fen int NOT NULL CHECK (amount_fen > 0),
+  out_trade_no text NOT NULL UNIQUE,
+  wx_order_id text NOT NULL DEFAULT '',
+  status text NOT NULL DEFAULT 'created' CHECK (status IN ('created','paid','fulfilled','refunded','closed')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, id)
 );
 
 CREATE TABLE billing_ledger (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  delta int NOT NULL,
-  reason text NOT NULL CHECK (reason IN ('reserve','settle','refund','welcome','purchase')),
-  reference_type text NOT NULL,
-  reference_id uuid NOT NULL,
+  entry_type text NOT NULL CHECK (entry_type IN ('reserve','settle','refund','purchase')),
+  product text NOT NULL CHECK (product IN
+    ('assessment','plan_set','render_publication','credit_pack')),
+  charge_source text NOT NULL CHECK (charge_source IN
+    ('credits','welcome_analysis','welcome_plan_set','purchase')),
+  delta integer NOT NULL,
   operation_id uuid,
+  publication_id uuid,
+  order_id uuid,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id, id),
-  UNIQUE (user_id, reason, reference_type, reference_id),
-  FOREIGN KEY (user_id, operation_id) REFERENCES operations(user_id, id) ON DELETE CASCADE
+  UNIQUE (user_id, operation_id, entry_type),
+  FOREIGN KEY (user_id, operation_id) REFERENCES operations(user_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id, publication_id) REFERENCES render_publications(user_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id, order_id) REFERENCES billing_orders(user_id, id) ON DELETE CASCADE,
+  CHECK (num_nonnulls(operation_id, order_id)=1),
+  CHECK (
+    (entry_type='reserve' AND operation_id IS NOT NULL AND publication_id IS NULL
+      AND product<>'credit_pack'
+      AND ((charge_source='credits' AND delta<0)
+        OR (charge_source IN ('welcome_analysis','welcome_plan_set') AND delta=0)))
+    OR (entry_type='settle' AND operation_id IS NOT NULL AND delta=0
+      AND charge_source IN ('credits','welcome_analysis','welcome_plan_set')
+      AND ((product='render_publication' AND publication_id IS NOT NULL)
+        OR (product IN ('assessment','plan_set') AND publication_id IS NULL)))
+    OR (entry_type='refund' AND operation_id IS NOT NULL AND publication_id IS NULL
+      AND ((charge_source='credits' AND delta>0)
+        OR (charge_source IN ('welcome_analysis','welcome_plan_set') AND delta=0)))
+    OR (entry_type='purchase' AND order_id IS NOT NULL AND product='credit_pack'
+      AND charge_source='purchase' AND delta>0)
+  )
 );
+CREATE UNIQUE INDEX billing_ledger_order_purchase_uniq
+  ON billing_ledger(user_id, order_id, entry_type)
+  WHERE order_id IS NOT NULL;
 
 CREATE FUNCTION assert_plan_set_complete() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
