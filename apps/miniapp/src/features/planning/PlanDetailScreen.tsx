@@ -3,14 +3,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
-import { ERROR_COPY, PLANNING_COPY, PLAN_DETAIL_COPY, SOURCE_IMAGE_COPY, planSlotLabel } from '@zsm/core'
+import { ERROR_COPY, CHECKLIST_COPY, PLANNING_COPY, PLANS_COPY, PLAN_DETAIL_COPY, SOURCE_IMAGE_COPY, planSlotLabel } from '@zsm/core'
 import type { PlanSet, PlanStep, Report } from '@zsm/core'
 import { qualityApi } from '../../app/api/quality'
+import { PublicApiError } from '../../app/api/result'
 import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
+import { selectAndCreateExecution } from '../execution/start'
 import ErrorState from '../../components/error-state'
 import RenderState from '../../components/render-state'
 import SourceImage from '../../components/source-image'
 import CompareSlider from '../../components/compare-slider'
+import PrimaryButton from '../../components/primary-button'
 import { boundBodyMedia, sortedVariants, stepActionText, stepDetailLines, variantRenderView } from './model'
 import './index.scss'
 
@@ -31,6 +34,7 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
   )
   const [boundReport, setBoundReport] = useState<Report | null>(null)
   const [failed, setFailed] = useState(false)
+  const [selecting, setSelecting] = useState(false)
   const [activeCategory, setActiveCategory] = useState<'hair' | 'makeup' | 'outfit'>('hair')
 
   const load = useCallback(async () => {
@@ -68,6 +72,23 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
   const steps: PlanStep[] = (variant?.steps ?? [])
     .filter((step: PlanStep) => step.category === activeCategory)
     .sort((a, b) => a.position - b.position)
+
+  /** 「选这套」：PUT Selection → POST Execution → 带着快照进清单页。 */
+  const selectThis = async () => {
+    if (!planSet || !variant || selecting) return
+    setSelecting(true)
+    try {
+      const { execution } = await selectAndCreateExecution(planSet, variant)
+      await Taro.navigateTo({
+        url: `/pages/checklist/index?execution_id=${encodeURIComponent(execution.id)}`,
+      })
+    } catch (error) {
+      const message = error instanceof PublicApiError && error.message ? error.message : CHECKLIST_COPY.selectFailed
+      Taro.showToast({ title: message, icon: 'none' })
+    } finally {
+      setSelecting(false)
+    }
+  }
 
   // 对比左图：绑定校验不过就抛错——这里把它接住并呈现为空态，绝不退回"随便哪份报告"
   let leftMedia: ReturnType<typeof boundBodyMedia> = null
@@ -181,6 +202,14 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
         ) : (
           <Text className="plan-detail__empty-step">{PLAN_DETAIL_COPY.emptyStep}</Text>
         )}
+
+        <View className="plan-detail__cta">
+          <PrimaryButton
+            text={PLANS_COPY.cta}
+            loading={selecting}
+            onClick={() => void selectThis()}
+          />
+        </View>
       </View>
     </View>
   )

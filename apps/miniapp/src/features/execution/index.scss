@@ -1,0 +1,150 @@
+// 执行清单。页面外壳（.page / AppHeader）归 pages/checklist，这里只管内容。
+.execution-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 28rpx;
+  padding-top: 24rpx;
+
+  // ---------- 进度 ----------
+  &__progress {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+    padding: 28rpx;
+    border-radius: var(--radius-lg);
+    border: 1rpx solid var(--line);
+    background: var(--surface-strong);
+  }
+
+  &__progress--done {
+    border-color: var(--moss);
+    background: var(--moss-soft);
+  }
+
+  &__progress-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  &__progress-num {
+    font-size: 30rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__progress-remain {
+    font-size: 24rpx;
+    color: var(--ink-2);
+  }
+
+  &__track {
+    height: 12rpx;
+    border-radius: var(--radius-pill);
+    background: var(--moss-soft);
+    overflow: hidden;
+  }
+
+  &__fill {
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--moss);
+    transition: width 0.3s ease-out;
+  }
+
+  &__progress-hint {
+    font-size: 24rpx;
+    color: var(--ink-2);
+  }
+
+  // ---------- 步骤 ----------
+  &__items {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+  }
+
+  &__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 20rpx;
+    padding: 24rpx;
+    border-radius: var(--radius-lg);
+    border: 1rpx solid var(--line);
+    background: var(--surface-strong);
+  }
+
+  &__item--done {
+    border-color: var(--moss);
+    background: var(--moss-soft);
+  }
+
+  &__check {
+    flex: none;
+    width: 44rpx;
+    height: 44rpx;
+    margin-top: 4rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 2rpx solid var(--line);
+    background: var(--surface-strong);
+  }
+
+  &__item--done &__check {
+    border-color: var(--moss);
+    background: var(--moss);
+  }
+
+  &__check-mark {
+    color: #ffffff;
+    font-size: 26rpx;
+    font-weight: 700;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    min-width: 0;
+  }
+
+  &__cat {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__title {
+    font-size: 28rpx;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--ink);
+  }
+
+  &__desc {
+    font-size: 25rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  &__empty {
+    font-size: 25rpx;
+    color: var(--ink-3);
+  }
+
+  // ---------- 页脚 ----------
+  &__foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14rpx;
+    padding-top: 8rpx;
+  }
+
+  &__foot-note {
+    font-size: 22rpx;
+    text-align: center;
+    color: var(--ink-3);
+  }
+}

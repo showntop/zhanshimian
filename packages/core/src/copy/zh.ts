@@ -390,7 +390,14 @@ export const CHECKLIST_COPY = {
   footNote: '你的反馈会让下一次建议更准确',
   emptyTitle: '清单还是空的',
   emptyBody: '先在方案详情页选择一套方案。',
-  emptyAction: '去看方案'
+  emptyAction: '去看方案',
+  loadFailed: '清单没有加载成功，请重试',
+  completeAction: '完成执行',
+  completedNote: '这份执行已完成，可以聊聊哪里省时间、哪里别扭',
+  syncConflict: '清单刚在其他地方更新过，已同步最新进度，请重试',
+  syncFailed: '同步没有成功，已还原，再点一次即可',
+  completeFailed: '完成没有成功，请重试',
+  selectFailed: '选择没有成功，请重试'
 } as const
 
 export const PLAN_DETAIL_COPY = {

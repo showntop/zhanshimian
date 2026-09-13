@@ -17,6 +17,12 @@ import type {
   PlanVariant,
   Report,
 } from '@zsm/core'
+// 带 .ts 后缀：这个模块被 node --test 直接加载，Node 的 ESM 解析不做后缀补全。
+import { createIdempotencyKey } from '../../app/keys.ts'
+
+// 幂等键生成器已上移到 app/keys（建档重发、渲染重试、执行事件共用同一条规则）；
+// 这里保留再导出，老引用不需要知道它搬了家。
+export { createIdempotencyKey }
 
 /** 文字是否已发布：只要有一步真的内容就算。空 steps 的方案等于"还没文字"。 */
 function hasText(variant: Pick<PlanVariant, 'steps'>): boolean {
@@ -106,17 +112,6 @@ export function boundBodyMedia(
     )
   }
   return report.source_media?.body?.media ?? null
-}
-
-let idempotencySeq = 0
-
-/**
- * 每次点击都不同的幂等键。渲染重试与建档重发同理：同一把键会被幂等层原样重放，
- * "重试一次失败的渲染"必须是一笔新请求，键里带上单调序号保证这一点。
- */
-export function createIdempotencyKey(prefix: string): string {
-  idempotencySeq += 1
-  return `${prefix}:${Date.now()}-${idempotencySeq}`
 }
 
 export interface StepDetailLine {
