@@ -7,59 +7,23 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/service/today"
 )
 
 const CapabilityTodayPlan = "today_plan"
 
-// Weather 是今日方案生成所需的天气快照。与 provider.Weather 同形但独立定义，
-// 因为 provider/ai 不能被 provider 反向导入（provider 已依赖 provider/ai）。
-type Weather struct {
-	City        string
-	Condition   string
-	Temperature int
-}
-
-// TodayPlanRequest 是今日方案生成所需的质量核心 grounding。
-type TodayPlanRequest struct {
-	ReportID     string
-	Profile      domain.ProfileSnapshot
-	Findings     []domain.FindingGrounding
-	SelectedPlan *domain.PlanVariantGrounding
-	Weather      Weather
-	Schedule     string
-}
-
-// TodayPlanStep 是生成方案里的一步建议。
-type TodayPlanStep struct {
-	Category string
-	Label    string
-	Title    string
-	Copy     string
-}
-
-// TodayPlanOutput 是校验通过的生成器输出。
-type TodayPlanOutput struct {
-	Title   string
-	Summary string
-	Steps   []TodayPlanStep
-}
-
-// TodayPlanner 从质量核心 grounding 生成一套今日方案。
-type TodayPlanner interface {
-	Generate(context.Context, TodayPlanRequest) (TodayPlanOutput, error)
-}
-
-// StructuredTodayPlanner 走能力路由的今日方案生成器；不直接接触厂商或模型名。
+// StructuredTodayPlanner 走能力路由的今日方案生成器；实现 today.TodayPlanner。
 type StructuredTodayPlanner struct{ runtime StructuredRuntime }
 
 func NewTodayPlanner(runtime StructuredRuntime) *StructuredTodayPlanner {
 	return &StructuredTodayPlanner{runtime: runtime}
 }
 
+var _ today.TodayPlanner = (*StructuredTodayPlanner)(nil)
+
 const todayPlanInstructions = "你是审慎、尊重用户的私人形象顾问。根据用户的形象档案和今天的城市、天气、日程，给出一套今天就能执行的造型方案。语气像顾问而不像教程：尊重用户现有条件，建议具体、轻量、当天能完成，优先利用已有衣物。不打分，不评价颜值和身体，不制造焦虑，不编造用户没有的单品。"
 
-func (p *StructuredTodayPlanner) Generate(ctx context.Context, input TodayPlanRequest) (TodayPlanOutput, error) {
+func (p *StructuredTodayPlanner) Generate(ctx context.Context, input today.TodayPlanRequest) (today.TodayPlanOutput, error) {
 	result, err := p.runtime.Structured(ctx, StructuredRequest{
 		Capability:      CapabilityTodayPlan,
 		Instructions:    todayPlanInstructions,
@@ -70,14 +34,14 @@ func (p *StructuredTodayPlanner) Generate(ctx context.Context, input TodayPlanRe
 		Validate:        validateTodayPlanPayload,
 	})
 	if err != nil {
-		return TodayPlanOutput{}, err
+		return today.TodayPlanOutput{}, err
 	}
 	if err := validateTodayPlanPayload(result.JSON); err != nil {
-		return TodayPlanOutput{}, err
+		return today.TodayPlanOutput{}, err
 	}
 	var payload todayPlanPayload
 	if err := json.Unmarshal(result.JSON, &payload); err != nil {
-		return TodayPlanOutput{}, fmt.Errorf("decode structured today plan: %w", err)
+		return today.TodayPlanOutput{}, fmt.Errorf("decode structured today plan: %w", err)
 	}
 	return payload.toOutput(), nil
 }
@@ -97,16 +61,16 @@ type todayPlanStepPayload struct {
 
 var todayPlanCategoryOrder = map[string]int{"hair": 0, "makeup": 1, "outfit": 2}
 
-func (p todayPlanPayload) toOutput() TodayPlanOutput {
-	steps := make([]TodayPlanStep, 0, len(p.Steps))
+func (p todayPlanPayload) toOutput() today.TodayPlanOutput {
+	steps := make([]today.TodayPlanStep, 0, len(p.Steps))
 	for _, category := range []string{"hair", "makeup", "outfit"} {
 		for _, step := range p.Steps {
 			if step.Category == category {
-				steps = append(steps, TodayPlanStep{Category: step.Category, Label: step.Label, Title: step.Title, Copy: step.Copy})
+				steps = append(steps, today.TodayPlanStep{Category: step.Category, Label: step.Label, Title: step.Title, Copy: step.Copy})
 			}
 		}
 	}
-	return TodayPlanOutput{Title: p.Title, Summary: p.Summary, Steps: steps}
+	return today.TodayPlanOutput{Title: p.Title, Summary: p.Summary, Steps: steps}
 }
 
 func validateTodayPlanPayload(data []byte) error {
@@ -149,8 +113,8 @@ func todayPlanSchema() map[string]any {
 	}
 }
 
-func todayPlanPrompt(input TodayPlanRequest) string {
-	parts := []string{fmt.Sprintf("今天是%s，用户%s，天气%s、气温约 %d°C，今日日程是%s。请给出一套今天立即可执行的方案：一个整体标题、一句摘要，以及发型、妆造、穿搭三步建议，每步说明具体做法。",
+func todayPlanPrompt(input today.TodayPlanRequest) string {
+	parts := []string{fmt.Sprintf("用户所在城市是%s，天气%s、气温约 %d°C，今日日程是%s。请给出一套今天立即可执行的方案：一个整体标题、一句摘要，以及发型、妆造、穿搭三步建议，每步说明具体做法。",
 		input.Weather.City, input.Weather.Condition, input.Weather.Temperature, input.Schedule)}
 	if input.Weather.Condition == "" {
 		parts[0] = "今天请给出一套立即可执行的方案：一个整体标题、一句摘要，以及发型、妆造、穿搭三步建议，每步说明具体做法。"
