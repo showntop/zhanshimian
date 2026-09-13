@@ -3,6 +3,8 @@
 // 页面隐藏（visibility 订阅回调 visible=false）即暂停，恢复可见立即补一次拉取；
 // 卸载时调用 handle.stop() 清理；连续失败 MAX_POLL_FAILURES 次触发 onFailed 并停止。
 
+import type { SubscribeVisibility } from '../operations/polling.ts'
+
 /** 各场景轮询间隔（ms）—— 唯一规范源 */
 export const POLL_INTERVALS = {
   /** 分析页 tasks/{id} */
@@ -30,7 +32,8 @@ export function shouldStopPolling(status: TaskStatusLike): boolean {
 }
 
 /** 平台注入的可见性订阅：回调 false=不可见（暂停），true=可见（恢复）；返回取消函数 */
-export type SubscribeVisibility = (callback: (visible: boolean) => void) => () => void
+// 类型只有一个定义，落在公开 Operation 轮询那一侧；本文件随 Task 12 一起消失。
+export type { SubscribeVisibility }
 
 interface TaskLike {
   status?: TaskStatusLike

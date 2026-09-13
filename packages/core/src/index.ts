@@ -74,10 +74,19 @@ export {
   useTaskPolling,
   createTaskPolling,
   type PollScenario,
-  type SubscribeVisibility,
   type TaskPollingHandle,
   type TaskPollingOptions
 } from './hooks/useTaskPolling.ts'
+export {
+  MAX_OPERATION_FETCH_FAILURES,
+  OPERATION_POLL_INTERVAL_MS,
+  areOperationsSettled,
+  createOperationPolling,
+  isOperationSettled,
+  type OperationPollingHandle,
+  type OperationPollingOptions,
+  type SubscribeVisibility
+} from './operations/polling.ts'
 export {
   PROGRESS_CATCH_UP_MS,
   advanceDisplayProgress,

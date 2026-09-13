@@ -42,6 +42,12 @@ export const qualityApi = {
   getOperation: (id: string): Promise<Operation> =>
     client.GET('/v1/operations/{id}', { params: { path: { id } } }).then(dataOrThrow),
 
+  /** 一次问一批 Operation：契约里 ids 是逗号分隔的字符串，不是数组。 */
+  listOperations: (ids: readonly string[]): Promise<Operation[]> =>
+    client
+      .GET('/v1/operations', { params: { query: { ids: ids.join(',') } } })
+      .then(dataOrThrow),
+
   /** 还没有报告时服务端返回 404；这不是错误，是空态。 */
   getCurrentReport: async (): Promise<Report | null> => {
     const result = await client.GET('/v1/reports/current')
