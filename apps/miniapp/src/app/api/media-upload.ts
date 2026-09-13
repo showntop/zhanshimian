@@ -2,7 +2,7 @@
 // 任何一步失败都向上抛错，绝不落一个本地假 Asset——本地路径只在本次会话里用于预览。
 import type { UploadIntent, UploadedMediaAsset } from '@zsm/core'
 
-export type MediaPurpose = 'face' | 'side' | 'body' | 'feedback'
+export type MediaPurpose = 'face' | 'side' | 'body' | 'feedback' | 'wardrobe'
 
 export type LocalImageFile = {
   /** 本地临时文件路径（拍照/选择后的 tempFilePath） */

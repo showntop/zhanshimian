@@ -56,3 +56,12 @@ test('the main loop reads no business storage keys', () => {
   const app = readFileSync(join(srcRoot, 'app.ts'), 'utf8')
   assert.doesNotMatch(app, businessKey)
 })
+
+test('no miniapp module imports old api or hand-written dto surfaces', () => {
+  for (const file of scan(srcRoot).filter((path) => /\.(ts|tsx)$/.test(path))) {
+    const source = readFileSync(file, 'utf8')
+    assert.doesNotMatch(source, /services\/api/, file)
+    assert.doesNotMatch(source, /API_PATHS|createApiEndpoints/, file)
+    assert.doesNotMatch(source, /getTask\(|getTasks\(|active_tasks/, file)
+  }
+})

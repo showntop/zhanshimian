@@ -2,10 +2,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
-import { lookImage, trackEvent, userImage, type WardrobeItem, type WardrobeOutfit } from '@zsm/core'
+import { trackEvent, type WardrobeItem, type WardrobeOutfit } from '@zsm/core'
 import { usePageShell } from '../../../../hooks/use-page-visibility'
-import { api } from '../../../../services/api'
+import { peripherals } from '../../../../app/api/peripherals'
+import { mediaUpload } from '../../../../app/api/client'
+import { uploadMedia } from '../../../../app/api/media-upload'
+import { readLocalImage } from '../../../../features/capture/local-file'
 import AppHeader from '../../../../components/app-header'
+import SourceImage from '../../../../components/source-image'
 import PrimaryButton from '../../../../components/primary-button'
 import BottomSheet from '../../../../components/bottom-sheet'
 import Pill from '../../../../components/pill'
@@ -37,7 +41,7 @@ export default function Wardrobe() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setItems(await api.listWardrobeItems())
+      setItems(await peripherals.listWardrobeItems())
     } finally {
       setLoading(false)
     }
@@ -67,9 +71,10 @@ export default function Wardrobe() {
     try {
       let mediaId: string | undefined
       if (formPhoto) {
-        mediaId = (await api.uploadMedia({ kind: 'wardrobe', filePath: formPhoto })).id
+        const image = await readLocalImage(formPhoto)
+        mediaId = (await uploadMedia(mediaUpload, image, 'wardrobe')).id
       }
-      await api.createWardrobeItem({ name: form.name.trim(), category: form.category, color: form.color || '未注明', media_id: mediaId })
+      await peripherals.createWardrobeItem({ name: form.name.trim(), category: form.category, color: form.color || '未注明', media_id: mediaId })
       trackEvent('wardrobe_item_add', { category: form.category })
       setAdding(false)
       setForm({ name: '', category: 'top', color: '' })
@@ -89,7 +94,7 @@ export default function Wardrobe() {
       confirmColor: '#9B4B45',
       success: (res) => {
         if (!res.confirm) return
-        api.deleteWardrobeItem(item.id).then(load).catch(() => Taro.showToast({ title: '删除没有成功', icon: 'none' }))
+        peripherals.deleteWardrobeItem(item.id).then(load).catch(() => Taro.showToast({ title: '删除没有成功', icon: 'none' }))
       },
     })
   }
@@ -101,9 +106,8 @@ export default function Wardrobe() {
     }
     setBusy(true)
     try {
-      const ctx = await api.getTodayContext().catch(() => null)
       const ids = items.slice(0, 4).map((i) => i.id)
-      const result = await api.createWardrobeOutfit({ title: '今日组合', item_ids: ids, context: ctx ?? undefined })
+      const result = await peripherals.createWardrobeOutfit({ title: '今日组合', item_ids: ids })
       setOutfit(result)
       trackEvent('wardrobe_outfit_generate', {})
     } catch (e) {
@@ -116,7 +120,7 @@ export default function Wardrobe() {
   const wear = async () => {
     if (!outfit) return
     try {
-      const result = await api.wearWardrobeOutfit(outfit.id)
+      const result = await peripherals.wearWardrobeOutfit(outfit.id)
       setOutfit(result)
       trackEvent('wardrobe_outfit_wear', {})
       Taro.showToast({ title: '已记录', icon: 'success' })
@@ -170,11 +174,10 @@ export default function Wardrobe() {
 
             <View className={`wd__grid ${enter(1)}`}>
               {shown.map((item) => {
-                const img = userImage(item.image_url) || lookImage(item.image_url)
                 return (
                   <View key={item.id} className="wd__item" onLongPress={() => removeItem(item)}>
-                    {img ? (
-                      <Image className="wd__item-img" src={img} mode="aspectFill" />
+                    {item.media ? (
+                      <SourceImage className="wd__item-img" media={item.media} mode="aspectFill" />
                     ) : (
                       <View className="wd__item-empty">
                         <Text>{item.name.slice(0, 1)}</Text>

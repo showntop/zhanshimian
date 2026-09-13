@@ -11,8 +11,6 @@ export {
   type TaskRef
 } from './http/client.ts'
 export { localizeDevImages, rewriteLoopbackAssetURLs, type ImageDownloader } from './http/images.ts'
-export { API_PATHS, createApiEndpoints, type ApiEndpoints, type ApiPathName, type EndpointOptions, type TaskCreated } from './api/endpoints.ts'
-export * from './types/index.ts'
 export {
   createGeneratedApiClient,
   type GeneratedApiClient
@@ -50,7 +48,25 @@ export type {
   ReportFinding,
   Selection,
   UploadGrant,
-  UploadIntent
+  UploadIntent,
+  Diagnosis,
+  DiagnosisKind,
+  HairPreview,
+  HairPreviewAccepted,
+  HairStyle,
+  TodayContext,
+  TodayPlan,
+  TodayPlanAccepted,
+  Share,
+  ShareView,
+  WardrobeItem,
+  WardrobeOutfit,
+  AdvisorMessage,
+  AdvisorAction,
+  BillingOrder,
+  BillingSummary,
+  MeAccount,
+  UserProfile
 } from './api/types.ts'
 export {
   LOCAL_LOOK_SLUGS,
@@ -71,16 +87,6 @@ export {
   type DisplayBadge,
   type DisplayImage
 } from './media/display.ts'
-export {
-  MAX_POLL_FAILURES,
-  POLL_INTERVALS,
-  shouldStopPolling,
-  useTaskPolling,
-  createTaskPolling,
-  type PollScenario,
-  type TaskPollingHandle,
-  type TaskPollingOptions
-} from './hooks/useTaskPolling.ts'
 export {
   MAX_OPERATION_FETCH_FAILURES,
   OPERATION_POLL_INTERVAL_MS,

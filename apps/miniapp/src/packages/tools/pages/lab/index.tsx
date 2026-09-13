@@ -4,7 +4,7 @@ import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import { usePageShell } from '../../../../hooks/use-page-visibility'
 import AppHeader from '../../../../components/app-header'
-import ExampleImage from '../../../../components/example-image'
+import SourceImage from '../../../../components/source-image'
 import './index.scss'
 
 const FEATURES = [
@@ -44,7 +44,7 @@ export default function Lab() {
         </View>
         {FEATURES.map((feature, i) => (
           <View key={feature.key} className={`lab__card card ${enter((i + 1) as 1 | 2 | 3)}`}>
-            <ExampleImage className="lab__card-img" slug={feature.slug} variant="full" badgeText="风格参考" anchor="top" />
+            <SourceImage className="lab__card-img" reference={{ slug: feature.slug, variant: 'full' }} anchor="top" />
             <View className="lab__card-copy">
               <View className="lab__card-head">
                 <Text className="lab__card-name">{feature.name}</Text>

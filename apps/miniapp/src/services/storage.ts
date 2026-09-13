@@ -1,4 +1,5 @@
-// 本地存储：key 语义对齐总计划附录 B（zsm_ 前缀，零历史包袱）。
+// 本地存储：只允许 token 与 UI 偏好。业务资源全部归服务端 + src/app/cache，
+// 这里再出现业务 id 就是回归。
 import Taro from '@tarojs/taro'
 import { setLocalLooksResolver } from '@zsm/core'
 
@@ -6,15 +7,6 @@ export const STORAGE_KEYS = {
   token: 'zsm_token',
   uiSchemaVersion: 'zsm_ui_schema_version',
   compareHint: 'zsm_compare_hint',
-  // 以下外围 key 在 Task 12 随外围页迁移一并删除。主闭环已不再持有任何
-  // 业务 id（服务端资源归 src/app/cache，本地只留 UI 偏好）。
-  reportId: 'zsm_report_id',
-  activeTaskHairPreview: 'zsm_active_task_hair_preview',
-  outfitSession: 'zsm_outfit_session',
-  lastOutfitDiagnosis: 'zsm_last_outfit_diagnosis',
-  purchaseSession: 'zsm_purchase_session',
-  lastPurchaseDiagnosis: 'zsm_last_purchase_diagnosis',
-  advisorConversationId: 'zsm_advisor_conversation_id',
   city: 'zsm_city',
   openCreditSheet: 'zsm_open_credit_sheet',
 } as const

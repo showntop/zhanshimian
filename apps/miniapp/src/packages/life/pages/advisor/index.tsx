@@ -4,9 +4,8 @@ import Taro from '@tarojs/taro'
 import { Input, ScrollView, Text, View } from '@tarojs/components'
 import { ADVISOR_COPY, trackEvent, type AdvisorMessage } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
-import { api } from '../../../../services/api'
+import { peripherals } from '../../../../app/api/peripherals'
 import { handleBillingError } from '../../../../services/billing'
-import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
 import './index.scss'
 
@@ -20,16 +19,12 @@ export default function Advisor() {
   const [scrollKey, setScrollKey] = useState('')
   const { pageClass, enter } = usePageShell(loaded, 'page--advisor', 'advisor')
 
+  // 会话归服务端「当前会话」所有：恢复不再依赖本地 conversation id
   const restore = useCallback(async () => {
-    const conversationId = readStorage(STORAGE_KEYS.advisorConversationId)
-    if (!conversationId) {
-      setLoaded(true)
-      return
-    }
     try {
-      setMessages(await api.getAdvisorMessages(conversationId))
+      setMessages(await peripherals.listAdvisorMessages())
     } catch {
-      writeStorage(STORAGE_KEYS.advisorConversationId, '')
+      /* 首次使用还没有会话：保持空态 */
     } finally {
       setLoaded(true)
     }
@@ -60,13 +55,7 @@ export default function Advisor() {
     setInput('')
     scrollToEnd()
     try {
-      const conversationId = readStorage(STORAGE_KEYS.advisorConversationId) || undefined
-      const reply = await api.sendAdvisorMessage({
-        conversation_id: conversationId,
-        content: text,
-        report_id: readStorage(STORAGE_KEYS.reportId) || undefined,
-      })
-      writeStorage(STORAGE_KEYS.advisorConversationId, reply.conversation_id)
+      const reply = await peripherals.sendAdvisorMessage({ content: text })
       // 接口只回助手一条；本地用户气泡保留，只补上 conversation_id
       setMessages((prev) =>
         prev
@@ -87,7 +76,7 @@ export default function Advisor() {
 
   const applyAction = async (message: AdvisorMessage, actionId: string) => {
     try {
-      const applied = await api.applyAdvisorAction(actionId)
+      const applied = await peripherals.applyAdvisorAction(actionId)
       setMessages((prev) =>
         prev.map((m) =>
           m.id === message.id

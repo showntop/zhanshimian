@@ -3,7 +3,6 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createApiClient, ApiError } from '../src/http/client.ts'
 import { localizeDevImages, rewriteLoopbackAssetURLs } from '../src/http/images.ts'
-import { createApiEndpoints } from '../src/api/endpoints.ts'
 
 function memoryStore(initial = '') {
   let token = initial
@@ -224,45 +223,5 @@ test('rewriteLoopbackAssetURLs：生产 API 下把 127.0.0.1/uploads 改到 API 
   assert.equal((await local({ url: 'http://127.0.0.1:58000/uploads/x.png' })).url, 'http://127.0.0.1:58000/uploads/x.png')
 })
 
-test('getCurrentAnalysis：无进行中分析 404 返回 null，其它错误仍抛出', async () => {
-  let status = 404
-  const { adapter } = fakeAdapter(() => ({
-    statusCode: status,
-    data: { error: { code: status === 404 ? 'not_found' : 'server_error', message: status === 404 ? '分析不存在' : '服务暂时不可用' } },
-  }))
-  const api = createApiEndpoints(createApiClient({ adapter, baseUrl: 'https://api.test' }))
-  assert.equal(await api.getCurrentAnalysis(), null)
-  status = 500
-  await assert.rejects(() => api.getCurrentAnalysis(), (error) => error.statusCode === 500)
-})
 
-test('getCurrentReport：无档案 404 返回 null，其它错误仍抛出', async () => {
-  let status = 404
-  const { adapter } = fakeAdapter(() => ({
-    statusCode: status,
-    data: { error: { code: status === 404 ? 'not_found' : 'server_error', message: status === 404 ? '报告不存在' : '服务暂时不可用' } },
-  }))
-  const api = createApiEndpoints(createApiClient({ adapter, baseUrl: 'https://api.test' }))
-  assert.equal(await api.getCurrentReport(), null)
-  status = 500
-  await assert.rejects(() => api.getCurrentReport(), (error) => error.statusCode === 500)
-})
 
-test('diagnose：404 清 report 引用后无 report_id 重试一次', async () => {
-  const posts = []
-  let clearCalls = 0
-  const { adapter } = fakeAdapter((req) => {
-    posts.push(req)
-    if (req.data?.report_id) {
-      return { statusCode: 404, data: { error: { code: 'report_not_found', message: '报告不存在' } } }
-    }
-    return { statusCode: 201, data: { data: { id: 'd1', kind: req.data.kind, saved: false } } }
-  })
-  const client = createApiClient({ adapter, baseUrl: 'https://api.test' })
-  const api = createApiEndpoints(client, { clearReportRef: () => { clearCalls += 1 } })
-  const diagnosis = await api.diagnose({ kind: 'outfit', media_id: 'm1', report_id: 'gone' })
-  assert.equal(diagnosis.id, 'd1')
-  assert.equal(clearCalls, 1)
-  assert.equal(posts.length, 2)
-  assert.equal(posts[1].data.report_id, undefined)
-})

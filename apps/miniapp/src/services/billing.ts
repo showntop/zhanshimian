@@ -1,6 +1,6 @@
 import Taro from '@tarojs/taro'
 import { ApiError, BILLING_COPY, type BillingOrder } from '@zsm/core'
-import { api } from './api'
+import { peripherals } from '../app/api/peripherals'
 import { STORAGE_KEYS, writeStorage } from './storage'
 
 export function isInsufficientCredits(error: unknown): error is ApiError {
@@ -34,9 +34,9 @@ export function handleBillingError(error: unknown): boolean {
 
 export async function purchaseSku(skuId: string): Promise<BillingOrder> {
   const login = await Taro.login()
-  const order = await api.createBillingOrder({ sku_id: skuId, code: login.code })
+  const order = await peripherals.createBillingOrder({ sku_id: skuId, code: login.code })
   await requestVirtualPayment(order)
-  return api.syncBillingOrder(order.id)
+  return peripherals.syncBillingOrder(order.id)
 }
 
 function requestVirtualPayment(order: BillingOrder): Promise<void> {

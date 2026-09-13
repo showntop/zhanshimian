@@ -41,3 +41,23 @@ export type CreateRenderRunRequest = Record<string, never>
 export type CreateExecutionEventRequest = components['schemas']['CreateExecutionEventRequest']
 export type CreateGenerationFeedbackRequest = components['schemas']['CreateGenerationFeedbackRequest']
 export type CreateExecutionFeedbackRequest = components['schemas']['CreateExecutionFeedbackRequest']
+
+// 外围（工具/生活分包）响应：同样与生成 schema 同源。
+export type Diagnosis = components['schemas']['Diagnosis']
+export type DiagnosisKind = 'outfit' | 'purchase'
+export type HairPreview = components['schemas']['HairPreview']
+export type HairPreviewAccepted = components['schemas']['HairPreviewAccepted']
+export type HairStyle = components['schemas']['HairStyle']
+export type TodayContext = components['schemas']['TodayContext']
+export type TodayPlan = components['schemas']['TodayPlan']
+export type TodayPlanAccepted = components['schemas']['TodayPlanAccepted']
+export type Share = components['schemas']['Share']
+export type ShareView = components['schemas']['ShareView']
+export type WardrobeItem = components['schemas']['WardrobeItem']
+export type WardrobeOutfit = components['schemas']['WardrobeOutfit']
+export type AdvisorMessage = components['schemas']['AdvisorMessage']
+export type AdvisorAction = components['schemas']['AdvisorAction']
+export type BillingOrder = components['schemas']['BillingOrder']
+export type BillingSummary = components['schemas']['BillingSummary']
+export type MeAccount = components['schemas']['MeAccount']
+export type UserProfile = components['schemas']['UserProfile']

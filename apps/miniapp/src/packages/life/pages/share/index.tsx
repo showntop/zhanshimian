@@ -1,13 +1,14 @@
 // 分享卡：创建（plan/today）→ 公开 token 分享 → 接收方查看 → 撤销即失效。
+// 图片来自服务端带类型的 DisplayMedia；接收视图是 ShareView（无 id、不可撤销）。
 import { useCallback, useEffect, useState } from 'react'
 import Taro, { useLoad, useShareAppMessage } from '@tarojs/taro'
 import { Button, Text, View } from '@tarojs/components'
-import { APP_NAME, lookImage, trackEvent, type Share } from '@zsm/core'
+import { APP_NAME, trackEvent, type Share, type ShareView } from '@zsm/core'
 import { usePageShell } from '../../../../hooks/use-page-visibility'
-import { api } from '../../../../services/api'
+import { peripherals } from '../../../../app/api/peripherals'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
-import ExampleImage from '../../../../components/example-image'
+import SourceImage from '../../../../components/source-image'
 import Skeleton from '../../../../components/skeleton'
 import ErrorState from '../../../../components/error-state'
 import './index.scss'
@@ -15,22 +16,21 @@ import './index.scss'
 interface Snapshot {
   title?: string
   summary?: string
-  image_url?: string
   label?: string
 }
 
 export default function SharePage() {
-  const [share, setShare] = useState<Share | null>(null)
+  const [share, setShare] = useState<Share | ShareView | null>(null)
+  const [isOwner, setIsOwner] = useState(false)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
-  const [isOwner, setIsOwner] = useState(false)
   const { pageClass, enter } = usePageShell(!loading || Boolean(share), '', 'share')
 
   const loadByToken = useCallback(async (token: string) => {
     setLoading(true)
     setFailed(false)
     try {
-      setShare(await api.getShareByToken(token))
+      setShare(await peripherals.getShareByToken(token))
     } catch {
       setFailed(true)
     } finally {
@@ -38,21 +38,24 @@ export default function SharePage() {
     }
   }, [])
 
-  const createForSource = useCallback(async (sourceType: 'plan' | 'today', sourceId: string) => {
-    setLoading(true)
-    setFailed(false)
-    try {
-      const card = await api.createShare({ source_type: sourceType, source_id: sourceId, include_photo: false })
-      setShare(card)
-      setIsOwner(true)
-      trackEvent('share_card_create', { source_type: sourceType })
-    } catch (e) {
-      Taro.showToast({ title: (e as Error).message || '创建没有成功', icon: 'none' })
-      setFailed(true)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const createForSource = useCallback(
+    async (sourceType: 'plan_variant' | 'today_plan', sourceId: string) => {
+      setLoading(true)
+      setFailed(false)
+      try {
+        const card = await peripherals.createShare({ source_type: sourceType, source_id: sourceId, include_photo: false })
+        setShare(card)
+        setIsOwner(true)
+        trackEvent('share_card_create', { source_type: sourceType })
+      } catch (e) {
+        Taro.showToast({ title: (e as Error).message || '创建没有成功', icon: 'none' })
+        setFailed(true)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [],
+  )
 
   useLoad((options) => {
     if (options?.token) {
@@ -60,34 +63,29 @@ export default function SharePage() {
       return
     }
     if (options?.type === 'today') {
-      api
+      peripherals
         .getCurrentTodayPlan()
-        .then((plan) => (plan ? createForSource('today', plan.id) : setFailed(true)))
+        .then((plan) => (plan ? createForSource('today_plan', plan.id) : setFailed(true)))
         .catch(() => setFailed(true))
       return
     }
-    // 默认：已选方案
-    try {
-      const planId = Taro.getStorageSync('zsm_saved_plan_id') || Taro.getStorageSync('zsm_plan_id')
-      if (planId) {
-        createForSource('plan', planId)
-        return
-      }
-    } catch {
-      /* fallthrough */
+    if (options?.plan_variant_id) {
+      createForSource('plan_variant', options.plan_variant_id)
+      return
     }
+    // 没有可分享的来源：分享只能从方案详情或今日方案发起
     setFailed(true)
   })
 
   useShareAppMessage(() => ({
     title: snapshotTitle(share) || '我的形象方案',
-    path: `/packages/life/pages/share/index?token=${share?.token ?? ''}`,
+    path: `/packages/life/pages/share/index?token=${share && 'token' in share ? share.token : ''}`,
   }))
 
   const revoke = async () => {
-    if (!share) return
+    if (!share || !('id' in share) || !share.id) return
     try {
-      await api.revokeShare(share.id!)
+      await peripherals.revokeShare(share.id)
       Taro.showToast({ title: '已撤销，链接即刻失效', icon: 'success' })
       setTimeout(() => Taro.navigateBack(), 800)
     } catch (e) {
@@ -95,7 +93,7 @@ export default function SharePage() {
     }
   }
 
-  const snapshotTitle = (card: Share | null): string => {
+  const snapshotTitle = (card: Share | ShareView | null): string => {
     const snapshot = (card?.snapshot ?? {}) as Snapshot
     return snapshot.title ?? ''
   }
@@ -123,7 +121,6 @@ export default function SharePage() {
   }
 
   const snapshot = (share.snapshot ?? {}) as Snapshot
-  const imageUrl = lookImage(snapshot.image_url)
 
   return (
     <View className={pageClass}>
@@ -134,8 +131,8 @@ export default function SharePage() {
           {snapshot.label ? <Text className="sh__label">{snapshot.label}</Text> : null}
           <Text className="sh__title">{snapshot.title || '我的形象方案'}</Text>
           {snapshot.summary ? <Text className="sh__summary">{snapshot.summary}</Text> : null}
-          {lookImage(snapshot.image_url) ? (
-            <ExampleImage className="sh__image" src={snapshot.image_url} badgeText="风格参考" anchor="top" />
+          {share.media ? (
+            <SourceImage className="sh__image" media={share.media} anchor="top" />
           ) : null}
           <View className="sh__foot">
             <Text className="sh__foot-note">由 AI 形象顾问生成 · 效果仅供参考</Text>
@@ -148,7 +145,7 @@ export default function SharePage() {
               <Button className="sh__share-btn" openType="share">
                 <Text className="sh__share-text">发给朋友</Text>
               </Button>
-              <Text className="sh__revoke pressable" onClick={revoke}>撤销分享（链接即刻失效）</Text>
+              <Text className="sh__revoke pressable" onClick={() => void revoke()}>撤销分享（链接即刻失效）</Text>
             </>
           ) : (
             <PrimaryButton

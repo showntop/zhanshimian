@@ -1,4 +1,4 @@
-// 页面可见性桥：Taro 页面 useDidShow/useDidHide → core useTaskPolling 的
+// 页面可见性桥：Taro 页面 useDidShow/useDidHide → core 轮询控制器的
 // subscribeVisibility（不可见即暂停轮询，见请求纪律 §4）。
 // 切 tab / 回页防闪屏：useShowOnce 跳过首次 onShow；usePageClass 在入场动画
 // 播完后加 page--settled，避免 fade-up 从透明重播把已渲染图片藏掉。

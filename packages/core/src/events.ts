@@ -1,6 +1,11 @@
 // 埋点 —— 名字与负载在端上先校验，静默失败（埋点永不影响业务流程）。
-// 服务端端点：POST /v1/events（见 api/endpoints.ts 的 postEvent）。
-import type { EventInput } from './types/index.ts'
+// 服务端端点：POST /v1/events。
+
+/** 埋点负载：事件名 + 任意可序列化负载；端上只校验名字与大小。 */
+export interface EventInput {
+  name: string
+  payload?: unknown
+}
 
 /** 小写字母开头，仅小写字母/数字/下划线，总长 2–64 */
 export const EVENT_NAME_PATTERN = /^[a-z][a-z0-9_]{1,63}$/

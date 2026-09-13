@@ -1,4 +1,4 @@
-// createApiClient —— 传输无关 API 客户端（语义移植自原型 services/api.js）。
+// createApiClient —— 传输无关 API 客户端（传输层与业务解耦）。
 // - 拼 baseUrl + path、注入 Bearer、content-type json；
 // - 2xx 解 {data}（附带 202 的 task 引用）；非 2xx 抛 ApiError；
 // - 401 单飞重登重放一次：非 /v1/auth/ 路径且未重试过 → 清 token →

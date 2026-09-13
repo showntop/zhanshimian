@@ -1,15 +1,20 @@
-// 今日造型：天气上下文 + 当日方案（生成/换一个/加入清单/反馈）+ 生成图轮询。
+// 今日造型：天气上下文 + 当日方案（生成/换一个/加入清单/反馈）。
+// 生成是异步受理（202 + 公开 Operation）：状态只通过唯一轮询路径观察，
+// 就绪后整体替换本地方案；城市偏好留在本地（UI 偏好，不是业务 id）。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
-import { IMAGE_BADGE_COPY, POLL_INTERVALS, lookImage, shouldStopPolling, useTaskPolling, trackEvent, type TodayContext, type TodayPlan } from '@zsm/core'
+import { trackEvent, type TodayContext, type TodayPlan } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
-import { api } from '../../../../services/api'
+import { peripherals } from '../../../../app/api/peripherals'
+import { qualityApi } from '../../../../app/api/quality'
+import { resourceCache, resourceKey } from '../../../../app/cache/resource-cache'
+import { useOperationPolling } from '../../../../app/operations/use-operation-polling'
 import { handleBillingError } from '../../../../services/billing'
-import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
+import { readStorage, writeStorage, STORAGE_KEYS } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
-import ExampleImage from '../../../../components/example-image'
+import SourceImage from '../../../../components/source-image'
 import Skeleton from '../../../../components/skeleton'
 import ErrorState from '../../../../components/error-state'
 import './index.scss'
@@ -22,7 +27,7 @@ export default function Today() {
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [previewOpen, setPreviewOpen] = useState(false)
+  const [preview, setPreview] = useState(false)
   const planRef = useRef<TodayPlan | null>(null)
   planRef.current = plan
   const { pageClass, enter } = usePageShell(!loading || Boolean(plan), '', 'today')
@@ -36,8 +41,8 @@ export default function Today() {
     try {
       const city = readStorage(STORAGE_KEYS.city) || undefined
       const [ctx, current] = await Promise.all([
-        api.getTodayContext(city).catch(() => null),
-        api.getCurrentTodayPlan().catch(() => null),
+        peripherals.getTodayContext(city).catch(() => null),
+        peripherals.getCurrentTodayPlan().catch(() => null),
       ])
       setContext(ctx)
       setPlan(current)
@@ -47,15 +52,22 @@ export default function Today() {
     } finally {
       setLoading(false)
     }
+    // generate 在下方定义；依赖只取 useCallback 稳定引用
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const generate = async (refresh: boolean) => {
     setBusy(true)
     try {
-      const reportId = readStorage(STORAGE_KEYS.reportId) || undefined
+      const report = await qualityApi.getCurrentReport()
       const city = readStorage(STORAGE_KEYS.city) || undefined
-      const { data } = await api.createTodayPlan({ report_id: reportId, city, refresh })
-      setPlan(data)
+      const accepted = await peripherals.createTodayPlan({
+        report_id: report?.id,
+        city,
+        refresh,
+      })
+      resourceCache.write(resourceKey('operation', accepted.operation.id), accepted.operation)
+      setPlan(accepted.data)
       trackEvent('today_plan_generate', { refresh: String(refresh) })
     } catch (e) {
       if (handleBillingError(e)) return
@@ -66,31 +78,24 @@ export default function Today() {
   }
 
   useEffect(() => {
-    load()
+    void load()
   }, [load])
 
   useShowOnce(() => {
-    if (planRef.current) load()
+    if (planRef.current) void load()
   })
 
-  const generating = plan && plan.look_task && (plan.look_task.status === 'queued' || plan.look_task.status === 'processing')
-  const { stop } = useTaskPolling({
-    fetcher: async () => {
-      const current = await api.getCurrentTodayPlan()
-      if (current) setPlan(current)
-      return current
-    },
-    intervalMs: POLL_INTERVALS.today,
-    enabled: Boolean(generating),
-    isSettled: (result) => {
-      const status = result?.look_task?.status
-      return !status || shouldStopPolling(status)
-    },
-    onDone: (result) => {
-      if (result) setPlan(result)
+  // 生成中（planning/rendering）就盯着受理 Operation；终态后重新拉当前方案
+  const operationId = plan?.state === 'planning' || plan?.state === 'rendering' ? plan.operation?.id ?? '' : ''
+  useOperationPolling({
+    operationIds: operationId ? [operationId] : [],
+    enabled: Boolean(operationId),
+    onSettled: () => {
+      void peripherals.getCurrentTodayPlan().then((current) => {
+        if (current) setPlan(current)
+      })
     },
   })
-  Taro.useDidHide(() => stop())
 
   const editCity = () => {
     const modal = Taro.showModal as unknown as (opts: Record<string, unknown>) => Promise<{ confirm: boolean; content?: string }>
@@ -101,7 +106,7 @@ export default function Today() {
       success: (res: { confirm: boolean; content?: string }) => {
         if (!res.confirm) return
         writeStorage(STORAGE_KEYS.city, res.content || '')
-        generate(true)
+        void generate(true)
       },
     })
   }
@@ -109,7 +114,7 @@ export default function Today() {
   const activate = async () => {
     if (!plan) return
     try {
-      const item = await api.activateTodayPlan(plan.id)
+      const item = await peripherals.activateTodayPlan(plan.id)
       setPlan(item)
       trackEvent('today_plan_activate', {})
       Taro.showToast({ title: '已加入今日清单', icon: 'success' })
@@ -121,7 +126,7 @@ export default function Today() {
   const feedback = async (word: string) => {
     if (!plan) return
     try {
-      const item = await api.sendTodayPlanFeedback(plan.id, word)
+      const item = await peripherals.submitTodayPlanFeedback(plan.id, word)
       setPlan(item)
       trackEvent('today_feedback', { word })
     } catch (e) {
@@ -129,11 +134,7 @@ export default function Today() {
     }
   }
 
-  const generatedUrl = lookImage(plan?.generated_image_url)
-  const imageUrl = generatedUrl || lookImage(plan?.image_url)
-  const badgeText = (plan?.look_provider ?? '').startsWith('demo')
-    ? IMAGE_BADGE_COPY.demo
-    : IMAGE_BADGE_COPY.bundled
+  const imageUrl = plan?.media?.url ?? ''
 
   if (loading && !plan) {
     return (
@@ -148,7 +149,7 @@ export default function Today() {
     return (
       <View className={pageClass}>
         <AppHeader title="今日造型" back />
-        <ErrorState onRetry={load} />
+        <ErrorState onRetry={() => void load()} />
       </View>
     )
   }
@@ -161,7 +162,7 @@ export default function Today() {
           <Text className="today__ctx-city">{context?.city || '设置城市'}</Text>
           {context ? (
             <Text className="today__ctx-weather">
-              {context.condition} · {context.temperature} · {context.day_type}
+              {context.condition} · {context.temperature}° · {context.day_type}
               {context.schedule ? ` · ${context.schedule}` : ''}
             </Text>
           ) : null}
@@ -169,26 +170,21 @@ export default function Today() {
         </View>
 
         <View className={`today__card card ${enter(1)}`}>
-          <View className="today__img-wrap photo-hero pressable" onClick={() => imageUrl && setPreviewOpen(true)}>
-            <ExampleImage
-              className="today__img"
-              src={plan?.generated_image_url || plan?.image_url}
-              badgeText={badgeText}
-              anchor="top"
-            />
-            {generating ? (
+          <View className="today__img-wrap photo-hero pressable" onClick={() => imageUrl && setPreview(true)}>
+            <SourceImage className="today__img" media={plan?.media ?? null} anchor="top" />
+            {plan && plan.state !== 'ready' && plan.state !== 'ready_partial' ? (
               <View className="today__mask">
                 <View className="scan-sweep" />
                 <View className="today__mask-spin spinner" />
-                <Text className="today__mask-text">{plan?.look_task?.stage || '正在生成搭配图'}</Text>
+                <Text className="today__mask-text">正在生成搭配图</Text>
               </View>
             ) : null}
           </View>
           <View className="today__copy">
             <Text className="today__title">{plan?.title ?? ''}</Text>
             <Text className="today__summary">{plan?.summary ?? ''}</Text>
-            {(plan?.steps ?? []).map((step, i) => (
-              <View key={i} className="today__step">
+            {(plan?.steps ?? []).map((step) => (
+              <View key={step.title} className="today__step">
                 <Text className="today__step-label">{step.label || step.category}</Text>
                 <Text className="today__step-text">
                   {step.title}
@@ -200,9 +196,9 @@ export default function Today() {
         </View>
 
         <View className={`today__actions ${enter(2)}`}>
-          <PrimaryButton text={plan?.active ? '已加入今日清单' : '加入今日清单'} disabled={plan?.active} onClick={activate} />
+          <PrimaryButton text={plan?.active ? '已加入今日清单' : '加入今日清单'} disabled={plan?.active} onClick={() => void activate()} />
           <View className="today__actions-row">
-            <Text className="today__actions-alt pressable" onClick={() => generate(true)}>换一个方案</Text>
+            <Text className="today__actions-alt pressable" onClick={() => void generate(true)}>换一个方案</Text>
             <Text className="today__actions-alt pressable" onClick={() => Taro.navigateTo({ url: '/packages/life/pages/advisor/index' })}>问问顾问</Text>
           </View>
         </View>
@@ -214,7 +210,7 @@ export default function Today() {
               <View
                 key={word}
                 className={`today__feedback-pill ${plan?.feedback === word ? 'today__feedback-pill--active' : ''} pressable`}
-                onClick={() => feedback(word)}
+                onClick={() => void feedback(word)}
               >
                 <Text>{word}</Text>
               </View>
@@ -223,8 +219,8 @@ export default function Today() {
         </View>
       </View>
 
-      {previewOpen && imageUrl ? (
-        <View className="today__viewer" onClick={() => setPreviewOpen(false)}>
+      {preview && imageUrl ? (
+        <View className="today__viewer" onClick={() => setPreview(false)}>
           <Image className="today__viewer-img" src={imageUrl} mode="aspectFit" />
           <Text className="today__viewer-close">轻触关闭</Text>
         </View>
