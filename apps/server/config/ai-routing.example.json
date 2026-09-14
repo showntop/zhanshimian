@@ -83,9 +83,9 @@
     },
     "photo_quality_check": {
       "policy": "value_first",
-      "primary": "aliyun/qwen3.7-flash",
+      "primary": "aliyun/qwen3.7-plus",
       "fallbacks": [
-        "aliyun/qwen3.7-plus"
+        "aliyun/qwen3.7-flash"
       ],
       "max_cost_cny": 0.04,
       "max_input_images": 3

@@ -14,7 +14,7 @@ const (
 	photoQualityPrompt       = `三张照片依次为 face、side、body。逐一判断是否为单一真人主体且符合角色：
 - face：真实人物正对镜头，面部完整清晰，无严重遮挡；
 - side：真实人物约 90° 侧脸，轮廓清晰；
-- body：真实人物正面全身，至少覆盖头部到小腿。
+- body：真实人物正面全身或大半身，从头部到膝盖以下（小腿）可见即可；脚部轻微裁切、手持包袋、靠墙站立都不算拒收理由。
 风景、宠物、物品、截图、插画、多人主导或无法辨认人物的照片一律 reject。
 decision 只能是 pass 或 reject；pass 时 reason_code 必须是空字符串；reject 时 reason_code 只能是 multiple_people、no_person、screenshot、illustration、pet、face_not_frontal、face_occluded、side_not_profile、body_not_head_to_calf、too_blurry、too_dark 之一。`
 
