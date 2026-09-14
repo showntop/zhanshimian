@@ -73,6 +73,37 @@ func renderPublishCommand(f *renderingPublishFixture, candidateID string) domain
 	return command
 }
 
+func TestGetRunReturnsCurrentPublicationObjectKey(t *testing.T) {
+	f := newRenderingPublishFixture(t)
+	ctx := context.Background()
+	candidate, err := f.store.RecordCandidate(ctx, domain.RenderRecordCandidateCommand{
+		TaskID: f.task.ID, LeaseToken: f.task.LeaseToken,
+		UserID: f.userA, RenderRunID: f.run.ID, SubjectGeneration: 1, Ordinal: 1,
+		Asset: renderCandidateAsset(), ProviderInvocationID: seedRenderInvocation(t, f.store, f.userA, f.task.OperationID, f.task.ID),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := renderPublishCommand(f, candidate.ID)
+	if _, err = f.store.CommitEvaluation(ctx, command); err != nil {
+		t.Fatal(err)
+	}
+	// 读回路径必须沿 candidate→media_assets 找到已提升的 published key。
+	_, publication, _, err := f.store.GetRun(ctx, f.userA, f.run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if publication == nil {
+		t.Fatal("published run must project its current publication")
+	}
+	if publication.ObjectKey != command.PublishedObject.Key {
+		t.Fatalf("object key = %q, want %q", publication.ObjectKey, command.PublishedObject.Key)
+	}
+	if publication.AssetID == "" {
+		t.Fatal("publication must carry the promoted asset id")
+	}
+}
+
 func TestCommitEvaluationPassPublishesAtomically(t *testing.T) {
 	f := newRenderingPublishFixture(t)
 	ctx := context.Background()

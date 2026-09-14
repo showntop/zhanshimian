@@ -281,7 +281,8 @@ func (s *Store) loadCurrentPublication(ctx context.Context, q planningQuerier, u
 		       a.object_key, a.id::text, p.created_at
 		FROM render_heads h
 		JOIN render_publications p ON p.user_id=h.user_id AND p.plan_variant_id=h.plan_variant_id AND p.id=h.current_publication_id
-		JOIN media_assets a ON a.user_id=p.user_id AND a.id=p.asset_id
+		JOIN render_candidates c ON c.user_id=p.user_id AND c.render_run_id=p.render_run_id AND c.id=p.candidate_id
+		JOIN media_assets a ON a.user_id=c.user_id AND a.id=c.asset_id
 		WHERE h.user_id=$1::uuid AND h.plan_variant_id=$2::uuid`, userID, variantID).Scan(
 		&publication.ID, &publication.UserID, &publication.PlanVariantID, &publication.RenderRunID,
 		&publication.CandidateID, &publication.QualityEvaluationID, &publication.Generation,
