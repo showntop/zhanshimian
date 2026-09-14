@@ -22,7 +22,7 @@ func (s *Store) CreateTodayPlan(ctx context.Context, userID string, plan today.P
 	}
 	err = s.pool.QueryRow(ctx, `
 		INSERT INTO today_plans(user_id, report_id, context, title, summary, steps, active, state, feedback)
-		VALUES ($1::uuid, NULLIF($2::uuid,''), $3, $4, $5, $6, $7, $8, $9)
+		VALUES ($1::uuid, NULLIF($2,'')::uuid, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id::text, created_at, updated_at`,
 		userID, plan.ReportID, contextJSON, plan.Title, plan.Summary, steps,
 		plan.Active, plan.State, plan.Feedback).
