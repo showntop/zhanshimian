@@ -153,7 +153,7 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 		if err := h.progress.Set(ctx, task.OperationID, 9500, StageReportPublishing); err != nil {
 			return domain.TaskResult{}, err
 		}
-		report, quality := buildImmutablePublication(input, draft, evidence, supported, analysisResult.Meta.InvocationID)
+		report, quality := buildImmutablePublication(input, draft, evidence, supported, analysisResult.Meta.InvocationID, evidence.Meta.InvocationID)
 		reportID, err := h.repo.PrepareReport(ctx, domain.PrepareReportParams{
 			RunID:    input.Run.ID,
 			UserID:   task.UserID,
@@ -212,6 +212,7 @@ func buildImmutablePublication(
 	evidence ai.EvidenceResult,
 	supported []domain.DraftFinding,
 	invocationID string,
+	evaluatorInvocationID string,
 ) (domain.Report, domain.QualityEvaluation) {
 	itemsByRole := make(map[domain.PhotoRole]domain.PhotoSetItem, len(input.PhotoSet.Items))
 	for _, item := range input.PhotoSet.Items {
@@ -262,12 +263,13 @@ func buildImmutablePublication(
 		"draft_findings":     len(draft.Findings),
 	})
 	quality := domain.QualityEvaluation{
-		UserID:         input.Run.UserID,
-		SubjectType:    domain.QualitySubjectReport,
-		Policy:         domain.QualityPolicyRef{Version: input.Run.QualityPolicyVersion},
-		Decision:       domain.QualityDecisionPass,
-		ReasonCodes:    reasonCodes,
-		InternalScores: scores,
+		UserID:                 input.Run.UserID,
+		SubjectType:            domain.QualitySubjectReport,
+		Policy:                 domain.QualityPolicyRef{Version: input.Run.QualityPolicyVersion},
+		Decision:               domain.QualityDecisionPass,
+		ReasonCodes:            reasonCodes,
+		InternalScores:         scores,
+		EvaluatorInvocationID:  evaluatorInvocationID,
 	}
 	return report, quality
 }

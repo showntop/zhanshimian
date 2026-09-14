@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type InvocationStatus string
 
@@ -66,4 +69,25 @@ type FinishInvocation struct {
 	LatencyMS         *int
 	ErrorClass        ErrorClass
 	ErrorCode         string
+}
+
+// InvocationScope 是把一次 AI 调用归集到 (user, operation, task, attempt)
+// 的任务身份。taskrunner 在 Execute 前注入 ctx；provider 运行时读取它决定
+// 是否写 provider_invocations 台账（无 scope 的同步 API 调用不写）。
+type InvocationScope struct {
+	UserID      string
+	OperationID string
+	TaskID      string
+	AttemptNo   int
+}
+
+type invocationScopeKey struct{}
+
+func WithInvocationScope(ctx context.Context, scope InvocationScope) context.Context {
+	return context.WithValue(ctx, invocationScopeKey{}, scope)
+}
+
+func InvocationScopeFrom(ctx context.Context) (InvocationScope, bool) {
+	scope, ok := ctx.Value(invocationScopeKey{}).(InvocationScope)
+	return scope, ok
 }

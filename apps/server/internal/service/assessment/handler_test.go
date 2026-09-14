@@ -17,7 +17,7 @@ func TestHandlerRunsGatesInOrderAndPublishesSupportedFindings(t *testing.T) {
 		{Key: "f2", Supported: false, Confidence: .91, ReasonCode: "observation_not_visible"},
 		{Key: "f3", Supported: true, Confidence: .97},
 		{Key: "f4", Supported: true, Confidence: .96},
-	}}
+	}, Meta: ai.InvocationMeta{InvocationID: "inv-evidence"}}
 	result, err := spy.handler.Execute(ctx, spy.lease)
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
@@ -34,6 +34,12 @@ func TestHandlerRunsGatesInOrderAndPublishesSupportedFindings(t *testing.T) {
 	}
 	if spy.repo.prepared == nil || len(spy.repo.prepared.Findings) != 3 {
 		t.Fatalf("prepared findings = %v, want 3", findingsLen(spy.repo.prepared))
+	}
+	if spy.repo.prepared.Report.ProviderInvocationID != "inv-analysis" {
+		t.Fatalf("report must reference the analysis invocation, got %q", spy.repo.prepared.Report.ProviderInvocationID)
+	}
+	if spy.repo.prepared.Quality.EvaluatorInvocationID != "inv-evidence" {
+		t.Fatalf("quality evaluation must reference the evidence invocation, got %q", spy.repo.prepared.Quality.EvaluatorInvocationID)
 	}
 	outcome, err := spy.handler.Commit(ctx, spy.lease, result)
 	if err != nil {

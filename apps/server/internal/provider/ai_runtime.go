@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zhanshimian/server/internal/domain"
 	providerai "github.com/zhanshimian/server/internal/provider/ai"
 )
 
@@ -81,6 +82,7 @@ type InvocationMeta struct {
 	Protocol         string  `json:"protocol"`
 	Model            string  `json:"model"`
 	Source           string  `json:"source,omitempty"`
+	InvocationID     string  `json:"invocation_id,omitempty"`
 	RequestID        string  `json:"request_id,omitempty"`
 	LatencyMS        int64   `json:"latency_ms"`
 	InputTokens      int     `json:"input_tokens,omitempty"`
@@ -107,10 +109,12 @@ type ImageEditResult struct {
 }
 
 type AIRuntime struct {
-	models map[string]AIModel
-	routes map[string]AIRoute
-	client *http.Client
-	logger *slog.Logger
+	models               map[string]AIModel
+	routes               map[string]AIRoute
+	client               *http.Client
+	logger               *slog.Logger
+	recorder             *providerai.InvocationRecorder
+	routingConfigVersion string
 }
 
 func NewAIRuntime(models []AIModel, routes []AIRoute, client *http.Client, logger *slog.Logger) (*AIRuntime, error) {
@@ -147,6 +151,121 @@ func NewAIRuntime(models []AIModel, routes []AIRoute, client *http.Client, logge
 	return runtime, nil
 }
 
+// SetInvocationRecorder 接上 provider_invocations 台账：装配后、且 ctx 携带
+// domain.InvocationScope 时，每一次模型网络调用（含 fallback 的每次尝试）
+// 都会落一行台账，返回的 Meta.InvocationID 是台账行 ID——reports、plan_sets、
+// render_candidates 的 NOT NULL 外键都引用它。无 scope 的调用不写台账。
+func (r *AIRuntime) SetInvocationRecorder(recorder *providerai.InvocationRecorder, routingConfigVersion string) {
+	r.recorder = recorder
+	r.routingConfigVersion = routingConfigVersion
+}
+
+// invocationRecorderFor 返回可用的台账记录器与任务身份；任一缺失则跳过记录。
+func (r *AIRuntime) invocationRecorderFor(ctx context.Context) (*providerai.InvocationRecorder, domain.InvocationScope, bool) {
+	if r.recorder == nil {
+		return nil, domain.InvocationScope{}, false
+	}
+	scope, ok := domain.InvocationScopeFrom(ctx)
+	if !ok || scope.UserID == "" || scope.OperationID == "" || scope.TaskID == "" {
+		return nil, domain.InvocationScope{}, false
+	}
+	return r.recorder, scope, true
+}
+
+// recordStructuredCall 包一次结构化模型调用：台账先 start 后 finish，
+// 成功时把台账行 ID 写回 result.Meta.InvocationID。
+func (r *AIRuntime) recordStructuredCall(ctx context.Context, capability string, model AIModel, input StructuredRequest, call func(context.Context) (StructuredResult, error)) (StructuredResult, error) {
+	recorder, scope, ok := r.invocationRecorderFor(ctx)
+	if !ok {
+		return call(ctx)
+	}
+	var result StructuredResult
+	_, meta, err := recorder.Record(ctx, domain.StartInvocation{
+		UserID: scope.UserID, OperationID: scope.OperationID, TaskID: scope.TaskID, AttemptNo: scope.AttemptNo,
+		Capability: capability, RoutingConfigVersion: r.routingConfigVersion,
+		ProviderKey: model.Vendor, ModelKey: model.ID, Protocol: model.Protocol,
+		RequestHash: structuredRequestHash(capability, input), InputImages: len(input.Images),
+	}, func(callCtx context.Context) (providerai.CallResult, error) {
+		var callErr error
+		result, callErr = call(callCtx)
+		if callErr != nil {
+			return providerai.CallResult{}, callErr
+		}
+		return providerai.CallResult{
+			ProviderRequestID: result.Meta.RequestID,
+			InputTokens:       intPtr(result.Meta.InputTokens),
+			OutputTokens:      intPtr(result.Meta.OutputTokens),
+			InputImages:       intPtr(result.Meta.InputImages),
+			OutputImages:      intPtr(result.Meta.OutputImages),
+			EstimatedCostCNY:  floatPtr(result.Meta.EstimatedCostCNY),
+		}, nil
+	})
+	if err == nil {
+		result.Meta.InvocationID = meta.InvocationID
+	}
+	return result, err
+}
+
+// recordEditCall 与 recordStructuredCall 对称，包一次图片生成调用。
+func (r *AIRuntime) recordEditCall(ctx context.Context, capability string, model AIModel, input ImageEditRequest, call func(context.Context) (ImageEditResult, error)) (ImageEditResult, error) {
+	recorder, scope, ok := r.invocationRecorderFor(ctx)
+	if !ok {
+		return call(ctx)
+	}
+	var result ImageEditResult
+	_, meta, err := recorder.Record(ctx, domain.StartInvocation{
+		UserID: scope.UserID, OperationID: scope.OperationID, TaskID: scope.TaskID, AttemptNo: scope.AttemptNo,
+		Capability: capability, RoutingConfigVersion: r.routingConfigVersion,
+		ProviderKey: model.Vendor, ModelKey: model.ID, Protocol: model.Protocol,
+		RequestHash: editRequestHash(capability, input), InputImages: len(input.Images),
+	}, func(callCtx context.Context) (providerai.CallResult, error) {
+		var callErr error
+		result, callErr = call(callCtx)
+		if callErr != nil {
+			return providerai.CallResult{}, callErr
+		}
+		return providerai.CallResult{
+			ProviderRequestID: result.Meta.RequestID,
+			InputTokens:       intPtr(result.Meta.InputTokens),
+			OutputTokens:      intPtr(result.Meta.OutputTokens),
+			InputImages:       intPtr(result.Meta.InputImages),
+			OutputImages:      intPtr(result.Meta.OutputImages),
+			EstimatedCostCNY:  floatPtr(result.Meta.EstimatedCostCNY),
+		}, nil
+	})
+	if err == nil {
+		result.Meta.InvocationID = meta.InvocationID
+	}
+	return result, err
+}
+
+// structuredRequestHash 只覆盖可脱敏的请求形状：能力、指令、提示词、schema
+// 名与图片角色/类型序列。图片字节与 URL 一律不进哈希输入。
+func structuredRequestHash(capability string, input StructuredRequest) string {
+	var b strings.Builder
+	b.WriteString(capability)
+	b.WriteString("\ninstructions:" + input.Instructions)
+	b.WriteString("\nprompt:" + input.Prompt)
+	b.WriteString("\nschema:" + input.SchemaName)
+	for _, image := range input.Images {
+		b.WriteString("\nimage:" + image.Kind + ":" + image.MIMEType)
+	}
+	return b.String()
+}
+
+func editRequestHash(capability string, input ImageEditRequest) string {
+	var b strings.Builder
+	b.WriteString(capability)
+	b.WriteString("\nprompt:" + input.Prompt)
+	b.WriteString("\nsize:" + input.Size + "\nquality:" + input.Quality)
+	for _, image := range input.Images {
+		b.WriteString("\nimage:" + image.Kind + ":" + image.MIMEType)
+	}
+	return b.String()
+}
+
+func intPtr(v int) *int { return &v }
+
 func (r *AIRuntime) HasRoute(capability string) bool {
 	_, ok := r.routes[capability]
 	return ok
@@ -176,7 +295,7 @@ func (r *AIRuntime) StructuredCompatible(ctx context.Context, request providerai
 		return providerai.StructuredResult{}, err
 	}
 	return providerai.StructuredResult{JSON: result.JSON, Meta: providerai.InvocationMeta{
-		InvocationID: result.Meta.RequestID, ModelKey: result.Meta.ModelID, Protocol: result.Meta.Protocol,
+		InvocationID: result.Meta.InvocationID, ModelKey: result.Meta.ModelID, Protocol: result.Meta.Protocol,
 		ProviderRequestID: result.Meta.RequestID, LatencyMS: int(result.Meta.LatencyMS),
 		EstimatedCostCNY:  floatPtr(result.Meta.EstimatedCostCNY),
 	}}, nil
@@ -202,19 +321,24 @@ func (r *AIRuntime) Structured(ctx context.Context, capability string, input Str
 			continue
 		}
 		started := time.Now()
-		var result StructuredResult
-		var err error
-		if model.Protocol == "openai_chat_completions" {
-			result, err = r.openAIChatCompletions(ctx, capability, model, input)
-		} else {
-			result, err = r.openAIResponses(ctx, capability, model, input)
-		}
-		if err == nil {
-			result.JSON = normalizeStructuredJSON(result.JSON)
-			if input.Validate != nil {
-				err = input.Validate(result.JSON)
+		result, err := r.recordStructuredCall(ctx, capability, model, input, func(callCtx context.Context) (StructuredResult, error) {
+			var res StructuredResult
+			var callErr error
+			if model.Protocol == "openai_chat_completions" {
+				res, callErr = r.openAIChatCompletions(callCtx, capability, model, input)
+			} else {
+				res, callErr = r.openAIResponses(callCtx, capability, model, input)
 			}
-		}
+			// 域校验计入这次 invocation：provider 返回 200 但载荷不合契约，
+			// 对“每阶段成功率/fallback 命中率”而言就是一次失败调用。
+			if callErr == nil {
+				res.JSON = normalizeStructuredJSON(res.JSON)
+				if input.Validate != nil {
+					callErr = input.Validate(res.JSON)
+				}
+			}
+			return res, callErr
+		})
 		if err == nil {
 			if index > 0 {
 				result.Meta.FallbackReason = strings.Join(causes, "; ")
@@ -268,18 +392,21 @@ func (r *AIRuntime) EditImageOnModel(ctx context.Context, modelID, capability st
 	}
 	var result ImageEditResult
 	var err error
-	switch model.Protocol {
-	case "openai_image_edit":
-		result, err = r.openAIImageEdit(ctx, capability, model, input)
-	case "dashscope_wan":
-		result, err = r.dashScopeImageEdit(ctx, capability, model, input)
-	case "dashscope_wanx_imageedit":
-		result, err = r.dashScopeWanxImageEdit(ctx, capability, model, input)
-	case "ark_image":
-		result, err = r.arkImageEdit(ctx, capability, model, input)
-	default:
-		err = fmt.Errorf("incompatible image protocol %s", model.Protocol)
+	dispatch := func(callCtx context.Context) (ImageEditResult, error) {
+		switch model.Protocol {
+		case "openai_image_edit":
+			return r.openAIImageEdit(callCtx, capability, model, input)
+		case "dashscope_wan":
+			return r.dashScopeImageEdit(callCtx, capability, model, input)
+		case "dashscope_wanx_imageedit":
+			return r.dashScopeWanxImageEdit(callCtx, capability, model, input)
+		case "ark_image":
+			return r.arkImageEdit(callCtx, capability, model, input)
+		default:
+			return ImageEditResult{}, fmt.Errorf("incompatible image protocol %s", model.Protocol)
+		}
 	}
+	result, err = r.recordEditCall(ctx, capability, model, input, dispatch)
 	if err != nil {
 		r.logInvocation(InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model, Source: InvocationSource(ctx)}, err)
 		return ImageEditResult{}, err
@@ -302,20 +429,20 @@ func (r *AIRuntime) EditImage(ctx context.Context, capability string, input Imag
 			continue
 		}
 		started := time.Now()
-		var result ImageEditResult
-		var err error
-		switch model.Protocol {
-		case "openai_image_edit":
-			result, err = r.openAIImageEdit(ctx, capability, model, input)
-		case "dashscope_wan":
-			result, err = r.dashScopeImageEdit(ctx, capability, model, input)
-		case "dashscope_wanx_imageedit":
-			result, err = r.dashScopeWanxImageEdit(ctx, capability, model, input)
-		case "ark_image":
-			result, err = r.arkImageEdit(ctx, capability, model, input)
-		default:
-			err = fmt.Errorf("incompatible image protocol %s", model.Protocol)
-		}
+		result, err := r.recordEditCall(ctx, capability, model, input, func(callCtx context.Context) (ImageEditResult, error) {
+			switch model.Protocol {
+			case "openai_image_edit":
+				return r.openAIImageEdit(callCtx, capability, model, input)
+			case "dashscope_wan":
+				return r.dashScopeImageEdit(callCtx, capability, model, input)
+			case "dashscope_wanx_imageedit":
+				return r.dashScopeWanxImageEdit(callCtx, capability, model, input)
+			case "ark_image":
+				return r.arkImageEdit(callCtx, capability, model, input)
+			default:
+				return ImageEditResult{}, fmt.Errorf("incompatible image protocol %s", model.Protocol)
+			}
+		})
 		if err == nil {
 			if index > 0 {
 				result.Meta.FallbackReason = strings.Join(causes, "; ")

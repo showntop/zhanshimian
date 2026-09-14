@@ -48,7 +48,7 @@ func (c runtimeImageCaller) GenerateOnModel(ctx context.Context, modelID, capabi
 	cost := result.Meta.EstimatedCostCNY
 	return providerai.RouterImageResult{
 		Data: result.Data, MIMEType: result.MIMEType,
-		InvocationID: result.Meta.RequestID, Protocol: result.Meta.Protocol,
+		InvocationID: result.Meta.InvocationID, Protocol: result.Meta.Protocol,
 		ProviderRequestID: result.Meta.RequestID, LatencyMS: result.Meta.LatencyMS,
 		CostCNY: &cost,
 	}, nil

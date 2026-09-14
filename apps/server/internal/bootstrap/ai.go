@@ -1,6 +1,9 @@
 package bootstrap
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -8,6 +11,7 @@ import (
 
 	"github.com/zhanshimian/server/internal/config"
 	"github.com/zhanshimian/server/internal/provider"
+	providerai "github.com/zhanshimian/server/internal/provider/ai"
 	"github.com/zhanshimian/server/internal/repository/postgres"
 	"github.com/zhanshimian/server/internal/storage"
 )
@@ -57,5 +61,19 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 	if err != nil {
 		return AIBundle{}, err
 	}
+	// 台账：worker 任务内（ctx 带 InvocationScope）的每次模型调用都落
+	// provider_invocations，行 ID 供 reports/plan_sets/render_candidates 外键引用。
+	runtime.SetInvocationRecorder(providerai.NewInvocationRecorder(repo, nil), aiRoutingConfigVersion(cfg))
 	return AIBundle{Routes: runtime.RouteSummary(), Runtime: runtime}, nil
+}
+
+// aiRoutingConfigVersion 用路由表内容哈希标识台账里的 routing_config_version：
+// 路由文件无独立 version 字段，内容变化即版本变化。
+func aiRoutingConfigVersion(cfg config.Config) string {
+	canonical, err := json.Marshal(cfg.AIRouting)
+	if err != nil {
+		return "ai-routing:unknown"
+	}
+	sum := sha256.Sum256(canonical)
+	return fmt.Sprintf("%s#%s", cfg.AIRoutingSource, hex.EncodeToString(sum[:])[:12])
 }

@@ -183,6 +183,11 @@ func (r *Runner) execute(ctx context.Context, handler Handler, lease domain.Task
 			result = domain.TaskResult{}
 		}
 	}()
+	// 注入 AI 台账身份：handler 链路里的每次模型调用都按
+	// (user, operation, task, attempt) 落 provider_invocations。
+	ctx = domain.WithInvocationScope(ctx, domain.InvocationScope{
+		UserID: lease.UserID, OperationID: lease.OperationID, TaskID: lease.ID, AttemptNo: lease.Attempt,
+	})
 	return handler.Execute(ctx, lease)
 }
 
