@@ -98,6 +98,7 @@ func (s *Service) Run(ctx context.Context, userID string, input RunInput) (Diagn
 		Tags:          output.Tags,
 		Findings:      output.Findings,
 		Options:       output.Options,
+		MediaAssetID:  input.MediaAssetID,
 		CreatedAt:     time.Now().UTC(),
 	})
 }

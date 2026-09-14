@@ -5,7 +5,6 @@ import (
 
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -39,19 +38,11 @@ func (s *Store) EnsureUserByIdentity(ctx context.Context, provider, identifier, 
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return domain.User{}, err
 	}
-	// wechat_miniapp identities keep the raw openid as users.open_id so rows
-	// created before the identity table still match; other providers get a
-	// synthesized, namespace-separated value (open_id stays NOT NULL UNIQUE).
-	openID := identifier
-	if provider != domain.ProviderWeChatMiniApp {
-		openID = provider + ":" + identifier
-	}
+	// baseline 的 users 没有 open_id：身份唯一性由
+	// user_identities(provider,identifier) UNIQUE 承担，上面的按身份查询
+	// 未命中即首次登录，直接建用户再绑身份。
 	var userID string
-	err = tx.QueryRow(ctx, `INSERT INTO users(open_id,nickname) VALUES($1,$2) ON CONFLICT(open_id) DO NOTHING RETURNING id::text`, openID, nickname).Scan(&userID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		// Pre-migration user row already carries this open_id.
-		err = tx.QueryRow(ctx, `SELECT id::text FROM users WHERE open_id=$1`, openID).Scan(&userID)
-	}
+	err = tx.QueryRow(ctx, `INSERT INTO users(nickname) VALUES($1) RETURNING id::text`, nickname).Scan(&userID)
 	if err != nil {
 		return domain.User{}, err
 	}
@@ -66,8 +57,8 @@ func (s *Store) EnsureUserByIdentity(ctx context.Context, provider, identifier, 
 
 func (s *Store) CreateDevUser(ctx context.Context, nickname string) (domain.User, error) {
 	var user domain.User
-	err := s.pool.QueryRow(ctx, `INSERT INTO users(open_id,nickname) VALUES($1,$2) RETURNING id::text,nickname`,
-		"dev:"+newUUID(), nickname).Scan(&user.ID, &user.Nickname)
+	err := s.pool.QueryRow(ctx, `INSERT INTO users(nickname) VALUES($1) RETURNING id::text,nickname`,
+		nickname).Scan(&user.ID, &user.Nickname)
 	return user, err
 }
 
@@ -218,10 +209,6 @@ func (s *Store) ConsumeSmsCode(ctx context.Context, id string) error {
 }
 
 // ---- 媒体 ----
-
-func (s *Store) CreateMedia(ctx context.Context, userID, kind, storageKey, mime string, size int64) (domain.MediaAsset, error) {
-	return domain.MediaAsset{}, fmt.Errorf("legacy multipart CreateMedia is not supported; use upload intents")
-}
 
 func (s *Store) GetMediaAssets(ctx context.Context, ids []string) ([]domain.MediaAsset, error) {
 	if len(ids) == 0 {

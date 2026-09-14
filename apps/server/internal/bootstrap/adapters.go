@@ -132,7 +132,7 @@ func (a deleteObjectAdapter) Delete(key string) error {
 }
 
 // demoMediaAdapter 提供 Demo 媒体行（POST /v1/media/demo）：
-// 与 legacy CreateDemoMedia 同一实现——内置 demo/<kind>.png，.origin=demo。
+// origin=demo、state=ready 的媒体资产，展示侧映射为 效果示例。
 type demoMediaAdapter struct{ store *postgres.Store }
 
 var demoKinds = map[string]bool{"face": true, "side": true, "body": true, "outfit": true, "product": true, "wardrobe": true}
@@ -141,7 +141,7 @@ func (a demoMediaAdapter) CreateDemoMedia(ctx context.Context, userID, kind stri
 	if !demoKinds[kind] {
 		return domain.MediaAsset{}, fmt.Errorf("%w: unsupported photo kind", account.ErrValidation)
 	}
-	return a.store.CreateMedia(ctx, userID, kind, "demo/"+kind+".png", "image/png", 1)
+	return a.store.InsertDemoMedia(ctx, userID, kind)
 }
 
 // eventWriterAdapter 把 Store 的埋点行写入适配到 httpapi.EventWriter。

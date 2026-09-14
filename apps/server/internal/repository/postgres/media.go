@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -131,4 +133,33 @@ func scanMediaAsset(row rowScanner) (domain.MediaAsset, error) {
 		asset.ProviderInvocationID = *invocationID
 	}
 	return asset, err
+}
+
+// demoMediaPurposes 把 demo 种类映射到 baseline 允许的 purpose：
+// 三图就是三种 purpose；诊断/单品照没有专属 purpose，归入 feedback/wardrobe。
+var demoMediaPurposes = map[string]domain.MediaPurpose{
+	"face":     domain.MediaPurposeFace,
+	"side":     domain.MediaPurposeSide,
+	"body":     domain.MediaPurposeBody,
+	"outfit":   domain.MediaPurposeFeedback,
+	"product":  domain.MediaPurposeFeedback,
+	"wardrobe": domain.MediaPurposeWardrobe,
+}
+
+// InsertDemoMedia 插入一条 demo 媒体资产（POST /v1/media/demo 的存储侧）。
+// object_key 全局唯一（UNIQUE 约束），所以每行都用独立 key；sha256 取
+// key 的摘要，满足 64-hex CHECK，不伪造真实图片哈希之外的语义。
+func (s *Store) InsertDemoMedia(ctx context.Context, userID, kind string) (domain.MediaAsset, error) {
+	purpose, ok := demoMediaPurposes[kind]
+	if !ok {
+		return domain.MediaAsset{}, fmt.Errorf("unsupported demo kind %q", kind)
+	}
+	objectKey := fmt.Sprintf("demo/%s/%s-%s.png", userID, kind, uuid.NewString())
+	sum := sha256.Sum256([]byte(objectKey))
+	return scanMediaAsset(s.pool.QueryRow(ctx, `
+		INSERT INTO media_assets(user_id, origin, purpose, object_key, sha256, mime_type, byte_size, state, display_kind)
+		VALUES($1::uuid, 'demo', $2, $3, $4, 'image/png', 1, 'ready', 'effect_example')
+		RETURNING id::text, user_id::text, origin, purpose, object_key, sha256, mime_type, byte_size,
+		          width, height, state, display_kind, provider_invocation_id::text, created_at, deleted_at`,
+		userID, purpose, objectKey, hex.EncodeToString(sum[:])))
 }
