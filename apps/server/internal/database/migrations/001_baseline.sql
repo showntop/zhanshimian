@@ -11,7 +11,10 @@ $$;
 CREATE TABLE users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   nickname text NOT NULL DEFAULT '',
-  created_at timestamptz NOT NULL DEFAULT now()
+  -- 账户展示头像,与建档三张照片分开;媒体删除时引用清空(FK 在 media_assets 建表后补)。
+  avatar_media_id uuid,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE user_identities (
@@ -186,6 +189,8 @@ CREATE TABLE media_assets (
   CHECK (origin <> 'provider_output' OR state <> 'published' OR mime_type = 'image/jpeg'),
   CHECK (origin <> 'user_upload' OR mime_type IN ('image/jpeg','image/png'))
 );
+
+ALTER TABLE users ADD FOREIGN KEY (avatar_media_id) REFERENCES media_assets(id) ON DELETE SET NULL;
 
 CREATE TABLE upload_intents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
