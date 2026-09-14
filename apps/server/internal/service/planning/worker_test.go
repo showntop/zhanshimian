@@ -147,10 +147,10 @@ func TestHandlerGeneratorContractViolationConsumesContentRetry(t *testing.T) {
 // 和补生成 prompt(实测 reason_codes 里出现整条厂商错误体)。
 func TestHandlerGeneratorContractViolationExtractsInnermostDetail(t *testing.T) {
 	deps := validHandlerDependencies()
-	contractErr := fmt.Errorf("%w: bad step category %q", ErrGeneratorContract, "outfit")
+	contractErr := fmt.Errorf("%w: variant %s repeats step category %q: each variant needs exactly one hair, one makeup and one outfit step", ErrGeneratorContract, "sharp", "outfit")
 	modelErr := fmt.Errorf("vendor-x/model-y: %w", contractErr)
 	combined := &multiCauseError{
-		text:   "all AI models failed for plan_set_generation: vendor-x/model-y: plan set generator contract violation: bad step category \"outfit\"; vendor-x/model-z: 403 {\"error\":{\"message\":\"quota\"}}",
+		text:   "all AI models failed for plan_set_generation: vendor-x/model-y: plan set generator contract violation: variant sharp repeats step category \"outfit\": each variant needs exactly one hair, one makeup and one outfit step; vendor-x/model-z: 403 {\"error\":{\"message\":\"quota\"}}",
 		causes: []error{modelErr, errors.New("vendor-x/model-z: 403 quota JSON blob")},
 	}
 	deps.generator.err = combined
@@ -167,7 +167,7 @@ func TestHandlerGeneratorContractViolationExtractsInnermostDetail(t *testing.T) 
 		t.Fatalf("retry payload = %#v", payload)
 	}
 	got := payload.PriorReasonCodes[0]
-	if !strings.Contains(got, `bad step category "outfit"`) {
+	if !strings.Contains(got, `repeats step category "outfit"`) {
 		t.Fatalf("reason must carry the innermost contract detail: %q", got)
 	}
 	if strings.Contains(got, "403") || strings.Contains(got, "all AI models failed") || strings.Contains(got, "vendor-x") {

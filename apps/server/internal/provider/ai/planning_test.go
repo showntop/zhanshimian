@@ -77,6 +77,35 @@ func TestPlanSetGeneratorRejectsUnknownGroundingSourceType(t *testing.T) {
 	}
 }
 
+// 变体内步骤类别重复(实测 kimi-k3 两次给出 hair+outfit+outfit)时,错误消息
+// 是重试 prompt 唯一能看到的修正线索:必须说清"重复"、点名变体与类别,
+// 笼统的 bad step category 让模型无从下手。
+func TestPlanSetGeneratorNamesRepeatedStepCategory(t *testing.T) {
+	base := validGeneratedPlanSetJSON()
+	// 把 sharp 变体的 makeup 步骤整段换成 outfit 步骤(details 保持 outfit 形状),
+	// 得到 hair+outfit+outfit —— 即第 10 轮 E2E kimi-k3 两次采出的违约形态。
+	makeupStep := `{"category":"makeup","action":"keep","title":"保持干净眉形"`
+	outfitStep := `{"category":"outfit","action":"adjust","title":"换合肩线上装","summary":"用合肩直线版型替代过塌肩线。","details":{"target":"","intensity":"","silhouette":"合肩直线版型","palette":["象牙白"],"layers":["浅色内搭"],"avoid":["夸张图案"],"formality":"smart_casual"},"groundings":[{"source_type":"report_finding","source_id":"21000000-0000-0000-0000-000000000002","reason":"报告观察到肩线偏塌"},{"source_type":"scene_answer","source_id":"weather","reason":"空调环境需要一层外搭"}]}`
+	text := string(base)
+	start := strings.Index(text, makeupStep)
+	end := strings.Index(text, outfitStep)
+	if start < 0 || end < 0 || end < start {
+		t.Fatal("fixture layout changed")
+	}
+	duplicated := []byte(text[:start] + outfitStep + "," + text[end:])
+	runtime := &fakeStructuredRuntime{result: duplicated}
+	_, err := NewPlanSetGenerator(runtime).Generate(context.Background(), validGenerationInput())
+	if !errors.Is(err, ErrGeneratorContract) {
+		t.Fatalf("got %v, want ErrGeneratorContract", err)
+	}
+	if !strings.Contains(err.Error(), "sharp") || !strings.Contains(err.Error(), `"outfit"`) {
+		t.Fatalf("error must name variant and category: %v", err)
+	}
+	if !strings.Contains(err.Error(), "repeats") && !strings.Contains(err.Error(), "重复") {
+		t.Fatalf("error must say the category repeats: %v", err)
+	}
+}
+
 func TestPlanSetGeneratorRejectsBrokenShape(t *testing.T) {
 	runtime := &fakeStructuredRuntime{result: []byte(`{"variants":[{"slot":1,"key":"sharp"}]}`)}
 	if _, err := NewPlanSetGenerator(runtime).Generate(context.Background(), validGenerationInput()); !errors.Is(err, ErrGeneratorContract) {

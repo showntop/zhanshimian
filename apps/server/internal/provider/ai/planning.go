@@ -396,7 +396,7 @@ func validatePlanSetPayload(data []byte) error {
 		if len(variant.Steps) != 3 {
 			return fmt.Errorf("%w: want exactly 3 steps, got %d", ErrGeneratorContract, len(variant.Steps))
 		}
-		if err := validatePlanSteps(variant.Steps); err != nil {
+		if err := validatePlanSteps(variant.Key, variant.Steps); err != nil {
 			return err
 		}
 	}
@@ -410,11 +410,17 @@ var planGroundingSourceTypes = map[string]bool{
 	"report_finding": true, "scene_answer": true, "profile_preference": true, "style_rule": true,
 }
 
-func validatePlanSteps(steps []planStepPayload) error {
+// validatePlanSteps 的错误消息是内容重试 prompt 唯一的修正线索:重复类别必须
+// 说清"重复"并点名变体与类别(实测 kimi-k3 两次采出 hair+outfit+outfit,笼统的
+// bad step category 让模型无从下手),未知类别另行表述。
+func validatePlanSteps(variantKey string, steps []planStepPayload) error {
 	seenCategory := map[string]bool{}
 	for _, step := range steps {
-		if !planStepCategories[step.Category] || seenCategory[step.Category] {
-			return fmt.Errorf("%w: bad step category %q", ErrGeneratorContract, step.Category)
+		if !planStepCategories[step.Category] {
+			return fmt.Errorf("%w: variant %s has unknown step category %q (want hair/makeup/outfit)", ErrGeneratorContract, variantKey, step.Category)
+		}
+		if seenCategory[step.Category] {
+			return fmt.Errorf("%w: variant %s repeats step category %q: each variant needs exactly one hair, one makeup and one outfit step", ErrGeneratorContract, variantKey, step.Category)
 		}
 		seenCategory[step.Category] = true
 		if !planStepActions[step.Action] {
