@@ -133,6 +133,7 @@ type workerRepoFake struct {
 	failCalls         int
 	commitCalls       int
 	lastEnqueued      EnqueueNextCandidateCommand
+	lastFail          FailRunCommand
 	expandGenerations []int64
 	commitErr         error
 }
@@ -173,6 +174,7 @@ func (r *workerRepoFake) FailRun(_ context.Context, command FailRunCommand) erro
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.failCalls++
+	r.lastFail = command
 	r.run.Outcome = command.Outcome
 	return nil
 }
@@ -435,6 +437,33 @@ func TestGenerationSupersededNeverCallsProvider(t *testing.T) {
 	}
 	if len(h.generator.requests) != 0 {
 		t.Fatal("superseded generation must not call the provider")
+	}
+}
+
+// Execute 出错(生成失败/预算耗尽等)时 staged work 不存在,runner 会以
+// TaskDomainFail 调 Commit 收尾:Commit 不得因"staged candidate work missing"
+// 报错,必须用 result.Failure 的错误码把 run/operation 干净终态——否则提交
+// 失败 → lease 过期 → 重试到 attempt 耗尽,run 永久卡在 accepted(线上实测)。
+func TestCommitDomainFailWithoutStagedWorkFailsRunCleanly(t *testing.T) {
+	h := newWorkerHarness(t)
+	outcome, err := h.handler.Commit(context.Background(), renderLease(1), domain.TaskResult{
+		Disposition: domain.TaskDomainFail,
+		Failure:     &domain.TaskFailure{Class: domain.ErrorPermanent, Code: "capability_unavailable"},
+	})
+	if err != nil || outcome != domain.CommitApplied {
+		t.Fatalf("outcome=%s err=%v", outcome, err)
+	}
+	if h.repo.failCalls != 1 {
+		t.Fatalf("FailRun calls = %d, want 1", h.repo.failCalls)
+	}
+	if h.repo.run.Outcome != domain.RenderOutcomeFailed {
+		t.Fatalf("run outcome = %s, want failed", h.repo.run.Outcome)
+	}
+	if h.repo.lastFail.ErrorCode != "capability_unavailable" {
+		t.Fatalf("FailRun error code = %q, want the failure's code", h.repo.lastFail.ErrorCode)
+	}
+	if h.repo.commitCalls != 0 {
+		t.Fatalf("no candidate means no evaluation row, got %d CommitEvaluation calls", h.repo.commitCalls)
 	}
 }
 

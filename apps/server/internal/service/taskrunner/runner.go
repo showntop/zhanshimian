@@ -159,6 +159,8 @@ func (r *Runner) process(ctx context.Context, lease domain.TaskLease, def Defini
 	}
 
 	class, code := classifyExecuteError(err)
+	r.logger.Warn("execute failed", "task_id", lease.ID, "task_type", string(lease.Task.Type),
+		"attempt", lease.Attempt, "class", string(class), "code", code, "error", err)
 	failure := domain.TaskFailure{Class: class, Code: code}
 	if class == domain.ErrorSuperseded {
 		r.fail(ctx, lease, failure, time.Time{})

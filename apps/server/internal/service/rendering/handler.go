@@ -181,9 +181,36 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 
 // Commit 在双 CAS(lease + generation/version)事务中应用 disposition:
 // pass → 发布;retry → 扩预算并入队 Candidate 2;reject/unavailable →
-// run/operation 终态失败。
+// run/operation 终态失败。staged work 只存在于 Execute 走到质量门禁之后;
+// Execute 出错由 runner 直接以 TaskDomainFail 收尾时没有 staged work,
+// 此时按 result.Failure 的错误码终态失败 run,不得误报 staged 缺失。
 func (h *Handler) Commit(ctx context.Context, lease domain.TaskLease, result domain.TaskResult) (domain.CommitOutcome, error) {
 	s := h.service
+
+	if result.Disposition == domain.TaskDomainFail {
+		if work := h.consume(lease); work != nil {
+			return h.commitRejected(ctx, lease, work)
+		}
+		code := "render_failed"
+		if result.Failure != nil && result.Failure.Code != "" {
+			code = result.Failure.Code
+		}
+		if err := s.repo.FailRun(ctx, FailRunCommand{
+			TaskID: lease.Task.ID, LeaseToken: lease.LeaseToken,
+			UserID: lease.Task.UserID, RenderRunID: lease.Task.SubjectID,
+			SubjectGeneration: int(lease.Task.SubjectGeneration),
+			Outcome:           domain.RenderOutcomeFailed,
+			ErrorCode:         code,
+			Retryable:         false,
+		}); err != nil {
+			if errors.Is(err, repository.ErrLeaseLost) || errors.Is(err, ErrRenderSuperseded) {
+				return domain.CommitSuperseded, nil
+			}
+			return domain.CommitSuperseded, err
+		}
+		return domain.CommitApplied, nil
+	}
+
 	work := h.consume(lease)
 	if work == nil {
 		return domain.CommitSuperseded, fmt.Errorf("staged candidate work missing for task %s", lease.ID)
@@ -229,36 +256,39 @@ func (h *Handler) Commit(ctx context.Context, lease domain.TaskLease, result dom
 		_ = enqueuedTaskID
 		return domain.CommitApplied, nil
 
-	default: // domain_failed
-		outcome := domain.RenderOutcomeFailed
-		if work.quality.Decision == string(domain.QualityDecisionError) {
-			outcome = domain.RenderOutcomeFailed
-		}
-		// 把质量评估留档后终态失败。
-		if _, err := s.repo.CommitEvaluation(ctx, CommitEvaluationCommand{
-			TaskID: lease.Task.ID, LeaseToken: lease.LeaseToken,
-			UserID: lease.Task.UserID, RenderRunID: work.run.ID,
-			SubjectGeneration: int(lease.Task.SubjectGeneration),
-			CandidateID:       work.candidate.ID,
-			Evaluation:        evaluationOf(work.quality, s.config.QualityPolicyVersion),
-		}); err != nil && !errors.Is(err, repository.ErrLeaseLost) && !errors.Is(err, ErrRenderSuperseded) {
-			return domain.CommitSuperseded, err
-		}
-		if err := s.repo.FailRun(ctx, FailRunCommand{
-			TaskID: lease.Task.ID, LeaseToken: lease.LeaseToken,
-			UserID: lease.Task.UserID, RenderRunID: work.run.ID,
-			SubjectGeneration: int(lease.Task.SubjectGeneration),
-			Outcome:           outcome,
-			ErrorCode:         "render_quality_rejected",
-			Retryable:         false,
-		}); err != nil {
-			if errors.Is(err, repository.ErrLeaseLost) || errors.Is(err, ErrRenderSuperseded) {
-				return domain.CommitSuperseded, nil
-			}
-			return domain.CommitSuperseded, err
-		}
-		return domain.CommitApplied, nil
+	default:
+		return domain.CommitSuperseded, fmt.Errorf("unsupported render commit disposition %q", result.Disposition)
 	}
+}
+
+// commitRejected 是候选走完质量门禁后的终态失败:先把质量评估留档,再失败
+// run/operation(错误码固定为质量拒绝)。
+func (h *Handler) commitRejected(ctx context.Context, lease domain.TaskLease, work *candidateWork) (domain.CommitOutcome, error) {
+	s := h.service
+	// 把质量评估留档后终态失败。
+	if _, err := s.repo.CommitEvaluation(ctx, CommitEvaluationCommand{
+		TaskID: lease.Task.ID, LeaseToken: lease.LeaseToken,
+		UserID: lease.Task.UserID, RenderRunID: work.run.ID,
+		SubjectGeneration: int(lease.Task.SubjectGeneration),
+		CandidateID:       work.candidate.ID,
+		Evaluation:        evaluationOf(work.quality, s.config.QualityPolicyVersion),
+	}); err != nil && !errors.Is(err, repository.ErrLeaseLost) && !errors.Is(err, ErrRenderSuperseded) {
+		return domain.CommitSuperseded, err
+	}
+	if err := s.repo.FailRun(ctx, FailRunCommand{
+		TaskID: lease.Task.ID, LeaseToken: lease.LeaseToken,
+		UserID: lease.Task.UserID, RenderRunID: work.run.ID,
+		SubjectGeneration: int(lease.Task.SubjectGeneration),
+		Outcome:           domain.RenderOutcomeFailed,
+		ErrorCode:         "render_quality_rejected",
+		Retryable:         false,
+	}); err != nil {
+		if errors.Is(err, repository.ErrLeaseLost) || errors.Is(err, ErrRenderSuperseded) {
+			return domain.CommitSuperseded, nil
+		}
+		return domain.CommitSuperseded, err
+	}
+	return domain.CommitApplied, nil
 }
 
 // mediaToProviderImage 把 MediaAsset 映射为 provider 图片输入。
