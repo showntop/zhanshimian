@@ -47,6 +47,24 @@ func TestPostPlanSetsReturnsPublishedPlanSetOnReuse(t *testing.T) {
 	assertJSONPath(t, res, "data.variants.0.render.state", "unavailable")
 }
 
+// 语义键尚未发布、但同键操作已在途(dedupe 命中)时,必须重放在途 operation
+// 引用让客户端继续轮询;Accepted=false 不等于"已发布",解引用空 PlanSet 会
+// panic(线上实测:卡在重试循环的旧操作使新 POST 拿到 Accepted=false+nil)。
+func TestPostPlanSetsReturnsInFlightOperationOnDedupe(t *testing.T) {
+	api := newPlanSetAPI(t, fakePlanSetService{create: planning.CreateResult{
+		PlanSetID: "10000000-0000-0000-0000-000000000001",
+		Accepted:  false,
+		Operation: domain.OperationRef{ID: "30000000-0000-0000-0000-000000000002", Kind: domain.OperationPlanSet, Status: domain.OperationRunning},
+	}})
+	body := `{"report_id":"20000000-0000-0000-0000-000000000001","scene":"daily","brief":{"activity":"office","weather":"air_conditioned","preparation":"closet","impression":"natural"}}`
+	res := api.Do(http.MethodPost, "/v1/plan-sets", body, map[string]string{"Idempotency-Key": "plan-daily-dedupe"})
+	assertStatus(t, res, http.StatusAccepted)
+	assertJSONPath(t, res, "data.id", "10000000-0000-0000-0000-000000000001")
+	assertJSONPath(t, res, "data.state", "planning")
+	assertJSONPath(t, res, "operation.id", "30000000-0000-0000-0000-000000000002")
+	assertJSONPath(t, res, "operation.status", "running")
+}
+
 func TestGetPlanSetExposesGroundedStepsWithoutInternalFields(t *testing.T) {
 	published := planningPublishedPlanSet()
 	api := newPlanSetAPI(t, fakePlanSetService{get: published})

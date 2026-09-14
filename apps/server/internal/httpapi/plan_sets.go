@@ -46,7 +46,7 @@ func (a *API) createPlanSet(w http.ResponseWriter, r *http.Request) {
 		a.writePlanSetError(w, r, err)
 		return
 	}
-	if !result.Accepted {
+	if !result.Accepted && result.PlanSet != nil {
 		// Semantic key already published: return the immutable plan set.
 		writeData(w, http.StatusOK, publicPlanSet(*result.PlanSet))
 		return
