@@ -60,7 +60,7 @@ func (s *Store) scanShare(row rowScanner) (share.Card, error) {
 	err := row.Scan(&card.ID, &card.Token, &card.SourceType, &card.SourceID, &snapshotJSON,
 		&card.IncludePhoto, &card.Revoked, &card.ExpiresAt, &card.CreatedAt, &card.ObjectKey)
 	if err != nil {
-		return card, err
+		return card, mapNotFound(err)
 	}
 	if err := json.Unmarshal(snapshotJSON, &card.Snapshot); err != nil {
 		return card, err

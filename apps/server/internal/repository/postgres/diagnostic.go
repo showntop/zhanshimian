@@ -83,7 +83,7 @@ func (s *Store) scanDiagnostic(row rowScanner) (diagnostic.Diagnosis, error) {
 		&tags, &findings, &optionsJSON, &d.Saved, &d.CreatedAt,
 		&mediaAssetID, &sourceKind, &displayLabel)
 	if err != nil {
-		return d, err
+		return d, mapNotFound(err)
 	}
 	_ = json.Unmarshal(tags, &d.Tags)
 	_ = json.Unmarshal(findings, &d.Findings)
