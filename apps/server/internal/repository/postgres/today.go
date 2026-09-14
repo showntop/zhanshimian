@@ -107,7 +107,7 @@ func (s *Store) scanTodayPlan(row rowScanner) (today.Plan, error) {
 		&plan.CreatedAt, &plan.UpdatedAt,
 	)
 	if err != nil {
-		return plan, err
+		return plan, mapNotFound(err)
 	}
 	if err := json.Unmarshal(contextJSON, &plan.Context); err != nil {
 		return plan, err

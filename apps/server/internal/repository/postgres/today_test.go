@@ -2,12 +2,29 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/service/today"
 	"github.com/zhanshimian/server/internal/testutil"
 )
+
+// 无生效方案时 CurrentTodayPlan 必须给出 repository.ErrNotFound —— handler 据此
+// 回 200 data:null(契约:无生效方案时 data 为 null)。裸 pgx.ErrNoRows 会被
+// writeServiceError 当成 500(第 9 轮 E2E 实测)。
+func TestCurrentTodayPlanMapsNoRowsToNotFound(t *testing.T) {
+	store := New(testutil.NewPostgres(t))
+	ctx := context.Background()
+	var userID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO users(nickname) VALUES('today-empty') RETURNING id::text`).Scan(&userID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CurrentTodayPlan(ctx, userID); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("empty current must map to ErrNotFound, got %v", err)
+	}
+}
 
 // 无当前报告的用户也要能生成今日方案(报告列可空)。线上实测 NULLIF($2::uuid,'')
 // 把 '' 字面量先转成 uuid,任何输入都 22P02 —— 空 report id 是常态路径,必须钉住。
