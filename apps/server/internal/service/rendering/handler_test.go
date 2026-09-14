@@ -1,6 +1,7 @@
 package rendering
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,6 +15,7 @@ import (
 	"github.com/zhanshimian/server/internal/domain"
 	providerai "github.com/zhanshimian/server/internal/provider/ai"
 	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/service/taskrunner"
 )
 
 // ---- worker fakes ----
@@ -54,10 +56,19 @@ type fakeObjects struct {
 	mu         sync.Mutex
 	candidates map[string][]byte
 	published  map[string][]byte
+	media      map[string][]byte
+	openErr    error
 }
 
 func newFakeObjects() *fakeObjects {
-	return &fakeObjects{candidates: map[string][]byte{}, published: map[string][]byte{}}
+	return &fakeObjects{
+		candidates: map[string][]byte{},
+		published:  map[string][]byte{},
+		media: map[string][]byte{
+			"users/user-1/media/asset-body.jpg": []byte("body-bytes"),
+			"users/user-1/media/asset-face.jpg": []byte("face-bytes"),
+		},
+	}
 }
 
 func (f *fakeObjects) PutCandidate(_ context.Context, input CandidateObjectInput) (StoredObject, error) {
@@ -91,8 +102,16 @@ func (f *fakeObjects) Delete(_ context.Context, key string) error {
 	return nil
 }
 
-func (f *fakeObjects) Open(context.Context, string) (io.ReadCloser, error) {
-	return nil, errors.New("not implemented")
+func (f *fakeObjects) Open(_ context.Context, key string) (io.ReadCloser, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.openErr != nil {
+		return nil, f.openErr
+	}
+	if data, ok := f.media[key]; ok {
+		return io.NopCloser(bytes.NewReader(data)), nil
+	}
+	return nil, errors.New("object not found: " + key)
 }
 
 func sumOf(data []byte) string {
@@ -144,8 +163,8 @@ func (r *workerRepoFake) GetCandidateJob(_ context.Context, _, _ string, ordinal
 	r.jobOrdinal = ordinal
 	return CandidateJob{
 		Run: r.run, Spec: r.spec,
-		Body:     domain.MediaAsset{ID: "asset-body", MIMEType: "image/jpeg"},
-		Face:     domain.MediaAsset{ID: "asset-face", MIMEType: "image/jpeg"},
+		Body:     domain.MediaAsset{ID: "asset-body", MIMEType: "image/jpeg", ObjectKey: "users/user-1/media/asset-body.jpg"},
+		Face:     domain.MediaAsset{ID: "asset-face", MIMEType: "image/jpeg", ObjectKey: "users/user-1/media/asset-face.jpg"},
 		Previous: r.jobPrevious,
 	}, nil
 }
@@ -395,8 +414,31 @@ func TestGeneratorRequestCarriesOnlySpecAndReferences(t *testing.T) {
 	if request.Body.AssetID != "asset-body" || request.Face.AssetID != "asset-face" {
 		t.Fatalf("references = %#v", request)
 	}
+	// 生成调用必须带参考图字节:Provider 只认内联帧,空 Data 会被路由
+	// 直接丢弃(线上实测 400 "Got 0 image items")。
+	if !bytes.Equal(request.Body.Data, []byte("body-bytes")) || !bytes.Equal(request.Face.Data, []byte("face-bytes")) {
+		t.Fatalf("reference bytes not loaded: body=%q face=%q", request.Body.Data, request.Face.Data)
+	}
 	if request.Spec.Output.MIMEType != "image/jpeg" {
 		t.Fatalf("spec = %#v", request.Spec)
+	}
+}
+
+// 对象库读参考图失败(如 COS 抖动)必须按 transient 分类重试,而不是
+// permanent/unclassified 一次性废掉 run。
+func TestReferenceLoadFailureIsTransient(t *testing.T) {
+	h := newWorkerHarness(t)
+	h.objects.openErr = errors.New("cos timeout")
+	_, err := h.handler.Execute(context.Background(), renderLease(1))
+	var taskErr *taskrunner.TaskError
+	if !errors.As(err, &taskErr) {
+		t.Fatalf("got %v, want TaskError", err)
+	}
+	if taskErr.Class != domain.ErrorTransient {
+		t.Fatalf("class = %s, want transient", taskErr.Class)
+	}
+	if len(h.generator.requests) != 0 {
+		t.Fatal("provider must not be called when references fail to load")
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/zhanshimian/server/internal/domain"
@@ -83,8 +84,14 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 		}}, fmt.Errorf("%w: ordinal %d not allowed", ErrQualityRejected, payload.Ordinal)
 	}
 
-	bodyInput := mediaToProviderImage(job.Body, "body")
-	faceInput := mediaToProviderImage(job.Face, "face")
+	bodyInput, err := h.loadReference(ctx, job.Body, "body")
+	if err != nil {
+		return domain.TaskResult{}, err
+	}
+	faceInput, err := h.loadReference(ctx, job.Face, "face")
+	if err != nil {
+		return domain.TaskResult{}, err
+	}
 	generated, err := s.generator.Generate(ctx, providerai.GenerationRequest{
 		RenderRunID:      job.Run.ID,
 		Ordinal:          payload.Ordinal,
@@ -291,9 +298,22 @@ func (h *Handler) commitRejected(ctx context.Context, lease domain.TaskLease, wo
 	return domain.CommitApplied, nil
 }
 
-// mediaToProviderImage 把 MediaAsset 映射为 provider 图片输入。
-func mediaToProviderImage(asset domain.MediaAsset, role string) providerai.ImageInput {
-	return providerai.ImageInput{AssetID: asset.ID, Role: role, MIMEType: asset.MIMEType}
+// loadReference 读参考图字节并映射为 provider 图片输入;Provider 只认内联
+// 帧,空 Data 会被路由静默丢弃。对象库读失败按 transient 分类,交给 task
+// runner 重试而不是一次性废掉 run。
+func (h *Handler) loadReference(ctx context.Context, asset domain.MediaAsset, role string) (providerai.ImageInput, error) {
+	input := providerai.ImageInput{AssetID: asset.ID, Role: role, MIMEType: asset.MIMEType}
+	reader, err := h.service.objects.Open(ctx, asset.ObjectKey)
+	if err != nil {
+		return providerai.ImageInput{}, &taskrunner.TaskError{Class: domain.ErrorTransient, Code: "render_reference_unavailable"}
+	}
+	defer func() { _ = reader.Close() }()
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return providerai.ImageInput{}, &taskrunner.TaskError{Class: domain.ErrorTransient, Code: "render_reference_unavailable"}
+	}
+	input.Data = data
+	return input, nil
 }
 
 // evaluationOf 把 gate 的结果映射到不可变质量评估行。
