@@ -59,7 +59,7 @@ const hairPreviewSelectSQL = `
 func (s *Store) InsertHairPreview(ctx context.Context, userID string, preview hair.Preview) (hair.Preview, error) {
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO hair_previews(user_id, style_id, source_media_asset_id, state)
-		VALUES ($1::uuid, $2, NULLIF($3::uuid,''), $4)
+		VALUES ($1::uuid, $2, NULLIF($3,'')::uuid, $4)
 		RETURNING id::text, created_at, updated_at`,
 		userID, preview.StyleID, preview.SourceMedia.AssetID, preview.State).
 		Scan(&preview.ID, &preview.CreatedAt, &preview.UpdatedAt)

@@ -23,7 +23,7 @@ func (s *Store) InsertShare(ctx context.Context, userID string, source share.Sou
 	}
 	err = s.pool.QueryRow(ctx, `
 		INSERT INTO shares(user_id, token, source_type, source_id, asset_id, snapshot, include_photo, expires_at)
-		VALUES ($1::uuid, gen_random_uuid()::text, $2, $3::uuid, NULLIF($4::uuid,''), $5, $6, $7)
+		VALUES ($1::uuid, gen_random_uuid()::text, $2, $3::uuid, NULLIF($4,'')::uuid, $5, $6, $7)
 		RETURNING id::text, token, created_at`,
 		userID, source.SourceType, source.SourceID, source.AssetID, snapshotJSON, includePhoto, card.ExpiresAt).
 		Scan(&card.ID, &card.Token, &card.CreatedAt)

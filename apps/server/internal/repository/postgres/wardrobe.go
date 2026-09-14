@@ -60,7 +60,7 @@ func (s *Store) GetWardrobeItems(ctx context.Context, userID string) ([]wardrobe
 func (s *Store) InsertWardrobeItem(ctx context.Context, userID string, item wardrobe.Item) (wardrobe.Item, error) {
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO wardrobe_items(user_id, media_asset_id, name, category, color, season, formality, scenes)
-		VALUES ($1::uuid, NULLIF($2::uuid,''), $3, $4, $5, $6, $7, $8)
+		VALUES ($1::uuid, NULLIF($2,'')::uuid, $3, $4, $5, $6, $7, $8)
 		RETURNING id::text, created_at, updated_at`,
 		userID, item.MediaAssetID, item.Name, item.Category, item.Color, item.Season, item.Formality, item.Scenes).
 		Scan(&item.ID, &item.CreatedAt, &item.UpdatedAt)
@@ -85,7 +85,7 @@ func (s *Store) InsertWardrobeOutfit(ctx context.Context, userID string, outfit 
 	}
 	err = s.pool.QueryRow(ctx, `
 		INSERT INTO wardrobe_outfits(user_id, title, note, context, item_ids, selected_plan_id)
-		VALUES ($1::uuid, $2, $3, $4, $5::uuid[], NULLIF($6::uuid,''))
+		VALUES ($1::uuid, $2, $3, $4, $5::uuid[], NULLIF($6,'')::uuid)
 		RETURNING id::text, created_at`,
 		userID, outfit.Title, outfit.Note, contextJSON, outfit.ItemIDs, outfit.SelectedPlanID).
 		Scan(&outfit.ID, &outfit.CreatedAt)

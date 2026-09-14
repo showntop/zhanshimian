@@ -45,7 +45,7 @@ func (s *Store) InsertDiagnostic(ctx context.Context, userID string, d diagnosti
 	err = s.pool.QueryRow(ctx, `
 		INSERT INTO diagnostics(user_id, kind, scene, conclusion, priority_title, priority_copy,
 		                        tags, findings, options, source_media_asset_id)
-		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, NULLIF($10::uuid,''))
+		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, NULLIF($10,'')::uuid)
 		RETURNING id::text, created_at`,
 		userID, d.Kind, d.Scene, d.Conclusion, d.PriorityTitle, d.PriorityCopy,
 		tags, findings, options, d.MediaAssetID).
