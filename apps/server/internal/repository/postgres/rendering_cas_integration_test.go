@@ -197,7 +197,7 @@ func TestRenderCrossTenantReadIs404(t *testing.T) {
 func renderCandidateAsset() domain.RenderCandidateAsset {
 	return domain.RenderCandidateAsset{
 		ObjectKey: "users/x/render-quarantine/run/candidate.jpg",
-			SHA256:    schemaHex64(), MIMEType: "image/jpeg", ByteSize: 4096, Width: 1024, Height: 1536,
+		SHA256:    schemaHex64(), MIMEType: "image/jpeg", ByteSize: 4096, Width: 1024, Height: 1536,
 	}
 }
 

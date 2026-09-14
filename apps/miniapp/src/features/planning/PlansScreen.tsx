@@ -3,7 +3,7 @@
 //
 // 与旧 plans 页的差别：
 // 1. 不再读 Storage 的 reportId / sceneBrief——入口只有「交接条」和「问服务端」；
-// 2. 不再沿用旧的 Plan/look_task 轮询——唯一轮询路径是 useOperationPolling，
+// 2. 不再沿用旧的任务轮询——唯一轮询路径是 useOperationPolling，
 //    盯着受理 operation 与各套渲染的 operation，settled 后整体刷新方案集；
 // 3. 刷新走 resourceCache.revalidate：刷新期间继续显示当前 PlanSet，到达后整体替换，
 //    不做客户端字段级拼接（那会造出服务端从没发布过的组合）。

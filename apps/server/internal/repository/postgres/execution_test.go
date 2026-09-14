@@ -34,8 +34,8 @@ type executionFixture struct {
 	HairStepTitle string
 	Pool          *pgxpool.Pool
 
-	ExecutionA         string
-	HairExecutionStep  string
+	ExecutionA          string
+	HairExecutionStep   string
 	MakeupExecutionStep string
 }
 

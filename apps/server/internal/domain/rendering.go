@@ -269,13 +269,13 @@ type RenderCandidateAsset struct {
 
 // RenderRecordCandidateCommand 在 lease CAS 下记录一个隔离候选。
 type RenderRecordCandidateCommand struct {
-	TaskID            string
-	LeaseToken        string
-	UserID            string
-	RenderRunID       string
-	SubjectGeneration int
-	Ordinal           int
-	Asset             RenderCandidateAsset
+	TaskID               string
+	LeaseToken           string
+	UserID               string
+	RenderRunID          string
+	SubjectGeneration    int
+	Ordinal              int
+	Asset                RenderCandidateAsset
 	ProviderInvocationID string
 }
 
@@ -311,8 +311,8 @@ type RenderCommitEvaluationCommand struct {
 	SubjectGeneration int
 	CandidateID       string
 	Evaluation        QualityEvaluation
-	PublishedObject *RenderPublishedObject
-	PublicationID   string
+	PublishedObject   *RenderPublishedObject
+	PublicationID     string
 }
 
 // RenderPublishedObject 是提升后的发布对象。

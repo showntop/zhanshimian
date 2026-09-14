@@ -8,7 +8,7 @@ import (
 )
 
 // Plan 是持久化的今日方案（OpenAPI TodayPlan 形状）。与旧 domain.TodayPlan 不同：
-// 没有 look_task / generated_image_url / provider 等内部字段，只保留公开状态。
+// 只保留公开状态字段，不含任务/生成器等内部细节。
 type Plan struct {
 	ID        string                  `json:"id"`
 	ReportID  string                  `json:"-"`

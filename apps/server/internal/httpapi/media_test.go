@@ -296,7 +296,6 @@ type combinedObjectStore struct {
 }
 
 type sessionMediaRepo struct {
-	repository.Repository
 	*httpRepoFake
 	*memoryIdempotencyStore
 	users    map[string]domain.User
@@ -335,12 +334,78 @@ func (r *sessionMediaRepo) UserByTokenDigest(_ context.Context, digest []byte) (
 	return user, nil
 }
 
+func (r *sessionMediaRepo) EnsureUserByIdentity(_ context.Context, _, _, nickname string) (domain.User, error) {
+	return domain.User{ID: "id-" + nickname, Nickname: nickname}, nil
+}
+
+func (r *sessionMediaRepo) ListIdentities(_ context.Context, _ string) ([]domain.Identity, error) {
+	return nil, nil
+}
+
+func (r *sessionMediaRepo) DeleteSessionByTokenDigest(_ context.Context, _ []byte) error {
+	return nil
+}
+
+func (r *sessionMediaRepo) GetUserProfile(_ context.Context, _ string) (domain.UserProfile, error) {
+	return domain.UserProfile{}, repository.ErrNotFound
+}
+
+func (r *sessionMediaRepo) SaveUserProfile(_ context.Context, _ string, p domain.UserProfile) (domain.UserProfile, error) {
+	return p, nil
+}
+
+func (r *sessionMediaRepo) UpdateUserNickname(_ context.Context, _ string, _ string) error {
+	return nil
+}
+
+func (r *sessionMediaRepo) UpdateUserAvatar(_ context.Context, _ string, _ string) error {
+	return nil
+}
+
+func (r *sessionMediaRepo) GetUserAvatar(_ context.Context, _ string) (domain.MediaAsset, error) {
+	return domain.MediaAsset{}, repository.ErrNotFound
+}
+
+func (r *sessionMediaRepo) CreateSmsCode(context.Context, string, []byte, time.Time) error {
+	return nil
+}
+
+func (r *sessionMediaRepo) LatestSmsCode(_ context.Context, _ string) (domain.SmsCode, error) {
+	return domain.SmsCode{}, repository.ErrNotFound
+}
+
+func (r *sessionMediaRepo) ConsumeSmsCode(context.Context, string) error { return nil }
+
+func (r *sessionMediaRepo) CountSmsCodesSince(context.Context, string, time.Time) (int64, error) {
+	return 0, nil
+}
+
+func (r *sessionMediaRepo) DeleteUserData(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+
 // newTestDependencies 供 httpapi 测试构造最小 Dependencies：
 // 登录走 account（repo 提供 identity/session 端口），媒体走 media.Service。
 func newTestDependencies(repo interface {
-	repository.Repository
 	media.Repository
 	IdempotencyStore
+	// account 端口（登录/会话）：sessionMediaRepo 提供覆盖实现。
+	CreateDevUser(context.Context, string) (domain.User, error)
+	CreateSession(context.Context, string, []byte, time.Time) error
+	UserByTokenDigest(context.Context, []byte) (domain.User, error)
+	EnsureUserByIdentity(context.Context, string, string, string) (domain.User, error)
+	ListIdentities(context.Context, string) ([]domain.Identity, error)
+	DeleteSessionByTokenDigest(context.Context, []byte) error
+	GetUserProfile(context.Context, string) (domain.UserProfile, error)
+	SaveUserProfile(context.Context, string, domain.UserProfile) (domain.UserProfile, error)
+	UpdateUserNickname(context.Context, string, string) error
+	UpdateUserAvatar(context.Context, string, string) error
+	GetUserAvatar(context.Context, string) (domain.MediaAsset, error)
+	CreateSmsCode(context.Context, string, []byte, time.Time) error
+	LatestSmsCode(context.Context, string) (domain.SmsCode, error)
+	ConsumeSmsCode(context.Context, string) error
+	CountSmsCodesSince(context.Context, string, time.Time) (int64, error)
+	DeleteUserData(context.Context, string) ([]string, error)
 }, objects storage.ObjectStorage) Dependencies {
 	deps := Dependencies{
 		Idempotency: repo,

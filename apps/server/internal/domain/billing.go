@@ -94,9 +94,9 @@ type ReconcileFailure struct {
 
 // ReconcileResult summarizes one reconciliation sweep over terminal operations.
 type ReconcileResult struct {
-	Settled int
+	Settled  int
 	Refunded int
-	Failed  []ReconcileFailure
+	Failed   []ReconcileFailure
 }
 
 type BillingWallet struct {

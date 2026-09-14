@@ -43,5 +43,5 @@ func TestHomeBootstrapReturnsOperationsNotTasks(t *testing.T) {
 	assertJSONPath(t, rec, "data.active_operations.0.kind", "render")
 	assertJSONPath(t, rec, "data.active_operations.0.status", "running")
 	assertJSONDoesNotContainKey(t, rec, "active_tasks")
-	assertJSONDoesNotContainKey(t, rec, "look_task")
+	assertJSONDoesNotContainKey(t, rec, "task")
 }

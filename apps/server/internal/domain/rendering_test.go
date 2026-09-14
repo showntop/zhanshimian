@@ -36,11 +36,11 @@ func TestRenderRunViewUsesProductCopyAndHidesInternalScores(t *testing.T) {
 
 func TestRenderRunViewProjectsNonTerminalStages(t *testing.T) {
 	cases := []struct {
-		outcome    string
-		stageCode  string
-		wantState  string
-		wantMedia  bool
-		wantRetry  bool
+		outcome   string
+		stageCode string
+		wantState string
+		wantMedia bool
+		wantRetry bool
 	}{
 		{"", "render.generating", RenderStateGenerating, false, false},
 		{"", "render.checking", RenderStateChecking, false, true},
