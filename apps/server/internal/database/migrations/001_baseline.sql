@@ -33,6 +33,19 @@ CREATE TABLE user_sessions (
   UNIQUE (user_id, id)
 );
 
+-- 手机号验证码。只存摘要（sha256(phone:code)），明文验证码不落库；
+-- 60s 冷却按最新一条未使用记录判断，5/hour/phone 按创建时间计数。
+CREATE TABLE sms_codes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  phone text NOT NULL,
+  code_digest bytea NOT NULL,
+  expires_at timestamptz NOT NULL,
+  used_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX sms_codes_phone_created_idx ON sms_codes(phone, created_at DESC);
+CREATE INDEX sms_codes_created_idx ON sms_codes(created_at);
+
 CREATE TABLE user_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -776,6 +789,25 @@ CREATE TABLE billing_ledger (
 CREATE UNIQUE INDEX billing_ledger_order_purchase_uniq
   ON billing_ledger(user_id, order_id, entry_type)
   WHERE order_id IS NOT NULL;
+
+-- 每日免费额度/限流计数(daily_remaining 是 BillingSummary 必填契约)。
+CREATE TABLE billing_usage (
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  bucket timestamptz NOT NULL,
+  action text NOT NULL,
+  count int NOT NULL DEFAULT 0 CHECK (count >= 0),
+  PRIMARY KEY (user_id, bucket, action)
+);
+
+-- 产品埋点。静默失败由调用方负责,埋点永不影响业务流程。
+CREATE TABLE product_events (
+  id bigserial PRIMARY KEY,
+  user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  name text NOT NULL,
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX product_events_name_created_idx ON product_events(name, created_at DESC);
 
 -- ============ 外围持久化 ============
 -- 外围用例只读质量核心的稳定投影（report/plan variant/render publication/operation），

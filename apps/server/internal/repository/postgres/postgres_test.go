@@ -40,6 +40,7 @@ func TestDeleteUserDataCoversAllUserTables(t *testing.T) {
 	// 表集合与 001_baseline.sql 对齐。
 	for _, table := range []string{
 		"billing_ledger", "billing_reservations", "billing_orders", "billing_wallets",
+		"billing_usage", "sms_codes",
 		"generation_feedback", "execution_feedback", "preference_memories",
 		"execution_events", "execution_steps", "executions", "plan_selections",
 		"shares", "today_plans", "wardrobe_outfits", "wardrobe_items",

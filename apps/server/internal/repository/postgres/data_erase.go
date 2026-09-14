@@ -10,6 +10,9 @@ var deleteUserDataQueries = []string{
 	`DELETE FROM billing_reservations WHERE user_id=$1`,
 	`DELETE FROM billing_orders WHERE user_id=$1`,
 	`DELETE FROM billing_wallets WHERE user_id=$1`,
+	`DELETE FROM billing_usage WHERE user_id=$1`,
+	// 手机号是 PII:sms_codes 按 phone 索引,须在身份行删除前清掉。
+	`DELETE FROM sms_codes WHERE phone IN (SELECT identifier FROM user_identities WHERE user_id=$1 AND provider='phone')`,
 	`DELETE FROM generation_feedback WHERE user_id=$1`,
 	`DELETE FROM execution_feedback WHERE user_id=$1`,
 	`DELETE FROM preference_memories WHERE user_id=$1`,
@@ -28,7 +31,6 @@ var deleteUserDataQueries = []string{
 	`DELETE FROM hair_previews WHERE user_id=$1`,
 	`DELETE FROM product_events WHERE user_id=$1`,
 	`DELETE FROM operations WHERE user_id=$1`,
-	`DELETE FROM analyses WHERE user_id=$1`,
 	`DELETE FROM analysis_runs WHERE user_id=$1`,
 	`DELETE FROM reports WHERE user_id=$1`,
 	`DELETE FROM photo_sets WHERE user_id=$1`,

@@ -39,17 +39,17 @@ func TestBaselineCreatesOnlyNewSchema(t *testing.T) {
 
 	want := []string{
 		"advisor_conversations", "advisor_messages", "analysis_runs",
-		"billing_ledger", "billing_orders", "billing_reservations", "billing_wallets",
+		"billing_ledger", "billing_orders", "billing_reservations", "billing_usage", "billing_wallets",
 		"diagnostics", "execution_events", "execution_feedback", "execution_steps",
 		"executions", "generation_feedback", "hair_previews",
 		"idempotency_keys", "media_assets", "object_gc_jobs", "operations",
 		"photo_set_items", "photo_sets", "plan_selections", "plan_sets",
 		"plan_step_groundings", "plan_steps", "plan_variants",
-		"preference_memories", "provider_invocations",
+		"preference_memories", "product_events", "provider_invocations",
 		"quality_evaluations", "render_candidates", "render_heads",
 		"render_publications", "render_runs", "render_specs",
 		"report_findings", "reports", "schema_migrations",
-		"shares", "tasks", "today_plans",
+		"shares", "sms_codes", "tasks", "today_plans",
 		"upload_intents", "user_identities", "user_profiles", "user_sessions",
 		"users", "wardrobe_items", "wardrobe_outfits",
 	}
@@ -63,7 +63,7 @@ func TestBaselineCreatesOnlyNewSchema(t *testing.T) {
 	}
 	legacy := map[string]bool{
 		"analyses": true, "plans": true, "feedback": true, "tool_results": true,
-		"share_cards": true, "advisor_actions": true, "billing_usage": true,
+		"share_cards": true, "advisor_actions": true,
 	}
 	for _, table := range got {
 		if legacy[table] {
@@ -161,7 +161,7 @@ func TestResetThenMigrateRebuildsFromScratch(t *testing.T) {
 		t.Fatal(err)
 	}
 	rows.Close()
-	if tableCount != 46 {
-		t.Fatalf("rebuilt table count = %d, want 46", tableCount)
+	if tableCount != 49 {
+		t.Fatalf("rebuilt table count = %d, want 49", tableCount)
 	}
 }
