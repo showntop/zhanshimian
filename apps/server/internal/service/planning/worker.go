@@ -92,7 +92,9 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 		// 内容重试预算、携带 reason code 再采样,而不是直接判 operation 失败;
 		// 两次都违约才 fail closed。模型采样有方差,基础设施重试无意义。
 		if errors.Is(err, ErrGeneratorContract) {
-			return h.executeRejection(ctx, lease, payload, []string{ReasonGeneratorContract}, "")
+			// reason code 带上违约细节:补生成的 prompt 据此能定位要修的内容,
+			// 而不是只看到一个无法行动的 code。
+			return h.executeRejection(ctx, lease, payload, []string{reasonWithDetail(ReasonGeneratorContract, err.Error())}, "")
 		}
 		// Transient provider errors bubble up for an infrastructure retry of the same task.
 		return domain.TaskResult{}, err
@@ -134,7 +136,9 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 func (h *Handler) evaluateCandidate(ctx context.Context, report ReportSnapshot, payload GenerateTaskPayload, generated GeneratedPlanSet) ([]string, string, error) {
 	var reasonCodes []string
 	for _, violation := range ValidateCandidate(ValidationInput{Report: report, Brief: payload.Brief, Candidate: generated}) {
-		reasonCodes = append(reasonCodes, violation.Code)
+		// reason code 携带门禁细节(哪个变体/步骤、哪个词):补生成的 prompt
+		// 只看得见 prior_reason_codes,没有细节模型无法定位要修的内容。
+		reasonCodes = append(reasonCodes, reasonWithDetail(violation.Code, violation.Detail))
 	}
 	if len(reasonCodes) > 0 {
 		return reasonCodes, "", nil
@@ -149,6 +153,17 @@ func (h *Handler) evaluateCandidate(ctx context.Context, report ReportSnapshot, 
 		return verification.ReasonCodes, verification.InvocationID, nil
 	}
 	return nil, verification.InvocationID, nil
+}
+
+// reasonWithDetail joins a stable reason code with its human-actionable
+// detail. Reason codes are free-form text (DB text[] and prompt JSON), so
+// carrying the detail is contract-compatible and lets the single content
+// regeneration see exactly what to fix.
+func reasonWithDetail(code, detail string) string {
+	if detail == "" {
+		return code
+	}
+	return code + ": " + detail
 }
 
 func (h *Handler) executeRejection(ctx context.Context, lease domain.TaskLease, payload GenerateTaskPayload, reasonCodes []string, evaluatorID string) (domain.TaskResult, error) {

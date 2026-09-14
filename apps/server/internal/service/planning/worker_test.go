@@ -60,8 +60,8 @@ func TestHandlerEnqueuesSecondContentAttemptAfterQualityReject(t *testing.T) {
 	if payload.ContentAttempt != 2 {
 		t.Fatalf("retry payload = %#v", payload)
 	}
-	if len(payload.PriorReasonCodes) == 0 || payload.PriorReasonCodes[0] != ReasonDifferenceInsufficient {
-		t.Fatalf("retry must carry prior reason codes: %#v", payload.PriorReasonCodes)
+	if len(payload.PriorReasonCodes) == 0 || !strings.HasPrefix(payload.PriorReasonCodes[0], ReasonDifferenceInsufficient+": ") {
+		t.Fatalf("retry must carry prior reason codes with gate detail: %#v", payload.PriorReasonCodes)
 	}
 	if got := deps.enqueuer.command.Task.DedupeKey; got == "" || !strings.Contains(got, ":content:2") {
 		t.Fatalf("retry dedupe key = %q", got)
@@ -130,8 +130,12 @@ func TestHandlerGeneratorContractViolationConsumesContentRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	payload := deps.enqueuer.command.Task.Payload.(GenerateTaskPayload)
-	if payload.ContentAttempt != 2 || len(payload.PriorReasonCodes) == 0 || payload.PriorReasonCodes[0] != ReasonGeneratorContract {
+	if payload.ContentAttempt != 2 || len(payload.PriorReasonCodes) == 0 {
 		t.Fatalf("retry payload = %#v", payload)
+	}
+	if !strings.HasPrefix(payload.PriorReasonCodes[0], ReasonGeneratorContract+": ") ||
+		!strings.Contains(payload.PriorReasonCodes[0], "makeup details carry outfit-only fields") {
+		t.Fatalf("retry must carry the contract violation detail: %#v", payload.PriorReasonCodes)
 	}
 	if deps.enqueuer.command.Quality.Decision != qualityDecisionRetry {
 		t.Fatalf("quality record = %#v", deps.enqueuer.command.Quality)
@@ -147,6 +151,42 @@ func TestHandlerGeneratorContractViolationFailsClosedOnSecondAttempt(t *testing.
 	}
 	if deps.store.prepareCalls != 0 || deps.operations.failCalls != 1 {
 		t.Fatal("second contract violation must fail closed without publish")
+	}
+}
+
+// 确定性门禁只给 code 不给细节时,补生成的模型只知道"犯了文案政策"却不知道
+// 是哪个词——上一版线上两次内容采样都撞同一个词(纯棉)而 fail closed。reason
+// code 必须携带门禁细节(哪个变体/步骤、哪个词),让唯一一次补生成能精确修正。
+func TestHandlerGateViolationCarriesWordingDetailIntoRetry(t *testing.T) {
+	deps := validHandlerDependencies()
+	candidate := validValidationInput().Candidate
+	// outfit 步骤无 profile grounding,材质词触发 copy policy 门禁。
+	for i := range candidate.Variants[0].Steps {
+		if candidate.Variants[0].Steps[i].Category == domain.StepCategoryOutfit {
+			candidate.Variants[0].Steps[i].Summary = "选一件纯棉衬衫应对空调环境。"
+		}
+	}
+	deps.generator.output = candidate
+	handler := NewHandlerForTest(deps)
+	result, err := handler.Execute(context.Background(), validGenerateLease(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Disposition != domain.TaskEnqueueNext {
+		t.Fatalf("copy policy violation must consume content retry: %#v", result)
+	}
+	if _, err := handler.Commit(context.Background(), validGenerateLease(1), result); err != nil {
+		t.Fatal(err)
+	}
+	payload := deps.enqueuer.command.Task.Payload.(GenerateTaskPayload)
+	found := false
+	for _, code := range payload.PriorReasonCodes {
+		if strings.HasPrefix(code, ReasonCopyPolicyViolation+": ") && strings.Contains(code, "纯棉") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("retry reason codes must name the banned word: %#v", payload.PriorReasonCodes)
 	}
 }
 
