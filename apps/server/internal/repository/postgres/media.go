@@ -147,15 +147,15 @@ var demoMediaPurposes = map[string]domain.MediaPurpose{
 // InsertDemoMedia 插入一条 demo 媒体资产（POST /v1/media/demo 的存储侧）。
 // 对象字节由调用方（bootstrap demoMediaAdapter，内置 assets/looks/*.png）
 // 先写入对象存储；这里只落满足全部 CHECK 的媒体行。
-func (s *Store) InsertDemoMedia(ctx context.Context, userID, kind, objectKey, sha256Hex string, byteSize int64) (domain.MediaAsset, error) {
+func (s *Store) InsertDemoMedia(ctx context.Context, userID, kind, objectKey, sha256Hex string, byteSize int64, mimeType string) (domain.MediaAsset, error) {
 	purpose, ok := demoMediaPurposes[kind]
 	if !ok {
 		return domain.MediaAsset{}, fmt.Errorf("unsupported demo kind %q", kind)
 	}
 	return scanMediaAsset(s.pool.QueryRow(ctx, `
 		INSERT INTO media_assets(user_id, origin, purpose, object_key, sha256, mime_type, byte_size, state, display_kind)
-		VALUES($1::uuid, 'demo', $2, $3, $4, 'image/png', $5, 'ready', 'effect_example')
+		VALUES($1::uuid, 'demo', $2, $3, $4, $6, $5, 'ready', 'effect_example')
 		RETURNING id::text, user_id::text, origin, purpose, object_key, sha256, mime_type, byte_size,
 		          width, height, state, display_kind, provider_invocation_id::text, created_at, deleted_at`,
-		userID, purpose, objectKey, sha256Hex, byteSize))
+		userID, purpose, objectKey, sha256Hex, byteSize, mimeType))
 }

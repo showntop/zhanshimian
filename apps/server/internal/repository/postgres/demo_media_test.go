@@ -18,7 +18,7 @@ func TestInsertDemoMediaCreatesReadyAssessmentAssets(t *testing.T) {
 	ids := []string{}
 	for i, kind := range []string{"face", "side", "body"} {
 		asset, err := store.InsertDemoMedia(ctx, userID, kind,
-			fmt.Sprintf("demo/%s/%s-%d.png", userID, kind, i), demoSHA(kind), 1234)
+			fmt.Sprintf("demo/%s/%s-%d.png", userID, kind, i), demoSHA(kind), 1234, "image/jpeg")
 		if err != nil {
 			t.Fatalf("insert demo %s: %v", kind, err)
 		}
@@ -53,7 +53,7 @@ func TestInsertDemoMediaMapsDiagnosticKindsToAllowedPurposes(t *testing.T) {
 	for kind, want := range purposes {
 		i++
 		asset, err := store.InsertDemoMedia(ctx, userID, kind,
-			fmt.Sprintf("demo/%s/%s-%d.png", userID, kind, i), demoSHA(kind), 1234)
+			fmt.Sprintf("demo/%s/%s-%d.png", userID, kind, i), demoSHA(kind), 1234, "image/jpeg")
 		if err != nil {
 			t.Fatalf("insert demo %s: %v", kind, err)
 		}
@@ -67,13 +67,13 @@ func TestInsertDemoMediaRejectsBadInput(t *testing.T) {
 	store, userID := newMediaStore(t)
 	ctx := context.Background()
 
-	if _, err := store.InsertDemoMedia(ctx, userID, "pancake", "demo/x/pancake.png", demoSHA("pancake"), 1); err == nil {
+	if _, err := store.InsertDemoMedia(ctx, userID, "pancake", "demo/x/pancake.png", demoSHA("pancake"), 1, "image/jpeg"); err == nil {
 		t.Fatal("unsupported kind must be rejected")
 	}
-	if _, err := store.InsertDemoMedia(ctx, userID, "face", "demo/x/face.png", "not-hex", 1); err == nil {
+	if _, err := store.InsertDemoMedia(ctx, userID, "face", "demo/x/face.png", "not-hex", 1, "image/jpeg"); err == nil {
 		t.Fatal("malformed sha256 must be rejected by the CHECK constraint")
 	}
-	if _, err := store.InsertDemoMedia(ctx, userID, "face", "demo/x/face2.png", demoSHA("face"), 0); err == nil {
+	if _, err := store.InsertDemoMedia(ctx, userID, "face", "demo/x/face2.png", demoSHA("face"), 0, "image/jpeg"); err == nil {
 		t.Fatal("zero byte_size must be rejected by the CHECK constraint")
 	}
 }

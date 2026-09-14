@@ -147,31 +147,37 @@ type demoMediaAdapter struct {
 
 var demoKinds = map[string]bool{"face": true, "side": true, "body": true, "outfit": true, "product": true, "wardrobe": true}
 
-// demoBundledFile 沿用旧映射：单品照用 warm，其余全部 natural。
-func demoBundledFile(kind string) string {
-	if kind == "product" {
-		return "warm.png"
+// demoBundledAsset 决定每种 demo 用哪张内置图：三图与穿搭诊断用与拍摄引导
+// 同源的真人示例（assets/demo/*.jpg，能过内容门禁）；单品/衣橱沿用 looks 渲染图。
+func demoBundledAsset(kind string) (file, ext, mime string) {
+	switch kind {
+	case "face", "side", "body", "outfit":
+		return filepath.Join("demo", kind+".jpg"), "jpg", "image/jpeg"
+	case "product":
+		return filepath.Join("looks", "warm.png"), "png", "image/png"
+	default: // wardrobe
+		return filepath.Join("looks", "natural.png"), "png", "image/png"
 	}
-	return "natural.png"
 }
 
 func (a demoMediaAdapter) CreateDemoMedia(ctx context.Context, userID, kind string) (domain.MediaAsset, error) {
 	if !demoKinds[kind] {
 		return domain.MediaAsset{}, fmt.Errorf("%w: unsupported photo kind", account.ErrValidation)
 	}
-	file, err := os.Open(filepath.Join(a.assetDir, "looks", demoBundledFile(kind)))
+	bundled, ext, mime := demoBundledAsset(kind)
+	file, err := os.Open(filepath.Join(a.assetDir, bundled))
 	if err != nil {
 		return domain.MediaAsset{}, fmt.Errorf("open bundled demo asset: %w", err)
 	}
 	defer file.Close()
 
-	objectKey := fmt.Sprintf("demo/%s/%s-%s.png", userID, kind, uuid.NewString())
+	objectKey := fmt.Sprintf("demo/%s/%s-%s.%s", userID, kind, uuid.NewString(), ext)
 	sum := sha256.New()
 	counter := &countingReader{reader: io.TeeReader(file, sum)}
 	if _, err := a.objects.Save(ctx, objectKey, counter); err != nil {
 		return domain.MediaAsset{}, fmt.Errorf("save demo object: %w", err)
 	}
-	return a.store.InsertDemoMedia(ctx, userID, kind, objectKey, hex.EncodeToString(sum.Sum(nil)), counter.n)
+	return a.store.InsertDemoMedia(ctx, userID, kind, objectKey, hex.EncodeToString(sum.Sum(nil)), counter.n, mime)
 }
 
 type countingReader struct {
