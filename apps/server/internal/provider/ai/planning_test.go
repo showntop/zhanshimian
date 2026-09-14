@@ -233,3 +233,20 @@ func TestPlanSetPromptSpellsOutExactGroundingIDForms(t *testing.T) {
 		}
 	}
 }
+
+// 发给厂商的 response_format schema 只能包含校验形状;文件里的 JSON Schema
+// 元字段($schema/$id/title)会被模型当成输出字段回显——线上 qwen3.7-flash
+// 在 plan_grounding_verification 回包顶层塞了 "$id",撞 DisallowUnknownFields
+// 变成 ErrVerifierContract,整个操作 unclassified 失败。
+func TestPlanningSchemasCarryNoMetaFields(t *testing.T) {
+	for name, schema := range map[string]map[string]any{
+		"plan_set.v1":          PlanSetSchema(),
+		"plan_verification.v1": PlanVerificationSchema(),
+	} {
+		for _, meta := range []string{"$schema", "$id", "title"} {
+			if _, present := schema[meta]; present {
+				t.Fatalf("%s must not send meta field %q to the provider", name, meta)
+			}
+		}
+	}
+}

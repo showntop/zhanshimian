@@ -136,7 +136,9 @@ func (h *Handler) evaluateCandidate(ctx context.Context, report ReportSnapshot, 
 	}
 	verification, err := h.deps.Verifier.Verify(ctx, VerificationInput{Report: report, Brief: payload.Brief, Candidate: generated})
 	if err != nil {
-		return nil, "", err
+		// 核验器调用失败是基础设施类故障(配额、传输、厂商输出违约),不是
+		// 内容拒绝:归类 transient 让同一任务重试,不消耗内容重试预算。
+		return nil, "", &taskrunner.TaskError{Class: domain.ErrorTransient, Code: "plan_verifier_unavailable"}
 	}
 	if verification.Decision != qualityDecisionPass {
 		return verification.ReasonCodes, verification.InvocationID, nil

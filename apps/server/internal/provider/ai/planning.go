@@ -578,10 +578,17 @@ func orEmpty(values []string) []string {
 	return values
 }
 
+// decodeSchemaJSON loads an embedded schema file and strips JSON Schema meta
+// fields ($schema/$id/title): they are documentation for the file, not part of
+// the validation shape, and models echo them back as output fields (observed:
+// qwen3.7-flash returns a top-level "$id" inside the verification payload).
 func decodeSchemaJSON(name string, data []byte) map[string]any {
 	var schema map[string]any
 	if err := json.Unmarshal(data, &schema); err != nil {
 		panic("embedded schema " + name + " is invalid: " + err.Error())
+	}
+	for _, meta := range []string{"$schema", "$id", "title"} {
+		delete(schema, meta)
 	}
 	return schema
 }

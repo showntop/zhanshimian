@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/service/taskrunner"
 )
 
 func TestHandlerPreparesOnlyAfterAllGatesPass(t *testing.T) {
@@ -112,8 +113,15 @@ func TestHandlerVerifierRejectionAlsoConsumesContentRetry(t *testing.T) {
 func TestHandlerVerifierTransportErrorKeepsContentBudget(t *testing.T) {
 	deps := validHandlerDependencies()
 	deps.verifier.err = errors.New("verifier unavailable")
-	if _, err := NewHandlerForTest(deps).Execute(context.Background(), validGenerateLease(1)); err == nil {
+	_, err := NewHandlerForTest(deps).Execute(context.Background(), validGenerateLease(1))
+	if err == nil {
 		t.Fatal("verifier transport failure must surface for infra retry")
+	}
+	// 裸错误会被 taskrunner 归类为 permanent/unclassified,直接终杀操作;
+	// 核验器故障是基础设施类问题,必须归类 transient 走任务重试。
+	var taskErr *taskrunner.TaskError
+	if !errors.As(err, &taskErr) || taskErr.Class != domain.ErrorTransient {
+		t.Fatalf("verifier error must classify transient for infra retry, got %v", err)
 	}
 	if deps.store.prepareCalls != 0 || deps.enqueuer.calls != 0 {
 		t.Fatal("transport failure must not prepare or consume the retry")
