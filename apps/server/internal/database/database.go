@@ -72,3 +72,13 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	return nil
 }
+
+// Reset 在非生产环境重建 public schema（DROP CASCADE → 重建扩展与迁移表）。
+// 调用方（cmd/migrate --reset）负责环境门禁；这里只做数据库侧的破坏性动作。
+func Reset(ctx context.Context, pool *pgxpool.Pool) error {
+	if _, err := pool.Exec(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`); err != nil {
+		return err
+	}
+	_, err := pool.Exec(ctx, `CREATE EXTENSION IF NOT EXISTS pgcrypto`)
+	return err
+}
