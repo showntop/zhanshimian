@@ -133,6 +133,10 @@ func WireRendering(cfg config.Config, store *postgres.Store, objects storage.Obj
 		RoutingPolicyVersion: aiRoutingVersion(cfg),
 		QualityPolicyVersion: qualityPolicy.Version,
 	}).WithQualityGate(rendering.NewQualityGate(providerai.NewStructuredQualityEvaluator(qualityRuntime), qualityPolicy))
+	// 发布媒体的签名 URL 读路径:对象库支持签名才注册,否则保持空 URL。
+	if signer, ok := objects.(storage.SignedURLStorage); ok {
+		svc.RunSigner(signer.SignedURL)
+	}
 
 	handler := svc.Handler()
 	registry, err := taskrunner.NewRegistry(
