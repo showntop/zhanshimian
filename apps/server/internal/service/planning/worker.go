@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -94,7 +95,7 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 		if errors.Is(err, ErrGeneratorContract) {
 			// reason code 带上违约细节:补生成的 prompt 据此能定位要修的内容,
 			// 而不是只看到一个无法行动的 code。
-			return h.executeRejection(ctx, lease, payload, []string{reasonWithDetail(ReasonGeneratorContract, err.Error())}, "")
+			return h.executeRejection(ctx, lease, payload, []string{reasonWithDetail(ReasonGeneratorContract, generatorContractDetail(err))}, "")
 		}
 		// Transient provider errors bubble up for an infrastructure retry of the same task.
 		return domain.TaskResult{}, err
@@ -153,6 +154,41 @@ func (h *Handler) evaluateCandidate(ctx context.Context, report ReportSnapshot, 
 		return verification.ReasonCodes, verification.InvocationID, nil
 	}
 	return nil, verification.InvocationID, nil
+}
+
+// generatorContractDetail extracts the innermost contract-violation message
+// from a possibly router-combined error. The combined "all models failed"
+// text embeds every candidate's failure (including fallback transport error
+// payloads); only the precise violation belongs in the retry prompt. The
+// innermost wrapper has the shortest message containing the sentinel text.
+func generatorContractDetail(err error) string {
+	sentinel := ErrGeneratorContract.Error()
+	best := ""
+	var walk func(error)
+	walk = func(e error) {
+		if e == nil {
+			return
+		}
+		if msg := e.Error(); msg != sentinel && strings.Contains(msg, sentinel) && (best == "" || len(msg) < len(best)) {
+			best = msg
+		}
+		switch u := e.(type) {
+		case interface{ Unwrap() []error }:
+			for _, inner := range u.Unwrap() {
+				walk(inner)
+			}
+		case interface{ Unwrap() error }:
+			walk(u.Unwrap())
+		}
+	}
+	walk(err)
+	detail := strings.TrimSpace(strings.TrimPrefix(best, sentinel))
+	detail = strings.TrimSpace(strings.TrimPrefix(detail, ":"))
+	const maxDetail = 300
+	if len(detail) > maxDetail {
+		detail = detail[:maxDetail]
+	}
+	return detail
 }
 
 // reasonWithDetail joins a stable reason code with its human-actionable

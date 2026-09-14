@@ -142,6 +142,47 @@ func TestHandlerGeneratorContractViolationConsumesContentRetry(t *testing.T) {
 	}
 }
 
+// 路由合并错误(全候选失败)也携带违约细节,但细节必须是最内层那条违约原因,
+// 而不是整个合并文本——否则 fallback 的 403 配额 JSON 会被塞进 reason code
+// 和补生成 prompt(实测 reason_codes 里出现整条厂商错误体)。
+func TestHandlerGeneratorContractViolationExtractsInnermostDetail(t *testing.T) {
+	deps := validHandlerDependencies()
+	contractErr := fmt.Errorf("%w: bad step category %q", ErrGeneratorContract, "outfit")
+	modelErr := fmt.Errorf("vendor-x/model-y: %w", contractErr)
+	combined := &multiCauseError{
+		text:   "all AI models failed for plan_set_generation: vendor-x/model-y: plan set generator contract violation: bad step category \"outfit\"; vendor-x/model-z: 403 {\"error\":{\"message\":\"quota\"}}",
+		causes: []error{modelErr, errors.New("vendor-x/model-z: 403 quota JSON blob")},
+	}
+	deps.generator.err = combined
+	handler := NewHandlerForTest(deps)
+	result, err := handler.Execute(context.Background(), validGenerateLease(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := handler.Commit(context.Background(), validGenerateLease(1), result); err != nil {
+		t.Fatal(err)
+	}
+	payload := deps.enqueuer.command.Task.Payload.(GenerateTaskPayload)
+	if len(payload.PriorReasonCodes) != 1 {
+		t.Fatalf("retry payload = %#v", payload)
+	}
+	got := payload.PriorReasonCodes[0]
+	if !strings.Contains(got, `bad step category "outfit"`) {
+		t.Fatalf("reason must carry the innermost contract detail: %q", got)
+	}
+	if strings.Contains(got, "403") || strings.Contains(got, "all AI models failed") || strings.Contains(got, "vendor-x") {
+		t.Fatalf("reason must not embed the combined router text: %q", got)
+	}
+}
+
+type multiCauseError struct {
+	text   string
+	causes []error
+}
+
+func (e *multiCauseError) Error() string { return e.text }
+func (e *multiCauseError) Unwrap() []error { return e.causes }
+
 func TestHandlerGeneratorContractViolationFailsClosedOnSecondAttempt(t *testing.T) {
 	deps := validHandlerDependencies()
 	deps.generator.err = fmt.Errorf("%w: makeup details carry outfit-only fields", ErrGeneratorContract)
