@@ -7,6 +7,7 @@ package planning
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 
@@ -79,7 +80,20 @@ var knownReasonCodes = map[string]bool{
 // violation.
 func LoadBriefCases(t testingTB, path string) []BriefCase {
 	t.Helper()
-	lines := readLines(t, path)
+	cases, err := LoadBriefCasesStrict(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cases
+}
+
+// LoadBriefCasesStrict 是可被 cmd/eval 复用的错误返回版加载器,校验规则与
+// LoadBriefCases 完全一致。
+func LoadBriefCasesStrict(path string) ([]BriefCase, error) {
+	lines, err := readLinesErr(path)
+	if err != nil {
+		return nil, err
+	}
 	cases := make([]BriefCase, 0, len(lines))
 	seen := map[string]bool{}
 	for index, line := range lines {
@@ -87,28 +101,42 @@ func LoadBriefCases(t testingTB, path string) []BriefCase {
 		decode := json.NewDecoder(strings.NewReader(line))
 		decode.DisallowUnknownFields()
 		if err := decode.Decode(&c); err != nil {
-			t.Fatalf("%s:%d: decode brief case: %v", path, index+1, err)
+			return nil, fmt.Errorf("%s:%d: decode brief case: %v", path, index+1, err)
 		}
 		if c.ID == "" || seen[c.ID] {
-			t.Fatalf("%s:%d: missing or duplicate case id %q", path, index+1, c.ID)
+			return nil, fmt.Errorf("%s:%d: missing or duplicate case id %q", path, index+1, c.ID)
 		}
 		seen[c.ID] = true
-		assertSplit(t, path, index+1, c.Split)
+		if err := checkSplit(c.Split); err != nil {
+			return nil, fmt.Errorf("%s:%d: %v", path, index+1, err)
+		}
 		if !knownScenes[c.Scene] {
-			t.Fatalf("%s:%d: unknown scene %q", path, index+1, c.Scene)
+			return nil, fmt.Errorf("%s:%d: unknown scene %q", path, index+1, c.Scene)
 		}
 		if c.Valid == (c.WantErrorCode != "") {
-			t.Fatalf("%s:%d: valid flag and want_error_code disagree", path, index+1)
+			return nil, fmt.Errorf("%s:%d: valid flag and want_error_code disagree", path, index+1)
 		}
 		cases = append(cases, c)
 	}
-	return cases
+	return cases, nil
 }
 
 // LoadPlanSetCases reads plan_sets.v1.jsonl strictly.
 func LoadPlanSetCases(t testingTB, path string) []PlanSetCase {
 	t.Helper()
-	lines := readLines(t, path)
+	cases, err := LoadPlanSetCasesStrict(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cases
+}
+
+// LoadPlanSetCasesStrict 是可被 cmd/eval 复用的错误返回版加载器。
+func LoadPlanSetCasesStrict(path string) ([]PlanSetCase, error) {
+	lines, err := readLinesErr(path)
+	if err != nil {
+		return nil, err
+	}
 	cases := make([]PlanSetCase, 0, len(lines))
 	seen := map[string]bool{}
 	for index, line := range lines {
@@ -116,42 +144,44 @@ func LoadPlanSetCases(t testingTB, path string) []PlanSetCase {
 		decode := json.NewDecoder(strings.NewReader(line))
 		decode.DisallowUnknownFields()
 		if err := decode.Decode(&c); err != nil {
-			t.Fatalf("%s:%d: decode plan set case: %v", path, index+1, err)
+			return nil, fmt.Errorf("%s:%d: decode plan set case: %v", path, index+1, err)
 		}
 		if c.ID == "" || seen[c.ID] {
-			t.Fatalf("%s:%d: missing or duplicate case id %q", path, index+1, c.ID)
+			return nil, fmt.Errorf("%s:%d: missing or duplicate case id %q", path, index+1, c.ID)
 		}
 		seen[c.ID] = true
-		assertSplit(t, path, index+1, c.Split)
+		if err := checkSplit(c.Split); err != nil {
+			return nil, fmt.Errorf("%s:%d: %v", path, index+1, err)
+		}
 		if !knownScenes[c.Scene] {
-			t.Fatalf("%s:%d: unknown scene %q", path, index+1, c.Scene)
+			return nil, fmt.Errorf("%s:%d: unknown scene %q", path, index+1, c.Scene)
 		}
 		if c.BriefCaseID == "" {
-			t.Fatalf("%s:%d: missing brief_case_id", path, index+1)
+			return nil, fmt.Errorf("%s:%d: missing brief_case_id", path, index+1)
 		}
 		for _, code := range c.WantReasonCodes {
 			if !knownReasonCodes[code] {
-				t.Fatalf("%s:%d: unknown reason code %q", path, index+1, code)
+				return nil, fmt.Errorf("%s:%d: unknown reason code %q", path, index+1, code)
 			}
 		}
 		cases = append(cases, c)
 	}
-	return cases
+	return cases, nil
 }
 
-func assertSplit(t testingTB, path string, line int, split Split) {
+func checkSplit(split Split) error {
 	switch split {
 	case Development, Validation, Release:
+		return nil
 	default:
-		t.Fatalf("%s:%d: unknown split %q", path, line, split)
+		return fmt.Errorf("unknown split %q", split)
 	}
 }
 
-func readLines(t testingTB, path string) []string {
-	t.Helper()
+func readLinesErr(path string) ([]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	defer file.Close()
 	var lines []string
@@ -159,14 +189,14 @@ func readLines(t testingTB, path string) []string {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
-			t.Fatalf("%s:%d: blank lines are not allowed", path, len(lines)+1)
+			return nil, fmt.Errorf("%s:%d: blank lines are not allowed", path, len(lines)+1)
 		}
 		lines = append(lines, line)
 	}
 	if err := scanner.Err(); err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	return lines
+	return lines, nil
 }
 
 // BriefInput normalizes the recorded answers into the canonical brief.

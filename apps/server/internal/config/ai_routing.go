@@ -56,8 +56,19 @@ type RouteRequirements struct {
 }
 
 type AIRoutingConfig struct {
-	Models map[string]AIModelConfig `json:"models"`
-	Routes map[string]AIRouteConfig `json:"routes"`
+	Models  map[string]AIModelConfig `json:"models"`
+	Routes  map[string]AIRouteConfig `json:"routes"`
+	Release *AIReleaseConfig         `json:"release,omitempty"`
+}
+
+// AIReleaseConfig 是放量元数据:candidate_percent 只允许 0/5/25/50/100
+// 五档(与 provider/ai.router_rollout 的白名单一致,config 不反向 import
+// provider,这里保留同语义校验),bucket_salt 决定用户分桶。
+type AIReleaseConfig struct {
+	PreviousVersion  string `json:"previous_version"`
+	CandidateVersion string `json:"candidate_version"`
+	CandidatePercent int    `json:"candidate_percent"`
+	BucketSalt       string `json:"bucket_salt"`
 }
 
 func loadAIRouting() (AIRoutingConfig, string, error) {
@@ -108,6 +119,9 @@ func expandAIRoutingEnv(data []byte) []byte {
 func validateAIRouting(routing AIRoutingConfig) error {
 	if len(routing.Models) == 0 || len(routing.Routes) == 0 {
 		return fmt.Errorf("AI routing config requires models and routes")
+	}
+	if err := validateAIRelease(routing.Release); err != nil {
+		return err
 	}
 	protocols := map[string]bool{
 		"openai_responses":         true,
@@ -250,6 +264,27 @@ func validateRenderingRoute(capability string, route AIRouteConfig, models map[s
 		}
 	}
 	return nil
+}
+
+// validateAIRelease 校验放量元数据:出现 release 块时四个字段必须齐全,
+// candidate_percent 只接受 0/5/25/50/100 五档——与 set-rollout.mjs 和
+// provider/ai 的 validateCandidatePercent 同一份阶梯。
+func validateAIRelease(release *AIReleaseConfig) error {
+	if release == nil {
+		return nil
+	}
+	if strings.TrimSpace(release.PreviousVersion) == "" || strings.TrimSpace(release.CandidateVersion) == "" {
+		return fmt.Errorf("AI release config requires previous_version and candidate_version")
+	}
+	if strings.TrimSpace(release.BucketSalt) == "" {
+		return fmt.Errorf("AI release config requires bucket_salt")
+	}
+	switch release.CandidatePercent {
+	case 0, 5, 25, 50, 100:
+		return nil
+	default:
+		return fmt.Errorf("candidate_percent must be one of 0, 5, 25, 50, 100")
+	}
 }
 
 func containsMIME(values, required []string) bool {

@@ -2,7 +2,6 @@ package planning
 
 import (
 	"slices"
-	"sort"
 	"testing"
 
 	"github.com/zhanshimian/server/internal/domain"
@@ -63,20 +62,7 @@ func briefOf(t *testing.T, tc PlanSetCase) domain.SceneBrief {
 	return domain.SceneBrief{}
 }
 
-// violationCodes returns the deduplicated, sorted reason code set — golden
-// records pin the minimal expected code set, not per-detail duplicates.
-func violationCodes(violations []planning.Violation) []string {
-	seen := map[string]bool{}
-	codes := make([]string, 0, len(violations))
-	for _, violation := range violations {
-		if !seen[violation.Code] {
-			seen[violation.Code] = true
-			codes = append(codes, violation.Code)
-		}
-	}
-	sort.Strings(codes)
-	return codes
-}
+// violationCodes 由 run.go 提供(测试与 cmd/eval 共用同一份去重排序逻辑)。
 
 func assertGoldenSplit(t *testing.T, cases any, want map[Split]int) {
 	t.Helper()

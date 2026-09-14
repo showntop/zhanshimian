@@ -16,7 +16,7 @@ var _ invocationLedger = (*Store)(nil)
 
 const invocationReturning = `
 	id::text, user_id::text, operation_id::text, task_id::text, attempt_no,
-	capability, routing_config_version, provider_key, model_key, protocol,
+	capability, routing_config_version, release_bucket, provider_key, model_key, protocol,
 	request_hash, provider_request_id, status,
 	input_tokens, output_tokens, input_images, output_images,
 	estimated_cost_cny, latency_ms, error_class, error_code,
@@ -26,15 +26,15 @@ func (s *Store) StartInvocation(ctx context.Context, in domain.StartInvocation) 
 	return scanInvocation(s.pool.QueryRow(ctx, `
 		INSERT INTO provider_invocations (
 			user_id, operation_id, task_id, attempt_no, capability,
-			routing_config_version, provider_key, model_key, protocol,
+			routing_config_version, release_bucket, provider_key, model_key, protocol,
 			request_hash, status, input_images
 		) VALUES (
 			$1::uuid, $2::uuid, $3::uuid, $4, $5,
-			$6, $7, $8, $9,
-			$10, 'started', $11
+			$6, $7, $8, $9, $10,
+			$11, 'started', $12
 		) RETURNING`+invocationReturning,
 		in.UserID, in.OperationID, in.TaskID, in.AttemptNo, in.Capability,
-		in.RoutingConfigVersion, in.ProviderKey, in.ModelKey, in.Protocol,
+		in.RoutingConfigVersion, in.ReleaseBucket, in.ProviderKey, in.ModelKey, in.Protocol,
 		in.RequestHash, in.InputImages))
 }
 
@@ -78,7 +78,7 @@ func scanInvocation(row rowScanner) (domain.ProviderInvocation, error) {
 	var providerRequestID, errorClass, errorCode *string
 	err := row.Scan(
 		&inv.ID, &inv.UserID, &inv.OperationID, &inv.TaskID, &inv.AttemptNo,
-		&inv.Capability, &inv.RoutingConfigVersion, &inv.ProviderKey, &inv.ModelKey, &inv.Protocol,
+		&inv.Capability, &inv.RoutingConfigVersion, &inv.ReleaseBucket, &inv.ProviderKey, &inv.ModelKey, &inv.Protocol,
 		&inv.RequestHash, &providerRequestID, &inv.Status,
 		&inv.InputTokens, &inv.OutputTokens, &inv.InputImages, &inv.OutputImages,
 		&inv.EstimatedCostCNY, &inv.LatencyMS, &errorClass, &errorCode,

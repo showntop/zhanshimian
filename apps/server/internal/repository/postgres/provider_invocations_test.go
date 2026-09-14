@@ -223,3 +223,34 @@ func assertOneFinishedInvocation(t *testing.T, store *Store, userID, opID, taskI
 	}
 	return row
 }
+
+// release_bucket 随台账行落库:配置放量的环境按桶归因指标;不配置时保持 NULL。
+func TestStartInvocationPersistsReleaseBucket(t *testing.T) {
+	store, userID, opID, taskID := newInvocationFixture(t)
+	bucket := 42
+	in := invocationStart(userID, opID, taskID)
+	in.ReleaseBucket = &bucket
+	started, err := store.StartInvocation(context.Background(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if started.ReleaseBucket == nil || *started.ReleaseBucket != 42 {
+		t.Fatalf("release_bucket = %v", started.ReleaseBucket)
+	}
+	var stored *int
+	if err := store.pool.QueryRow(context.Background(),
+		`SELECT release_bucket FROM provider_invocations WHERE id=$1::uuid`, started.ID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored == nil || *stored != 42 {
+		t.Fatalf("stored release_bucket = %v", stored)
+	}
+
+	startedNil, err := store.StartInvocation(context.Background(), invocationStart(userID, opID, taskID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if startedNil.ReleaseBucket != nil {
+		t.Fatalf("bucket must stay NULL without release config, got %d", *startedNil.ReleaseBucket)
+	}
+}

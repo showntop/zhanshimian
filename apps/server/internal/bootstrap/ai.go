@@ -64,6 +64,16 @@ func BuildAI(cfg config.Config, repo *postgres.Store, objects storage.ObjectStor
 	// 台账：worker 任务内（ctx 带 InvocationScope）的每次模型调用都落
 	// provider_invocations，行 ID 供 reports/plan_sets/render_candidates 外键引用。
 	runtime.SetInvocationRecorder(providerai.NewInvocationRecorder(repo, nil), aiRoutingConfigVersion(cfg))
+	// 放量：配置带 release 块时,每条台账记录该用户的确定性分桶号(0-99),
+	// 观察窗按桶归因指标;桶号不是用户标识,不落任何敏感信息。
+	if cfg.AIRouting.Release != nil {
+		runtime.SetRelease(providerai.ReleaseConfig{
+			PreviousVersion:  cfg.AIRouting.Release.PreviousVersion,
+			CandidateVersion: cfg.AIRouting.Release.CandidateVersion,
+			CandidatePercent: cfg.AIRouting.Release.CandidatePercent,
+			BucketSalt:       cfg.AIRouting.Release.BucketSalt,
+		})
+	}
 	return AIBundle{Routes: runtime.RouteSummary(), Runtime: runtime}, nil
 }
 

@@ -115,6 +115,7 @@ type AIRuntime struct {
 	logger               *slog.Logger
 	recorder             *providerai.InvocationRecorder
 	routingConfigVersion string
+	release              *providerai.ReleaseConfig
 }
 
 func NewAIRuntime(models []AIModel, routes []AIRoute, client *http.Client, logger *slog.Logger) (*AIRuntime, error) {
@@ -160,6 +161,21 @@ func (r *AIRuntime) SetInvocationRecorder(recorder *providerai.InvocationRecorde
 	r.routingConfigVersion = routingConfigVersion
 }
 
+// SetRelease 接上放量元数据：之后每条台账行都记录该用户的确定性分桶号
+// （0-99，不含任何用户标识），放量观察窗据此按桶归因指标。
+func (r *AIRuntime) SetRelease(release providerai.ReleaseConfig) {
+	r.release = &release
+}
+
+// releaseBucketFor 计算当前任务用户的分桶；未配置 release 时不记录桶号。
+func (r *AIRuntime) releaseBucketFor(userID string) *int {
+	if r.release == nil || userID == "" {
+		return nil
+	}
+	bucket := providerai.ReleaseBucket(userID, r.release.BucketSalt)
+	return &bucket
+}
+
 // invocationRecorderFor 返回可用的台账记录器与任务身份；任一缺失则跳过记录。
 func (r *AIRuntime) invocationRecorderFor(ctx context.Context) (*providerai.InvocationRecorder, domain.InvocationScope, bool) {
 	if r.recorder == nil {
@@ -182,7 +198,7 @@ func (r *AIRuntime) recordStructuredCall(ctx context.Context, capability string,
 	var result StructuredResult
 	_, meta, err := recorder.Record(ctx, domain.StartInvocation{
 		UserID: scope.UserID, OperationID: scope.OperationID, TaskID: scope.TaskID, AttemptNo: scope.AttemptNo,
-		Capability: capability, RoutingConfigVersion: r.routingConfigVersion,
+		Capability: capability, RoutingConfigVersion: r.routingConfigVersion, ReleaseBucket: r.releaseBucketFor(scope.UserID),
 		ProviderKey: model.Vendor, ModelKey: model.ID, Protocol: model.Protocol,
 		RequestHash: structuredRequestHash(capability, input), InputImages: len(input.Images),
 	}, func(callCtx context.Context) (providerai.CallResult, error) {
@@ -215,7 +231,7 @@ func (r *AIRuntime) recordEditCall(ctx context.Context, capability string, model
 	var result ImageEditResult
 	_, meta, err := recorder.Record(ctx, domain.StartInvocation{
 		UserID: scope.UserID, OperationID: scope.OperationID, TaskID: scope.TaskID, AttemptNo: scope.AttemptNo,
-		Capability: capability, RoutingConfigVersion: r.routingConfigVersion,
+		Capability: capability, RoutingConfigVersion: r.routingConfigVersion, ReleaseBucket: r.releaseBucketFor(scope.UserID),
 		ProviderKey: model.Vendor, ModelKey: model.ID, Protocol: model.Protocol,
 		RequestHash: editRequestHash(capability, input), InputImages: len(input.Images),
 	}, func(callCtx context.Context) (providerai.CallResult, error) {

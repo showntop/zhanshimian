@@ -140,6 +140,7 @@ CREATE TABLE provider_invocations (
   attempt_no int NOT NULL CHECK (attempt_no >= 0),
   capability text NOT NULL,
   routing_config_version text NOT NULL,
+  release_bucket smallint CHECK (release_bucket BETWEEN 0 AND 99),
   provider_key text NOT NULL,
   model_key text NOT NULL,
   protocol text NOT NULL,

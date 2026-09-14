@@ -21,6 +21,7 @@ type ProviderInvocation struct {
 	AttemptNo            int
 	Capability           string
 	RoutingConfigVersion string
+	ReleaseBucket        *int
 	ProviderKey          string
 	ModelKey             string
 	Protocol             string
@@ -47,6 +48,7 @@ type StartInvocation struct {
 	AttemptNo            int
 	Capability           string
 	RoutingConfigVersion string
+	ReleaseBucket        *int
 	ProviderKey          string
 	ModelKey             string
 	Protocol             string
