@@ -2,6 +2,7 @@ package ai
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -148,12 +149,22 @@ func validateIdentityPayload(data []byte) error {
 	return nil
 }
 
+// ErrReportDraftContract marks a model sample that broke the report draft
+// contract (bad JSON, empty text, missing evidence anchor, banned copy, …).
+// The assessment handler treats it as sampling variance that consumes one
+// generation of the two-generation budget, distinct from transport/quota
+// failures which bubble for an infrastructure retry.
+var ErrReportDraftContract = errors.New("report draft contract violation")
+
 func validateReportPayload(data []byte) error {
 	var payload reportPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
-		return err
+		return fmt.Errorf("%w: %v", ErrReportDraftContract, err)
 	}
-	return validateReportDraft(payload.toDraft())
+	if err := validateReportDraft(payload.toDraft()); err != nil {
+		return fmt.Errorf("%w: %v", ErrReportDraftContract, err)
+	}
+	return nil
 }
 
 func validateReportDraft(draft domain.ReportDraft) error {

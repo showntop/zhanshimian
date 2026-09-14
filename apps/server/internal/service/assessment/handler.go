@@ -133,6 +133,12 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 		}
 		analysisResult, err := h.analyzer.Analyze(ctx, buildAnalysisInput(input, aiImages, generation))
 		if err != nil {
+			// 草稿违约(空文本、缺证据锚点等不合契约输出)是模型采样方差:
+			// 消耗一次生成预算补采样,与传输/配额故障区分——后者照常上抛走
+			// 任务重试,不消耗预算。两轮都违约落到循环外的 fail closed。
+			if errors.Is(err, ai.ErrReportDraftContract) {
+				continue
+			}
 			return domain.TaskResult{}, err
 		}
 		draft := analysisResult.Draft

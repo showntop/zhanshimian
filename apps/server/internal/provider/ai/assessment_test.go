@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math"
 	"strings"
 	"testing"
@@ -42,6 +43,26 @@ func TestReportSchemaAcceptsSnakeCaseAnchor(t *testing.T) {
 	raw := []byte(`{"impression_tags":["利落"],"priority_title":"先整理额前碎发","priority_copy":"额前碎发会挡住眉形，先固定再看妆容层次。","findings":[{"key":"hair-fringe","category":"hair","label":"额前碎发","visible_observation":"额前碎发落到眉毛上方","recommendation":"用少量发蜡向后梳理并固定","priority":1,"position":1,"source_role":"face","anchor":{"x":0.2,"y":0.1,"w":0.4,"h":0.2}},{"key":"makeup-brow","category":"makeup","label":"眉形层次","visible_observation":"眉尾比眉头更淡，左右不对称","recommendation":"用眉笔补齐眉尾，保持自然过渡","priority":2,"position":2,"source_role":"face","anchor":{"x":0.25,"y":0.22,"w":0.5,"h":0.12}},{"key":"outfit-collar","category":"outfit","label":"领口位置","visible_observation":"领口偏松，肩线看起来往下滑","recommendation":"换成合肩的上衣，领口贴近锁骨","priority":3,"position":3,"source_role":"body","anchor":{"x":0.3,"y":0.18,"w":0.4,"h":0.16}}]}`)
 	if err := validateReportPayload(raw); err != nil {
 		t.Fatalf("snake_case anchor should be accepted: %v", err)
+	}
+}
+
+// 草稿校验失败必须携带 ErrReportDraftContract 哨兵:assessment handler 据此
+// 把采样方差(空文本、缺锚点)归类为消耗一次生成预算的内容违约,与传输/配额
+// 故障区分;哨兵还需穿透路由器的多原因合并错误(errors.Is 沿 Unwrap 链可达)。
+func TestReportSchemaViolationCarriesDraftContractSentinel(t *testing.T) {
+	payload := validReportJSON()
+	payload.Findings[0].Anchor.W = 0
+	err := validateReportPayload(marshal(t, payload))
+	if !errors.Is(err, ErrReportDraftContract) {
+		t.Fatalf("got %v, want errors.Is ErrReportDraftContract", err)
+	}
+	payload = validReportJSON()
+	payload.Findings[0].VisibleObservation = ""
+	if err := validateReportPayload(marshal(t, payload)); !errors.Is(err, ErrReportDraftContract) {
+		t.Fatalf("empty text: got %v, want errors.Is ErrReportDraftContract", err)
+	}
+	if err := validateReportPayload([]byte(`{broken`)); !errors.Is(err, ErrReportDraftContract) {
+		t.Fatalf("bad JSON: got %v, want errors.Is ErrReportDraftContract", err)
 	}
 }
 

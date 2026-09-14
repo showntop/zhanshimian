@@ -3,6 +3,8 @@ package assessment
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -106,6 +108,56 @@ func TestHandlerFailsClosedAfterSecondEvidenceFailure(t *testing.T) {
 	}
 	if spy.repo.prepared != nil {
 		t.Fatalf("PrepareReport ran on closed evidence gate: %+v", spy.repo.prepared)
+	}
+}
+
+// 报告草稿违约(模型给出空文本/缺证据锚点等不合契约 JSON)是采样方差,不是
+// 基础设施故障:消耗一次生成预算补生成,而不是首轮直接终杀 operation。
+// 第 11 轮全量 E2E 实测:kimi-k3 空草稿 + flash 缺锚点 + plus 配额尽,三候选全挂
+// 的合并错误被归类 permanent/unclassified,generation 2 从未执行。
+func TestHandlerRegeneratesOnceWhenDraftBreaksContract(t *testing.T) {
+	spy := newHandlerFixture()
+	contractErr := fmt.Errorf("all AI models failed for appearance_analysis: vendor-x/model-y: %w", ai.ErrReportDraftContract)
+	spy.analyzer.errs = []error{contractErr, nil}
+	spy.evidence.result = threeSupported()
+	result, err := spy.handler.Execute(ctx, spy.lease)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if result.Disposition != domain.TaskPublish {
+		t.Fatalf("Disposition = %s, want %s", result.Disposition, domain.TaskPublish)
+	}
+	if spy.analyzer.calls != 2 {
+		t.Fatalf("analyzer.calls = %d, want 2", spy.analyzer.calls)
+	}
+}
+
+func TestHandlerFailsClosedAfterSecondDraftContractViolation(t *testing.T) {
+	spy := newHandlerFixture()
+	spy.analyzer.errs = []error{
+		fmt.Errorf("round 1: %w", ai.ErrReportDraftContract),
+		fmt.Errorf("round 2: %w", ai.ErrReportDraftContract),
+	}
+	result, err := spy.handler.Execute(ctx, spy.lease)
+	assertPublicFailure(t, result, err, "report_evidence_insufficient", "这次未能形成可靠报告，请重新拍摄后再试", true)
+	if spy.analyzer.calls != 2 {
+		t.Fatalf("analyzer.calls = %d, want 2", spy.analyzer.calls)
+	}
+	if spy.repo.publishCount != 0 {
+		t.Fatalf("publishCount = %d, want 0", spy.repo.publishCount)
+	}
+}
+
+// 非违约错误(传输、配额)不属于采样方差:照常上抛走任务重试,不消耗生成预算。
+func TestHandlerDraftContractBudgetDoesNotSwallowTransientErrors(t *testing.T) {
+	spy := newHandlerFixture()
+	transient := errors.New("connection reset by peer")
+	spy.analyzer.errs = []error{transient}
+	if _, err := spy.handler.Execute(ctx, spy.lease); !errors.Is(err, transient) {
+		t.Fatalf("Execute error = %v, want the transient error to bubble", err)
+	}
+	if spy.analyzer.calls != 1 {
+		t.Fatalf("analyzer.calls = %d, want 1 (no budget consumed)", spy.analyzer.calls)
 	}
 }
 
@@ -294,12 +346,18 @@ func (c *identityFake) Check(context.Context, []ai.ImageInput) (ai.IdentityResul
 type analyzerFake struct {
 	fixture *handlerFixture
 	draft   domain.ReportDraft
+	errs    []error
 	calls   int
 }
 
 func (a *analyzerFake) Analyze(context.Context, ai.ReportAnalysisInput) (ai.ReportAnalysisResult, error) {
 	a.fixture.record("analyze")
 	a.calls++
+	if len(a.errs) >= a.calls {
+		if err := a.errs[a.calls-1]; err != nil {
+			return ai.ReportAnalysisResult{}, err
+		}
+	}
 	return ai.ReportAnalysisResult{Draft: a.draft, Meta: ai.InvocationMeta{InvocationID: "inv-analysis"}}, nil
 }
 
