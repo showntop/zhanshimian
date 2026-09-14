@@ -103,6 +103,8 @@ func (a *API) writeFeedbackError(w http.ResponseWriter, r *http.Request, err err
 		writeError(w, r, http.StatusNotFound, "not_found", "没有找到对应内容")
 	case errors.Is(err, feedback.ErrExecutionNotCompleted):
 		writeError(w, r, http.StatusConflict, "execution_not_completed", "请先完成全部步骤再提交反馈")
+	case errors.Is(err, domain.ErrFeedbackAlreadyRecorded):
+		writeError(w, r, http.StatusConflict, "feedback_already_recorded", "已提交过反馈")
 	case errors.Is(err, feedback.ErrIdempotencyConflict):
 		writeError(w, r, http.StatusConflict, "idempotency_conflict", "相同幂等键已被用于不同请求")
 	default:

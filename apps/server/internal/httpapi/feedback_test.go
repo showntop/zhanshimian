@@ -162,6 +162,14 @@ func TestExecutionFeedbackIdempotencyConflictIsConflict(t *testing.T) {
 	assertError(t, res, http.StatusConflict, "idempotency_conflict", false)
 }
 
+func TestExecutionFeedbackAlreadyRecordedIsConflict(t *testing.T) {
+	api := newFeedbackAPI(t, &fakeFeedbackService{executionErr: domain.ErrFeedbackAlreadyRecorded})
+	res := api.Do(http.MethodPost, "/v1/execution-feedback",
+		`{"execution_id":"`+fbExecutionID+`","tags":["easy_to_execute"]}`,
+		map[string]string{"Idempotency-Key": "execution-feedback-http-6"})
+	assertError(t, res, http.StatusConflict, "feedback_already_recorded", false)
+}
+
 func TestExecutionFeedbackValidationErrorIsBadRequest(t *testing.T) {
 	api := newFeedbackAPI(t, &fakeFeedbackService{
 		executionErr: fmt.Errorf("%w: execution_id must be a valid UUID", feedback.ErrValidation),

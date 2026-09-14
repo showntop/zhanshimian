@@ -407,6 +407,25 @@ func TestExecutionFeedbackReplaysSameKey(t *testing.T) {
 	}
 }
 
+// 同一 Execution 用不同幂等键重复反馈:UNIQUE(user_id, execution_id) 必须
+// 翻译成 typed 冲突,而不是在已中止的事务里再查询导致 25P02 → 500(线上实测)。
+func TestExecutionFeedbackSecondDistinctKeyConflicts(t *testing.T) {
+	f := newExecutionFeedbackFixture(t)
+	f.completeExecution(t)
+	if _, _, err := f.store.CreateExecutionFeedback(ctx, executionFeedbackCommand(f, "exec-feedback-first",
+		domain.StructuredPreference{}, []domain.Tag{domain.ExecutionEasy})); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := f.store.CreateExecutionFeedback(ctx, executionFeedbackCommand(f, "exec-feedback-second",
+		domain.StructuredPreference{}, []domain.Tag{domain.ExecutionTooComplex}))
+	if !errors.Is(err, domain.ErrFeedbackAlreadyRecorded) {
+		t.Fatalf("err=%v, want ErrFeedbackAlreadyRecorded", err)
+	}
+	if n := countRows(t, f.store.pool, "execution_feedback"); n != 1 {
+		t.Fatalf("execution_feedback rows = %d, want 1", n)
+	}
+}
+
 func TestPreferenceMemoryListReturnsRecentFirst(t *testing.T) {
 	f := newExecutionFeedbackFixture(t)
 	f.completeExecution(t)

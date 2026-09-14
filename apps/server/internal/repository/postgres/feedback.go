@@ -107,7 +107,9 @@ func (s *Store) CreateGenerationFeedback(ctx context.Context, command domain.Cre
 	row, err := insertGenerationFeedback(ctx, tx, command, chain)
 	if err != nil {
 		if isUniqueViolation(err) {
-			if existing, found, lookupErr := findGenerationFeedbackByKey(ctx, tx, command.UserID, command.IdempotencyKey); lookupErr != nil {
+			// 唯一冲突后当前事务已中止(25P02),必须先回滚再用连接池重查。
+			_ = tx.Rollback(ctx)
+			if existing, found, lookupErr := findGenerationFeedbackByKey(ctx, s.pool, command.UserID, command.IdempotencyKey); lookupErr != nil {
 				return domain.GenerationFeedback{}, false, lookupErr
 			} else if found {
 				if existing.RequestHash != command.RequestHash {
@@ -142,8 +144,8 @@ func lockGenerationPublication(ctx context.Context, tx pgx.Tx, userID, publicati
 	return chain, nil
 }
 
-func findGenerationFeedbackByKey(ctx context.Context, tx pgx.Tx, userID, key string) (generationFeedbackRow, bool, error) {
-	row, err := scanGenerationFeedbackRow(tx.QueryRow(ctx, generationFeedbackSelect+` WHERE user_id=$1::uuid AND idempotency_key=$2`, userID, key))
+func findGenerationFeedbackByKey(ctx context.Context, q executionQuerier, userID, key string) (generationFeedbackRow, bool, error) {
+	row, err := scanGenerationFeedbackRow(q.QueryRow(ctx, generationFeedbackSelect+` WHERE user_id=$1::uuid AND idempotency_key=$2`, userID, key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return generationFeedbackRow{}, false, nil
 	}
@@ -310,6 +312,14 @@ func (s *Store) CreateExecutionFeedback(ctx context.Context, command domain.Crea
 		return fb, false, nil
 	}
 
+	// 每个 Execution 只接受一次反馈(baseline UNIQUE(user_id, execution_id));
+	// 行锁已持有,这里的预检查与插入之间不会有并发写入。
+	if exists, err := findExecutionFeedbackByExecution(ctx, tx, command.UserID, command.ExecutionID); err != nil {
+		return domain.ExecutionFeedback{}, false, err
+	} else if exists {
+		return domain.ExecutionFeedback{}, false, domain.ErrFeedbackAlreadyRecorded
+	}
+
 	if command.MediaAssetID != nil {
 		if err := verifyFeedbackMedia(ctx, tx, command.UserID, *command.MediaAssetID); err != nil {
 			return domain.ExecutionFeedback{}, false, err
@@ -324,13 +334,15 @@ func (s *Store) CreateExecutionFeedback(ctx context.Context, command domain.Crea
 	row, err := insertExecutionFeedback(ctx, tx, command, exec.SelectionID, planSetID)
 	if err != nil {
 		if isUniqueViolation(err) {
-			if existing, found, lookupErr := findExecutionFeedbackByKey(ctx, tx, command.UserID, command.IdempotencyKey); lookupErr != nil {
+			// 唯一冲突后当前事务已中止(25P02),必须先回滚再用连接池重查。
+			_ = tx.Rollback(ctx)
+			if existing, found, lookupErr := findExecutionFeedbackByKey(ctx, s.pool, command.UserID, command.IdempotencyKey); lookupErr != nil {
 				return domain.ExecutionFeedback{}, false, lookupErr
 			} else if found {
 				if existing.RequestHash != command.RequestHash {
 					return domain.ExecutionFeedback{}, false, domain.ErrIdempotencyConflict
 				}
-				memories, listErr := listPreferenceMemoriesByFeedback(ctx, tx, command.UserID, existing.ID)
+				memories, listErr := listPreferenceMemoriesByFeedback(ctx, s.pool, command.UserID, existing.ID)
 				if listErr != nil {
 					return domain.ExecutionFeedback{}, false, listErr
 				}
@@ -376,8 +388,8 @@ func lockExecutionSelection(ctx context.Context, tx pgx.Tx, userID, selectionID 
 	return planSetID, nil
 }
 
-func findExecutionFeedbackByKey(ctx context.Context, tx pgx.Tx, userID, key string) (executionFeedbackRow, bool, error) {
-	row, err := scanExecutionFeedbackRow(tx.QueryRow(ctx, executionFeedbackSelect+` WHERE user_id=$1::uuid AND idempotency_key=$2`, userID, key))
+func findExecutionFeedbackByKey(ctx context.Context, q executionQuerier, userID, key string) (executionFeedbackRow, bool, error) {
+	row, err := scanExecutionFeedbackRow(q.QueryRow(ctx, executionFeedbackSelect+` WHERE user_id=$1::uuid AND idempotency_key=$2`, userID, key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return executionFeedbackRow{}, false, nil
 	}
@@ -385,6 +397,16 @@ func findExecutionFeedbackByKey(ctx context.Context, tx pgx.Tx, userID, key stri
 		return executionFeedbackRow{}, false, err
 	}
 	return row, true, nil
+}
+
+// findExecutionFeedbackByExecution 检查同一 Execution 是否已有反馈;调用方必须
+// 已持有 Execution 行锁,这样检查与随后的插入之间不会有并发写入。
+func findExecutionFeedbackByExecution(ctx context.Context, q executionQuerier, userID, executionID string) (bool, error) {
+	var exists bool
+	err := q.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM execution_feedback WHERE user_id=$1::uuid AND execution_id=$2::uuid)`,
+		userID, executionID).Scan(&exists)
+	return exists, err
 }
 
 func insertExecutionFeedback(ctx context.Context, tx pgx.Tx, command domain.CreateExecutionFeedbackCommand, selectionID, planSetID string) (executionFeedbackRow, error) {

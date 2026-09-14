@@ -77,6 +77,10 @@ var ErrPreferenceNotAllowed = errors.New("preference memory not allowed for this
 // ErrExecutionNotCompleted 表示 Execution 反馈只允许落在已完成(completed)的执行上。
 var ErrExecutionNotCompleted = errors.New("execution not completed")
 
+// ErrFeedbackAlreadyRecorded 表示同一 Execution 已有反馈;每个 Execution 只接受
+// 一次反馈(baseline UNIQUE(user_id, execution_id)),重复提交按 409 处理而不是 500。
+var ErrFeedbackAlreadyRecorded = errors.New("feedback already recorded")
+
 var generationTags = map[Tag]bool{
 	GenerationIdentityMismatch: true,
 	GenerationHairMismatch:     true,
