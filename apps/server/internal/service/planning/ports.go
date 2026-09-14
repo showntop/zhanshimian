@@ -2,12 +2,20 @@ package planning
 
 import (
 	"context"
+	"errors"
 
 	"github.com/zhanshimian/server/internal/domain"
 )
 
 // PlanSetGenerationTaskType is the only internal task type Planning registers.
 const PlanSetGenerationTaskType domain.TaskType = "plan_set.generate"
+
+// ErrGeneratorContract marks structurally invalid generator output: the
+// upstream model answered but broke the output contract (bad variant count,
+// unknown category, cross-category detail fields). It lives in the consuming
+// package because provider/ai already imports planning; the worker treats it
+// as a content rejection that consumes the single content retry budget.
+var ErrGeneratorContract = errors.New("plan set generator contract violation")
 
 // Operation progress stages for the public plan_set operation.
 const (

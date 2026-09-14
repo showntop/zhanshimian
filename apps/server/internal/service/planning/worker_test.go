@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -107,6 +108,45 @@ func TestHandlerVerifierRejectionAlsoConsumesContentRetry(t *testing.T) {
 	payload := deps.enqueuer.command.Task.Payload.(GenerateTaskPayload)
 	if payload.PriorReasonCodes[0] != "plan.report_contradiction" {
 		t.Fatalf("verifier codes not carried: %#v", payload)
+	}
+}
+
+// 生成器输出违约(模型给出不合契约的 JSON)同样是内容拒绝:消耗内容重试预算、
+// 携带 reason code 再采一次,而不是把整个 operation 判失败——模型采样有方差,
+// 第二次采样通常能给出合契约输出;两次都违约才 fail closed。
+func TestHandlerGeneratorContractViolationConsumesContentRetry(t *testing.T) {
+	deps := validHandlerDependencies()
+	// 用 planning 侧哨兵包装,模拟 provider/ai 的真实错误链。
+	deps.generator.err = fmt.Errorf("%w: makeup details carry outfit-only fields", ErrGeneratorContract)
+	handler := NewHandlerForTest(deps)
+	result, err := handler.Execute(context.Background(), validGenerateLease(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Disposition != domain.TaskEnqueueNext || result.ResultType != "plan_set_attempt" || deps.store.prepareCalls != 0 {
+		t.Fatalf("contract violation must consume content retry: %#v", result)
+	}
+	if _, err := handler.Commit(context.Background(), validGenerateLease(1), result); err != nil {
+		t.Fatal(err)
+	}
+	payload := deps.enqueuer.command.Task.Payload.(GenerateTaskPayload)
+	if payload.ContentAttempt != 2 || len(payload.PriorReasonCodes) == 0 || payload.PriorReasonCodes[0] != ReasonGeneratorContract {
+		t.Fatalf("retry payload = %#v", payload)
+	}
+	if deps.enqueuer.command.Quality.Decision != qualityDecisionRetry {
+		t.Fatalf("quality record = %#v", deps.enqueuer.command.Quality)
+	}
+}
+
+func TestHandlerGeneratorContractViolationFailsClosedOnSecondAttempt(t *testing.T) {
+	deps := validHandlerDependencies()
+	deps.generator.err = fmt.Errorf("%w: makeup details carry outfit-only fields", ErrGeneratorContract)
+	_, err := NewHandlerForTest(deps).Execute(context.Background(), validGenerateLease(2))
+	if !errors.Is(err, ErrQualityRejected) {
+		t.Fatalf("got %v", err)
+	}
+	if deps.store.prepareCalls != 0 || deps.operations.failCalls != 1 {
+		t.Fatal("second contract violation must fail closed without publish")
 	}
 }
 

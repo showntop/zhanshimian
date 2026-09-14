@@ -88,8 +88,13 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 		PriorReasonCodes: payload.PriorReasonCodes,
 	})
 	if err != nil {
-		// Contract/schema errors are permanent; transient provider errors
-		// bubble up for an infrastructure retry of the same task.
+		// 生成器输出违约(模型给了不合契约的 JSON)按内容拒绝处理:消耗一次
+		// 内容重试预算、携带 reason code 再采样,而不是直接判 operation 失败;
+		// 两次都违约才 fail closed。模型采样有方差,基础设施重试无意义。
+		if errors.Is(err, ErrGeneratorContract) {
+			return h.executeRejection(ctx, lease, payload, []string{ReasonGeneratorContract}, "")
+		}
+		// Transient provider errors bubble up for an infrastructure retry of the same task.
 		return domain.TaskResult{}, err
 	}
 	_, _ = h.deps.Operations.MarkRunning(ctx, lease, ProgressPlanChecking, StagePlanChecking, "正在检查三套方案")

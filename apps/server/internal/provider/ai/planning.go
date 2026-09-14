@@ -19,9 +19,11 @@ const (
 )
 
 // ErrGeneratorContract marks structurally invalid generator output: the
-// candidate violates the frozen plan_set.v1 contract and must never retry the
-// same prompt blindly.
-var ErrGeneratorContract = errors.New("plan set generator contract violation")
+// candidate violates the frozen plan_set.v1 contract. The sentinel lives in
+// the consuming planning package (provider/ai imports planning, never the
+// reverse); the worker turns it into a content rejection that consumes the
+// single content retry budget instead of failing the operation outright.
+var ErrGeneratorContract = planning.ErrGeneratorContract
 
 // ErrVerifierContract marks structurally invalid verifier output.
 var ErrVerifierContract = errors.New("plan verifier contract violation")

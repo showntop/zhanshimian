@@ -39,6 +39,9 @@ const (
 	ReasonSceneConstraintUncovered = "plan.scene_constraint_uncovered"
 	ReasonDifferenceInsufficient   = "plan.difference_insufficient"
 	ReasonCopyPolicyViolation      = "plan.copy_policy_violation"
+	// ReasonGeneratorContract 不是确定性门禁的输出:它记录生成器输出违约
+	// (ErrGeneratorContract) 消耗掉的内容重试,供下一次采样在 prompt 里看到。
+	ReasonGeneratorContract = "plan.generator_contract_violation"
 )
 
 var copyPolicyBannedWords = []string{"颜值", "身材分", "缺陷严重", "医学诊断", "年龄判定", "族裔"}
