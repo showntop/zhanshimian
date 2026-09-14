@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -115,9 +116,9 @@ func (s *Store) DeleteSessionByTokenDigest(ctx context.Context, digest []byte) e
 func (s *Store) GetUserProfile(ctx context.Context, userID string) (domain.UserProfile, error) {
 	var profile domain.UserProfile
 	err := s.pool.QueryRow(ctx, `
-		SELECT id::text,user_id::text,role,COALESCE(height_cm,0),budget,updated_at
+		SELECT id::text,user_id::text,role,COALESCE(height_cm,0),budget,preferences,updated_at
 		FROM user_profiles WHERE user_id=$1`, userID).
-		Scan(&profile.ID, &profile.UserID, &profile.Role, &profile.HeightCM, &profile.Budget, &profile.UpdatedAt)
+		Scan(&profile.ID, &profile.UserID, &profile.Role, &profile.HeightCM, &profile.Budget, &profile.Preferences, &profile.UpdatedAt)
 	return profile, mapNotFound(err)
 }
 
@@ -163,13 +164,21 @@ func (s *Store) SaveUserProfile(ctx context.Context, userID string, profile doma
 	if profile.HeightCM >= 100 {
 		height = profile.HeightCM
 	}
+	// Preferences 是测量项补丁（/v1/me/profile 全量保存语义）：先删四个测量
+	// 键再合并补丁 —— 未提供的测量键消失，feedback_memory 等其他键保留。
+	patch := profile.Preferences
+	if len(patch) == 0 {
+		patch = json.RawMessage(`{}`)
+	}
 	err := s.pool.QueryRow(ctx, `
-		INSERT INTO user_profiles(user_id,height_cm,role,budget)
-		VALUES($1,$2,$3,$4)
+		INSERT INTO user_profiles(user_id,height_cm,role,budget,preferences)
+		VALUES($1,$2,$3,$4,$5::jsonb)
 		ON CONFLICT(user_id) DO UPDATE SET
-			height_cm=EXCLUDED.height_cm,role=EXCLUDED.role,budget=EXCLUDED.budget,updated_at=now()
-		RETURNING id::text,user_id::text,updated_at`, userID, height, profile.Role, profile.Budget).
-		Scan(&profile.ID, &profile.UserID, &profile.UpdatedAt)
+			height_cm=EXCLUDED.height_cm,role=EXCLUDED.role,budget=EXCLUDED.budget,
+			preferences=(user_profiles.preferences - 'weight_kg' - 'bust_cm' - 'waist_cm' - 'hip_cm') || EXCLUDED.preferences,
+			updated_at=now()
+		RETURNING id::text,user_id::text,preferences,updated_at`, userID, height, profile.Role, profile.Budget, patch).
+		Scan(&profile.ID, &profile.UserID, &profile.Preferences, &profile.UpdatedAt)
 	return profile, err
 }
 
