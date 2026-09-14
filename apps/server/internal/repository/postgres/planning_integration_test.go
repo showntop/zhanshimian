@@ -142,6 +142,59 @@ func TestPlanningStaleLeaseCannotCommit(t *testing.T) {
 	}
 }
 
+// operations_check 要求任何 status='failed' 写入必须带 trace_id。漏写 trace_id
+// 的失败写会直接撞 CHECK(23514),提交失败 → lease 过期 → 无限重试,真正的失败
+// 原因被吞掉。领域失败(非质量拒绝)也必须留下可追踪的 trace_id。
+func TestCommitPlanSetDomainFailSetsTraceID(t *testing.T) {
+	store, users := newPlanningStore(t)
+	lease := validDatabaseLease(t, store, users)
+	outcome, err := store.CommitPrepared(context.Background(), lease, domain.TaskResult{
+		Disposition: domain.TaskDomainFail,
+		Failure:     &domain.TaskFailure{Class: domain.ErrorPermanent, Code: "plan_contract_invalid"},
+	})
+	if err != nil || outcome != domain.CommitApplied {
+		t.Fatalf("outcome=%s err=%v", outcome, err)
+	}
+	assertOperationFailedWithTrace(t, store, lease.OperationID)
+}
+
+// 质量拒绝走 PlanningOperations.Fail:同一条 operations_check 约束,失败写同样
+// 必须落 trace_id,否则质量拒绝会把操作卡进无限重试而不是干净失败。
+func TestPlanningFailSetsOperationTraceID(t *testing.T) {
+	store, users := newPlanningStore(t)
+	lease := validDatabaseLease(t, store, users)
+	ops := NewPlanningOperations(store, 3)
+	quality := domain.PlanningPlanQualityRecord{
+		ID: uuid.NewString(), UserID: users.A, SubjectID: users.planSetID,
+		PolicyVersion: "plan-set.v1", Decision: "reject",
+		ReasonCodes: []string{"grounding_unknown_id"}, InternalScores: []byte(`{}`),
+		EvaluatorInvocationID: users.invocation,
+	}
+	applied, err := ops.Fail(context.Background(), lease, quality,
+		"grounding_unknown_id", "方案未通过质量校验", false)
+	if err != nil || !applied {
+		t.Fatalf("applied=%v err=%v", applied, err)
+	}
+	assertOperationFailedWithTrace(t, store, lease.OperationID)
+}
+
+func assertOperationFailedWithTrace(t *testing.T, store *Store, operationID string) {
+	t.Helper()
+	var status string
+	var traceID *string
+	if err := store.pool.QueryRow(context.Background(),
+		`SELECT status, trace_id::text FROM operations WHERE id=$1::uuid`, operationID).
+		Scan(&status, &traceID); err != nil {
+		t.Fatal(err)
+	}
+	if status != string(domain.OperationFailed) {
+		t.Fatalf("operation status = %s, want failed", status)
+	}
+	if traceID == nil || *traceID == "" {
+		t.Fatal("failed operation has no trace_id (violates operations_check)")
+	}
+}
+
 func TestRenderSpecReaderIsTenantScopedAndTyped(t *testing.T) {
 	store, users := newPlanningStore(t)
 	lease := validDatabaseLease(t, store, users)

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/zhanshimian/server/internal/domain"
@@ -386,10 +387,10 @@ func (s *Store) CommitPrepared(ctx context.Context, lease domain.TaskLease, resu
 			return "", err
 		}
 		if _, err = tx.Exec(ctx, `
-			UPDATE operations SET status='failed', error_code=NULLIF($3,''), retryable=false,
+			UPDATE operations SET status='failed', error_code=NULLIF($3,''), trace_id=$4, retryable=false,
 			    version=version+1, updated_at=now(), finished_at=now()
 			WHERE id=$1::uuid AND user_id=$2::uuid AND status <> 'failed'`,
-			lease.OperationID, lease.UserID, code); err != nil {
+			lease.OperationID, lease.UserID, code, uuid.NewString()); err != nil {
 			return "", err
 		}
 	default:
@@ -566,10 +567,10 @@ func (p *PlanningOperations) Fail(ctx context.Context, lease domain.TaskLease, q
 		return false, err
 	}
 	if _, err = tx.Exec(ctx, `
-		UPDATE operations SET status='failed', error_code=$3, public_message=$4, retryable=$5,
+		UPDATE operations SET status='failed', error_code=$3, public_message=$4, retryable=$5, trace_id=$6,
 		    version=version+1, updated_at=now(), finished_at=now()
 		WHERE id=$1::uuid AND user_id=$2::uuid`,
-		lease.OperationID, lease.UserID, code, publicMessage, retryable); err != nil {
+		lease.OperationID, lease.UserID, code, publicMessage, retryable, uuid.NewString()); err != nil {
 		return false, err
 	}
 	return true, tx.Commit(ctx)

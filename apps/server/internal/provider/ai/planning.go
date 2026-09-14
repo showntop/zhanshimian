@@ -56,7 +56,16 @@ func NewPlanSetGenerator(runtime StructuredRuntime) *PlanSetGenerator {
 	return &PlanSetGenerator{runtime: runtime}
 }
 
-const planSetInstructions = `你是严谨的中文形象方案策划。基于可信的形象报告、用户资料快照和场景答案，输出恰好三套有实质差异、可执行的方案。禁止外貌、身材、年龄、敏感属性评分；不编造衣橱单品、品牌、价格、材质或身体特征；方案文字不得与报告矛盾。每一步必须引用稳定 source_id 说明依据，不得使用无法核验的自由文本 ID。`
+const planSetInstructions = `你是严谨的中文形象方案策划。基于可信的形象报告、用户资料快照和场景答案，输出恰好三套有实质差异、可执行的方案。禁止外貌、身材、年龄、敏感属性评分；不编造衣橱单品、品牌、价格、材质或身体特征；方案文字不得与报告矛盾。
+
+grounding 输出契约（逐字遵守，下游会逐条确定性校验）：
+1. report_finding 的 source_id 必须逐字等于 report.findings 数组中某一条的 id（UUID 字符串）；不得引用 report.id，也不得使用 finding 的 label 或自由文本。
+2. scene_answer 的 source_id 必须是 brief.answers 的字段名本身（例如 focus），不得写成 brief.answers.focus，也不得使用答案值。
+3. brief.answers 的每个字段都必须至少出现在一条 scene_answer grounding 中。
+4. style_rule 的 source_id 只能逐字来自 style_rule_ids 列表，不得发明新 ID。
+5. report.priority_finding_id 指向的 finding 至少被一条 report_finding grounding 引用。
+6. profile_snapshot 为空对象时不得使用 profile_preference；没有 profile_preference grounding 的 outfit 步骤，其文案不得出现材质词（真丝、桑蚕丝、羊绒、纯棉、皮革、醋酸面料）。
+7. 任何用户可见文案不得出现价格（¥、元、块钱）与“颜值、身材分、缺陷严重、医学诊断、年龄判定、族裔”。`
 
 func (g *PlanSetGenerator) Generate(ctx context.Context, input planning.GenerationInput) (planning.GeneratedPlanSet, error) {
 	result, err := g.runtime.Structured(ctx, StructuredRequest{
@@ -270,11 +279,18 @@ func buildPlanSetPrompt(input planning.GenerationInput) string {
 			string(domain.SourceProfilePreference),
 			string(domain.SourceStyleRule),
 		},
-		"grounding_example": []map[string]string{{
-			"source_type": "report_finding",
-			"source_id":   "引用上面 findings 中的 id",
-			"reason":      "一句话说明这一步为什么落实该依据",
-		}},
+		"grounding_example": []map[string]string{
+			{
+				"source_type": "report_finding",
+				"source_id":   "逐字引用 report.findings[].id 的 UUID，例如 " + exampleFindingID(input.Report),
+				"reason":      "一句话说明这一步为什么落实该依据",
+			},
+			{
+				"source_type": "scene_answer",
+				"source_id":   "brief.answers 的字段名本身，例如 " + exampleBriefField(input.Brief),
+				"reason":      "一句话说明这一步如何回应场景答案",
+			},
+		},
 		"content_attempt":    input.ContentAttempt,
 		"prior_reason_codes": orEmpty(input.PriorReasonCodes),
 	}
@@ -535,6 +551,24 @@ func defaultJSON(raw json.RawMessage) string {
 		return "{}"
 	}
 	return string(raw)
+}
+
+// exampleFindingID 给 grounding 示例一个真实可引用的 finding UUID，
+// 避免模型把 report.id 或 label 当成合法 source_id。
+func exampleFindingID(report planning.ReportSnapshot) string {
+	if len(report.Findings) > 0 {
+		return report.Findings[0].ID
+	}
+	return "<findings[].id>"
+}
+
+// exampleBriefField 给 scene_answer 示例一个真实字段名，
+// 避免模型写出 brief.answers.focus 之类的路径形式。
+func exampleBriefField(brief domain.SceneBrief) string {
+	for name := range brief.Answers {
+		return name
+	}
+	return "<answers 字段名>"
 }
 
 func orEmpty(values []string) []string {

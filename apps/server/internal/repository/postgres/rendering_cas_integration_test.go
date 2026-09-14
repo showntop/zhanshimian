@@ -131,6 +131,36 @@ func TestCommitEvaluationExpiredLeaseTouchesNothing(t *testing.T) {
 	}
 }
 
+// FailRun 终态失败同样受 operations_check 约束:不带 trace_id 的失败写会撞
+// CHECK(23514),run 永远无法干净终态,只剩 lease 过期重试。
+func TestFailRunSetsOperationTraceID(t *testing.T) {
+	f := newRenderingPublishFixture(t)
+	ctx := context.Background()
+	err := f.store.FailRun(ctx, domain.RenderFailRunCommand{
+		TaskID: f.task.ID, LeaseToken: f.task.LeaseToken,
+		UserID: f.userA, PlanVariantID: f.variantID, RenderRunID: f.run.ID,
+		SubjectGeneration: 1, Outcome: "failed",
+		ErrorCode: ReasonIdentityDrift, Retryable: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var status string
+	var traceID *string
+	if err = f.store.pool.QueryRow(ctx, `
+		SELECT o.status, o.trace_id::text
+		FROM operations o JOIN render_runs r ON r.user_id=o.user_id AND r.operation_id=o.id
+		WHERE r.id=$1::uuid AND r.user_id=$2::uuid`, f.run.ID, f.userA).Scan(&status, &traceID); err != nil {
+		t.Fatal(err)
+	}
+	if status != string(domain.OperationFailed) {
+		t.Fatalf("operation status = %s, want failed", status)
+	}
+	if traceID == nil || *traceID == "" {
+		t.Fatal("failed render operation has no trace_id (violates operations_check)")
+	}
+}
+
 func TestExpandCandidateBudgetOnlyOnce(t *testing.T) {
 	f := newRenderingPublishFixture(t)
 	ctx := context.Background()

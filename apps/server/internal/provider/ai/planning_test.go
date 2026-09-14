@@ -204,3 +204,32 @@ func TestPlanSetVerifierRejectsContractViolations(t *testing.T) {
 		}
 	}
 }
+
+// 确定性门禁逐条执行的规则必须在 prompt 里写明——线上 kimi-k3 因为契约没说清
+// 连续三轮产出 grounding_unknown_id / scene_constraint_uncovered /
+// copy_policy_violation（把 report.id 当 finding 引用、把 scene_answer 写成
+// brief.answers.focus、outfit 文案带"真丝"）。
+func TestPlanSetPromptSpellsOutExactGroundingIDForms(t *testing.T) {
+	runtime := &fakeStructuredRuntime{result: validGeneratedPlanSetJSON()}
+	_, err := NewPlanSetGenerator(runtime).Generate(context.Background(), planning.GenerationInput{
+		Report:         validPlanningReport(),
+		Brief:          validDailyBrief(),
+		ContentAttempt: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"不得引用 report.id",
+		"字段名本身",
+		"每个字段都必须至少出现在一条 scene_answer grounding 中",
+		"不得发明新 ID",
+		"priority_finding_id",
+		"材质词",
+		"真丝",
+	} {
+		if !strings.Contains(runtime.request.Instructions, want) {
+			t.Fatalf("instructions must state the grounding contract (%q missing):\n%s", want, runtime.request.Instructions)
+		}
+	}
+}

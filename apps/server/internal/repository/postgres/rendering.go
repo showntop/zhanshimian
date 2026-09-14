@@ -649,10 +649,10 @@ func (s *Store) FailRun(ctx context.Context, command domain.RenderFailRunCommand
 		return err
 	}
 	if _, err = tx.Exec(ctx, `
-		UPDATE operations SET status='failed', error_code=$3, retryable=$4, updated_at=now(), finished_at=now()
+		UPDATE operations SET status='failed', error_code=$3, retryable=$4, trace_id=$5, updated_at=now(), finished_at=now()
 		WHERE id=(SELECT operation_id FROM render_runs WHERE id=$1::uuid AND user_id=$2::uuid)
 		  AND user_id=$2::uuid`,
-		command.RenderRunID, command.UserID, command.ErrorCode, command.Retryable); err != nil {
+		command.RenderRunID, command.UserID, command.ErrorCode, command.Retryable, uuid.NewString()); err != nil {
 		return err
 	}
 	if _, err = tx.Exec(ctx, `
