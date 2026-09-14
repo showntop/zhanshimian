@@ -27,6 +27,8 @@ server-vet:
 
 server-build:
 	cd apps/server && CGO_ENABLED=0 go build -o /tmp/zhanshimian-api ./cmd/api
+	cd apps/server && CGO_ENABLED=0 go build -o /tmp/zhanshimian-worker ./cmd/worker
+	cd apps/server && CGO_ENABLED=0 go build -o /tmp/zhanshimian-migrate ./cmd/migrate
 
 server-tidy:
 	cd apps/server && go mod tidy

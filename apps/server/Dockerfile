@@ -6,19 +6,21 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/uplook-api ./cmd/api && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/uplook-worker ./cmd/worker
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/uplook-worker ./cmd/worker && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/uplook-migrate ./cmd/migrate
 RUN mkdir -p /out/data/uploads
 
 FROM alpine:3.22
 RUN apk add --no-cache ca-certificates \
-    && addgroup -S jianwo \
-    && adduser -S -G jianwo jianwo
+    && addgroup -S uplook \
+    && adduser -S -G uplook uplook
 WORKDIR /app
-COPY --from=build --chown=jianwo:jianwo /out/uplook-api /app/uplook-api
-COPY --from=build --chown=jianwo:jianwo /out/uplook-worker /app/uplook-worker
-COPY --from=build --chown=jianwo:jianwo /out/data /app/data
-COPY --chown=jianwo:jianwo assets /app/assets
-COPY --chown=jianwo:jianwo config /app/config
-USER jianwo
+COPY --from=build --chown=uplook:uplook /out/uplook-api /app/uplook-api
+COPY --from=build --chown=uplook:uplook /out/uplook-worker /app/uplook-worker
+COPY --from=build --chown=uplook:uplook /out/uplook-migrate /app/uplook-migrate
+COPY --from=build --chown=uplook:uplook /out/data /app/data
+COPY --chown=uplook:uplook assets /app/assets
+COPY --chown=uplook:uplook config /app/config
+USER uplook
 EXPOSE 8080
 ENTRYPOINT ["/app/uplook-api"]
