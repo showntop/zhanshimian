@@ -358,49 +358,162 @@ type planGroundingPayload struct {
 // slots, recommended count) and grounding reference existence stay in the
 // deterministic planning gate.
 func validatePlanSetPayload(data []byte) error {
-	var payload planSetPayload
-	decode := json.NewDecoder(strings.NewReader(string(data)))
-	decode.DisallowUnknownFields()
-	if err := decode.Decode(&payload); err != nil {
-		return fmt.Errorf("%w: %v", ErrGeneratorContract, err)
+	payload, err := decodePlanSetStrict(data)
+	if err != nil {
+		return err
 	}
 	if len(payload.Variants) != 3 {
 		return fmt.Errorf("%w: want exactly 3 variants, got %d", ErrGeneratorContract, len(payload.Variants))
 	}
 	seenSlot := map[int]bool{}
 	seenKey := map[string]bool{}
-	for _, variant := range payload.Variants {
+	for i, variant := range payload.Variants {
 		if variant.Slot < 1 || variant.Slot > 3 || seenSlot[variant.Slot] {
-			return fmt.Errorf("%w: bad slot %d", ErrGeneratorContract, variant.Slot)
+			return fmt.Errorf("%w: variant #%d has bad slot %d", ErrGeneratorContract, i+1, variant.Slot)
 		}
 		seenSlot[variant.Slot] = true
 		if !planVariantKeys[variant.Key] || seenKey[variant.Key] {
-			return fmt.Errorf("%w: bad variant key %q", ErrGeneratorContract, variant.Key)
+			return fmt.Errorf("%w: variant #%d has bad key %q", ErrGeneratorContract, i+1, variant.Key)
 		}
 		seenKey[variant.Key] = true
-		if err := requirePlanText("name", variant.Name, 80); err != nil {
-			return err
-		}
-		if err := requirePlanText("descriptor", variant.Descriptor, 160); err != nil {
-			return err
-		}
-		if err := requirePlanText("rationale", variant.Rationale, 240); err != nil {
-			return err
-		}
-		if err := validateStringArray("outcome_tags", variant.OutcomeTags, 8, 40); err != nil {
-			return err
-		}
-		if err := validateStringArray("difference_tags", variant.DifferenceTags, 8, 40); err != nil {
-			return err
+		if err := validatePlanVariantText(variant); err != nil {
+			return fmt.Errorf("%w: variant %s: %v", ErrGeneratorContract, variant.Key, err)
 		}
 		if len(variant.Steps) != 3 {
-			return fmt.Errorf("%w: want exactly 3 steps, got %d", ErrGeneratorContract, len(variant.Steps))
+			return fmt.Errorf("%w: variant %s: want exactly 3 steps, got %d", ErrGeneratorContract, variant.Key, len(variant.Steps))
 		}
 		if err := validatePlanSteps(variant.Key, variant.Steps); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func validatePlanVariantText(variant planVariantPayload) error {
+	if err := requirePlanText("name", variant.Name, 80); err != nil {
+		return err
+	}
+	if err := requirePlanText("descriptor", variant.Descriptor, 160); err != nil {
+		return err
+	}
+	if err := requirePlanText("rationale", variant.Rationale, 240); err != nil {
+		return err
+	}
+	if err := validateStringArray("outcome_tags", variant.OutcomeTags, 8, 40); err != nil {
+		return err
+	}
+	return validateStringArray("difference_tags", variant.DifferenceTags, 8, 40)
+}
+
+// decodePlanSetStrict decodes layer by layer with DisallowUnknownFields so an
+// unknown-field failure carries its variant/step location. The retry prompt
+// only ever sees the reason code — location is the model's only self-correction
+// lead (run-13 E2E: the model wrote rationale into a step; the bare
+// `json: unknown field "rationale"` left the regeneration guessing).
+func decodePlanSetStrict(data []byte) (planSetPayload, error) {
+	payload := planSetPayload{}
+	var raw struct {
+		Variants []json.RawMessage `json:"variants"`
+	}
+	if err := strictPlanUnmarshal(data, &raw); err != nil {
+		return payload, fmt.Errorf("%w: %v", ErrGeneratorContract, err)
+	}
+	for i, rawVariant := range raw.Variants {
+		variant, err := decodePlanVariantStrict(rawVariant)
+		if err != nil {
+			key := planVariantKeyOf(rawVariant)
+			if key == "" {
+				key = fmt.Sprintf("#%d", i+1)
+			}
+			return payload, fmt.Errorf("%w: variant %s: %v", ErrGeneratorContract, key, err)
+		}
+		payload.Variants = append(payload.Variants, variant)
+	}
+	return payload, nil
+}
+
+func decodePlanVariantStrict(data []byte) (planVariantPayload, error) {
+	var raw struct {
+		Slot           int               `json:"slot"`
+		Key            string            `json:"key"`
+		Name           string            `json:"name"`
+		Descriptor     string            `json:"descriptor"`
+		Rationale      string            `json:"rationale"`
+		Recommended    bool              `json:"recommended"`
+		OutcomeTags    []string          `json:"outcome_tags"`
+		DifferenceTags []string          `json:"difference_tags"`
+		Steps          []json.RawMessage `json:"steps"`
+	}
+	variant := planVariantPayload{}
+	if err := strictPlanUnmarshal(data, &raw); err != nil {
+		return variant, err
+	}
+	variant.Slot, variant.Key, variant.Name = raw.Slot, raw.Key, raw.Name
+	variant.Descriptor, variant.Rationale, variant.Recommended = raw.Descriptor, raw.Rationale, raw.Recommended
+	variant.OutcomeTags, variant.DifferenceTags = raw.OutcomeTags, raw.DifferenceTags
+	for j, rawStep := range raw.Steps {
+		step, err := decodePlanStepStrict(rawStep)
+		if err != nil {
+			loc := planStepCategoryOf(rawStep)
+			if loc == "" {
+				loc = fmt.Sprintf("#%d", j+1)
+			}
+			return variant, fmt.Errorf("step %s: %v", loc, err)
+		}
+		variant.Steps = append(variant.Steps, step)
+	}
+	return variant, nil
+}
+
+func decodePlanStepStrict(data []byte) (planStepPayload, error) {
+	var raw struct {
+		Category   string            `json:"category"`
+		Action     string            `json:"action"`
+		Title      string            `json:"title"`
+		Summary    string            `json:"summary"`
+		Details    json.RawMessage   `json:"details"`
+		Groundings []json.RawMessage `json:"groundings"`
+	}
+	step := planStepPayload{}
+	if err := strictPlanUnmarshal(data, &raw); err != nil {
+		return step, err
+	}
+	step.Category, step.Action, step.Title, step.Summary = raw.Category, raw.Action, raw.Title, raw.Summary
+	if len(raw.Details) > 0 {
+		if err := strictPlanUnmarshal(raw.Details, &step.Details); err != nil {
+			return step, fmt.Errorf("details: %v", err)
+		}
+	}
+	for k, rawGrounding := range raw.Groundings {
+		var grounding planGroundingPayload
+		if err := strictPlanUnmarshal(rawGrounding, &grounding); err != nil {
+			return step, fmt.Errorf("grounding #%d: %v", k+1, err)
+		}
+		step.Groundings = append(step.Groundings, grounding)
+	}
+	return step, nil
+}
+
+func strictPlanUnmarshal(data []byte, v any) error {
+	decode := json.NewDecoder(strings.NewReader(string(data)))
+	decode.DisallowUnknownFields()
+	return decode.Decode(v)
+}
+
+func planVariantKeyOf(data []byte) string {
+	var probe struct {
+		Key string `json:"key"`
+	}
+	_ = json.Unmarshal(data, &probe)
+	return probe.Key
+}
+
+func planStepCategoryOf(data []byte) string {
+	var probe struct {
+		Category string `json:"category"`
+	}
+	_ = json.Unmarshal(data, &probe)
+	return probe.Category
 }
 
 var planVariantKeys = map[string]bool{"sharp": true, "warm": true, "natural": true}
@@ -412,7 +525,8 @@ var planGroundingSourceTypes = map[string]bool{
 
 // validatePlanSteps 的错误消息是内容重试 prompt 唯一的修正线索:重复类别必须
 // 说清"重复"并点名变体与类别(实测 kimi-k3 两次采出 hair+outfit+outfit,笼统的
-// bad step category 让模型无从下手),未知类别另行表述。
+// bad step category 让模型无从下手),未知类别另行表述;步骤级错误一律携带
+// variant + step 位置(第 13 轮:details 字段错配无位置,补生成盲改)。
 func validatePlanSteps(variantKey string, steps []planStepPayload) error {
 	seenCategory := map[string]bool{}
 	for _, step := range steps {
@@ -423,31 +537,39 @@ func validatePlanSteps(variantKey string, steps []planStepPayload) error {
 			return fmt.Errorf("%w: variant %s repeats step category %q: each variant needs exactly one hair, one makeup and one outfit step", ErrGeneratorContract, variantKey, step.Category)
 		}
 		seenCategory[step.Category] = true
-		if !planStepActions[step.Action] {
-			return fmt.Errorf("%w: bad step action %q", ErrGeneratorContract, step.Action)
+		if err := validatePlanStep(step); err != nil {
+			return fmt.Errorf("%w: variant %s step %s: %v", ErrGeneratorContract, variantKey, step.Category, err)
 		}
-		if err := requirePlanText("title", step.Title, 120); err != nil {
+	}
+	return nil
+}
+
+// validatePlanStep 返回不含哨兵的纯错误,位置与哨兵由 validatePlanSteps 统一包装。
+func validatePlanStep(step planStepPayload) error {
+	if !planStepActions[step.Action] {
+		return fmt.Errorf("bad step action %q", step.Action)
+	}
+	if err := requirePlanText("title", step.Title, 120); err != nil {
+		return err
+	}
+	if err := requirePlanText("summary", step.Summary, 240); err != nil {
+		return err
+	}
+	if err := validatePlanDetails(step.Category, step.Details); err != nil {
+		return err
+	}
+	if len(step.Groundings) < 1 || len(step.Groundings) > 8 {
+		return fmt.Errorf("wants 1-8 groundings, got %d", len(step.Groundings))
+	}
+	for _, grounding := range step.Groundings {
+		if !planGroundingSourceTypes[grounding.SourceType] {
+			return fmt.Errorf("unknown grounding source_type %q", grounding.SourceType)
+		}
+		if err := requirePlanText("source_id", grounding.SourceID, 200); err != nil {
 			return err
 		}
-		if err := requirePlanText("summary", step.Summary, 240); err != nil {
+		if err := requirePlanText("reason", grounding.Reason, 240); err != nil {
 			return err
-		}
-		if err := validatePlanDetails(step.Category, step.Details); err != nil {
-			return err
-		}
-		if len(step.Groundings) < 1 || len(step.Groundings) > 8 {
-			return fmt.Errorf("%w: step %s wants 1-8 groundings, got %d", ErrGeneratorContract, step.Category, len(step.Groundings))
-		}
-		for _, grounding := range step.Groundings {
-			if !planGroundingSourceTypes[grounding.SourceType] {
-				return fmt.Errorf("%w: unknown grounding source_type %q", ErrGeneratorContract, grounding.SourceType)
-			}
-			if err := requirePlanText("source_id", grounding.SourceID, 200); err != nil {
-				return err
-			}
-			if err := requirePlanText("reason", grounding.Reason, 240); err != nil {
-				return err
-			}
 		}
 	}
 	return nil
@@ -458,34 +580,34 @@ func validatePlanDetails(category string, details planDetailsPayload) error {
 	case "hair", "makeup":
 		if details.Silhouette != "" || details.Formality != "" ||
 			len(details.Palette) != 0 || len(details.Layers) != 0 {
-			return fmt.Errorf("%w: %s details carry outfit-only fields", ErrGeneratorContract, category)
+			return fmt.Errorf("%s details carry outfit-only fields", category)
 		}
 		if details.Intensity != "low" && details.Intensity != "medium" {
-			return fmt.Errorf("%w: %s intensity must be low|medium, got %q", ErrGeneratorContract, category, details.Intensity)
+			return fmt.Errorf("%s intensity must be low|medium, got %q", category, details.Intensity)
 		}
 		return requirePlanText("target", details.Target, 160)
 	case "outfit":
 		if details.Target != "" || details.Intensity != "" {
-			return fmt.Errorf("%w: outfit details carry hair/makeup-only fields", ErrGeneratorContract)
+			return fmt.Errorf("outfit details carry hair/makeup-only fields (target/intensity belong to hair and makeup steps)")
 		}
 		if len(details.Palette) < 1 || len(details.Palette) > 8 {
-			return fmt.Errorf("%w: outfit palette wants 1-8 colors, got %d", ErrGeneratorContract, len(details.Palette))
+			return fmt.Errorf("outfit palette wants 1-8 colors, got %d", len(details.Palette))
 		}
 		if len(details.Layers) > 8 || len(details.Avoid) > 8 {
-			return fmt.Errorf("%w: outfit layers/avoid exceed 8 items", ErrGeneratorContract)
+			return fmt.Errorf("outfit layers/avoid exceed 8 items")
 		}
 		if len(details.Formality) > 40 {
-			return fmt.Errorf("%w: outfit formality exceeds 40 chars", ErrGeneratorContract)
+			return fmt.Errorf("outfit formality exceeds 40 chars")
 		}
 		return requirePlanText("silhouette", details.Silhouette, 160)
 	}
-	return fmt.Errorf("%w: unknown category %q", ErrGeneratorContract, category)
+	return fmt.Errorf("unknown category %q", category)
 }
 
 func decodePlanSetPayload(data []byte) ([]planning.GeneratedPlanVariant, error) {
-	var payload planSetPayload
-	if err := json.Unmarshal(data, &payload); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrGeneratorContract, err)
+	payload, err := decodePlanSetStrict(data)
+	if err != nil {
+		return nil, err
 	}
 	variants := make([]planning.GeneratedPlanVariant, 0, len(payload.Variants))
 	for _, variant := range payload.Variants {
@@ -529,17 +651,17 @@ func decodePlanSetPayload(data []byte) ([]planning.GeneratedPlanVariant, error) 
 func requirePlanText(field, value string, maxLength int) error {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return fmt.Errorf("%w: %s must not be empty", ErrGeneratorContract, field)
+		return fmt.Errorf("%s must not be empty", field)
 	}
 	if len([]rune(trimmed)) > maxLength {
-		return fmt.Errorf("%w: %s exceeds %d chars", ErrGeneratorContract, field, maxLength)
+		return fmt.Errorf("%s exceeds %d chars", field, maxLength)
 	}
 	return nil
 }
 
 func validateStringArray(field string, values []string, maxItems, maxLen int) error {
 	if len(values) > maxItems {
-		return fmt.Errorf("%w: %s exceeds %d items", ErrGeneratorContract, field, maxItems)
+		return fmt.Errorf("%s exceeds %d items", field, maxItems)
 	}
 	seen := map[string]bool{}
 	for _, value := range values {
@@ -547,7 +669,7 @@ func validateStringArray(field string, values []string, maxItems, maxLen int) er
 			return err
 		}
 		if seen[value] {
-			return fmt.Errorf("%w: %s has duplicate %q", ErrGeneratorContract, field, value)
+			return fmt.Errorf("%s has duplicate %q", field, value)
 		}
 		seen[value] = true
 	}

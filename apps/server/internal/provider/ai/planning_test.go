@@ -106,6 +106,42 @@ func TestPlanSetGeneratorNamesRepeatedStepCategory(t *testing.T) {
 	}
 }
 
+// 第 13 轮 E2E 实测:attempt 1 违约 `json: unknown field "rationale"`(模型把
+// rationale 写进步骤),attempt 2 修掉后又撞 `outfit details carry hair/makeup-
+// only fields`——两条消息都不带变体/步骤位置,模型只能盲改。违约消息必须定位
+// 到 variant + step,这是单次内容重试能自纠的前提。
+func TestPlanSetGeneratorLocatesUnknownFieldInStep(t *testing.T) {
+	base := validGeneratedPlanSetJSON()
+	broken := []byte(strings.Replace(string(base), `{"category":"hair"`, `{"rationale":"步骤里多写的字段","category":"hair"`, 1))
+	runtime := &fakeStructuredRuntime{result: broken}
+	_, err := NewPlanSetGenerator(runtime).Generate(context.Background(), validGenerationInput())
+	if !errors.Is(err, ErrGeneratorContract) {
+		t.Fatalf("got %v, want ErrGeneratorContract", err)
+	}
+	if !strings.Contains(err.Error(), "sharp") {
+		t.Fatalf("error must name the variant: %v", err)
+	}
+	if !strings.Contains(err.Error(), "rationale") {
+		t.Fatalf("error must name the unknown field: %v", err)
+	}
+	if !strings.Contains(err.Error(), "step") {
+		t.Fatalf("error must locate the step: %v", err)
+	}
+}
+
+func TestPlanSetGeneratorLocatesDetailsViolation(t *testing.T) {
+	base := validGeneratedPlanSetJSON()
+	broken := []byte(strings.Replace(string(base), `"silhouette":"合肩直线版型"`, `"target":"颅顶","silhouette":"合肩直线版型"`, 1))
+	runtime := &fakeStructuredRuntime{result: broken}
+	_, err := NewPlanSetGenerator(runtime).Generate(context.Background(), validGenerationInput())
+	if !errors.Is(err, ErrGeneratorContract) {
+		t.Fatalf("got %v, want ErrGeneratorContract", err)
+	}
+	if !strings.Contains(err.Error(), "sharp") || !strings.Contains(err.Error(), "outfit") {
+		t.Fatalf("error must name variant and step category: %v", err)
+	}
+}
+
 func TestPlanSetGeneratorRejectsBrokenShape(t *testing.T) {
 	runtime := &fakeStructuredRuntime{result: []byte(`{"variants":[{"slot":1,"key":"sharp"}]}`)}
 	if _, err := NewPlanSetGenerator(runtime).Generate(context.Background(), validGenerationInput()); !errors.Is(err, ErrGeneratorContract) {

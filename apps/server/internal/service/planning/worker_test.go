@@ -180,7 +180,7 @@ type multiCauseError struct {
 	causes []error
 }
 
-func (e *multiCauseError) Error() string { return e.text }
+func (e *multiCauseError) Error() string   { return e.text }
 func (e *multiCauseError) Unwrap() []error { return e.causes }
 
 func TestHandlerGeneratorContractViolationFailsClosedOnSecondAttempt(t *testing.T) {
