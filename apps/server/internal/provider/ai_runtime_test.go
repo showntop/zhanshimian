@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -163,6 +165,37 @@ func TestAIRuntimeFallsBackWhenDomainValidationRejectsOutput(t *testing.T) {
 	}
 	if primaryCalls != 1 || fallbackCalls != 1 || result.Meta.ModelID != "fallback" || result.Meta.FallbackReason == "" {
 		t.Fatalf("validation fallback failed: primary=%d fallback=%d meta=%#v", primaryCalls, fallbackCalls, result.Meta)
+	}
+}
+
+func TestAIRuntimeCombinedErrorPreservesCauseChain(t *testing.T) {
+	t.Setenv("AI_TEST_CHAIN_KEY", "key")
+	sentinel := errors.New("generator contract violation")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "fallback") {
+			// fallback 传输失败(403 配额),primary 域校验违约:两种失败都要留在错误链里。
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"error":{"message":"quota exhausted"}}`))
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "request", "choices": []map[string]any{{"finish_reason": "stop", "message": map[string]any{"content": `{"value":"bad"}`}}}})
+	}))
+	defer server.Close()
+	runtime, err := NewAIRuntime([]AIModel{
+		{ID: "primary", Vendor: "a", Protocol: "openai_chat_completions", Model: "a", BaseURL: server.URL + "/primary", APIKeyEnv: "AI_TEST_CHAIN_KEY", Timeout: time.Second},
+		{ID: "fallback", Vendor: "b", Protocol: "openai_chat_completions", Model: "b", BaseURL: server.URL + "/fallback", APIKeyEnv: "AI_TEST_CHAIN_KEY", Timeout: time.Second},
+	}, []AIRoute{{Capability: CapabilityAdvisorChat, Primary: "primary", Fallbacks: []string{"fallback"}}}, server.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = runtime.Structured(context.Background(), CapabilityAdvisorChat, StructuredRequest{Prompt: "x", SchemaName: "x", Schema: map[string]any{"type": "object"}, MaxOutputTokens: 50, Validate: func(data []byte) error {
+		return fmt.Errorf("%w: bad output", sentinel)
+	}})
+	if err == nil || !errors.Is(err, sentinel) {
+		t.Fatalf("combined error must preserve the cause chain: %v", err)
+	}
+	if !strings.Contains(err.Error(), "all AI models failed") || !strings.Contains(err.Error(), "fallback") {
+		t.Fatalf("message must stay human-readable: %v", err)
 	}
 }
 

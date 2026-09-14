@@ -309,6 +309,7 @@ func (r *AIRuntime) Structured(ctx context.Context, capability string, input Str
 		return StructuredResult{}, fmt.Errorf("no AI route configured for %s", capability)
 	}
 	var causes []string
+	var causeErrs []error
 	for index, modelID := range append([]string{route.Primary}, route.Fallbacks...) {
 		model := r.models[modelID]
 		worstCaseOutputCost := float64(input.MaxOutputTokens)*model.OutputCostPerMillion/1_000_000 + float64(len(input.Images))*model.InputImageCost
@@ -347,6 +348,7 @@ func (r *AIRuntime) Structured(ctx context.Context, capability string, input Str
 			return result, nil
 		}
 		causes = append(causes, modelID+": "+err.Error())
+		causeErrs = append(causeErrs, err)
 		failedMeta := result.Meta
 		if failedMeta.ModelID == "" {
 			failedMeta = InvocationMeta{Capability: capability, ModelID: model.ID, Vendor: model.Vendor, Protocol: model.Protocol, Model: model.Model, Source: InvocationSource(ctx)}
@@ -356,7 +358,23 @@ func (r *AIRuntime) Structured(ctx context.Context, capability string, input Str
 		}
 		r.logInvocation(failedMeta, err)
 	}
-	return StructuredResult{}, fmt.Errorf("all AI models failed for %s: %s", capability, strings.Join(causes, "; "))
+	return StructuredResult{}, &allModelsFailedError{
+		text:   fmt.Sprintf("all AI models failed for %s: %s", capability, strings.Join(causes, "; ")),
+		causes: causeErrs,
+	}
+}
+
+// allModelsFailedError 在全候选失败时保留每条原因的错误链:调用方用
+// errors.Is/As 区分内容类失败(契约违约,走内容重试预算)与传输类失败
+// (基础设施重试),而不是只能解析拼接字符串。
+type allModelsFailedError struct {
+	text   string
+	causes []error
+}
+
+func (e *allModelsFailedError) Error() string { return e.text }
+func (e *allModelsFailedError) Unwrap() []error {
+	return e.causes
 }
 
 // normalizeStructuredJSON handles a provider quirk seen in some compatible
