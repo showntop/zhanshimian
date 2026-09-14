@@ -49,6 +49,27 @@ test('pinned images, provider sniffing and business storage are banned', () => {
   )
 })
 
+test('legacy state keys and client source inference are banned', () => {
+  assert.match(
+    checkSourceFile('feature.tsx', "writeStorage('zsm_report_id', id)").join(' '),
+    /旧业务状态 key/,
+  )
+  assert.match(
+    checkSourceFile('feature.tsx', "writeStorage('zsm_last_outfit_diagnosis', id)").join(' '),
+    /旧业务状态 key/,
+  )
+  assert.match(
+    checkSourceFile('feature.tsx', "item.look_provider && item.look_provider.startsWith('demo')").join(' '),
+    /客户端来源推断/,
+  )
+  assert.match(
+    checkSourceFile('feature.tsx', 'url.startsWith("demo")').join(' '),
+    /客户端来源推断/,
+  )
+  // 正常 source_kind 判定不是来源推断
+  assert.deepEqual(checkSourceFile('feature.tsx', "media.source_kind === 'generated_preview'"), [])
+})
+
 test('task polling is banned everywhere; operation polling only in the wrapper', () => {
   assert.match(
     checkSourceFile('pages/home/index.tsx', 'useTaskPolling({})').join(' '),

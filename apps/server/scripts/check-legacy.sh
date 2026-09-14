@@ -23,7 +23,7 @@ if rg -n 'LatestTasksByRef|locked_at|generation_status|look_task|media_ids|gener
   exit 1
 fi
 
-if rg -n '/v1/tasks|/v1/analyses|/v1/plans' "$repo/contracts/openapi.yaml" "$repo/packages/core/src"; then
+if rg -n '/v1/tasks|/v1/analyses|/v1/plans' "$repo/contracts/openapi.yaml" "$repo/packages/core/src" "$repo/apps/miniapp/src"; then
   echo "legacy endpoint remains" >&2
   exit 1
 fi

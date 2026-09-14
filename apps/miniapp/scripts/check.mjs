@@ -69,6 +69,15 @@ export function checkSourceFile(path, source) {
     }
     if (/\bisBundledAsset\b/.test(code)) fail('禁止 isBundledAsset')
 
+    // 旧业务状态 key(切换后一律从 Reader 读,不再落地本地 ID)
+    if (/zsm_(report_id|plan_id|saved_plan_id|active_task_|last_(outfit|purchase)_diagnosis)/.test(code)) {
+      fail('旧业务状态 key')
+    }
+    // 客户端来源推断:展示语义只认 source_kind/display_label,不许嗅探 provider 或 demo 前缀
+    if (/(look_provider|provider_version).*startsWith|startsWith\(['"]demo/.test(code)) {
+      fail('客户端来源推断')
+    }
+
     // 业务 Storage key
     if (/STORAGE_KEYS\.(reportId|planId|savedPlanId|activeTask|scene|outfit|purchase|advisor)/.test(code)) {
       fail('禁止业务 Storage key')
