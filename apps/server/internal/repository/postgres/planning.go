@@ -455,12 +455,27 @@ func (p *PlanningOperations) StartWithTask(ctx context.Context, command domain.P
 	}
 	defer tx.Rollback(ctx)
 
-	ref, err := findPlanningOperationByDedupe(ctx, tx, command.UserID, command.DedupeKey)
+	ref, err := findActivePlanningOperationByDedupe(ctx, tx, command.UserID, command.DedupeKey)
 	if err != nil {
 		return domain.OperationRef{}, false, err
 	}
 	if ref.ID != "" {
 		return ref, false, nil
+	}
+	// 无在途操作:若同语义键已有终态任务(质量拒绝/失败),失败文案本就承诺
+	// "稍后重试",必须为这次新启动派生下一代任务 dedupe key(tasks 表
+	// UNIQUE(user_id,dedupe_key) 不允许复用)。计数对并发一致:并发双方数到
+	// 相同的 N、派生相同的键,唯一索引只放行一个。
+	taskKey := command.Task.DedupeKey
+	var prior int
+	if err = tx.QueryRow(ctx, `
+		SELECT count(*) FROM tasks
+		WHERE user_id=$1::uuid AND (dedupe_key=$2 OR strpos(dedupe_key, $2 || ':')=1)`,
+		command.UserID, command.DedupeKey).Scan(&prior); err != nil {
+		return domain.OperationRef{}, false, err
+	}
+	if prior > 0 {
+		taskKey = fmt.Sprintf("%s:retry:%d", command.Task.DedupeKey, prior)
 	}
 	if _, err = tx.Exec(ctx, `
 		INSERT INTO operations(id, user_id, kind, subject_type, subject_id, status)
@@ -480,7 +495,7 @@ func (p *PlanningOperations) StartWithTask(ctx context.Context, command domain.P
 		ON CONFLICT (user_id, dedupe_key) DO NOTHING`,
 		command.UserID, command.OperationID, string(command.Task.Type), command.Task.SubjectType,
 		command.Task.SubjectID, command.Task.SubjectGeneration, command.Task.PayloadVersion,
-		payload, command.Task.DedupeKey, p.maxTaskAttempts)
+		payload, taskKey, p.maxTaskAttempts)
 	if err != nil {
 		return domain.OperationRef{}, false, err
 	}
@@ -488,7 +503,7 @@ func (p *PlanningOperations) StartWithTask(ctx context.Context, command domain.P
 		// A concurrent start won the dedupe key; roll the orphan operation
 		// back and surface the existing one.
 		tx.Rollback(ctx)
-		existing, err := findPlanningOperationByDedupe(ctx, p.store.pool, command.UserID, command.DedupeKey)
+		existing, err := findActivePlanningOperationByDedupe(ctx, p.store.pool, command.UserID, command.DedupeKey)
 		if err != nil {
 			return domain.OperationRef{}, false, err
 		}
@@ -500,13 +515,19 @@ func (p *PlanningOperations) StartWithTask(ctx context.Context, command domain.P
 	return domain.OperationRef{ID: command.OperationID, Kind: command.Kind, Status: domain.OperationAccepted}, true, nil
 }
 
-func findPlanningOperationByDedupe(ctx context.Context, q planningQuerier, userID, dedupeKey string) (domain.OperationRef, error) {
+// findActivePlanningOperationByDedupe 按语义键前缀找"仍在途"的操作:终态
+// (failed/cancelled/superseded)操作不参与去重,否则一次失败会把同语义输入
+// 永久钉死。前缀匹配覆盖内容重试(:content:2)与代际重试(:retry:N)派生键。
+func findActivePlanningOperationByDedupe(ctx context.Context, q planningQuerier, userID, dedupeKey string) (domain.OperationRef, error) {
 	var ref domain.OperationRef
 	err := q.QueryRow(ctx, `
 		SELECT o.id::text, o.kind, o.status
 		FROM operations o
 		JOIN tasks t ON t.user_id=o.user_id AND t.operation_id=o.id
-		WHERE t.user_id=$1::uuid AND t.dedupe_key=$2
+		WHERE t.user_id=$1::uuid
+		  AND (t.dedupe_key=$2 OR strpos(t.dedupe_key, $2 || ':')=1)
+		  AND o.status NOT IN ('failed','cancelled','superseded')
+		ORDER BY o.created_at DESC
 		LIMIT 1`, userID, dedupeKey).Scan(&ref.ID, &ref.Kind, &ref.Status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.OperationRef{}, nil

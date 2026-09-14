@@ -178,6 +178,72 @@ func TestPlanningFailSetsOperationTraceID(t *testing.T) {
 	assertOperationFailedWithTrace(t, store, lease.OperationID)
 }
 
+// 终态失败的操作不得成为语义键墓碑:失败文案本就告诉用户"稍后重试",同一
+// report+brief 再次 POST 必须启动新操作(新任务 dedupe key 确定性派生),
+// 而不是重放一个已失败的操作。在途操作仍按语义键去重(不重复调用 AI)。
+func TestStartWithTaskRetriesAfterTerminalFailure(t *testing.T) {
+	store, users := newPlanningStore(t)
+	ctx := context.Background()
+	ops := NewPlanningOperations(store, 3)
+	dedupe := "plan-set:retry:" + uuid.NewString()
+	startCommand := func() domain.PlanningStartOperationCommand {
+		planSetID := uuid.NewString()
+		return domain.PlanningStartOperationCommand{
+			OperationID: uuid.NewString(),
+			UserID:      users.A,
+			Kind:        domain.OperationPlanSet,
+			SubjectType: domain.PlanningSubjectType,
+			SubjectID:   planSetID,
+			DedupeKey:   dedupe,
+			Task: domain.PlanningEnqueueTask{
+				Type:              domain.TaskType("plan_set.generate"),
+				SubjectType:       domain.PlanningSubjectType,
+				SubjectID:         planSetID,
+				SubjectGeneration: 1,
+				PayloadVersion:    1,
+				Payload:           map[string]string{"plan_set_id": planSetID},
+				DedupeKey:         dedupe,
+			},
+		}
+	}
+	first, created, err := ops.StartWithTask(ctx, startCommand())
+	if err != nil || !created {
+		t.Fatalf("first start: created=%v err=%v", created, err)
+	}
+	// 在途:同键必须重放同一操作。
+	replay, created, err := ops.StartWithTask(ctx, startCommand())
+	if err != nil || created || replay.ID != first.ID {
+		t.Fatalf("active replay: created=%v id=%s want %s err=%v", created, replay.ID, first.ID, err)
+	}
+	// 走到终态失败(质量拒绝路径,带质量记录)。
+	lease, ok, err := store.Claim(ctx, "worker-planning", 30*time.Second, []domain.TaskType{"plan_set.generate"})
+	if err != nil || !ok {
+		t.Fatalf("claim: ok=%v err=%v", ok, err)
+	}
+	quality := domain.PlanningPlanQualityRecord{
+		ID: uuid.NewString(), UserID: users.A, SubjectID: lease.Task.SubjectID,
+		PolicyVersion: "plan-set.v1", Decision: "reject",
+		ReasonCodes: []string{"grounding_unknown_id"}, InternalScores: []byte(`{}`),
+	}
+	applied, err := ops.Fail(ctx, lease, quality, "grounding_unknown_id", "方案未通过质量校验", false)
+	if err != nil || !applied {
+		t.Fatalf("fail: applied=%v err=%v", applied, err)
+	}
+	// 失败后:同键必须启动新操作,而不是重放失败操作。
+	second, created, err := ops.StartWithTask(ctx, startCommand())
+	if err != nil || !created {
+		t.Fatalf("retry after failure must start fresh: created=%v err=%v", created, err)
+	}
+	if second.ID == first.ID {
+		t.Fatal("retry replayed the failed operation")
+	}
+	// 派生键确定性:第二个在途期间,再次同键启动重放第二个操作。
+	replaySecond, created, err := ops.StartWithTask(ctx, startCommand())
+	if err != nil || created || replaySecond.ID != second.ID {
+		t.Fatalf("active retry replay: created=%v id=%s want %s err=%v", created, replaySecond.ID, second.ID, err)
+	}
+}
+
 func assertOperationFailedWithTrace(t *testing.T, store *Store, operationID string) {
 	t.Helper()
 	var status string
