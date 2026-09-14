@@ -269,13 +269,13 @@ func buildImmutablePublication(
 		"draft_findings":     len(draft.Findings),
 	})
 	quality := domain.QualityEvaluation{
-		UserID:                 input.Run.UserID,
-		SubjectType:            domain.QualitySubjectReport,
-		Policy:                 domain.QualityPolicyRef{Version: input.Run.QualityPolicyVersion},
-		Decision:               domain.QualityDecisionPass,
-		ReasonCodes:            reasonCodes,
-		InternalScores:         scores,
-		EvaluatorInvocationID:  evaluatorInvocationID,
+		UserID:                input.Run.UserID,
+		SubjectType:           domain.QualitySubjectReport,
+		Policy:                domain.QualityPolicyRef{Version: input.Run.QualityPolicyVersion},
+		Decision:              domain.QualityDecisionPass,
+		ReasonCodes:           reasonCodes,
+		InternalScores:        scores,
+		EvaluatorInvocationID: evaluatorInvocationID,
 	}
 	return report, quality
 }
