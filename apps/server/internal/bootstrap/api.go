@@ -167,7 +167,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		DeleteObject: deleteObjectAdapter{objects: objects}.Delete,
 		Events:       eventWriterAdapter{store: store},
 		Jobs:         store,
-		Demo:         demoMediaAdapter{store: store},
+		Demo:         demoMediaAdapter{store: store, objects: objects, assetDir: cfg.AssetDir},
 
 		Account:    accountSvc,
 		Billing:    ordersSvc,

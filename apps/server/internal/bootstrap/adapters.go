@@ -2,11 +2,16 @@ package bootstrap
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/provider"
 	identitypayment "github.com/zhanshimian/server/internal/provider/payment"
@@ -131,17 +136,53 @@ func (a deleteObjectAdapter) Delete(key string) error {
 	return a.objects.Delete(context.Background(), key)
 }
 
-// demoMediaAdapter 提供 Demo 媒体行（POST /v1/media/demo）：
-// origin=demo、state=ready 的媒体资产，展示侧映射为 效果示例。
-type demoMediaAdapter struct{ store *postgres.Store }
+// demoMediaAdapter 提供 Demo 媒体（POST /v1/media/demo）：
+// 内置 assets/looks/*.png 写入对象存储（worker 与签名 URL 都按真实对象取），
+// 再落 origin=demo 的媒体行，展示侧映射为 效果示例。
+type demoMediaAdapter struct {
+	store    *postgres.Store
+	objects  storage.ObjectStorage
+	assetDir string
+}
 
 var demoKinds = map[string]bool{"face": true, "side": true, "body": true, "outfit": true, "product": true, "wardrobe": true}
+
+// demoBundledFile 沿用旧映射：单品照用 warm，其余全部 natural。
+func demoBundledFile(kind string) string {
+	if kind == "product" {
+		return "warm.png"
+	}
+	return "natural.png"
+}
 
 func (a demoMediaAdapter) CreateDemoMedia(ctx context.Context, userID, kind string) (domain.MediaAsset, error) {
 	if !demoKinds[kind] {
 		return domain.MediaAsset{}, fmt.Errorf("%w: unsupported photo kind", account.ErrValidation)
 	}
-	return a.store.InsertDemoMedia(ctx, userID, kind)
+	file, err := os.Open(filepath.Join(a.assetDir, "looks", demoBundledFile(kind)))
+	if err != nil {
+		return domain.MediaAsset{}, fmt.Errorf("open bundled demo asset: %w", err)
+	}
+	defer file.Close()
+
+	objectKey := fmt.Sprintf("demo/%s/%s-%s.png", userID, kind, uuid.NewString())
+	sum := sha256.New()
+	counter := &countingReader{reader: io.TeeReader(file, sum)}
+	if _, err := a.objects.Save(ctx, objectKey, counter); err != nil {
+		return domain.MediaAsset{}, fmt.Errorf("save demo object: %w", err)
+	}
+	return a.store.InsertDemoMedia(ctx, userID, kind, objectKey, hex.EncodeToString(sum.Sum(nil)), counter.n)
+}
+
+type countingReader struct {
+	reader io.Reader
+	n      int64
+}
+
+func (r *countingReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	r.n += int64(n)
+	return n, err
 }
 
 // eventWriterAdapter 把 Store 的埋点行写入适配到 httpapi.EventWriter。

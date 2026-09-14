@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/zhanshimian/server/internal/domain"
@@ -15,8 +16,9 @@ func TestInsertDemoMediaCreatesReadyAssessmentAssets(t *testing.T) {
 	ctx := context.Background()
 
 	ids := []string{}
-	for _, kind := range []string{"face", "side", "body"} {
-		asset, err := store.InsertDemoMedia(ctx, userID, kind)
+	for i, kind := range []string{"face", "side", "body"} {
+		asset, err := store.InsertDemoMedia(ctx, userID, kind,
+			fmt.Sprintf("demo/%s/%s-%d.png", userID, kind, i), demoSHA(kind), 1234)
 		if err != nil {
 			t.Fatalf("insert demo %s: %v", kind, err)
 		}
@@ -42,12 +44,16 @@ func TestInsertDemoMediaMapsDiagnosticKindsToAllowedPurposes(t *testing.T) {
 	store, userID := newMediaStore(t)
 	ctx := context.Background()
 
-	for kind, want := range map[string]domain.MediaPurpose{
+	purposes := map[string]domain.MediaPurpose{
 		"outfit":   domain.MediaPurposeFeedback,
 		"product":  domain.MediaPurposeFeedback,
 		"wardrobe": domain.MediaPurposeWardrobe,
-	} {
-		asset, err := store.InsertDemoMedia(ctx, userID, kind)
+	}
+	i := 0
+	for kind, want := range purposes {
+		i++
+		asset, err := store.InsertDemoMedia(ctx, userID, kind,
+			fmt.Sprintf("demo/%s/%s-%d.png", userID, kind, i), demoSHA(kind), 1234)
 		if err != nil {
 			t.Fatalf("insert demo %s: %v", kind, err)
 		}
@@ -57,23 +63,24 @@ func TestInsertDemoMediaMapsDiagnosticKindsToAllowedPurposes(t *testing.T) {
 	}
 }
 
-func TestInsertDemoMediaObjectKeysNeverCollide(t *testing.T) {
+func TestInsertDemoMediaRejectsBadInput(t *testing.T) {
 	store, userID := newMediaStore(t)
 	ctx := context.Background()
 
-	first, err := store.InsertDemoMedia(ctx, userID, "face")
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := store.InsertDemoMedia(ctx, userID, "face")
-	if err != nil {
-		t.Fatalf("same-kind second demo must not hit object_key UNIQUE: %v", err)
-	}
-	if first.ObjectKey == second.ObjectKey {
-		t.Fatal("object keys must differ per asset")
-	}
-
-	if _, err := store.InsertDemoMedia(ctx, userID, "pancake"); err == nil {
+	if _, err := store.InsertDemoMedia(ctx, userID, "pancake", "demo/x/pancake.png", demoSHA("pancake"), 1); err == nil {
 		t.Fatal("unsupported kind must be rejected")
 	}
+	if _, err := store.InsertDemoMedia(ctx, userID, "face", "demo/x/face.png", "not-hex", 1); err == nil {
+		t.Fatal("malformed sha256 must be rejected by the CHECK constraint")
+	}
+	if _, err := store.InsertDemoMedia(ctx, userID, "face", "demo/x/face2.png", demoSHA("face"), 0); err == nil {
+		t.Fatal("zero byte_size must be rejected by the CHECK constraint")
+	}
+}
+
+// demoSHA 生成合法形状的 64-hex 测试哈希（内容无关，只满足 CHECK）。
+func demoSHA(seed string) string {
+	sum := [32]byte{}
+	copy(sum[:], seed)
+	return fmt.Sprintf("%x", sum)
 }
