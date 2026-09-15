@@ -178,19 +178,19 @@
     },
     "outfit_diagnosis": {
       "policy": "quality_first",
-      "primary": "aliyun/kimi-k3"
+      "primary": "aliyun/qwen3.8-flash"
     },
     "purchase_diagnosis": {
       "policy": "quality_first",
-      "primary": "aliyun/kimi-k3"
+      "primary": "aliyun/qwen3.8-flash"
     },
     "advisor_chat": {
       "policy": "quality_first",
-      "primary": "aliyun/kimi-k3"
+      "primary": "aliyun/qwen3.8-flash"
     },
     "today_plan": {
       "policy": "quality_first",
-      "primary": "aliyun/kimi-k3"
+      "primary": "aliyun/qwen3.8-flash"
     },
     "hair_edit": {
       "policy": "quality_first",
