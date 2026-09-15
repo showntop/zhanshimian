@@ -20,6 +20,9 @@ import SourceImage from '../../../../components/source-image'
 import './index.scss'
 
 const IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
+// hero 相框 750rpx 宽 × 720rpx 高：anchor=top 自动填充据此决定铺宽还是铺高。
+// 不传 mode 走 widthFix/heightFix——aspectFit + height:auto 在微信里会塌成 0 高（空白）。
+const HERO_ASPECT = 750 / 720
 const STYLES = [
   { id: 'sharp', name: '锁骨层次发' },
   { id: 'warm', name: '空气微卷' },
@@ -192,16 +195,17 @@ export default function Hair() {
         <View className={`hair__hero photo-hero photo-hero--bleed ${enter()}`}>
           <View className="hair__hero-frame">
             {mode === 'result' && hasResult ? (
-              <SourceImage className="hair__hero-img" media={preview!.media} mode="aspectFit" anchor="top" />
+              <SourceImage className="hair__hero-img" media={preview!.media} anchor="top" frameAspect={HERO_ASPECT} />
             ) : preview?.source_media ? (
-              <SourceImage className="hair__hero-img" media={preview.source_media} mode="aspectFit" anchor="top" />
+              <SourceImage className="hair__hero-img" media={preview.source_media} anchor="top" frameAspect={HERO_ASPECT} />
             ) : reportFace ? (
-              <SourceImage className="hair__hero-img" media={reportFace} mode="aspectFit" anchor="top" />
+              <SourceImage className="hair__hero-img" media={reportFace} anchor="top" frameAspect={HERO_ASPECT} />
             ) : (
               <SourceImage
                 className="hair__hero-img"
                 reference={{ slug: (LOCAL_LOOK_SLUGS as readonly string[]).includes(styleId) ? styleId : 'sharp', variant: 'hair' }}
                 anchor="top"
+                frameAspect={HERO_ASPECT}
               />
             )}
             {preview && IN_FLIGHT.has(preview.state) ? (
