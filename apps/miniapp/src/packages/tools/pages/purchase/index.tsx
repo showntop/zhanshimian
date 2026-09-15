@@ -62,6 +62,7 @@ export default function Purchase() {
     Taro.chooseMedia({
       count: 1,
       mediaType: ['image'],
+      sizeType: ['compressed'],
       success: (res) => {
         const file = res.tempFiles[0]
         if (file) {

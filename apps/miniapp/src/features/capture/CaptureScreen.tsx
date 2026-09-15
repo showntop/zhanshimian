@@ -139,6 +139,8 @@ export default function CaptureScreen() {
       mediaType: ['image'],
       // 不指定 source 时由系统面板提供「拍摄 / 从相册选择」
       sourceType: source ? [source] : ['camera', 'album'],
+      // 送微信压缩档：AI 分析不需要原图，上传与下游推理都快一个量级
+      sizeType: ['compressed'],
       // 正脸/侧脸自拍更稳；全身照交给默认相机，避免强制前置
       ...(source === 'camera' && role !== 'body' ? { camera: 'front' as const } : {}),
       success: (res) => {
@@ -224,6 +226,7 @@ export default function CaptureScreen() {
       count: missing.length,
       mediaType: ['image'],
       sourceType: [source],
+      sizeType: ['compressed'],
       success: (res) => {
         const files = res.tempFiles.slice(0, missing.length)
         void Promise.all(

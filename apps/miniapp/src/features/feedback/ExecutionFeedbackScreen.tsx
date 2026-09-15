@@ -82,6 +82,7 @@ export default function ExecutionFeedbackScreen({ executionId }: ExecutionFeedba
       count: 1,
       mediaType: ['image'],
       sourceType: ['camera', 'album'],
+      sizeType: ['compressed'],
       success: (res) => {
         const file = res.tempFiles[0]
         if (!file) return

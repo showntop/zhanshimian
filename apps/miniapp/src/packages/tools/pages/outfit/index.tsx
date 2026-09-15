@@ -84,6 +84,7 @@ export default function Outfit() {
     Taro.chooseMedia({
       count: 1,
       mediaType: ['image'],
+      sizeType: ['compressed'],
       success: (res) => {
         const file = res.tempFiles[0]
         if (file) {

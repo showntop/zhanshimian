@@ -97,6 +97,7 @@ export default function Hair() {
       mediaType: ['image'],
       sourceType: ['camera', 'album'],
       camera: 'front',
+      sizeType: ['compressed'],
       success: (res) => {
         const file = res.tempFiles[0]
         if (file) setPendingPath(file.tempFilePath)
