@@ -10,6 +10,8 @@ import (
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/service/share"
+	"github.com/zhanshimian/server/internal/service/today"
 )
 
 // readmodelFixture 复用完整发布链（report → plan set → render → publication）
@@ -126,6 +128,9 @@ func TestReadShareSourceRequiresOwnedPublishedAsset(t *testing.T) {
 	if source.DisplayLabel != "风格参考" {
 		t.Fatalf("display_label = %q", source.DisplayLabel)
 	}
+	if source.MIMEType != "image/jpeg" {
+		t.Fatalf("mime = %q, want image/jpeg（创建响应的媒体投影强制校验）", source.MIMEType)
+	}
 	if source.ObjectKey != "" && (source.ObjectKey[:4] == "http" || source.ObjectKey[:3] == "://") {
 		t.Fatalf("object key leaked a URL: %q", source.ObjectKey)
 	}
@@ -140,6 +145,124 @@ func TestReadShareSourceRequiresOwnedPublishedAsset(t *testing.T) {
 	}
 	if _, err := f.store.ReadShareSource(ctx, f.userA, "bogus", f.variantID); !errors.Is(err, repository.ErrNotFound) {
 		t.Fatalf("unknown source type = %v, want ErrNotFound", err)
+	}
+}
+
+// 今日方案的 render_publication_id 当前没有任何写路径回填（恒 NULL）：
+// 分享源读取必须退化为纯文本快照（不 404），回填后同一查询自动带媒体。
+func TestReadShareTodayPlanToleratesMissingRenderPublication(t *testing.T) {
+	f := newReadModelFixture(t)
+	ctx := context.Background()
+
+	plan, err := f.store.CreateTodayPlan(ctx, f.userA, today.Plan{
+		Title: "今日利落通勤", Summary: "浅色提亮",
+		Steps: []domain.TodayPlanStep{}, Active: true, State: "planning",
+	})
+	if err != nil {
+		t.Fatalf("create today plan: %v", err)
+	}
+
+	source, err := f.store.ReadShareSource(ctx, f.userA, "today_plan", plan.ID)
+	if err != nil {
+		t.Fatalf("today share source must not 404 without publication: %v", err)
+	}
+	if source.Title != "今日利落通勤" || source.Summary != "浅色提亮" {
+		t.Fatalf("snapshot copy = %#v", source)
+	}
+	if source.AssetID != "" || source.ObjectKey != "" {
+		t.Fatalf("text-only source must not carry asset identity: %#v", source)
+	}
+
+	// 回填发布（渲染链路接回后的状态）：同一读取必须带上资产身份与 mime。
+	if _, err := f.store.pool.Exec(ctx, `
+		UPDATE today_plans SET render_publication_id=$3::uuid
+		WHERE user_id=$1::uuid AND id=$2::uuid`, f.userA, plan.ID, f.publicationID); err != nil {
+		t.Fatal(err)
+	}
+	withMedia, err := f.store.ReadShareSource(ctx, f.userA, "today_plan", plan.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if withMedia.AssetID == "" || withMedia.ObjectKey == "" {
+		t.Fatalf("published source lacks asset identity: %#v", withMedia)
+	}
+	if withMedia.MIMEType != "image/jpeg" || withMedia.SourceKind != domain.MediaSourceGeneratedPreview {
+		t.Fatalf("published source media = %q/%q", withMedia.MIMEType, withMedia.SourceKind)
+	}
+
+	// 越权：userB 读 userA 的今日方案一律 NotFound。
+	if _, err := f.store.ReadShareSource(ctx, f.userB, "today_plan", plan.ID); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("cross-tenant today share = %v, want ErrNotFound", err)
+	}
+}
+
+// 公开读取分享必须把对象定位（object key + mime）带给签名层；
+// 创建行本身不存 URL（快照只存资产身份）。
+func TestShareRoundTripCarriesMediaLocation(t *testing.T) {
+	f := newReadModelFixture(t)
+	ctx := context.Background()
+
+	source, err := f.store.ReadShareSource(ctx, f.userA, "plan_variant", f.variantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	card, err := f.store.InsertShare(ctx, f.userA, source, share.Snapshot{
+		Title: source.Title, Summary: source.Summary,
+		AssetID: source.AssetID, SourceKind: string(source.SourceKind), DisplayLabel: source.DisplayLabel,
+	}, false)
+	if err != nil {
+		t.Fatalf("insert share: %v", err)
+	}
+
+	public, err := f.store.GetPublicShareByToken(ctx, card.Token)
+	if err != nil {
+		t.Fatalf("public read: %v", err)
+	}
+	if public.Snapshot.AssetID != source.AssetID {
+		t.Fatalf("snapshot asset = %q, want %q", public.Snapshot.AssetID, source.AssetID)
+	}
+	if public.ObjectKey == "" {
+		t.Fatal("public read must carry the current object key for signing")
+	}
+	if public.MIMEType != "image/jpeg" {
+		t.Fatalf("public read mime = %q（接收方投影强制 image/jpeg）", public.MIMEType)
+	}
+}
+
+// active_operations 的语义是「需要用户关注的操作」：failed 必须下发
+// （我的页任务中心「未完成，点击查看」）；终态 succeeded 不下发。
+func TestReadHomeIncludesFailedOperations(t *testing.T) {
+	f := newReadModelFixture(t)
+	ctx := context.Background()
+
+	failedID, succeededID := uuid.NewString(), uuid.NewString()
+	// 库约束：failed 必须带 trace_id（operations_check）。
+	if _, err := f.store.pool.Exec(ctx, `
+		INSERT INTO operations(id, user_id, kind, subject_type, subject_id, status, trace_id)
+		VALUES ($1::uuid, $2::uuid, 'assessment', 'photo_set', $3::uuid, 'failed', 'trace-seed')`,
+		failedID, f.userA, f.variantID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.store.pool.Exec(ctx, `
+		INSERT INTO operations(id, user_id, kind, subject_type, subject_id, status)
+		VALUES ($1::uuid, $2::uuid, 'assessment', 'photo_set', $3::uuid, 'succeeded')`,
+		succeededID, f.userA, f.variantID); err != nil {
+		t.Fatal(err)
+	}
+
+	snap, err := f.store.ReadHome(ctx, f.userA, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	statuses := map[string]domain.OperationStatus{}
+	for _, ref := range snap.ActiveOperations {
+		statuses[ref.ID] = ref.Status
+	}
+	if statuses[failedID] != domain.OperationFailed {
+		t.Fatalf("failed operation missing from active_operations: %#v", snap.ActiveOperations)
+	}
+	if _, found := statuses[succeededID]; found {
+		t.Fatalf("succeeded operation must not be active: %#v", snap.ActiveOperations)
 	}
 }
 

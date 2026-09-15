@@ -16,6 +16,7 @@ type Source struct {
 	Summary      string
 	AssetID      string
 	ObjectKey    string
+	MIMEType     string
 	SourceKind   domain.MediaSourceKind
 	DisplayLabel string
 	PublishedAt  time.Time

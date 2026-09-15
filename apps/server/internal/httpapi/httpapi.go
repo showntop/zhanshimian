@@ -97,15 +97,15 @@ func New(deps Dependencies, logger *slog.Logger, devLoginEnabled bool, runtime R
 	mux.Handle("PATCH /v1/diagnostics/{id}", api.auth(http.HandlerFunc(api.patchDiagnostic)))
 	mux.Handle("GET /v1/hairstyles", api.auth(http.HandlerFunc(api.listHairstyles)))
 
-	mux.Handle("POST /v1/hair-previews", api.auth(http.HandlerFunc(api.createHairPreview)))
-	mux.Handle("GET /v1/hair-previews", api.auth(http.HandlerFunc(api.listSavedHairPreviews)))
+	mux.Handle("POST /v1/hair-previews", api.auth(api.requireIdempotency(http.HandlerFunc(api.createHairPreview))))
+	mux.Handle("GET /v1/hair-previews", api.auth(http.HandlerFunc(api.listHairPreviews)))
 	mux.Handle("GET /v1/hair-previews/active", api.auth(http.HandlerFunc(api.getActiveHairPreview)))
 	mux.Handle("GET /v1/hair-previews/{id}", api.auth(http.HandlerFunc(api.getHairPreview)))
 	mux.Handle("POST /v1/hair-previews/{id}/save", api.auth(http.HandlerFunc(api.saveHairPreview)))
 
 	mux.Handle("GET /v1/today/context", api.auth(http.HandlerFunc(api.getTodayContext)))
 	mux.Handle("GET /v1/today/plans/current", api.auth(http.HandlerFunc(api.getTodayPlan)))
-	mux.Handle("POST /v1/today/plans", api.auth(http.HandlerFunc(api.createTodayPlan)))
+	mux.Handle("POST /v1/today/plans", api.auth(api.requireIdempotency(http.HandlerFunc(api.createTodayPlan))))
 	mux.Handle("POST /v1/today/plans/{id}/activate", api.auth(http.HandlerFunc(api.activateTodayPlan)))
 	mux.Handle("POST /v1/today/plans/{id}/feedback", api.auth(http.HandlerFunc(api.feedbackTodayPlan)))
 

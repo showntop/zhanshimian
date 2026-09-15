@@ -49,7 +49,7 @@ func TestHomeMediaSignerLocalFallsBackToPublicUploads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer := newHomeMediaSigner(objects, "http://localhost:58000", 15*time.Minute)
+	signer := newMediaURLSigner(objects, "http://localhost:58000", 15*time.Minute)
 
 	url, expiresAt, err := signer.SignedURL(context.Background(), "users/user-1/render-published/pub-1.jpg")
 	if err != nil {

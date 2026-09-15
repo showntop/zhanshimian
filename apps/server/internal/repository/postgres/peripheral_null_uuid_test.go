@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/service/diagnostic"
 	"github.com/zhanshimian/server/internal/service/hair"
 	"github.com/zhanshimian/server/internal/service/share"
@@ -64,15 +63,14 @@ func TestPeripheralInsertsPersistNullOptionalUUID(t *testing.T) {
 	})
 
 	t.Run("hair preview", func(t *testing.T) {
-		preview, err := store.InsertHairPreview(ctx, userID, hair.Preview{
-			StyleID: "style-texture-crop", State: "queued",
-			SourceMedia: &domain.RenderMediaView{},
+		preview, operation, err := store.CreateHairPreviewRun(ctx, userID, hair.CreateRunParams{
+			StyleID: "style-texture-crop",
 		})
 		if err != nil {
-			t.Fatalf("insert hair preview without source media: %v", err)
+			t.Fatalf("create hair preview without source media: %v", err)
 		}
-		if preview.ID == "" {
-			t.Fatal("returned preview must carry the inserted id")
+		if preview.ID == "" || operation.ID == "" {
+			t.Fatalf("returned preview/operation must carry ids: %#v %#v", preview, operation)
 		}
 	})
 

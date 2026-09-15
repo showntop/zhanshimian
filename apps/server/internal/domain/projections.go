@@ -151,4 +151,6 @@ type HairStyle struct {
 	Note   string          `json:"note,omitempty"`
 	Reason string          `json:"reason,omitempty"`
 	Tags   []string        `json:"tags,omitempty"`
+	// MediaObjectKey 仅供读路径即时签名（敏感信息红线：库不存签名 URL），不外发。
+	MediaObjectKey string `json:"-"`
 }

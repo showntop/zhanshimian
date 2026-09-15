@@ -23,6 +23,11 @@ type Plan struct {
 	Feedback  *string                 `json:"feedback,omitempty"`
 	CreatedAt time.Time               `json:"created_at"`
 	UpdatedAt time.Time               `json:"updated_at"`
+
+	// MediaObjectKey/MediaMIMEType 由读取侧 join media_assets 得到，供呈现层
+	// 即时签名（与 share.Card.ObjectKey 同一做法）；不出现在 JSON。
+	MediaObjectKey string `json:"-"`
+	MediaMIMEType  string `json:"-"`
 }
 
 type CreateInput struct {
@@ -60,10 +65,17 @@ type Service struct {
 	planner TodayPlanner
 	weather WeatherProvider
 	clock   Clock
+	signer  MediaSigner
 }
 
 func New(reader Reader, writer Writer, planner TodayPlanner, weather WeatherProvider, clock Clock) *Service {
 	return &Service{reader: reader, writer: writer, planner: planner, weather: weather, clock: clock}
+}
+
+// WithMediaSigner 装配读路径媒体签名器（与 assessment.WithBilling 同一链式做法）。
+func (s *Service) WithMediaSigner(signer MediaSigner) *Service {
+	s.signer = signer
+	return s
 }
 
 // Generate 从质量核心 grounding 生成并落库一套今日方案。
@@ -105,15 +117,46 @@ func (s *Service) Generate(ctx context.Context, userID string, input CreateInput
 }
 
 func (s *Service) Current(ctx context.Context, userID string) (Plan, error) {
-	return s.writer.CurrentTodayPlan(ctx, userID)
+	plan, err := s.writer.CurrentTodayPlan(ctx, userID)
+	if err != nil {
+		return Plan{}, err
+	}
+	return plan, s.signPlanMedia(ctx, &plan)
 }
 
 func (s *Service) Activate(ctx context.Context, userID string, id string) (Plan, error) {
-	return s.writer.MarkTodayPlanActive(ctx, userID, id)
+	plan, err := s.writer.MarkTodayPlanActive(ctx, userID, id)
+	if err != nil {
+		return Plan{}, err
+	}
+	return plan, s.signPlanMedia(ctx, &plan)
 }
 
 func (s *Service) Feedback(ctx context.Context, userID string, id string, feedback string) (Plan, error) {
-	return s.writer.RecordTodayPlanFeedback(ctx, userID, id, feedback)
+	plan, err := s.writer.RecordTodayPlanFeedback(ctx, userID, id, feedback)
+	if err != nil {
+		return Plan{}, err
+	}
+	return plan, s.signPlanMedia(ctx, &plan)
+}
+
+// signPlanMedia 给发布媒体补可读 URL：对象定位来自读模型 join，签名经
+// MediaSigner；未装配签名器时保持无 URL（单测/降级组装）。URL 与 MIMEType
+// 必须一起下发——客户端投影对空 url 或 generated 非 image/jpeg 一律拒渲染。
+func (s *Service) signPlanMedia(ctx context.Context, plan *Plan) error {
+	if plan.Media == nil || s.signer == nil || plan.MediaObjectKey == "" {
+		return nil
+	}
+	url, expiresAt, err := s.signer.SignedURL(ctx, plan.MediaObjectKey)
+	if err != nil {
+		return err
+	}
+	plan.Media.URL = url
+	plan.Media.URLExpiresAt = expiresAt
+	if plan.Media.MIMEType == "" {
+		plan.Media.MIMEType = plan.MediaMIMEType
+	}
+	return nil
 }
 
 // Context 返回今日的天气/日程上下文（GET /v1/today/context）。

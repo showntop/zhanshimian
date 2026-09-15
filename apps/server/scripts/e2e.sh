@@ -197,6 +197,7 @@ printf '%s' "$today_context" | jq -e '
   .data.city == "杭州" and (.data.date | length) > 0 and (.data.day_type | length) > 0' >/dev/null
 today_plan="$(curl -fsS -X POST "$api_base/v1/today/plans" \
   -H "Authorization: Bearer $token" -H 'content-type: application/json' \
+  -H "Idempotency-Key: $(idem_key)" \
   -d '{"city":"杭州","schedule":"通勤"}')"
 printf '%s' "$today_plan" | jq -e '.data.id != null and (.data.steps | length) >= 1' >/dev/null
 today_plan_id="$(printf '%s' "$today_plan" | jq -r '.data.id')"

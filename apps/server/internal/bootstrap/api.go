@@ -136,17 +136,17 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	bodySvc := core.Body.WithBilling(billingSvc)
 	executionSvc := execution.New(store)
 	feedbackSvc := feedback.New(store)
-	todaySvc := today.New(store, store, providerai.NewTodayPlanner(structuredRuntimeAdapter{ai.Runtime}), todayWeatherAdapter{inner: weather}, today.NewClock())
-	wardrobeSvc := wardrobe.New(store, store)
+	// 外围读模型的展示媒体统一经 mediaURLSigner 呈现：COS 短时签名，
+	// 本地存储回退 PUBLIC_BASE_URL + /uploads/（开发环境可播）。
+	mediaSigner := newMediaURLSigner(objects, cfg.PublicBaseURL, cfg.AssetURLTTL)
+	todaySvc := today.New(store, store, providerai.NewTodayPlanner(structuredRuntimeAdapter{ai.Runtime}), todayWeatherAdapter{inner: weather}, today.NewClock()).
+		WithMediaSigner(mediaSigner)
+	wardrobeSvc := wardrobe.New(store, store).WithMediaSigner(mediaSigner)
 	advisorSvc := advisor.New(store, store, providerai.NewAdvisorChat(structuredRuntimeAdapter{ai.Runtime}))
-	diagnosticSvc := diagnostic.New(store, store, providerai.NewDiagnostic(structuredRuntimeAdapter{ai.Runtime}))
-	hairStarter := hairStarterAdapter{store: store}
-	hairSvc := hair.New(store, store, hairStarter, store)
-	var shareSigner share.URLSigner
-	if cos, ok := objects.(storage.SignedURLStorage); ok {
-		shareSigner = signedURLSigner{inner: cos}
-	}
-	shareSvc := share.New(store, store, shareSigner, cfg.AssetURLTTL)
+	diagnosticSvc := diagnostic.New(store, store, providerai.NewDiagnostic(structuredRuntimeAdapter{ai.Runtime})).
+		WithMediaSigner(mediaSigner)
+	hairSvc := hair.New(store, store, store, store, mediaSigner)
+	shareSvc := share.New(store, store, shareURLSigner{inner: mediaSigner}, cfg.AssetURLTTL)
 
 	logger.Info("AI capability routes configured", "source", cfg.AIRoutingSource, "routes", ai.Routes)
 
@@ -169,7 +169,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 			PlanSets: core.Planning,
 			Today:    homeTodayReader{inner: todaySvc},
 			Billing:  ordersSvc,
-			Media:    newHomeMediaSigner(objects, cfg.PublicBaseURL, cfg.AssetURLTTL),
+			Media:    mediaSigner,
 		}),
 		Idempotency:  store,
 		DeleteObject: deleteObjectAdapter{objects: objects}.Delete,

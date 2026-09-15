@@ -24,6 +24,11 @@ type Diagnosis struct {
 
 	// MediaAssetID 写入 diagnostics.source_media_asset_id；不出现在 JSON 里。
 	MediaAssetID string `json:"-"`
+
+	// SourceMediaObjectKey/SourceMediaMIMEType 由读取侧 join media_assets 得到，
+	// 供呈现层即时签名（与 share.Card.ObjectKey 同一做法）；不出现在 JSON。
+	SourceMediaObjectKey string `json:"-"`
+	SourceMediaMIMEType  string `json:"-"`
 }
 
 type RunInput struct {
@@ -70,10 +75,17 @@ type Service struct {
 	reader  Reader
 	writer  Writer
 	advisor Advisor
+	signer  MediaSigner
 }
 
 func New(reader Reader, writer Writer, advisor Advisor) *Service {
 	return &Service{reader: reader, writer: writer, advisor: advisor}
+}
+
+// WithMediaSigner 装配读路径媒体签名器（与 assessment.WithBilling 同一链式做法）。
+func (s *Service) WithMediaSigner(signer MediaSigner) *Service {
+	s.signer = signer
+	return s
 }
 
 // Run 同步跑一次诊断：grounding → AI → 落库。AI 失败必须返回错误，
@@ -104,13 +116,43 @@ func (s *Service) Run(ctx context.Context, userID string, input RunInput) (Diagn
 }
 
 func (s *Service) Get(ctx context.Context, userID string, id string) (Diagnosis, error) {
-	return s.writer.GetDiagnosticByID(ctx, userID, id)
+	d, err := s.writer.GetDiagnosticByID(ctx, userID, id)
+	if err != nil {
+		return Diagnosis{}, err
+	}
+	return d, s.signSourceMedia(ctx, &d)
 }
 
 func (s *Service) Latest(ctx context.Context, userID string, kind string) (Diagnosis, error) {
-	return s.writer.GetLatestDiagnosticByKind(ctx, userID, kind)
+	d, err := s.writer.GetLatestDiagnosticByKind(ctx, userID, kind)
+	if err != nil {
+		return Diagnosis{}, err
+	}
+	return d, s.signSourceMedia(ctx, &d)
 }
 
 func (s *Service) SetSaved(ctx context.Context, userID string, id string, saved bool) (Diagnosis, error) {
-	return s.writer.UpdateDiagnosticSaved(ctx, userID, id, saved)
+	d, err := s.writer.UpdateDiagnosticSaved(ctx, userID, id, saved)
+	if err != nil {
+		return Diagnosis{}, err
+	}
+	return d, s.signSourceMedia(ctx, &d)
+}
+
+// signSourceMedia 给诊断源照片补可读 URL：复访恢复（GET latest/{id}）时
+// 客户端投影对空 url 一律拒渲染。未装配签名器时保持无 URL（单测/降级组装）。
+func (s *Service) signSourceMedia(ctx context.Context, d *Diagnosis) error {
+	if d.SourceMedia == nil || s.signer == nil || d.SourceMediaObjectKey == "" {
+		return nil
+	}
+	url, expiresAt, err := s.signer.SignedURL(ctx, d.SourceMediaObjectKey)
+	if err != nil {
+		return err
+	}
+	d.SourceMedia.URL = url
+	d.SourceMedia.URLExpiresAt = expiresAt
+	if d.SourceMedia.MIMEType == "" {
+		d.SourceMedia.MIMEType = d.SourceMediaMIMEType
+	}
+	return nil
 }

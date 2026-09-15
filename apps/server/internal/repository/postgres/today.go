@@ -11,6 +11,10 @@ import (
 
 var _ today.Writer = (*Store)(nil)
 
+// CreateTodayPlan 落库今日方案，并在同一事务里创建其搭配图渲染的公开
+// Operation（kind=render，subject_type=today_plan，与 hair 预览同一先例）：
+// 创建响应必须带 operation 引用（契约 TodayPlanAccepted），客户端据此轮询。
+// 渲染 worker 接入后由它推进该 Operation；当前保持 accepted 可轮询。
 func (s *Store) CreateTodayPlan(ctx context.Context, userID string, plan today.Plan) (today.Plan, error) {
 	steps, err := json.Marshal(plan.Steps)
 	if err != nil {
@@ -20,14 +24,41 @@ func (s *Store) CreateTodayPlan(ctx context.Context, userID string, plan today.P
 	if err != nil {
 		return plan, err
 	}
-	err = s.pool.QueryRow(ctx, `
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return plan, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	err = tx.QueryRow(ctx, `
 		INSERT INTO today_plans(user_id, report_id, context, title, summary, steps, active, state, feedback)
 		VALUES ($1::uuid, NULLIF($2,'')::uuid, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id::text, created_at, updated_at`,
 		userID, plan.ReportID, contextJSON, plan.Title, plan.Summary, steps,
 		plan.Active, plan.State, plan.Feedback).
 		Scan(&plan.ID, &plan.CreatedAt, &plan.UpdatedAt)
-	return plan, mapNotFound(err)
+	if err != nil {
+		return plan, mapNotFound(err)
+	}
+	err = tx.QueryRow(ctx, `
+		INSERT INTO operations(user_id, kind, subject_type, subject_id, status)
+		VALUES ($1::uuid, 'render', 'today_plan', $2::uuid, 'accepted')
+		RETURNING id::text`, userID, plan.ID).
+		Scan(&plan.Operation.ID)
+	if err != nil {
+		return plan, err
+	}
+	if _, err = tx.Exec(ctx, `
+		UPDATE today_plans SET operation_id=$3::uuid WHERE user_id=$1::uuid AND id=$2::uuid`,
+		userID, plan.ID, plan.Operation.ID); err != nil {
+		return plan, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return plan, err
+	}
+	plan.Operation.Kind = domain.OperationRender
+	plan.Operation.Status = domain.OperationAccepted
+	return plan, nil
 }
 
 func (s *Store) CurrentTodayPlan(ctx context.Context, userID string) (today.Plan, error) {
@@ -72,7 +103,7 @@ const todayPlanSelectSQL = `
 	SELECT tp.id::text, COALESCE(tp.report_id::text,''), tp.context, tp.title, tp.summary,
 	       tp.steps, tp.active, tp.state, tp.feedback,
 	       COALESCE(op.id::text,''), COALESCE(op.kind::text,''), COALESCE(op.status::text,''),
-	       COALESCE(ma.id::text,''), COALESCE(ma.object_key,''),
+	       COALESCE(ma.id::text,''), COALESCE(ma.object_key,''), COALESCE(ma.mime_type,''),
 	       CASE ma.origin
 	         WHEN 'user_upload' THEN 'user_original'
 	         WHEN 'provider_output' THEN 'generated_preview'
@@ -98,12 +129,12 @@ func (s *Store) scanTodayPlan(row rowScanner) (today.Plan, error) {
 	var plan today.Plan
 	var contextJSON, stepsJSON []byte
 	var feedback *string
-	var mediaAssetID, mediaObjectKey, mediaSourceKind, mediaDisplayLabel string
+	var mediaAssetID, mediaSourceKind, mediaDisplayLabel string
 	err := row.Scan(
 		&plan.ID, &plan.ReportID, &contextJSON, &plan.Title, &plan.Summary,
 		&stepsJSON, &plan.Active, &plan.State, &feedback,
 		&plan.Operation.ID, &plan.Operation.Kind, &plan.Operation.Status,
-		&mediaAssetID, &mediaObjectKey, &mediaSourceKind, &mediaDisplayLabel,
+		&mediaAssetID, &plan.MediaObjectKey, &plan.MediaMIMEType, &mediaSourceKind, &mediaDisplayLabel,
 		&plan.CreatedAt, &plan.UpdatedAt,
 	)
 	if err != nil {
@@ -120,7 +151,8 @@ func (s *Store) scanTodayPlan(row rowScanner) (today.Plan, error) {
 	}
 	if mediaAssetID != "" {
 		plan.Media = &domain.RenderMediaView{
-			AssetID: mediaAssetID, SourceKind: mediaSourceKind, DisplayLabel: mediaDisplayLabel,
+			AssetID: mediaAssetID, MIMEType: plan.MediaMIMEType,
+			SourceKind: mediaSourceKind, DisplayLabel: mediaDisplayLabel,
 		}
 	}
 	return plan, nil

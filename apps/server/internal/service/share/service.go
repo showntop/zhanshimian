@@ -30,8 +30,9 @@ type Card struct {
 	ExpiresAt    time.Time               `json:"expires_at"`
 	CreatedAt    time.Time               `json:"created_at"`
 
-	// ObjectKey 由读取侧 join media_assets 得到；创建响应里为空。
+	// ObjectKey/MIMEType 由读取侧 join media_assets 得到；创建响应里为空。
 	ObjectKey string `json:"-"`
+	MIMEType  string `json:"-"`
 }
 
 // PublicView 是公开读取的投影：媒体按当前 object key 即时签名。
@@ -75,15 +76,25 @@ func New(reader Reader, writer Writer, signer URLSigner, ttl time.Duration) *Ser
 }
 
 // Create 读取来源的发布态资产，落一份不可变快照；来源未发布返回 ErrNotFound。
+// 创建响应同样回填签名媒体：创建者立刻看到自己的分享卡（与公开读取同一呈现）。
 func (s *Service) Create(ctx context.Context, userID string, input CreateInput) (Card, error) {
 	source, err := s.reader.ReadShareSource(ctx, userID, input.SourceType, input.SourceID)
 	if err != nil {
 		return Card{}, err
 	}
-	return s.writer.InsertShare(ctx, userID, source, Snapshot{
+	card, err := s.writer.InsertShare(ctx, userID, source, Snapshot{
 		Title: source.Title, Summary: source.Summary,
 		AssetID: source.AssetID, SourceKind: string(source.SourceKind), DisplayLabel: source.DisplayLabel,
 	}, input.IncludePhoto)
+	if err != nil {
+		return Card{}, err
+	}
+	media, err := s.signMedia(ctx, source.AssetID, source.ObjectKey, source.MIMEType, source.SourceKind, source.DisplayLabel)
+	if err != nil {
+		return Card{}, err
+	}
+	card.Media = media
+	return card, nil
 }
 
 // GetPublic 按 token 读公开分享；快照里的 asset_id 指向的媒体必须仍是 published，
@@ -100,17 +111,29 @@ func (s *Service) GetPublic(ctx context.Context, token string) (PublicView, erro
 		SourceType: card.SourceType, Snapshot: card.Snapshot,
 		IncludePhoto: card.IncludePhoto, ExpiresAt: card.ExpiresAt,
 	}
-	if s.signer != nil && card.Snapshot.AssetID != "" && card.ObjectKey != "" {
-		url, expiresAt, err := s.signer.SignedURL(ctx, card.ObjectKey, s.ttl)
-		if err != nil {
-			return PublicView{}, err
-		}
-		view.Media = &domain.RenderMediaView{
-			AssetID: card.Snapshot.AssetID, URL: url, URLExpiresAt: expiresAt,
-			SourceKind: card.Snapshot.SourceKind, DisplayLabel: card.Snapshot.DisplayLabel,
-		}
+	media, err := s.signMedia(ctx, card.Snapshot.AssetID, card.ObjectKey, card.MIMEType,
+		domain.MediaSourceKind(card.Snapshot.SourceKind), card.Snapshot.DisplayLabel)
+	if err != nil {
+		return PublicView{}, err
 	}
+	view.Media = media
 	return view, nil
+}
+
+// signMedia 按当前 object key 即时签名；无签名器或无资产时无媒体（纯文本卡）。
+// MIMEType 必须随 URL 一起下发：客户端投影对 generated 类强制 image/jpeg。
+func (s *Service) signMedia(ctx context.Context, assetID, objectKey, mimeType string, sourceKind domain.MediaSourceKind, displayLabel string) (*domain.RenderMediaView, error) {
+	if s.signer == nil || assetID == "" || objectKey == "" {
+		return nil, nil
+	}
+	url, expiresAt, err := s.signer.SignedURL(ctx, objectKey, s.ttl)
+	if err != nil {
+		return nil, err
+	}
+	return &domain.RenderMediaView{
+		AssetID: assetID, URL: url, URLExpiresAt: expiresAt, MIMEType: mimeType,
+		SourceKind: string(sourceKind), DisplayLabel: displayLabel,
+	}, nil
 }
 
 // Revoke 撤销分享；撤销后公开读取 404。

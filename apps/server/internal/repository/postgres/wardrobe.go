@@ -15,7 +15,7 @@ func (s *Store) GetWardrobeItems(ctx context.Context, userID string) ([]wardrobe
 	rows, err := s.pool.Query(ctx, `
 		SELECT wi.id::text, wi.name, wi.category, wi.color, wi.season, wi.formality,
 		       wi.scenes, wi.favorite, wi.wear_count, wi.created_at, wi.updated_at,
-		       ma.id::text, ma.mime_type,
+		       ma.id::text, ma.mime_type, COALESCE(ma.object_key, ''),
 		       CASE ma.origin
 		         WHEN 'user_upload' THEN 'user_original'
 		         WHEN 'provider_output' THEN 'generated_preview'
@@ -44,7 +44,7 @@ func (s *Store) GetWardrobeItems(ctx context.Context, userID string) ([]wardrobe
 		var mediaAssetID, mediaMIME, sourceKind, displayLabel *string
 		if err := rows.Scan(&item.ID, &item.Name, &item.Category, &item.Color, &item.Season, &item.Formality,
 			&item.Scenes, &item.Favorite, &item.WearCount, &item.CreatedAt, &item.UpdatedAt,
-			&mediaAssetID, &mediaMIME, &sourceKind, &displayLabel); err != nil {
+			&mediaAssetID, &mediaMIME, &item.MediaObjectKey, &sourceKind, &displayLabel); err != nil {
 			return nil, err
 		}
 		if mediaAssetID != nil && *mediaAssetID != "" {

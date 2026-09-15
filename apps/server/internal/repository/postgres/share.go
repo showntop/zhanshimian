@@ -50,7 +50,7 @@ func (s *Store) RevokeShareByID(ctx context.Context, userID string, id string) e
 const shareSelect = `
 	SELECT s.id::text, s.token, s.source_type, s.source_id::text, s.snapshot,
 	       s.include_photo, s.revoked, s.expires_at, s.created_at,
-	       COALESCE(ma.object_key, '')
+	       COALESCE(ma.object_key, ''), COALESCE(ma.mime_type, '')
 	FROM shares s
 	LEFT JOIN media_assets ma ON ma.user_id = s.user_id AND ma.id = s.asset_id`
 
@@ -58,7 +58,7 @@ func (s *Store) scanShare(row rowScanner) (share.Card, error) {
 	var card share.Card
 	var snapshotJSON []byte
 	err := row.Scan(&card.ID, &card.Token, &card.SourceType, &card.SourceID, &snapshotJSON,
-		&card.IncludePhoto, &card.Revoked, &card.ExpiresAt, &card.CreatedAt, &card.ObjectKey)
+		&card.IncludePhoto, &card.Revoked, &card.ExpiresAt, &card.CreatedAt, &card.ObjectKey, &card.MIMEType)
 	if err != nil {
 		return card, mapNotFound(err)
 	}

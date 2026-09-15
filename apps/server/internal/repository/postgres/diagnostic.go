@@ -14,7 +14,7 @@ var _ diagnostic.Writer = (*Store)(nil)
 const diagnosticSelectSQL = `
 	SELECT d.id::text, d.kind, d.scene, d.conclusion, d.priority_title, d.priority_copy,
 	       d.tags, d.findings, d.options, d.saved, d.created_at,
-	       ma.id::text,
+	       ma.id::text, ma.object_key, ma.mime_type,
 	       CASE ma.origin
 	         WHEN 'user_upload' THEN 'user_original'
 	         WHEN 'provider_output' THEN 'generated_preview'
@@ -78,10 +78,10 @@ func (s *Store) UpdateDiagnosticSaved(ctx context.Context, userID string, id str
 func (s *Store) scanDiagnostic(row rowScanner) (diagnostic.Diagnosis, error) {
 	var d diagnostic.Diagnosis
 	var tags, findings, optionsJSON []byte
-	var mediaAssetID, sourceKind, displayLabel *string
+	var mediaAssetID, objectKey, mimeType, sourceKind, displayLabel *string
 	err := row.Scan(&d.ID, &d.Kind, &d.Scene, &d.Conclusion, &d.PriorityTitle, &d.PriorityCopy,
 		&tags, &findings, &optionsJSON, &d.Saved, &d.CreatedAt,
-		&mediaAssetID, &sourceKind, &displayLabel)
+		&mediaAssetID, &objectKey, &mimeType, &sourceKind, &displayLabel)
 	if err != nil {
 		return d, mapNotFound(err)
 	}
@@ -89,8 +89,11 @@ func (s *Store) scanDiagnostic(row rowScanner) (diagnostic.Diagnosis, error) {
 	_ = json.Unmarshal(findings, &d.Findings)
 	_ = json.Unmarshal(optionsJSON, &d.Options)
 	if mediaAssetID != nil && *mediaAssetID != "" {
+		d.SourceMediaObjectKey = deref(objectKey)
+		d.SourceMediaMIMEType = deref(mimeType)
 		d.SourceMedia = &domain.RenderMediaView{
-			AssetID: *mediaAssetID, SourceKind: deref(sourceKind), DisplayLabel: deref(displayLabel),
+			AssetID: *mediaAssetID, MIMEType: d.SourceMediaMIMEType,
+			SourceKind: deref(sourceKind), DisplayLabel: deref(displayLabel),
 		}
 	}
 	return d, nil

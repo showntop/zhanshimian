@@ -106,22 +106,43 @@ func (a todayWeatherAdapter) Current(ctx context.Context, city string) (today.We
 	return today.Weather{City: w.City, Condition: w.Condition, Temperature: w.Temperature}, err
 }
 
-// signedURLSigner 把 storage 的双返回值签名适配到 share.URLSigner。
-type signedURLSigner struct{ inner storage.SignedURLStorage }
-
-func (s signedURLSigner) SignedURL(ctx context.Context, objectKey string, ttl time.Duration) (string, time.Time, error) {
-	url, err := s.inner.SignedURL(ctx, objectKey, ttl)
-	if err != nil {
-		return "", time.Time{}, err
-	}
-	return url, time.Now().Add(ttl).UTC(), nil
+// mediaURLSigner 给外围读模型（home/today/diagnostic/wardrobe）的展示媒体
+// 解析可读 URL：COS 走短时签名；本地存储没有签名能力时回退
+// PUBLIC_BASE_URL + /uploads/ 公开路径（与 mediaPresenter/bodyURLSigner
+// 同一做法，开发环境可播）。url_expires_at 语义是「此刻起 ttl 内新鲜」，
+// 公开 URL 实际不过期。
+type mediaURLSigner struct {
+	signer        storage.SignedURLStorage
+	ttl           time.Duration
+	publicBaseURL string
 }
 
-// hairStarterAdapter 把 Store 的 hair 预览 Operation 创建适配到 hair.OperationStarter。
-type hairStarterAdapter struct{ store *postgres.Store }
+func newMediaURLSigner(objects storage.ObjectStorage, publicBaseURL string, ttl time.Duration) mediaURLSigner {
+	var signer storage.SignedURLStorage
+	if s, ok := objects.(storage.SignedURLStorage); ok {
+		signer = s
+	}
+	return mediaURLSigner{signer: signer, ttl: ttl, publicBaseURL: strings.TrimRight(publicBaseURL, "/")}
+}
 
-func (a hairStarterAdapter) StartPreviewOperation(ctx context.Context, userID string, previewID string) (domain.OperationRef, error) {
-	return a.store.StartPreviewOperation(ctx, userID, previewID)
+func (s mediaURLSigner) SignedURL(ctx context.Context, objectKey string) (string, time.Time, error) {
+	expiresAt := time.Now().Add(s.ttl).UTC()
+	if s.signer != nil {
+		url, err := s.signer.SignedURL(ctx, objectKey, s.ttl)
+		if err != nil {
+			return "", time.Time{}, err
+		}
+		return url, expiresAt, nil
+	}
+	return s.publicBaseURL + "/uploads/" + strings.TrimPrefix(objectKey, "/"), expiresAt, nil
+}
+
+// shareURLSigner 把 mediaURLSigner 适配到 share.URLSigner（ttl 构造时固定，
+// 与读模型签名同一策略；本地存储同样回退公开路径）。
+type shareURLSigner struct{ inner mediaURLSigner }
+
+func (s shareURLSigner) SignedURL(ctx context.Context, objectKey string, _ time.Duration) (string, time.Time, error) {
+	return s.inner.SignedURL(ctx, objectKey)
 }
 
 // avatarURLResolver 把头像 object key 解析为可加载 URL：

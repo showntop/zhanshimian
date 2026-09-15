@@ -22,6 +22,10 @@ type Item struct {
 	WearCount    int                     `json:"wear_count"`
 	CreatedAt    time.Time               `json:"created_at"`
 	UpdatedAt    time.Time               `json:"updated_at"`
+
+	// MediaObjectKey 由读取侧 join media_assets 得到，供呈现层即时签名
+	// （与 share.Card.ObjectKey 同一做法）；不出现在 JSON。
+	MediaObjectKey string `json:"-"`
 }
 
 // Outfit 是持久化的衣橱组合（OpenAPI WardrobeOutfit 形状）。
@@ -65,14 +69,45 @@ type Writer interface {
 type Service struct {
 	reader Reader
 	writer Writer
+	signer MediaSigner
 }
 
 func New(reader Reader, writer Writer) *Service {
 	return &Service{reader: reader, writer: writer}
 }
 
+// WithMediaSigner 装配读路径媒体签名器（与 assessment.WithBilling 同一链式做法）。
+func (s *Service) WithMediaSigner(signer MediaSigner) *Service {
+	s.signer = signer
+	return s
+}
+
 func (s *Service) ListItems(ctx context.Context, userID string) ([]Item, error) {
-	return s.writer.GetWardrobeItems(ctx, userID)
+	items, err := s.writer.GetWardrobeItems(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range items {
+		if err := s.signItemMedia(ctx, &items[i]); err != nil {
+			return nil, err
+		}
+	}
+	return items, nil
+}
+
+// signItemMedia 给单品照片补可读 URL：客户端投影对空 url 一律拒渲染
+// （衣橱单品照片不显示的根因）。未装配签名器时保持无 URL（单测/降级组装）。
+func (s *Service) signItemMedia(ctx context.Context, item *Item) error {
+	if item.Media == nil || s.signer == nil || item.MediaObjectKey == "" {
+		return nil
+	}
+	url, expiresAt, err := s.signer.SignedURL(ctx, item.MediaObjectKey)
+	if err != nil {
+		return err
+	}
+	item.Media.URL = url
+	item.Media.URLExpiresAt = expiresAt
+	return nil
 }
 
 func (s *Service) CreateItem(ctx context.Context, userID string, input CreateItemInput) (Item, error) {

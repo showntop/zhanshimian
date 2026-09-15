@@ -2,13 +2,10 @@ package bootstrap
 
 import (
 	"context"
-	"strings"
-	"time"
 
 	"github.com/zhanshimian/server/internal/service/assessment"
 	"github.com/zhanshimian/server/internal/service/home"
 	"github.com/zhanshimian/server/internal/service/today"
-	"github.com/zhanshimian/server/internal/storage"
 )
 
 // 本文件是首页聚合的装配适配器：home 只定义端口（不 import 兄弟 service
@@ -101,34 +98,4 @@ func (a homeTodayReader) Current(ctx context.Context, userID string) (home.Today
 		CreatedAt: plan.CreatedAt,
 		UpdatedAt: plan.UpdatedAt,
 	}, nil
-}
-
-// homeMediaSigner 给 today_plan 的发布媒体解析可读 URL：COS 走短时签名；
-// 本地存储没有签名能力时回退 PUBLIC_BASE_URL + /uploads/ 公开路径
-// （与 bodyURLSigner/mediaPresenter 同一做法）。url_expires_at 语义是
-// 「此刻起 ttl 内新鲜」，公开 URL 实际不过期。
-type homeMediaSigner struct {
-	signer        storage.SignedURLStorage
-	ttl           time.Duration
-	publicBaseURL string
-}
-
-func newHomeMediaSigner(objects storage.ObjectStorage, publicBaseURL string, ttl time.Duration) homeMediaSigner {
-	var signer storage.SignedURLStorage
-	if s, ok := objects.(storage.SignedURLStorage); ok {
-		signer = s
-	}
-	return homeMediaSigner{signer: signer, ttl: ttl, publicBaseURL: strings.TrimRight(publicBaseURL, "/")}
-}
-
-func (s homeMediaSigner) SignedURL(ctx context.Context, objectKey string) (string, time.Time, error) {
-	expiresAt := time.Now().Add(s.ttl).UTC()
-	if s.signer != nil {
-		url, err := s.signer.SignedURL(ctx, objectKey, s.ttl)
-		if err != nil {
-			return "", time.Time{}, err
-		}
-		return url, expiresAt, nil
-	}
-	return s.publicBaseURL + "/uploads/" + strings.TrimPrefix(objectKey, "/"), expiresAt, nil
 }

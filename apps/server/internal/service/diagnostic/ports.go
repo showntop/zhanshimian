@@ -2,6 +2,7 @@ package diagnostic
 
 import (
 	"context"
+	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 )
@@ -16,4 +17,10 @@ type Grounding struct {
 
 type Reader interface {
 	ReadDiagnosticGrounding(ctx context.Context, userID string, reportID string, kind string) (Grounding, error)
+}
+
+// MediaSigner 给诊断源照片解析可读 URL（COS 短时签名，本地存储由适配器回退
+// 公开路径）。与 home.MediaSigner 同形。
+type MediaSigner interface {
+	SignedURL(ctx context.Context, objectKey string) (url string, expiresAt time.Time, err error)
 }

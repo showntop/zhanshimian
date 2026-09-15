@@ -68,7 +68,11 @@ func (a *API) createTodayPlan(w http.ResponseWriter, r *http.Request) {
 		a.writeServiceError(w, r, err)
 		return
 	}
-	writeData(w, http.StatusCreated, item)
+	// 契约 TodayPlanAccepted：{data, operation}——客户端凭 operation.id 轮询
+	// 搭配图渲染进度（与 hair 预览同一最小 DTO 形状）。
+	writeDataOperation(w, http.StatusCreated, item, operationDTO{
+		ID: item.Operation.ID, Kind: string(item.Operation.Kind), Status: string(item.Operation.Status),
+	})
 }
 
 func (a *API) activateTodayPlan(w http.ResponseWriter, r *http.Request) {

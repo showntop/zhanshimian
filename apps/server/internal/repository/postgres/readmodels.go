@@ -100,10 +100,13 @@ func (s *Store) readHomeProfile(ctx context.Context, userID string) (*domain.Pro
 }
 
 func (s *Store) readHomeActiveOperations(ctx context.Context, userID string) ([]domain.OperationRef, error) {
+	// failed 也下发：active_operations 的语义是「需要用户关注的操作」——
+	// 我的页任务中心靠它呈现「未完成，点击查看」；首页轮询消费方按 IN_FLIGHT
+	// 集合（accepted/running/retrying）自行过滤，不会被 failed 行误导。
 	rows, err := s.pool.Query(ctx, `
 		SELECT id::text, kind, status
 		FROM operations
-		WHERE user_id=$1::uuid AND status IN ('accepted','running','retrying')
+		WHERE user_id=$1::uuid AND status IN ('accepted','running','retrying','failed')
 		ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -307,7 +310,7 @@ func (s *Store) readSharePlanVariant(ctx context.Context, userID string, sourceI
 	var source share.Source
 	err := s.pool.QueryRow(ctx, `
 		SELECT 'plan_variant', pv.id::text, pv.name, pv.descriptor,
-		       ma.id::text, ma.object_key,
+		       ma.id::text, ma.object_key, ma.mime_type,
 		       CASE ma.origin
 		         WHEN 'user_upload' THEN 'user_original'
 		         WHEN 'provider_output' THEN 'generated_preview'
@@ -330,16 +333,22 @@ func (s *Store) readSharePlanVariant(ctx context.Context, userID string, sourceI
 		  AND ma.state = 'published'`,
 		userID, sourceID).
 		Scan(&source.SourceType, &source.SourceID, &source.Title, &source.Summary,
-			&source.AssetID, &source.ObjectKey, &source.SourceKind, &source.DisplayLabel,
+			&source.AssetID, &source.ObjectKey, &source.MIMEType, &source.SourceKind, &source.DisplayLabel,
 			&source.PublishedAt)
 	return source, mapNotFound(err)
 }
 
+// readShareTodayPlan：今日方案目前没有任何渲染写路径回填 render_publication_id
+// （恒 NULL，见 today.Generate——只生成文本，不触发渲染）。因此按 LEFT JOIN 读：
+// 有发布媒体时带资产身份，没有时退化为纯文本快照卡（title/summary），而不是 404。
+// 一旦渲染链路接回并回填该列，同一查询自动带上媒体。
 func (s *Store) readShareTodayPlan(ctx context.Context, userID string, sourceID string) (share.Source, error) {
 	var source share.Source
+	var assetID, objectKey, mimeType, sourceKind, displayLabel *string
+	var publishedAt *time.Time
 	err := s.pool.QueryRow(ctx, `
 		SELECT 'today_plan', tp.id::text, tp.title, tp.summary,
-		       ma.id::text, ma.object_key,
+		       ma.id::text, ma.object_key, ma.mime_type,
 		       CASE ma.origin
 		         WHEN 'user_upload' THEN 'user_original'
 		         WHEN 'provider_output' THEN 'generated_preview'
@@ -354,16 +363,28 @@ func (s *Store) readShareTodayPlan(ctx context.Context, userID string, sourceID 
 		       END,
 		       rp.created_at
 		FROM today_plans tp
-		JOIN render_publications rp ON rp.user_id = tp.user_id AND rp.id = tp.render_publication_id
-		JOIN render_candidates rc ON rc.user_id = rp.user_id AND rc.id = rp.candidate_id
-		JOIN media_assets ma ON ma.user_id = rc.user_id AND ma.id = rc.asset_id
-		WHERE tp.user_id = $1 AND tp.id = $2::uuid
-		  AND ma.state = 'published'`,
+		LEFT JOIN render_publications rp ON rp.user_id = tp.user_id AND rp.id = tp.render_publication_id
+		LEFT JOIN render_candidates rc ON rc.user_id = rp.user_id AND rc.id = rp.candidate_id
+		LEFT JOIN media_assets ma ON ma.user_id = rc.user_id AND ma.id = rc.asset_id
+		  AND ma.state = 'published'
+		WHERE tp.user_id = $1 AND tp.id = $2::uuid`,
 		userID, sourceID).
 		Scan(&source.SourceType, &source.SourceID, &source.Title, &source.Summary,
-			&source.AssetID, &source.ObjectKey, &source.SourceKind, &source.DisplayLabel,
-			&source.PublishedAt)
-	return source, mapNotFound(err)
+			&assetID, &objectKey, &mimeType, &sourceKind, &displayLabel, &publishedAt)
+	if err != nil {
+		return source, mapNotFound(err)
+	}
+	source.AssetID = deref(assetID)
+	source.ObjectKey = deref(objectKey)
+	source.MIMEType = deref(mimeType)
+	if sourceKind != nil {
+		source.SourceKind = domain.MediaSourceKind(*sourceKind)
+	}
+	source.DisplayLabel = deref(displayLabel)
+	if publishedAt != nil {
+		source.PublishedAt = *publishedAt
+	}
+	return source, nil
 }
 
 // ---- 共享子查询 ----

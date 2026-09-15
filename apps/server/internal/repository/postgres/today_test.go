@@ -93,3 +93,92 @@ func TestCreateTodayPlanWithReportPersists(t *testing.T) {
 		t.Fatalf("report id = %q, want %q", current.ReportID, f.reportID)
 	}
 }
+
+// 创建今日方案必须同事务创建并回填其搭配图渲染的公开 Operation（契约
+// TodayPlanAccepted 要求响应带 operation，客户端凭它轮询）。
+func TestCreateTodayPlanStartsRenderOperation(t *testing.T) {
+	store := New(testutil.NewPostgres(t))
+	ctx := context.Background()
+	var userID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO users(nickname) VALUES('today-op') RETURNING id::text`).Scan(&userID); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := store.CreateTodayPlan(ctx, userID, today.Plan{
+		Context: domain.TodayContext{City: "杭州"},
+		Title:   "今日利落通勤",
+		Steps:   []domain.TodayPlanStep{},
+		Active:  true,
+		State:   "planning",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if plan.Operation.ID == "" {
+		t.Fatal("create must return the render operation ref")
+	}
+	if plan.Operation.Kind != domain.OperationRender || plan.Operation.Status != domain.OperationAccepted {
+		t.Fatalf("operation = %#v", plan.Operation)
+	}
+
+	var subjectType string
+	if err := store.pool.QueryRow(ctx, `
+		SELECT subject_type FROM operations WHERE user_id=$1::uuid AND id=$2::uuid`,
+		userID, plan.Operation.ID).Scan(&subjectType); err != nil {
+		t.Fatalf("operation row: %v", err)
+	}
+	if subjectType != "today_plan" {
+		t.Fatalf("subject_type = %q", subjectType)
+	}
+
+	current, err := store.CurrentTodayPlan(ctx, userID)
+	if err != nil {
+		t.Fatalf("current: %v", err)
+	}
+	if current.Operation.ID != plan.Operation.ID || current.Operation.Status != domain.OperationAccepted {
+		t.Fatalf("readback operation = %#v", current.Operation)
+	}
+}
+
+// 读模型必须把发布媒体的对象定位（object key + mime）带给呈现层：
+// 签名在服务层即时发生，URL 不落库（敏感信息红线）。
+func TestCurrentTodayPlanCarriesPublishedMediaLocation(t *testing.T) {
+	f := newReadModelFixture(t)
+	ctx := context.Background()
+
+	plan, err := f.store.CreateTodayPlan(ctx, f.userA, today.Plan{
+		Context: domain.TodayContext{City: "杭州"},
+		Title:   "今日利落通勤",
+		Steps:   []domain.TodayPlanStep{},
+		Active:  true,
+		State:   "ready",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := f.store.pool.Exec(ctx, `
+		UPDATE today_plans SET render_publication_id=$3::uuid
+		WHERE user_id=$1::uuid AND id=$2::uuid`, f.userA, plan.ID, f.publicationID); err != nil {
+		t.Fatal(err)
+	}
+
+	current, err := f.store.CurrentTodayPlan(ctx, f.userA)
+	if err != nil {
+		t.Fatalf("current: %v", err)
+	}
+	if current.Media == nil {
+		t.Fatal("published plan must carry media")
+	}
+	if current.Media.AssetID == "" || current.Media.SourceKind != "generated_preview" || current.Media.DisplayLabel != "风格参考" {
+		t.Fatalf("media = %#v", current.Media)
+	}
+	if current.MediaObjectKey == "" {
+		t.Fatal("media object key must reach the presenter")
+	}
+	if current.MediaMIMEType != "image/jpeg" || current.Media.MIMEType != "image/jpeg" {
+		t.Fatalf("media mime = %q/%q", current.MediaMIMEType, current.Media.MIMEType)
+	}
+	if current.Media.URL != "" {
+		t.Fatalf("repository must never persist/sign URLs: %q", current.Media.URL)
+	}
+}
