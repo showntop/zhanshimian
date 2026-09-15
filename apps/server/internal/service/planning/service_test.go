@@ -54,6 +54,49 @@ func TestCreatePlanSetReturnsPublishedResultWithoutStartingAI(t *testing.T) {
 	}
 }
 
+func TestCreatePlanSetRefreshSkipsReuseWithFreshIdentity(t *testing.T) {
+	store := &fakeStore{found: true, planSet: validPublishedPlanSet()}
+	starter := &fakeStarter{}
+	svc := NewService(Dependencies{
+		Reports:    fakeReports{report: validReport(store.planSet.ReportID)},
+		Operations: starter,
+		Store:      store,
+		IDs:        func() string { return "10000000-0000-0000-0000-000000000001" },
+	})
+	cmd := validCreateCommand(store.planSet.ReportID)
+	// 对照组：不带 refresh 时同语义键复用已发布结果
+	reused, err := svc.CreatePlanSet(context.Background(), cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reused.Accepted || len(store.findKeys) != 1 {
+		t.Fatalf("non-refresh should reuse the published set: %#v", reused)
+	}
+	plainHash := store.findKeys[0].PlanningInputHash
+
+	cmd.Refresh = true
+	got, err := svc.CreatePlanSet(context.Background(), cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Accepted || starter.calls != 1 {
+		t.Fatalf("refresh must start a new operation: %#v", got)
+	}
+	if len(store.findKeys) != 1 {
+		t.Fatal("refresh must not consult the published-reuse lookup")
+	}
+	if got.PlanSetID == store.planSet.ID || got.PlanSetID == reused.PlanSetID {
+		t.Fatalf("refresh must derive a fresh plan set identity: %s", got.PlanSetID)
+	}
+	payload := starter.command.Task.Payload.(GenerateTaskPayload)
+	if payload.PlanningInputHash != RegenerationInputHash(plainHash, "10000000-0000-0000-0000-000000000001") {
+		t.Fatalf("refresh payload hash = %q, want nonce-derived from %q", payload.PlanningInputHash, plainHash)
+	}
+	if payload.PlanningInputHash == plainHash {
+		t.Fatal("refresh kept the semantic hash; UNIQUE(user_id, planning_input_hash) would reject the new set")
+	}
+}
+
 func TestCreatePlanSetFoldsPreferenceMemoriesIntoPlanningInputHash(t *testing.T) {
 	reportID := "20000000-0000-0000-0000-000000000001"
 	report := validReport(reportID)

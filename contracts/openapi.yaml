@@ -4554,6 +4554,9 @@ components:
             const: general
           brief:
             "$ref": "#/components/schemas/GeneralBrief"
+          refresh:
+            type: boolean
+            description: true 时不复用同语义键的已发布方案集，强制重新生成（产生新任务）；缺省 false
       - type: object
         additionalProperties: false
         required:
@@ -4569,6 +4572,9 @@ components:
             const: interview
           brief:
             "$ref": "#/components/schemas/InterviewBrief"
+          refresh:
+            type: boolean
+            description: true 时不复用同语义键的已发布方案集，强制重新生成（产生新任务）；缺省 false
       - type: object
         additionalProperties: false
         required:
@@ -4584,6 +4590,9 @@ components:
             const: wedding
           brief:
             "$ref": "#/components/schemas/WeddingBrief"
+          refresh:
+            type: boolean
+            description: true 时不复用同语义键的已发布方案集，强制重新生成（产生新任务）；缺省 false
       - type: object
         additionalProperties: false
         required:
@@ -4599,6 +4608,9 @@ components:
             const: date
           brief:
             "$ref": "#/components/schemas/DateBrief"
+          refresh:
+            type: boolean
+            description: true 时不复用同语义键的已发布方案集，强制重新生成（产生新任务）；缺省 false
       - type: object
         additionalProperties: false
         required:
@@ -4614,6 +4626,9 @@ components:
             const: daily
           brief:
             "$ref": "#/components/schemas/DailyBrief"
+          refresh:
+            type: boolean
+            description: true 时不复用同语义键的已发布方案集，强制重新生成（产生新任务）；缺省 false
       - type: object
         additionalProperties: false
         required:
@@ -4629,6 +4644,9 @@ components:
             const: gathering
           brief:
             "$ref": "#/components/schemas/GatheringBrief"
+          refresh:
+            type: boolean
+            description: true 时不复用同语义键的已发布方案集，强制重新生成（产生新任务）；缺省 false
     PutSelectionRequest:
       type: object
       additionalProperties: false

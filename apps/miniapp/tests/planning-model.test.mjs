@@ -4,6 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   boundBodyMedia,
+  briefFingerprint,
   createIdempotencyKey,
   inFlightPlanSetOperationIds,
   planSetView,
@@ -194,6 +195,15 @@ test('scene brief answers become a typed request or nothing at all', () => {
   )
   // 未知场景没有问题表，同样拒绝构造
   assert.equal(sceneBriefRequest('r1', 'general', {}), null)
+})
+
+test('brief fingerprints key on content, not key order', () => {
+  const a = briefFingerprint({ when: 'today', format: 'video', preparation: 'closet', impression: 'reliable' })
+  const b = briefFingerprint({ impression: 'reliable', preparation: 'closet', format: 'video', when: 'today' })
+  assert.equal(a, b)
+  // 改了任何一个答案就是新指纹（409「相同幂等键已被用于不同请求」的修法）
+  assert.notEqual(a, briefFingerprint({ when: 'week', format: 'video', preparation: 'closet', impression: 'reliable' }))
+  assert.equal(briefFingerprint({}), briefFingerprint({}))
 })
 
 test('in-flight plan-set accepts are the only operations worth watching', () => {

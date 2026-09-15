@@ -39,6 +39,7 @@ import SourceImage from '../../components/source-image'
 import TextLink from '../../components/text-link'
 import {
   boundBodyMedia,
+  briefFingerprint,
   createIdempotencyKey,
   inFlightPlanSetOperationIds,
   planSetRetryMarkerKey,
@@ -56,6 +57,9 @@ const CAPTURE_ROUTE = '/pages/capture/index'
 
 /** 渲染还在动的状态集合：这些 operation 值得盯。 */
 const RENDER_IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
+
+/** general 的 brief 固定（没有 Brief 页）；「不满意重出」走 refresh 绕开语义键去重。 */
+const GENERAL_BRIEF = { focus: 'balanced', preparation: 'closet', impression: 'natural' } as const
 
 // hero 高度跟随照片比例（旧线思路保留）：三套方案图同一管线产出、宽高比一致，
 // 切换不跳动，因此让照片自己定高度——满宽 + 完整，无侧边区。
@@ -387,21 +391,24 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     }
   }
 
-  /** general 空态 → 生成形象方案（受理后原地进入 planning 视图）。 */
-  const generateGeneral = async () => {
+  /** general → 生成形象方案；refresh=true 是「不满意重出」：服务端绕开语义键复用，派生新身份。 */
+  const generateGeneral = async (refresh = false) => {
     if (!report) return
     setAcceptFailed('')
     try {
-      // 与 Brief 页同一条规则：上次固定键受理到终态 failed 后换新键重发，在途/双击仍用固定键
+      // 换新键的两种情况：上次受理终态 failed（同键 24h 内重放同一份失败）、
+      // refresh 强制重出（每次都是新任务，重放旧 202 会把新任务吞掉）；其余同键保幂等。
       const retryKey = planSetRetryMarkerKey('general')
-      const fresh = Boolean(resourceCache.read<string>(retryKey))
+      const fresh = refresh || Boolean(resourceCache.read<string>(retryKey))
+      const baseKey = `plan-set:${report.id}:${briefFingerprint(GENERAL_BRIEF)}`
       const start = await qualityApi.createPlanSet(
         {
           report_id: report.id,
           scene: 'general',
-          brief: { focus: 'balanced', preparation: 'closet', impression: 'natural' },
+          brief: { ...GENERAL_BRIEF },
+          ...(refresh ? { refresh: true } : {}),
         },
-        fresh ? createIdempotencyKey(`plan-set:${report.id}`) : `plan-set:${report.id}`,
+        fresh ? createIdempotencyKey(baseKey) : baseKey,
       )
       if (fresh) resourceCache.remove(retryKey)
       if (start.accepted) {
@@ -775,14 +782,21 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
                 ? PLANNING_COPY.ctaNoteDemo
                 : PLANNING_COPY.ctaNote}
             </Text>
-            {/* 重新设计入口：场景回 Brief 页预填改答案；general 的 brief 固定，
-                只有重拍出新报告才会出新方案，入口直白说明 */}
+            {/* 重新设计入口：场景回 Brief 页预填改答案；general 直接 refresh 重出，
+                重拍仅作为更新档案的路径保留 */}
             {scene === 'general' ? (
-              <TextLink
-                className="plans__redesign"
-                text={PLANNING_COPY.updateGeneralLink}
-                onClick={() => void Taro.navigateTo({ url: CAPTURE_ROUTE })}
-              />
+              <>
+                <TextLink
+                  className="plans__redesign"
+                  text={PLANNING_COPY.regenerateAction}
+                  onClick={() => void generateGeneral(true)}
+                />
+                <TextLink
+                  className="plans__redesign"
+                  text={PLANNING_COPY.updateGeneralLink}
+                  onClick={() => void Taro.navigateTo({ url: CAPTURE_ROUTE })}
+                />
+              </>
             ) : (
               <TextLink
                 className="plans__redesign"

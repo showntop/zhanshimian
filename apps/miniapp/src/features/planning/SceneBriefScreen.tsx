@@ -20,6 +20,7 @@ import ErrorState from '../../components/error-state'
 import Pill from '../../components/pill'
 import PrimaryButton from '../../components/primary-button'
 import {
+  briefFingerprint,
   createIdempotencyKey,
   planSetRetryMarkerKey,
   planSetSceneKey,
@@ -76,7 +77,9 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
 
   // 「重新设计」入口：用该场景最新方案集的 brief 预填答案（逐字段对表校验，缺题留空）。
   // 预填只发生一次，且不覆盖用户已经点过的选项（late response 不得回写）。
+  // hadPublishedRef 同时标记「该场景已有已发布方案集」：提交带 refresh 强制重出。
   const prefilledRef = useRef(false)
+  const hadPublishedRef = useRef(false)
   useEffect(() => {
     if (!reportId || prefilledRef.current) return
     prefilledRef.current = true
@@ -87,6 +90,7 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
         if (cancelled) return
         const latest = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
         if (!latest) return
+        hadPublishedRef.current = true
         const prefill = sceneBriefPrefill(scene, latest.brief)
         if (Object.keys(prefill).length === 0) return
         setAnswers((prev) => (Object.keys(prev).length > 0 ? prev : prefill))
@@ -112,17 +116,24 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
 
   const submit = async () => {
     if (!reportId || busy) return
-    const request = sceneBriefRequest(reportId, scene, answers)
-    if (!request) return
     setBusy(true)
     try {
-      // 上一次受理已到终态 failed 时，固定键 24h 内只会重放同一份失败：换新键重新受理。
-      // 在途/双击仍用固定键保幂等（busy 护栏之外的第二道）。
+      // 重新设计（该场景已有已发布方案集）：带 refresh——同 brief 也强制重出，
+      // 语义键去重只复用不新建，refresh 才绕得开（服务端折入一次性 nonce 派生新身份）。
+      const refresh = hadPublishedRef.current
+      const request = sceneBriefRequest(reportId, scene, answers)
+      if (!request) return
+      const body = refresh ? { ...request, refresh: true } : request
+      // 幂等键带答案指纹：同答案重发同键保幂等（在途/双击），改答案即新键——
+      // 固定键配改过的答案会被服务端判 409（相同幂等键已被用于不同请求）。
+      // 例外必须换新键：上次受理终态 failed（同键 24h 内重放同一份失败），
+      // 以及 refresh（每次强制重出都是新任务，重放旧 202 会把新任务吞掉）。
       const retryKey = planSetRetryMarkerKey(scene)
-      const fresh = Boolean(resourceCache.read<string>(retryKey))
+      const fresh = refresh || Boolean(resourceCache.read<string>(retryKey))
+      const baseKey = `plan-set:${reportId}:${scene}:${briefFingerprint(answers)}`
       const start = await qualityApi.createPlanSet(
-        request,
-        fresh ? createIdempotencyKey(`plan-set:${reportId}:${scene}`) : `plan-set:${reportId}:${scene}`,
+        body,
+        fresh ? createIdempotencyKey(baseKey) : baseKey,
       )
       if (fresh) resourceCache.remove(retryKey)
       if (start.accepted) {

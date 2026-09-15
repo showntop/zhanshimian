@@ -108,6 +108,8 @@ type CreateCommand struct {
 	Scene          domain.Scene
 	Answers        map[string]string
 	IdempotencyKey string
+	// Refresh 为 true 时不复用同语义键的已发布方案集，强制派生新身份重新生成。
+	Refresh bool
 }
 
 // GenerateTaskPayload is the versioned task payload of plan_set.generate.

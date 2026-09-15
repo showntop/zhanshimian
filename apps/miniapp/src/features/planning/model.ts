@@ -217,6 +217,25 @@ export function planSetRetryMarkerKey(scene: string): string {
   return `plan-set-retry:${scene}`
 }
 
+/**
+ * Brief 答案 → 幂等键指纹。服务端幂等按「键 + 请求体指纹」判重：
+ * 固定键配改过的答案会吃 409（相同幂等键已被用于不同请求），
+ * 所以键里带答案指纹——同答案重发同键（双击/重放安全），改答案即新键。
+ * FNV-1a 32bit：稳定、短、无依赖；只做键内区分，不做安全用途。
+ */
+export function briefFingerprint(answers: Record<string, string>): string {
+  const canonical = Object.keys(answers)
+    .sort()
+    .map((key) => `${key}=${answers[key]}`)
+    .join('&')
+  let hash = 0x811c9dc5
+  for (let index = 0; index < canonical.length; index++) {
+    hash ^= canonical.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(16)
+}
+
 /** 每个场景臂对应的 Brief 类型。 */
 type BriefOf<S extends CreatePlanSetRequest['scene']> = Extract<CreatePlanSetRequest, { scene: S }>['brief']
 

@@ -1801,36 +1801,48 @@ export interface components {
             /** @constant */
             scene: "general";
             brief: components["schemas"]["GeneralBrief"];
+            /** @description true 时不复用同语义键的已发布方案集，强制重新生成（产生新任务）；缺省 false */
+            refresh?: boolean;
         } | {
             /** Format: uuid */
             report_id: string;
             /** @constant */
             scene: "interview";
             brief: components["schemas"]["InterviewBrief"];
+            /** @description true 时不复用同语义键的已发布方案集，强制重新生成（产生新任务）；缺省 false */
+            refresh?: boolean;
         } | {
             /** Format: uuid */
             report_id: string;
             /** @constant */
             scene: "wedding";
             brief: components["schemas"]["WeddingBrief"];
+            /** @description true 时不复用同语义键的已发布方案集，强制重新生成（产生新任务）；缺省 false */
+            refresh?: boolean;
         } | {
             /** Format: uuid */
             report_id: string;
             /** @constant */
             scene: "date";
             brief: components["schemas"]["DateBrief"];
+            /** @description true 时不复用同语义键的已发布方案集，强制重新生成（产生新任务）；缺省 false */
+            refresh?: boolean;
         } | {
             /** Format: uuid */
             report_id: string;
             /** @constant */
             scene: "daily";
             brief: components["schemas"]["DailyBrief"];
+            /** @description true 时不复用同语义键的已发布方案集，强制重新生成（产生新任务）；缺省 false */
+            refresh?: boolean;
         } | {
             /** Format: uuid */
             report_id: string;
             /** @constant */
             scene: "gathering";
             brief: components["schemas"]["GatheringBrief"];
+            /** @description true 时不复用同语义键的已发布方案集，强制重新生成（产生新任务）；缺省 false */
+            refresh?: boolean;
         };
         PutSelectionRequest: {
             /** Format: uuid */

@@ -59,7 +59,11 @@ func (s *Service) CreatePlanSet(ctx context.Context, cmd CreateCommand) (CreateR
 		PlanningInputHash:    PlanningInputHash(report.ID, report.ProfileSnapshot, briefHash, memories),
 		PlannerSchemaVersion: PlannerSchemaVersion,
 	}
-	if published, found, err := s.deps.Store.FindPublished(ctx, key); err != nil {
+	if cmd.Refresh {
+		// 强制重生成（不满意重出）：跳过已发布复用，并给本次尝试派生一次性身份——
+		// 方案集 id / operation / task 全部由带 nonce 的键自然派生。
+		key.PlanningInputHash = RegenerationInputHash(key.PlanningInputHash, s.newID())
+	} else if published, found, err := s.deps.Store.FindPublished(ctx, key); err != nil {
 		return CreateResult{}, err
 	} else if found {
 		return CreateResult{PlanSetID: published.ID, Accepted: false, PlanSet: &published}, nil

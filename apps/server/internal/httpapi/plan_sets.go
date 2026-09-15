@@ -23,6 +23,7 @@ type createPlanSetRequest struct {
 	ReportID string            `json:"report_id"`
 	Scene    domain.Scene      `json:"scene"`
 	Brief    map[string]string `json:"brief"`
+	Refresh  bool              `json:"refresh"`
 }
 
 func (a *API) createPlanSet(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +42,7 @@ func (a *API) createPlanSet(w http.ResponseWriter, r *http.Request) {
 		Scene:          input.Scene,
 		Answers:        input.Brief,
 		IdempotencyKey: r.Header.Get("Idempotency-Key"),
+		Refresh:        input.Refresh,
 	})
 	if err != nil {
 		a.writePlanSetError(w, r, err)

@@ -167,6 +167,14 @@ func PlanningInputHash(reportID string, profileSnapshot json.RawMessage, briefHa
 	return hex.EncodeToString(sum[:])
 }
 
+// RegenerationInputHash 为强制重生成（refresh=true）派生一次性 input hash：
+// 原语义 hash 折入 nonce，新方案集拿到自己的身份——UNIQUE(user_id,
+// planning_input_hash) 不拦截，按原 hash 的已发布复用查询也永远命中不到它。
+func RegenerationInputHash(base string, nonce string) string {
+	sum := sha256.Sum256([]byte(base + ":" + nonce))
+	return hex.EncodeToString(sum[:])
+}
+
 // IsStyleRuleID reports whether sourceID is one of the frozen style rules.
 func IsStyleRuleID(sourceID string) bool {
 	return contains(StyleRuleIDs, sourceID)
