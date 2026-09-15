@@ -15,6 +15,18 @@ import (
 // ErrValidation marks an invalid render request or spec: nothing was created.
 var ErrValidation = errors.New("rendering validation error")
 
+// 用量限额（与 legacy billing_rules decideLook 一致）：look 8 次/日 + 在途并发 2。
+const (
+	limitRenderRunsPerDay = 8
+	limitLooksConcurrent  = 2
+)
+
+// lookConcurrencySubjects 是在途并发计数口径：render_run（方案效果图）、
+// hair_preview（发型预览）、body_presentation（3D 形象）对应旧线四类 look
+// 任务中的三类；today_plan 渲染占位 operation 当前没有 worker 推进、永不
+// 终态，计入会把并发槽永久占满，故排除（旧线 today_look 是真实会终态的任务）。
+var lookConcurrencySubjects = []string{"render_run", "hair_preview", "body_presentation"}
+
 // Service carries the rendering use cases: idempotent run creation, public
 // run reads, and the worker-side candidate orchestration (handler.go).
 type Service struct {
@@ -26,6 +38,7 @@ type Service struct {
 	config     Config
 	signer     func(ctx context.Context, key string, ttl time.Duration) (string, error)
 	billing    billing.Reserver
+	usage      UsageCounter
 }
 
 func New(
@@ -61,6 +74,39 @@ func (s *Service) WithBilling(b billing.Reserver) *Service {
 	return s
 }
 
+// WithUsageLimits 装配用量闸（与 WithBilling 同一链式做法）。限额先于扣费：
+// 超限直接 429，不创建 run、不 Reserve。Nil 容忍（单测/降级组装）。
+func (s *Service) WithUsageLimits(counter UsageCounter) *Service {
+	s.usage = counter
+	return s
+}
+
+// checkUsageLimits 恢复旧线 decideLook 的双闸：先日限（服务器本地自然日
+// 计数今日已创建 render_run），后在途并发（非终态 look operation）。
+func (s *Service) checkUsageLimits(ctx context.Context, userID string) error {
+	if s.usage == nil {
+		return nil
+	}
+	now := s.config.Now()
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	created, err := s.usage.CountOperationsCreatedSince(ctx, userID,
+		[]domain.OperationKind{domain.OperationRender}, []string{"render_run"}, dayStart)
+	if err != nil {
+		return err
+	}
+	if created >= limitRenderRunsPerDay {
+		return fmt.Errorf("%w: 今日形象方案制作次数已用完，明天再来", billing.ErrRateLimited)
+	}
+	active, err := s.usage.CountActiveOperations(ctx, userID, lookConcurrencySubjects)
+	if err != nil {
+		return err
+	}
+	if active >= limitLooksConcurrent {
+		return fmt.Errorf("%w: 请等待当前形象方案制作完成后再试", billing.ErrRateLimited)
+	}
+	return nil
+}
+
 // StartRun validates the variant's RenderSpec and idempotently creates the
 // run plus its first candidate task. An invalid spec creates nothing.
 func (s *Service) StartRun(ctx context.Context, cmd StartRunCommand) (StartRunResult, error) {
@@ -72,6 +118,10 @@ func (s *Service) StartRun(ctx context.Context, cmd StartRunCommand) (StartRunRe
 		return StartRunResult{}, err
 	}
 	if err := validateStartSpec(spec); err != nil {
+		return StartRunResult{}, err
+	}
+	// 限额先于落库与扣费：超限不创建 run、不 Reserve（旧线 authorize 次序）。
+	if err := s.checkUsageLimits(ctx, cmd.UserID); err != nil {
 		return StartRunResult{}, err
 	}
 	created, err := s.repo.CreateRun(ctx, CreateRunCommand{

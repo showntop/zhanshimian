@@ -57,6 +57,13 @@ type Repository interface {
 	CommitEvaluation(ctx context.Context, command CommitEvaluationCommand) (CommitEvaluationResult, error)
 }
 
+// UsageCounter 按用户计数既有 operation 行：日限与在途并发的仓储自计数口径。
+// 幂等键复用不产生新行，天然不占当日名额。
+type UsageCounter interface {
+	CountOperationsCreatedSince(ctx context.Context, userID string, kinds []domain.OperationKind, subjectTypes []string, since time.Time) (int, error)
+	CountActiveOperations(ctx context.Context, userID string, subjectTypes []string) (int, error)
+}
+
 // QualityGate turns a candidate into one immutable quality decision.
 type QualityGate interface {
 	Evaluate(ctx context.Context, input QualityInput) (QualityResult, error)

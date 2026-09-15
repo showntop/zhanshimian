@@ -2,26 +2,50 @@ package diagnostic
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/service/account"
 )
 
-type fakeReader struct{}
-
-func (fakeReader) ReadDiagnosticGrounding(context.Context, string, string, string) (Grounding, error) {
-	return Grounding{Profile: domain.ProfileSnapshot{}}, nil
+type fakeReader struct {
+	grounding Grounding
+	media     domain.MediaInput
+	mediaErr  error
 }
 
-type fakeAdvisor struct{}
+func (f fakeReader) ReadDiagnosticGrounding(context.Context, string, string, string) (Grounding, error) {
+	return f.grounding, nil
+}
 
-func (fakeAdvisor) Diagnose(context.Context, DiagnosticRequest) (DiagnosticOutput, error) {
+func (f fakeReader) ReadDiagnosticMedia(context.Context, string, string) (domain.MediaInput, error) {
+	if f.mediaErr != nil {
+		return domain.MediaInput{}, f.mediaErr
+	}
+	if f.media.AssetID == "" {
+		return domain.MediaInput{AssetID: "asset-1", ObjectKey: "users/u1/uploads/intent-1.jpg", MIMEType: "image/jpeg"}, nil
+	}
+	return f.media, nil
+}
+
+type fakeAdvisor struct {
+	called  bool
+	request DiagnosticRequest
+}
+
+func (f *fakeAdvisor) Diagnose(_ context.Context, request DiagnosticRequest) (DiagnosticOutput, error) {
+	f.called = true
+	f.request = request
 	return DiagnosticOutput{Conclusion: "可行"}, nil
 }
 
 type fakeWriter struct {
 	inserted Diagnosis
+	count    int
+	countErr error
 }
 
 func (f *fakeWriter) InsertDiagnostic(_ context.Context, _ string, d Diagnosis) (Diagnosis, error) {
@@ -43,11 +67,36 @@ func (f *fakeWriter) UpdateDiagnosticSaved(_ context.Context, _ string, _ string
 	return f.inserted, nil
 }
 
+func (f *fakeWriter) CountDiagnosticsSince(context.Context, string, time.Time) (int, error) {
+	return f.count, f.countErr
+}
+
+type fakeLoader struct {
+	image Image
+	err   error
+	media domain.MediaInput
+}
+
+func (f *fakeLoader) Load(_ context.Context, media domain.MediaInput) (Image, error) {
+	f.media = media
+	if f.err != nil {
+		return Image{}, f.err
+	}
+	if f.image.Data == nil {
+		return Image{AssetID: media.AssetID, MIMEType: "image/jpeg", Data: []byte{1, 2, 3}}, nil
+	}
+	return f.image, nil
+}
+
+func newRunFixture() (*fakeReader, *fakeWriter, *fakeAdvisor, *fakeLoader) {
+	return &fakeReader{}, &fakeWriter{}, &fakeAdvisor{}, &fakeLoader{}
+}
+
 // 诊断的源照片必须随结论落库（diagnostics.source_media_asset_id），
 // 否则"离开同步诊断页后恢复结论"拿不到原图。
 func TestRunPersistsSourceMediaAsset(t *testing.T) {
-	writer := &fakeWriter{}
-	svc := New(fakeReader{}, writer, fakeAdvisor{})
+	reader, writer, advisor, loader := newRunFixture()
+	svc := New(reader, writer, advisor, loader)
 	if _, err := svc.Run(context.Background(), "user-1", RunInput{
 		Kind: "outfit", Scene: "daily", MediaAssetID: "asset-1",
 	}); err != nil {
@@ -55,6 +104,97 @@ func TestRunPersistsSourceMediaAsset(t *testing.T) {
 	}
 	if writer.inserted.MediaAssetID != "asset-1" {
 		t.Fatalf("source media asset dropped: %q", writer.inserted.MediaAssetID)
+	}
+}
+
+// 输出 schema 要求 anchor_x/y，照片必须随请求发给视觉模型——无图时模型
+// 只能凭空编造锚点（来源真实性红线）。
+func TestRunSendsPhotoToAdvisor(t *testing.T) {
+	reader, writer, advisor, loader := newRunFixture()
+	svc := New(reader, writer, advisor, loader)
+	if _, err := svc.Run(context.Background(), "user-1", RunInput{
+		Kind: "outfit", Scene: "daily", MediaAssetID: "asset-1",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(advisor.request.Images) != 1 {
+		t.Fatalf("advisor received %d images, want 1", len(advisor.request.Images))
+	}
+	image := advisor.request.Images[0]
+	if len(image.Data) == 0 {
+		t.Fatal("advisor image has no bytes")
+	}
+	if image.AssetID != "asset-1" || image.Role != "outfit" {
+		t.Fatalf("outfit image identity = %q/%q", image.AssetID, image.Role)
+	}
+	if loader.media.ObjectKey == "" {
+		t.Fatal("loader must receive the repository media location")
+	}
+
+	reader, writer, advisor, loader = newRunFixture()
+	svc = New(reader, writer, advisor, loader)
+	if _, err := svc.Run(context.Background(), "user-1", RunInput{
+		Kind: "purchase", Scene: "daily", MediaAssetID: "asset-9",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(advisor.request.Images) != 1 || advisor.request.Images[0].Role != "product" {
+		t.Fatalf("purchase image role = %#v", advisor.request.Images)
+	}
+}
+
+// media_id 缺失时拒绝诊断（契约必填），绝不静默退化成无图诊断。
+func TestRunRequiresPhoto(t *testing.T) {
+	reader, writer, advisor, loader := newRunFixture()
+	svc := New(reader, writer, advisor, loader)
+	_, err := svc.Run(context.Background(), "user-1", RunInput{Kind: "outfit", Scene: "daily"})
+	if !errors.Is(err, account.ErrValidation) {
+		t.Fatalf("missing photo = %v, want ErrValidation", err)
+	}
+	if advisor.called {
+		t.Fatal("advisor must not be called without a photo")
+	}
+}
+
+// 照片越权/不存在按既有语义 404，绝不静默退化成无图诊断。
+func TestRunPropagatesMissingPhoto(t *testing.T) {
+	reader, writer, advisor, loader := newRunFixture()
+	reader.mediaErr = repository.ErrNotFound
+	svc := New(reader, writer, advisor, loader)
+	_, err := svc.Run(context.Background(), "user-1", RunInput{
+		Kind: "outfit", Scene: "daily", MediaAssetID: "asset-x",
+	})
+	if !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("unknown photo = %v, want ErrNotFound", err)
+	}
+	if advisor.called {
+		t.Fatal("advisor must not be called when the photo cannot be read")
+	}
+}
+
+// 日限是诊断同步端点的成本防线：自然日（UTC）内第 9 次必须被拒，且
+// 不触达 AI；8 次之内照常。
+func TestRunRejectsNinthDiagnosticOfDay(t *testing.T) {
+	reader, writer, advisor, loader := newRunFixture()
+	writer.count = DailyLimitPerDay
+	svc := New(reader, writer, advisor, loader)
+	_, err := svc.Run(context.Background(), "user-1", RunInput{
+		Kind: "outfit", Scene: "daily", MediaAssetID: "asset-1",
+	})
+	if !errors.Is(err, account.ErrRateLimited) {
+		t.Fatalf("9th diagnostic = %v, want ErrRateLimited", err)
+	}
+	if advisor.called {
+		t.Fatal("advisor must not be called over the daily limit")
+	}
+
+	reader, writer, advisor, loader = newRunFixture()
+	writer.count = DailyLimitPerDay - 1
+	svc = New(reader, writer, advisor, loader)
+	if _, err := svc.Run(context.Background(), "user-1", RunInput{
+		Kind: "outfit", Scene: "daily", MediaAssetID: "asset-1",
+	}); err != nil {
+		t.Fatalf("8th diagnostic must pass: %v", err)
 	}
 }
 
@@ -78,7 +218,7 @@ func TestReadPathsSignSourceMedia(t *testing.T) {
 		SourceMediaObjectKey: "users/u1/uploads/intent-1.jpg",
 		SourceMediaMIMEType:  "image/jpeg",
 	}}
-	svc := New(fakeReader{}, writer, fakeAdvisor{}).
+	svc := New(fakeReader{}, writer, &fakeAdvisor{}, &fakeLoader{}).
 		WithMediaSigner(signerFake{url: "https://signed.example/", expiresAt: expires})
 
 	got, err := svc.Get(context.Background(), "user-1", "diag-1")
@@ -122,7 +262,7 @@ func TestGetWithoutSignerLeavesSourceMediaUnsigned(t *testing.T) {
 		SourceMedia:          &domain.RenderMediaView{AssetID: "asset-1"},
 		SourceMediaObjectKey: "users/u1/uploads/intent-1.jpg",
 	}}
-	svc := New(fakeReader{}, writer, fakeAdvisor{})
+	svc := New(fakeReader{}, writer, &fakeAdvisor{}, &fakeLoader{})
 	got, err := svc.Get(context.Background(), "user-1", "diag-1")
 	if err != nil {
 		t.Fatal(err)

@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/rendering"
 )
 
@@ -89,6 +91,10 @@ func (a *API) getRenderRun(w http.ResponseWriter, r *http.Request) {
 func (a *API) writeRenderError(w http.ResponseWriter, r *http.Request, err error) {
 	if errorsIs(err, rendering.ErrValidation) {
 		writeError(w, r, http.StatusBadRequest, "validation_error", "渲染请求不完整，请重试")
+		return
+	}
+	if errorsIs(err, billing.ErrRateLimited) {
+		writeError(w, r, http.StatusTooManyRequests, "rate_limited", strings.TrimPrefix(err.Error(), billing.ErrRateLimited.Error()+": "))
 		return
 	}
 	if errorsIs(err, repositoryErrNotFound) {

@@ -338,3 +338,28 @@ func publishedHTTPReport() domain.AssessmentReport {
 		PhotoSet: domain.PhotoSet{ID: "photoset-1", UserID: "user-1", Items: items},
 	}
 }
+
+// 分析日限（2 次/日）超限 → 429 rate_limited，不创建、不扣费。
+type httpUsageCounterFake struct{ count int }
+
+func (u httpUsageCounterFake) CountOperationsCreatedSince(context.Context, string, []domain.OperationKind, []string, time.Time) (int, error) {
+	return u.count, nil
+}
+
+func TestPostAssessmentRateLimitedIs429(t *testing.T) {
+	repo := newHTTPAssessmentRepo()
+	svc := assessment.NewService(repo, validHTTPAssetReader(), stubHTTPProfiles(), stubHTTPMedia(), httpAssessmentTaskDefinition()).
+		WithUsageLimits(httpUsageCounterFake{count: 2})
+	api := &API{
+		assessment:  svc,
+		idempotency: startedIdempotencyStore{},
+		logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	mux := http.NewServeMux()
+	mux.Handle("POST /v1/assessments", api.requireIdempotency(http.HandlerFunc(api.createAssessment)))
+	client := &assessmentHTTP{t: t, handler: mux, userID: "user-1"}
+	body := `{"photos":{"face_asset_id":"face","side_asset_id":"side","body_asset_id":"body"}}`
+	res := client.Do(http.MethodPost, "/v1/assessments", body, map[string]string{"Idempotency-Key": "assessment-limited"})
+	assertError(t, res, http.StatusTooManyRequests, "rate_limited", true)
+	assertJSONPath(t, res, "error.message", "今日形象分析次数已用完，明天再来")
+}

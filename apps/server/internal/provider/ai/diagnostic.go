@@ -32,10 +32,20 @@ func (d *StructuredDiagnostic) Diagnose(ctx context.Context, request diagnostic.
 	if request.Kind == "purchase" {
 		capability = CapabilityPurchaseDiagnosis
 	}
+	// 锚点（anchor_x/y）必须锚在真实照片上：源照片随请求发给视觉模型
+	// （outfit_diagnosis/purchase_diagnosis 路由支持图输入），无图时宁可失败
+	// 也不让模型凭空编造锚点（来源真实性红线）。
+	images := make([]ImageInput, 0, len(request.Images))
+	for _, image := range request.Images {
+		images = append(images, ImageInput{
+			AssetID: image.AssetID, Role: image.Role, MIMEType: image.MIMEType, Data: image.Data,
+		})
+	}
 	result, err := d.runtime.Structured(ctx, StructuredRequest{
 		Capability:      capability,
 		Instructions:    diagnosticInstructions,
 		Prompt:          diagnosticPrompt(request),
+		Images:          images,
 		SchemaName:      capability,
 		Schema:          diagnosticSchema(),
 		MaxOutputTokens: 1600,

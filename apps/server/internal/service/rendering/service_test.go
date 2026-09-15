@@ -2,11 +2,13 @@ package rendering
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/service/billing"
 )
 
 func TestStartRunUsesValidatedRenderSpecAndOneInitialCandidate(t *testing.T) {
@@ -260,4 +262,74 @@ type reserveCall struct {
 func (b *billingFake) Reserve(_ context.Context, userID, operationID string, product domain.Product, units int) (domain.Reservation, error) {
 	b.calls = append(b.calls, reserveCall{userID: userID, operationID: operationID, product: product, units: units})
 	return domain.Reservation{ID: "reservation-1"}, nil
+}
+
+// ---- 用量日限 + 在途并发（旧线 decideLook 双闸） ----
+
+type usageCounterFake struct {
+	created    int
+	active     int
+	createdErr error
+	activeErr  error
+	calls      int
+}
+
+func (u *usageCounterFake) CountOperationsCreatedSince(context.Context, string, []domain.OperationKind, []string, time.Time) (int, error) {
+	u.calls++
+	return u.created, u.createdErr
+}
+
+func (u *usageCounterFake) CountActiveOperations(context.Context, string, []string) (int, error) {
+	u.calls++
+	return u.active, u.activeErr
+}
+
+func TestStartRunRejectsWhenDailyLookLimitReached(t *testing.T) {
+	repo := newRepoFake()
+	repo.spec = validRenderSpec("user-1", "variant-1")
+	reserver := &billingFake{}
+	svc := New(repo, nil, nil, nil, testConfig()).WithBilling(reserver).
+		WithUsageLimits(&usageCounterFake{created: limitRenderRunsPerDay})
+	_, err := svc.StartRun(context.Background(), StartRunCommand{
+		UserID: "user-1", PlanVariantID: "variant-1", IdempotencyKey: "idem-1",
+	})
+	if !errors.Is(err, billing.ErrRateLimited) {
+		t.Fatalf("StartRun error = %v, want ErrRateLimited", err)
+	}
+	// 限额先于扣费：超限不创建 run、不 Reserve。
+	if repo.createCalls != 0 || len(reserver.calls) != 0 {
+		t.Fatalf("limited run must not create or reserve: creates=%d reserves=%d", repo.createCalls, len(reserver.calls))
+	}
+}
+
+func TestStartRunRejectsWhenConcurrentLookLimitReached(t *testing.T) {
+	repo := newRepoFake()
+	repo.spec = validRenderSpec("user-1", "variant-1")
+	svc := New(repo, nil, nil, nil, testConfig()).
+		WithUsageLimits(&usageCounterFake{active: limitLooksConcurrent})
+	_, err := svc.StartRun(context.Background(), StartRunCommand{
+		UserID: "user-1", PlanVariantID: "variant-1", IdempotencyKey: "idem-1",
+	})
+	if !errors.Is(err, billing.ErrRateLimited) {
+		t.Fatalf("StartRun error = %v, want ErrRateLimited", err)
+	}
+	if repo.createCalls != 0 {
+		t.Fatalf("limited run must not create: creates=%d", repo.createCalls)
+	}
+}
+
+func TestStartRunWithinLimitsCreatesAndReserves(t *testing.T) {
+	repo := newRepoFake()
+	repo.spec = validRenderSpec("user-1", "variant-1")
+	reserver := &billingFake{}
+	svc := New(repo, nil, nil, nil, testConfig()).WithBilling(reserver).
+		WithUsageLimits(&usageCounterFake{created: limitRenderRunsPerDay - 1, active: limitLooksConcurrent - 1})
+	if _, err := svc.StartRun(context.Background(), StartRunCommand{
+		UserID: "user-1", PlanVariantID: "variant-1", IdempotencyKey: "idem-1",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if repo.createCalls != 1 || len(reserver.calls) != 1 {
+		t.Fatalf("creates=%d reserves=%d, want 1/1", repo.createCalls, len(reserver.calls))
+	}
 }

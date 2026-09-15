@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
@@ -25,6 +26,8 @@ type Service struct {
 	media          MediaPresenter
 	taskDefinition taskrunner.Definition
 	billing        billing.Reserver
+	usage          UsageCounter
+	now            func() time.Time
 }
 
 type CreateCommand struct {
@@ -98,6 +101,37 @@ func (s *Service) WithBilling(b billing.Reserver) *Service {
 	return s
 }
 
+// WithUsageLimits 装配用量日限闸（与 WithBilling 同一链式做法）。限额先于
+// 扣费：超限直接 429，不发生 Reserve。Nil 容忍（单测/降级组装）。
+func (s *Service) WithUsageLimits(counter UsageCounter) *Service {
+	s.usage = counter
+	return s
+}
+
+// limitAssessmentPerDay 与 legacy billing_rules limitAnalysisPerDay 一致。
+const limitAssessmentPerDay = 2
+
+// checkDailyLimit 按服务器本地自然日计数本用户已创建的 assessment
+// operation：达到上限即拒绝（旧线 decideAnalysis 的日限语义）。
+func (s *Service) checkDailyLimit(ctx context.Context, userID string) error {
+	if s.usage == nil {
+		return nil
+	}
+	now := time.Now()
+	if s.now != nil {
+		now = s.now()
+	}
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	count, err := s.usage.CountOperationsCreatedSince(ctx, userID, []domain.OperationKind{domain.OperationAssessment}, nil, dayStart)
+	if err != nil {
+		return err
+	}
+	if count >= limitAssessmentPerDay {
+		return fmt.Errorf("%w: 今日形象分析次数已用完，明天再来", billing.ErrRateLimited)
+	}
+	return nil
+}
+
 func (s *Service) Create(ctx context.Context, cmd CreateCommand) (CreateResult, error) {
 	ids := []string{cmd.Slots.FaceAssetID, cmd.Slots.SideAssetID, cmd.Slots.BodyAssetID}
 	assets, err := s.assets.GetReadyAssets(ctx, cmd.UserID, ids)
@@ -119,6 +153,10 @@ func (s *Service) Create(ctx context.Context, cmd CreateCommand) (CreateResult, 
 	inputHash := AnalysisInputHash(contentHash, profile, AnalyzerSchemaVersion, QualityPolicyVersion)
 	params := buildCreateParams(cmd, byID, profile, contentHash, inputHash)
 	params.MaxTaskAttempts = s.taskDefinition.MaxAttempts
+	// 限额先于落库与扣费：超限不创建行、不 Reserve（与旧线 authorize 次序一致）。
+	if err := s.checkDailyLimit(ctx, cmd.UserID); err != nil {
+		return CreateResult{}, err
+	}
 	created, err := s.repo.CreateOrReuseAssessment(ctx, params)
 	if err != nil {
 		return CreateResult{}, err

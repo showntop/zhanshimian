@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/service/advisor"
@@ -28,6 +29,11 @@ func (a *API) sendAdvisorMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := decodeJSON(r, &input); err != nil {
 		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+	// 输入闸（旧线语义）：1–500 字，超限 400，不进入服务与计费。
+	if strings.TrimSpace(input.Content) == "" || len([]rune(input.Content)) > 500 {
+		writeError(w, r, http.StatusBadRequest, "validation_error", "请输入 1–500 字的问题")
 		return
 	}
 	item, err := a.advisor.Send(r.Context(), currentUser(r).ID, advisor.SendInput{Content: input.Content})

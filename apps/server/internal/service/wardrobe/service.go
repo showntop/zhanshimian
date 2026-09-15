@@ -2,10 +2,23 @@ package wardrobe
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/repository"
 )
+
+// ErrValidation 标记无效输入：httpapi 映射 400。
+var ErrValidation = errors.New("wardrobe validation error")
+
+// 单品类目白名单（旧线 CreateWardrobeItem 与 miniapp CATEGORIES 一致）。
+var validCategories = map[string]bool{"top": true, "bottom": true, "outer": true, "shoes": true, "bag": true}
+
+// 搭配备注默认文案（旧线 CreateWardrobeOutfit 同款）。
+const defaultOutfitNote = "优先复用你常穿的单品，用颜色与比例完成这套表达。"
 
 // Item 是持久化的衣橱单品（OpenAPI WardrobeItem 形状）。
 type Item struct {
@@ -70,6 +83,7 @@ type Service struct {
 	reader Reader
 	writer Writer
 	signer MediaSigner
+	media  MediaChecker
 }
 
 func New(reader Reader, writer Writer) *Service {
@@ -79,6 +93,13 @@ func New(reader Reader, writer Writer) *Service {
 // WithMediaSigner 装配读路径媒体签名器（与 assessment.WithBilling 同一链式做法）。
 func (s *Service) WithMediaSigner(signer MediaSigner) *Service {
 	s.signer = signer
+	return s
+}
+
+// WithMediaChecker 装配单品照片的归属/用途校验（同一链式做法）。
+// 未装配时带 media_id 的建档拒绝——归属校验不可降级跳过（防越权建档）。
+func (s *Service) WithMediaChecker(checker MediaChecker) *Service {
+	s.media = checker
 	return s
 }
 
@@ -110,7 +131,31 @@ func (s *Service) signItemMedia(ctx context.Context, item *Item) error {
 	return nil
 }
 
+// CreateItem 恢复旧线校验与默认值：name/color 必填、category 白名单、
+// season/formality/scenes 缺省补齐；media 归属/用途不符一律 404（越权不泄露存在性）。
 func (s *Service) CreateItem(ctx context.Context, userID string, input CreateItemInput) (Item, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	input.Color = strings.TrimSpace(input.Color)
+	if input.Name == "" || input.Color == "" || !validCategories[input.Category] {
+		return Item{}, fmt.Errorf("%w: 请填写单品名称、类别与颜色", ErrValidation)
+	}
+	if input.Season == "" {
+		input.Season = "all"
+	}
+	if input.Formality == "" {
+		input.Formality = "proper"
+	}
+	if len(input.Scenes) == 0 {
+		input.Scenes = []string{"daily"}
+	}
+	if input.MediaAssetID != "" {
+		if s.media == nil {
+			return Item{}, repository.ErrNotFound
+		}
+		if err := s.media.CheckWardrobeMedia(ctx, userID, input.MediaAssetID); err != nil {
+			return Item{}, err
+		}
+	}
 	now := time.Now().UTC()
 	return s.writer.InsertWardrobeItem(ctx, userID, Item{
 		MediaAssetID: input.MediaAssetID,
@@ -125,7 +170,16 @@ func (s *Service) DeleteItem(ctx context.Context, userID string, id string) erro
 }
 
 // CreateOutfit 从质量核心 grounding 取稳定方案摘要，落一份组合快照；不写 PlanSet/RenderPublication。
+// 恢复旧线校验：标题 1–60 字、单品 1–12 件、item 归属不符一律 404、note 默认文案、
+// 上下文快照缺省按当前日期推导；响应内嵌单品详情（契约 201 形状）。
 func (s *Service) CreateOutfit(ctx context.Context, userID string, input CreateOutfitInput) (Outfit, error) {
+	title := strings.TrimSpace(input.Title)
+	if title == "" || len([]rune(title)) > 60 {
+		return Outfit{}, fmt.Errorf("%w: 请填写 60 字以内的搭配名称", ErrValidation)
+	}
+	if len(input.ItemIDs) == 0 || len(input.ItemIDs) > 12 {
+		return Outfit{}, fmt.Errorf("%w: 请选择 1–12 件单品组成搭配", ErrValidation)
+	}
 	grounding, err := s.reader.ReadWardrobeGrounding(ctx, userID)
 	if err != nil {
 		return Outfit{}, err
@@ -134,13 +188,58 @@ func (s *Service) CreateOutfit(ctx context.Context, userID string, input CreateO
 	if grounding.SelectedPlan != nil {
 		selected = grounding.SelectedPlan.ID
 	}
-	return s.writer.InsertWardrobeOutfit(ctx, userID, Outfit{
-		Title:          input.Title,
-		Note:           input.Note,
+	items, err := s.writer.GetWardrobeItems(ctx, userID)
+	if err != nil {
+		return Outfit{}, err
+	}
+	byID := make(map[string]Item, len(items))
+	for _, item := range items {
+		byID[item.ID] = item
+	}
+	selectedItems := make([]Item, 0, len(input.ItemIDs))
+	for _, id := range input.ItemIDs {
+		item, ok := byID[id]
+		if !ok {
+			return Outfit{}, repository.ErrNotFound
+		}
+		if err := s.signItemMedia(ctx, &item); err != nil {
+			return Outfit{}, err
+		}
+		selectedItems = append(selectedItems, item)
+	}
+	note := strings.TrimSpace(input.Note)
+	if note == "" {
+		note = defaultOutfitNote
+	}
+	outfit, err := s.writer.InsertWardrobeOutfit(ctx, userID, Outfit{
+		Title:          title,
+		Note:           note,
+		Context:        defaultOutfitContext(time.Now()),
 		ItemIDs:        input.ItemIDs,
 		SelectedPlanID: selected,
 		CreatedAt:      time.Now().UTC(),
 	})
+	if err != nil {
+		return outfit, err
+	}
+	outfit.Items = selectedItems
+	return outfit, nil
+}
+
+// defaultOutfitContext 固化创建时的上下文快照：旧线快照含天气，新线衣橱服务
+// 不依赖天气源，快照保留日期/日期类型/日程默认推导（与 today 服务同一措辞：
+// 工作日「日常」、周末「休息」，不叫「通勤」）。
+func defaultOutfitContext(now time.Time) domain.TodayContext {
+	ctxOut := domain.TodayContext{Date: now.Format("2006-01-02")}
+	switch now.Weekday() {
+	case time.Saturday, time.Sunday:
+		ctxOut.DayType = "周末"
+		ctxOut.Schedule = "休息"
+	default:
+		ctxOut.DayType = "工作日"
+		ctxOut.Schedule = "日常"
+	}
+	return ctxOut
 }
 
 func (s *Service) WearOutfit(ctx context.Context, userID string, id string) (Outfit, error) {

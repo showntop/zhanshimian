@@ -124,7 +124,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		return nil, fmt.Errorf("storage does not support upload grants")
 	}
 	mediaSvc := media.New(store, objectStore, cfg.MaxUploadBytes, cfg.AssetURLTTL)
-	operationSvc := operation.New(store)
+	operationSvc := operation.New(store).WithStaleFailer(store)
 	billingSvc := billing.New(store)
 
 	core, err := wireQualityCore(cfg, store, objects, ai)
@@ -132,7 +132,9 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		pool.Close()
 		return nil, err
 	}
-	assessmentSvc := core.Assessment.WithBilling(billingSvc)
+	// 用量闸（旧线 billing_rules 同款）：限额先于扣费，仓储按既有行自计数。
+	assessmentSvc := core.Assessment.WithBilling(billingSvc).WithUsageLimits(store)
+	renderingSvc := core.Rendering.WithUsageLimits(store)
 	bodySvc := core.Body.WithBilling(billingSvc)
 	executionSvc := execution.New(store)
 	feedbackSvc := feedback.New(store)
@@ -141,9 +143,10 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	mediaSigner := newMediaURLSigner(objects, cfg.PublicBaseURL, cfg.AssetURLTTL)
 	todaySvc := today.New(store, store, providerai.NewTodayPlanner(structuredRuntimeAdapter{ai.Runtime}), todayWeatherAdapter{inner: weather}, today.NewClock()).
 		WithMediaSigner(mediaSigner)
-	wardrobeSvc := wardrobe.New(store, store).WithMediaSigner(mediaSigner)
-	advisorSvc := advisor.New(store, store, providerai.NewAdvisorChat(structuredRuntimeAdapter{ai.Runtime}))
-	diagnosticSvc := diagnostic.New(store, store, providerai.NewDiagnostic(structuredRuntimeAdapter{ai.Runtime})).
+	wardrobeSvc := wardrobe.New(store, store).WithMediaSigner(mediaSigner).WithMediaChecker(store)
+	advisorSvc := advisor.New(store, store, providerai.NewAdvisorChat(structuredRuntimeAdapter{ai.Runtime})).WithUsageGate(store)
+	diagnosticSvc := diagnostic.New(store, store, providerai.NewDiagnostic(structuredRuntimeAdapter{ai.Runtime}),
+		diagnosticImageLoader{objects: objects}).
 		WithMediaSigner(mediaSigner)
 	hairSvc := hair.New(store, store, store, store, mediaSigner)
 	shareSvc := share.New(store, store, shareURLSigner{inner: mediaSigner}, cfg.AssetURLTTL)
@@ -182,7 +185,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		Assessment: assessmentSvc,
 		Body:       bodySvc,
 		Planning:   core.Planning,
-		Renders:    core.Rendering,
+		Renders:    renderingSvc,
 		Execution:  executionSvc,
 		Feedback:   feedbackSvc,
 		Today:      todaySvc,

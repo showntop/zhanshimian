@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
@@ -73,6 +74,16 @@ func (s *Store) UpdateDiagnosticSaved(ctx context.Context, userID string, id str
 		return diagnostic.Diagnosis{}, repository.ErrNotFound
 	}
 	return s.GetDiagnosticByID(ctx, userID, id)
+}
+
+// CountDiagnosticsSince 计用户在 since 之后落库的诊断条数；service 用它做
+// 每自然日 8 次的自计数闸门（诊断历史即账单，不引入 billing 依赖）。
+func (s *Store) CountDiagnosticsSince(ctx context.Context, userID string, since time.Time) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx,
+		`SELECT count(*) FROM diagnostics WHERE user_id=$1::uuid AND created_at>=$2`, userID, since).
+		Scan(&count)
+	return count, err
 }
 
 func (s *Store) scanDiagnostic(row rowScanner) (diagnostic.Diagnosis, error) {

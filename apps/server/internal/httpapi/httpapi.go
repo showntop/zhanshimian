@@ -14,10 +14,12 @@ import (
 	"github.com/zhanshimian/server/internal/provider"
 	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/service/account"
+	"github.com/zhanshimian/server/internal/service/advisor"
 	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/body"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
+	"github.com/zhanshimian/server/internal/service/wardrobe"
 	"github.com/zhanshimian/server/internal/storage"
 )
 
@@ -217,6 +219,15 @@ func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 		writeError(w, r, http.StatusTooManyRequests, "rate_limited", strings.TrimPrefix(err.Error(), account.ErrRateLimited.Error()+": "))
 	case errors.Is(err, billing.ErrInsufficientCredits):
 		writeError(w, r, http.StatusPaymentRequired, "insufficient_credits", strings.TrimPrefix(err.Error(), billing.ErrInsufficientCredits.Error()+": "))
+	case errors.Is(err, billing.ErrRateLimited):
+		// 用量日限/时限/并发限与下单限流同一公开形状（旧线 service.ErrRateLimited）。
+		writeError(w, r, http.StatusTooManyRequests, "rate_limited", strings.TrimPrefix(err.Error(), billing.ErrRateLimited.Error()+": "))
+	case errors.Is(err, advisor.ErrRateLimited):
+		writeError(w, r, http.StatusTooManyRequests, "rate_limited", strings.TrimPrefix(err.Error(), advisor.ErrRateLimited.Error()+": "))
+	case errors.Is(err, advisor.ErrValidation):
+		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), advisor.ErrValidation.Error()+": "))
+	case errors.Is(err, wardrobe.ErrValidation):
+		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), wardrobe.ErrValidation.Error()+": "))
 	case errors.Is(err, billing.ErrPaymentUnavailable):
 		writeError(w, r, http.StatusServiceUnavailable, "payment_unavailable", "购买暂未开通")
 	case errors.Is(err, account.ErrValidation):

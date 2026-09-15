@@ -78,6 +78,24 @@ func (s *Store) RemoveWardrobeItem(ctx context.Context, userID string, id string
 	return nil
 }
 
+// CheckWardrobeMedia 校验单品照片媒体的归属与用途：越权、不存在、已删除或
+// 用途非 wardrobe 一律 ErrNotFound（与 ReadDiagnosticMedia 同一 guard 形状）。
+func (s *Store) CheckWardrobeMedia(ctx context.Context, userID, assetID string) error {
+	var exists bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM media_assets
+			WHERE user_id=$1::uuid AND id=$2::uuid AND purpose='wardrobe' AND state<>'deleted'
+		)`, userID, assetID).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return repository.ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) InsertWardrobeOutfit(ctx context.Context, userID string, outfit wardrobe.Outfit) (wardrobe.Outfit, error) {
 	contextJSON, err := json.Marshal(outfit.Context)
 	if err != nil {

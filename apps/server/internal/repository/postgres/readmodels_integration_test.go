@@ -424,3 +424,29 @@ func TestReadDiagnosticGroundingOmitsWardrobeForOutfit(t *testing.T) {
 		t.Fatalf("purchase grounding missing wardrobe")
 	}
 }
+
+// report_id 缺省必须回退用户最新报告（旧线 LatestReport 语义）；用户还没有
+// 任何报告时照常诊断，只是缺少报告 grounding。
+func TestReadDiagnosticGroundingFallsBackToLatestReport(t *testing.T) {
+	f := newReadModelFixture(t)
+	ctx := context.Background()
+
+	g, err := f.store.ReadDiagnosticGrounding(ctx, f.userA, "", "outfit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Report == nil || g.Report.ID != f.reportID {
+		t.Fatalf("fallback report = %#v, want %q", g.Report, f.reportID)
+	}
+	if len(g.Report.Findings) == 0 {
+		t.Fatal("fallback report missing findings")
+	}
+
+	empty, err := f.store.ReadDiagnosticGrounding(ctx, f.userB, "", "outfit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if empty.Report != nil {
+		t.Fatalf("user without reports must not borrow one: %#v", empty.Report)
+	}
+}

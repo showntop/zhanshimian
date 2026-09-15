@@ -2,12 +2,14 @@ package httpapi
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/rendering"
 )
 
@@ -118,4 +120,12 @@ func stringPtr(v string) *string { return &v }
 
 func timeFixture() time.Time {
 	return time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
+}
+
+// look 日限/并发超限 → 429 rate_limited（与下单限流同一公开形状）。
+func TestCreateRenderRunRateLimitedIs429(t *testing.T) {
+	api := newRenderAPI(t, &fakeRenderService{startErr: fmt.Errorf("%w: 今日形象方案制作次数已用完，明天再来", billing.ErrRateLimited)})
+	res := api.Do(http.MethodPost, "/v1/plan-variants/variant-1/render-runs", "{}",
+		map[string]string{"Idempotency-Key": "render-limited"})
+	assertError(t, res, http.StatusTooManyRequests, "rate_limited", true)
 }

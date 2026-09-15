@@ -2,6 +2,7 @@ package today
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
@@ -85,6 +86,9 @@ func (s *Service) Generate(ctx context.Context, userID string, input CreateInput
 		return Plan{}, err
 	}
 
+	now := s.clock.Now()
+	schedule := scheduleOrDefault(now, input.Schedule)
+
 	weather := Weather{City: input.City}
 	if s.weather != nil {
 		if w, err := s.weather.Current(ctx, input.City); err == nil {
@@ -98,22 +102,36 @@ func (s *Service) Generate(ctx context.Context, userID string, input CreateInput
 		Findings:     grounding.Findings,
 		SelectedPlan: grounding.SelectedPlan,
 		Weather:      weather,
-		Schedule:     input.Schedule,
+		Schedule:     schedule,
 	})
 	if err != nil {
 		return Plan{}, err
 	}
 
-	now := s.clock.Now()
 	return s.writer.CreateTodayPlan(ctx, userID, Plan{
 		ReportID:  grounding.ReportID,
-		Context:   domain.TodayContext{City: weather.City, Condition: weather.Condition, Temperature: weather.Temperature, Schedule: input.Schedule},
+		Context:   domain.TodayContext{City: weather.City, Condition: weather.Condition, Temperature: weather.Temperature, Schedule: schedule},
 		Title:     output.Title,
 		Summary:   output.Summary,
 		Steps:     mapSteps(output.Steps),
 		State:     "planning",
 		CreatedAt: now, UpdatedAt: now,
 	})
+}
+
+// scheduleOrDefault 恢复旧线 buildTodayContext 的日程默认推导：日程为空时
+// 按工作日/休息日给默认并进 AI prompt。红线：场景叫「日常」不叫「通勤」，
+// 措辞与 Context 的 DayType（工作日/周末）及 packages/core SCENES 对齐。
+func scheduleOrDefault(now time.Time, schedule string) string {
+	if strings.TrimSpace(schedule) != "" {
+		return schedule
+	}
+	switch now.Weekday() {
+	case time.Saturday, time.Sunday:
+		return "休息"
+	default:
+		return "日常"
+	}
 }
 
 func (s *Service) Current(ctx context.Context, userID string) (Plan, error) {
@@ -165,7 +183,7 @@ func (s *Service) Context(ctx context.Context, city string, schedule string) dom
 	ctxOut := domain.TodayContext{
 		Date:     now.Format("2006-01-02"),
 		City:     city,
-		Schedule: schedule,
+		Schedule: scheduleOrDefault(now, schedule),
 	}
 	switch now.Weekday() {
 	case time.Saturday, time.Sunday:

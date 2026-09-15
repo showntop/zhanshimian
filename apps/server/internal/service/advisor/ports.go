@@ -2,6 +2,7 @@ package advisor
 
 import (
 	"context"
+	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 )
@@ -18,4 +19,10 @@ type Grounding struct {
 
 type Reader interface {
 	ReadAdvisorGrounding(ctx context.Context, userID string) (Grounding, error)
+}
+
+// UsageGate 是顾问用量闸：仓储自计数（billing_usage 台账），不扣次数。
+// 形状与 billing.OrdersRepository.ApplyBilling 一致（*postgres.Store 直接实现）。
+type UsageGate interface {
+	ApplyBilling(ctx context.Context, userID string, now time.Time, activeLooks int, decide func(domain.BillingSnapshot) (domain.BillingDecision, error)) error
 }

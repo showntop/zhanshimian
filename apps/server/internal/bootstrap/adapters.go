@@ -21,6 +21,7 @@ import (
 	"github.com/zhanshimian/server/internal/service/account"
 	"github.com/zhanshimian/server/internal/service/assessment"
 	"github.com/zhanshimian/server/internal/service/body"
+	"github.com/zhanshimian/server/internal/service/diagnostic"
 	"github.com/zhanshimian/server/internal/service/today"
 	"github.com/zhanshimian/server/internal/storage"
 )
@@ -87,6 +88,27 @@ func (l imageLoader) Load(ctx context.Context, items []domain.PhotoSetItem) ([]a
 		images = append(images, assessment.ImageInput{Role: string(item.Role), MIMEType: mime, Data: data})
 	}
 	return images, nil
+}
+
+// diagnosticImageLoader 给同步诊断加载源照片字节：与 assessment imageLoader
+// 同一链路（数据万象下载时压缩，未开通 CI 回退原图后本地预算约束），
+// 只是输入是单张媒体定位而非照片集。
+type diagnosticImageLoader struct {
+	objects storage.ObjectStorage
+}
+
+func (l diagnosticImageLoader) Load(ctx context.Context, media domain.MediaInput) (diagnostic.Image, error) {
+	rc, err := storage.OpenProcessedOr(ctx, l.objects, media.ObjectKey, providerai.VisionCOSProcess)
+	if err != nil {
+		return diagnostic.Image{}, fmt.Errorf("load %s: %w", media.ObjectKey, err)
+	}
+	data, err := io.ReadAll(rc)
+	_ = rc.Close()
+	if err != nil {
+		return diagnostic.Image{}, err
+	}
+	data, mime := providerai.ConstrainVisionImage(data, media.MIMEType)
+	return diagnostic.Image{AssetID: media.AssetID, MIMEType: mime, Data: data}, nil
 }
 
 // operationProgress 把 Store 的进度上报适配到 assessment.OperationProgress。

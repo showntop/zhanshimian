@@ -274,6 +274,18 @@ func (s *Store) ReadDiagnosticGrounding(ctx context.Context, userID string, repo
 		return g, err
 	}
 
+	if reportID == "" {
+		// report_id 缺省回退用户最新报告（旧线 LatestReport 语义；reports 行只在
+		// 分析完成后写入，即已发布）。用户还没有任何报告时照常诊断，只是缺少
+		// 报告 grounding。
+		latest, latestErr := s.latestReportID(ctx, userID)
+		switch {
+		case latestErr == nil:
+			reportID = latest
+		case !isNotFound(latestErr):
+			return g, latestErr
+		}
+	}
 	if reportID != "" {
 		report, err := s.readReportGrounding(ctx, userID, reportID)
 		if err == nil {
@@ -291,6 +303,35 @@ func (s *Store) ReadDiagnosticGrounding(ctx context.Context, userID string, repo
 	}
 
 	return g, nil
+}
+
+// latestReportID 定位用户最新一份报告（created_at 与 id 双键定序，与
+// LatestPublishedPlanSetID 同一定序习惯）。
+func (s *Store) latestReportID(ctx context.Context, userID string) (string, error) {
+	var id string
+	err := s.pool.QueryRow(ctx, `
+		SELECT id::text FROM reports WHERE user_id=$1::uuid
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1`, userID).Scan(&id)
+	if err != nil {
+		return "", mapNotFound(err)
+	}
+	return id, nil
+}
+
+// ReadDiagnosticMedia 读诊断源照片的对象定位；越权/不存在/已删除一律
+// ErrNotFound（与 MediaObjectInfo 同一 guard）。
+func (s *Store) ReadDiagnosticMedia(ctx context.Context, userID string, assetID string) (domain.MediaInput, error) {
+	var media domain.MediaInput
+	err := s.pool.QueryRow(ctx, `
+		SELECT id::text, object_key, mime_type
+		FROM media_assets
+		WHERE user_id=$1::uuid AND id=$2::uuid AND state<>'deleted'`, userID, assetID).
+		Scan(&media.AssetID, &media.ObjectKey, &media.MIMEType)
+	if err != nil {
+		return domain.MediaInput{}, mapNotFound(err)
+	}
+	return media, nil
 }
 
 // ---- 分享来源 ----

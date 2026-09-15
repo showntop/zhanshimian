@@ -3,10 +3,12 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/service/assessment"
+	"github.com/zhanshimian/server/internal/service/billing"
 )
 
 type createAssessmentRequest struct {
@@ -54,6 +56,10 @@ func (a *API) writeAssessmentError(w http.ResponseWriter, r *http.Request, err e
 	var rejected *assessment.ValidationError
 	if errors.As(err, &rejected) {
 		writeError(w, r, http.StatusBadRequest, rejected.Code, "请检查拍摄的三张照片后重试")
+		return
+	}
+	if errors.Is(err, billing.ErrRateLimited) {
+		writeError(w, r, http.StatusTooManyRequests, "rate_limited", strings.TrimPrefix(err.Error(), billing.ErrRateLimited.Error()+": "))
 		return
 	}
 	if errors.Is(err, repository.ErrNotFound) {

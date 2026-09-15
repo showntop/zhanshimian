@@ -10,6 +10,7 @@ import (
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
+	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
 )
 
@@ -400,5 +401,56 @@ func publishedReport() domain.AssessmentReport {
 			}},
 		},
 		PhotoSet: domain.PhotoSet{ID: "photoset-1", UserID: "user-1", Items: items},
+	}
+}
+
+// ---- 用量日限（旧线 decideAnalysis：2 次/日，限额先于扣费） ----
+
+type usageCounterFake struct {
+	count int
+	err   error
+	since time.Time
+}
+
+func (u *usageCounterFake) CountOperationsCreatedSince(_ context.Context, _ string, kinds []domain.OperationKind, _ []string, since time.Time) (int, error) {
+	if len(kinds) != 1 || kinds[0] != domain.OperationAssessment {
+		return 0, errors.New("unexpected kinds filter")
+	}
+	u.since = since
+	return u.count, u.err
+}
+
+func TestCreateRejectsWhenDailyAssessmentLimitReached(t *testing.T) {
+	repo := newRepoFake()
+	reserver := &billingFake{}
+	svc := NewService(repo, validAssetReader(), stubProfiles(), stubMedia(), assessmentTaskDefinition()).
+		WithBilling(reserver).
+		WithUsageLimits(&usageCounterFake{count: limitAssessmentPerDay})
+	_, err := svc.Create(ctx, validCreateCommand())
+	if !errors.Is(err, billing.ErrRateLimited) {
+		t.Fatalf("Create error = %v, want ErrRateLimited", err)
+	}
+	// 限额先于落库与扣费：超限不创建行、不 Reserve。
+	if repo.createCount != 0 || len(reserver.calls) != 0 {
+		t.Fatalf("limited create must not persist or reserve: creates=%d reserves=%d", repo.createCount, len(reserver.calls))
+	}
+}
+
+func TestCreateWithinDailyLimitProceeds(t *testing.T) {
+	repo := newRepoFake()
+	reserver := &billingFake{}
+	counter := &usageCounterFake{count: limitAssessmentPerDay - 1}
+	svc := NewService(repo, validAssetReader(), stubProfiles(), stubMedia(), assessmentTaskDefinition()).
+		WithBilling(reserver).
+		WithUsageLimits(counter)
+	if _, err := svc.Create(ctx, validCreateCommand()); err != nil {
+		t.Fatal(err)
+	}
+	if repo.createCount != 1 || len(reserver.calls) != 1 {
+		t.Fatalf("creates=%d reserves=%d, want 1/1", repo.createCount, len(reserver.calls))
+	}
+	// 日界按服务器本地自然日零点。
+	if counter.since.Hour() != 0 || counter.since.Minute() != 0 || counter.since.Second() != 0 {
+		t.Fatalf("day boundary = %v, want local midnight", counter.since)
 	}
 }
