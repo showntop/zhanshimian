@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
-import { LOCAL_LOOK_SLUGS, type HairPreview, type HairStyle, type LookSlug } from '@zsm/core'
+import { LOCAL_LOOK_SLUGS, type DisplayMedia, type HairPreview, type HairStyle, type LookSlug } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { peripherals } from '../../../../app/api/peripherals'
 import { qualityApi } from '../../../../app/api/quality'
@@ -119,12 +119,17 @@ export default function Hair() {
   // 档案正脸回退：服务端 create 支持 report_id 缺省 media_id（media_id 优先）。
   // 这里只取 id；报告还没出或取不到时保持空串，走「先拍一张」引导。
   const [reportId, setReportId] = useState('')
+  // 档案正脸本体（带签名 URL）：没有进行中任务时，hero 默认显示它而不是内置模特图——
+  // 生成默认用的就是这张，进来先让用户看到自己的脸。
+  const [reportFace, setReportFace] = useState<DisplayMedia | null>(null)
 
   useEffect(() => {
     void qualityApi
       .getCurrentReport()
       .then((report) => {
-        if (report) setReportId(report.id)
+        if (!report) return
+        setReportId(report.id)
+        setReportFace(report.source_media?.face?.media ?? null)
       })
       .catch(() => {})
   }, [])
@@ -190,6 +195,8 @@ export default function Hair() {
               <SourceImage className="hair__hero-img" media={preview!.media} mode="aspectFit" anchor="top" />
             ) : preview?.source_media ? (
               <SourceImage className="hair__hero-img" media={preview.source_media} mode="aspectFit" anchor="top" />
+            ) : reportFace ? (
+              <SourceImage className="hair__hero-img" media={reportFace} mode="aspectFit" anchor="top" />
             ) : (
               <SourceImage
                 className="hair__hero-img"
