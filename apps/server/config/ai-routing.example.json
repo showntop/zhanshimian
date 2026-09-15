@@ -65,6 +65,28 @@
       ],
       "data_retention": "zero"
     },
+    "aliyun/qwen3.8-flash": {
+      "vendor": "aliyun",
+      "protocol": "openai_chat_completions",
+      "model": "qwen3.8-flash",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "api_key_env": "ALIYUN_API_KEY",
+      "structured_mode": "json_object",
+      "parameters": {
+        "enable_thinking": false,
+        "temperature": 0
+      },
+      "timeout_seconds": 120,
+      "input_cost_per_million": 0.2,
+      "output_cost_per_million": 0.8,
+      "max_input_images": 3,
+      "supports_multiple_reference_images": true,
+      "identity_comparison": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
+    },
     "aliyun/wan2.7-image-pro": {
       "vendor": "aliyun",
       "protocol": "dashscope_wan",
@@ -127,31 +149,31 @@
   "routes": {
     "appearance_analysis": {
       "policy": "quality_first",
-      "primary": "aliyun/kimi-k3",
+      "primary": "aliyun/qwen3.8-flash",
       "max_cost_cny": 0.6,
       "max_input_images": 3
     },
     "photo_quality_check": {
       "policy": "quality_first",
-      "primary": "aliyun/kimi-k3",
+      "primary": "aliyun/qwen3.8-flash",
       "max_cost_cny": 0.6,
       "max_input_images": 3
     },
     "photo_identity_consistency": {
       "policy": "quality_first",
-      "primary": "aliyun/kimi-k3",
+      "primary": "aliyun/qwen3.8-flash",
       "max_cost_cny": 0.6,
       "max_input_images": 3
     },
     "report_evidence_verification": {
       "policy": "quality_first",
-      "primary": "aliyun/kimi-k3",
+      "primary": "aliyun/qwen3.8-flash",
       "max_cost_cny": 0.6,
       "max_input_images": 3
     },
     "photo_check": {
       "policy": "quality_first",
-      "primary": "aliyun/kimi-k3",
+      "primary": "aliyun/qwen3.8-flash",
       "max_cost_cny": 0.6
     },
     "outfit_diagnosis": {
@@ -172,7 +194,7 @@
     },
     "hair_edit": {
       "policy": "quality_first",
-      "primary": "aliyun/wan2.7-image-pro",
+      "primary": "aliyun/qwen-image-edit-plus",
       "fallbacks": [
         "volcengine/seedream-4.5"
       ],
@@ -180,7 +202,7 @@
     },
     "makeup_edit": {
       "policy": "quality_first",
-      "primary": "aliyun/wan2.7-image-pro",
+      "primary": "aliyun/qwen-image-edit-plus",
       "fallbacks": [
         "volcengine/seedream-4.5"
       ],
@@ -197,18 +219,18 @@
     },
     "render_quality_evaluation": {
       "policy": "balanced",
-      "primary": "aliyun/kimi-k3",
+      "primary": "aliyun/qwen3.8-flash",
       "max_switches": 1,
       "max_cost_cny": 0.6
     },
     "plan_set_generation": {
       "policy": "quality_first",
-      "primary": "aliyun/kimi-k3",
+      "primary": "aliyun/qwen3.8-flash",
       "max_cost_cny": 0.6
     },
     "plan_grounding_verification": {
       "policy": "quality_first",
-      "primary": "aliyun/kimi-k3",
+      "primary": "aliyun/qwen3.8-flash",
       "max_cost_cny": 0.6
     },
     "body_orbit": {
