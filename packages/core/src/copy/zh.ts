@@ -201,6 +201,7 @@ export const LAB_COPY = {
   desc3d: '表达比例和穿搭轮廓，不承诺精确测量。',
   generate: '生成 3D 形象',
   regenerate: '再生成一圈',
+  generating: '正在生成…',
   empty: '先拍正脸和正面全身，才能转起来看。',
   emptyAction: '去拍摄',
   failed: '这一圈没生成成功，再试一次或先返回。',
@@ -208,7 +209,14 @@ export const LAB_COPY = {
   viewLast: '看上一圈',
   noCompare: '对比需要更完整的静帧，先转着看。',
   badgeAI: 'AI 风格预览',
-  waitlist: '已加入候补'
+  waitlist: '已加入候补',
+  dragHint: '左右拖，看不同角度',
+  angleFront: '正面',
+  angleLeft: '左侧',
+  angleBack: '背面',
+  angleRight: '右侧',
+  prevAngle: '上一角度',
+  nextAngle: '下一角度'
 } as const
 
 // ---------- 分析页阶段文案 ----------

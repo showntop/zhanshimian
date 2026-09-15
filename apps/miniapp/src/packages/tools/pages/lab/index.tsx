@@ -24,12 +24,25 @@ import SourceImage from '../../../../components/source-image'
 import BodyViewer from '../../../../components/body-viewer'
 import EmptyState from '../../../../components/empty-state'
 import ErrorState from '../../../../components/error-state'
+import PrimaryButton from '../../../../components/primary-button'
 import TextLink from '../../../../components/text-link'
 import './index.scss'
 
+function StagePreview({ slug, dim }: { slug: string; dim?: boolean }) {
+  return (
+    <View className={`lab__podium ${dim ? 'lab__podium--dim' : ''}`}>
+      <View className="lab__podium-glow" />
+      <View className="lab__podium-spot" />
+      <View className="lab__podium-ring" />
+      <View className="lab__podium-floor" />
+      <SourceImage className="lab__podium-figure" reference={{ slug, variant: 'full' }} mode="aspectFit" />
+    </View>
+  )
+}
+
 const FEATURES = [
-  { key: 'hair-ar', name: '发型与妆容 AR', status: '内测', desc: '实时切换发型轮廓、发色与眉眼重点。', slug: 'sharp' },
   { key: '3d', name: LAB_COPY.title3d, status: '开发中', desc: LAB_COPY.desc3d, slug: 'natural' },
+  { key: 'hair-ar', name: '发型与妆容 AR', status: '内测', desc: '实时切换发型轮廓、发色与眉眼重点。', slug: 'sharp' },
   { key: 'try-on', name: '上半身试衣', status: '排队中', desc: '先支持外套和上衣，不做完整商城。', slug: 'warm' },
 ] as const
 
@@ -246,6 +259,7 @@ export default function Lab() {
   const showViewer = Boolean(status?.available) && Boolean(status?.completed) && !showProgress && !showError
   const showEmpty = Boolean(status?.available) && !showProgress && !showError && !showViewer && (!face || !body)
   const showWaitlist = status !== null && !status.available && !showLoadError
+  const useStage = !showWaitlist && !showError && !showEmpty
 
   const cardStatus = (feature: LabFeature): string => {
     if (feature.key !== '3d' || showWaitlist) {
@@ -285,18 +299,28 @@ export default function Lab() {
       )
     }
 
-    if (!loaded || showWaitlist) {
+    if (showWaitlist) {
       return (
         <>
           <SourceImage className="lab__card-img" reference={{ slug: feature.slug, variant: 'full' }} anchor="top" />
           <View className="lab__card-copy">
             {head}
             <Text className="lab__card-desc">{feature.desc}</Text>
-            {showWaitlist ? (
-              <View className="lab__card-btn pressable" onClick={() => act(feature)}>
-                <Text>{waitlisted.includes(feature.key) ? '已预约' : '预约体验'}</Text>
-              </View>
-            ) : null}
+            <View className="lab__card-btn pressable" onClick={() => act(feature)}>
+              <Text>{waitlisted.includes(feature.key) ? '已预约' : '预约体验'}</Text>
+            </View>
+          </View>
+        </>
+      )
+    }
+
+    if (!loaded) {
+      return (
+        <>
+          <StagePreview slug={feature.slug} />
+          <View className="lab__card-copy lab__card-copy--onstage">
+            {head}
+            <Text className="lab__card-desc">{feature.desc}</Text>
           </View>
         </>
       )
@@ -304,11 +328,11 @@ export default function Lab() {
 
     if (showProgress && active) {
       const progress = active.progress ?? 0
-      const stage = active.stage || '正在生成 3D 形象'
+      const stage = active.stage || LAB_COPY.generating
       return (
         <>
-          <SourceImage className="lab__card-img" reference={{ slug: feature.slug, variant: 'full' }} anchor="top" />
-          <View className="lab__card-copy">
+          <StagePreview slug={feature.slug} dim />
+          <View className="lab__card-copy lab__card-copy--onstage">
             {head}
             <Text className="lab__card-desc">{feature.desc}</Text>
             <View className="lab__card-progress">
@@ -327,9 +351,7 @@ export default function Lab() {
 
     if (showViewer && status?.completed) {
       return (
-        <View className="lab__card-copy lab__card-copy--wide">
-          {head}
-          <Text className="lab__card-desc">{feature.desc}</Text>
+        <>
           <View className="lab__card-viewer">
             <BodyViewer
               key={status.completed.id}
@@ -338,13 +360,17 @@ export default function Lab() {
               badgeText={viewerBadge(status.completed)}
             />
           </View>
-          <View
-            className={`lab__card-btn pressable ${busy ? 'lab__card-btn--busy' : ''}`}
-            onClick={() => void generate()}
-          >
-            <Text>{busy ? '正在生成…' : LAB_COPY.regenerate}</Text>
+          <View className="lab__card-copy lab__card-copy--onstage">
+            {head}
+            <Text className="lab__card-desc">{feature.desc}</Text>
+            <PrimaryButton
+              text={busy ? LAB_COPY.generating : LAB_COPY.regenerate}
+              loading={busy}
+              tone="onDark"
+              onClick={() => void generate()}
+            />
           </View>
-        </View>
+        </>
       )
     }
 
@@ -363,16 +389,16 @@ export default function Lab() {
 
     return (
       <>
-        <SourceImage className="lab__card-img" reference={{ slug: feature.slug, variant: 'full' }} anchor="top" />
-        <View className="lab__card-copy">
+        <StagePreview slug={feature.slug} />
+        <View className="lab__card-copy lab__card-copy--onstage">
           {head}
           <Text className="lab__card-desc">{feature.desc}</Text>
-          <View
-            className={`lab__card-btn pressable ${busy ? 'lab__card-btn--busy' : ''}`}
+          <PrimaryButton
+            text={busy ? LAB_COPY.generating : LAB_COPY.generate}
+            loading={busy}
+            tone="onDark"
             onClick={() => void generate()}
-          >
-            <Text>{busy ? '正在生成…' : LAB_COPY.generate}</Text>
-          </View>
+          />
         </View>
       </>
     )
@@ -386,29 +412,33 @@ export default function Lab() {
           <Text className="lab__title">这里放「哇塞」，不打断核心流程</Text>
         </View>
         {FEATURES.map((feature, i) => {
-          const wide = feature.key === '3d' && (showViewer || showError || showEmpty || showLoadError)
+          const stageCard = feature.key === '3d' && useStage
+          const wide = feature.key === '3d' && (stageCard || showViewer || showError || showEmpty || showLoadError)
           return (
-          <View key={feature.key} className={`lab__card card ${wide ? 'lab__card--wide' : ''} ${enter((i + 1) as 1 | 2 | 3)}`}>
-            {feature.key === '3d' ? (
-              render3d(feature)
-            ) : (
-              <>
-                <SourceImage className="lab__card-img" reference={{ slug: feature.slug, variant: 'full' }} anchor="top" />
-                <View className="lab__card-copy">
-                  <View className="lab__card-head">
-                    <Text className="lab__card-name">{feature.name}</Text>
-                    <Text className={`lab__card-status ${feature.status === '内测' ? 'lab__card-status--live' : ''}`}>
-                      {waitlisted.includes(feature.key) ? '已预约' : feature.status}
-                    </Text>
+            <View
+              key={feature.key}
+              className={`lab__card card ${stageCard ? 'card--hero lab__card--stage' : ''} ${wide ? 'lab__card--wide' : ''} ${enter((i + 1) as 1 | 2 | 3)}`}
+            >
+              {feature.key === '3d' ? (
+                render3d(feature)
+              ) : (
+                <>
+                  <SourceImage className="lab__card-img" reference={{ slug: feature.slug, variant: 'full' }} anchor="top" />
+                  <View className="lab__card-copy">
+                    <View className="lab__card-head">
+                      <Text className="lab__card-name">{feature.name}</Text>
+                      <Text className={`lab__card-status ${feature.status === '内测' ? 'lab__card-status--live' : ''}`}>
+                        {waitlisted.includes(feature.key) ? '已预约' : feature.status}
+                      </Text>
+                    </View>
+                    <Text className="lab__card-desc">{feature.desc}</Text>
+                    <View className="lab__card-btn pressable" onClick={() => act(feature)}>
+                      <Text>{feature.status === '内测' ? '了解进展' : '预约体验'}</Text>
+                    </View>
                   </View>
-                  <Text className="lab__card-desc">{feature.desc}</Text>
-                  <View className="lab__card-btn pressable" onClick={() => act(feature)}>
-                    <Text>{feature.status === '内测' ? '了解进展' : '预约体验'}</Text>
-                  </View>
-                </View>
-              </>
-            )}
-          </View>
+                </>
+              )}
+            </View>
           )
         })}
       </View>

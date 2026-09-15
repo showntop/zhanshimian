@@ -1,5 +1,6 @@
-// body-orbit Lite：先播环绕视频，再拖转盘看静帧；满 8 帧才出对比滑杆。
+// body-orbit Lite：舞台上先播一圈，再拖静帧；满 8 帧且非 Demo 才出对比。
 import { useMemo, useRef, useState } from 'react'
+import Taro from '@tarojs/taro'
 import { Image, Text, Video, View } from '@tarojs/components'
 import type { CommonEvent, ITouchEvent } from '@tarojs/components'
 import { LAB_COPY, lookImage, lookVideo, type BodyPresentation, type DisplayMedia } from '@zsm/core'
@@ -15,7 +16,28 @@ interface BodyViewerProps {
   badgeText: string
 }
 
-const FRAME_STEP_PX = 18
+const FRAME_STEP_PX = 16
+
+function angleLabel(yaw: number): string {
+  const y = ((yaw % 360) + 360) % 360
+  if (y < 45 || y >= 315) return LAB_COPY.angleFront
+  if (y < 135) return LAB_COPY.angleLeft
+  if (y < 225) return LAB_COPY.angleBack
+  return LAB_COPY.angleRight
+}
+
+function wrapIndex(raw: number, length: number): number {
+  if (length <= 0) return 0
+  return ((raw % length) + length) % length
+}
+
+function tapHaptic() {
+  try {
+    Taro.vibrateShort({ type: 'light' })
+  } catch {
+    /* 部分基础库无短振 */
+  }
+}
 
 export default function BodyViewer({ presentation, bodyMedia, badgeText }: BodyViewerProps) {
   const video = lookVideo(presentation.orbit.video_url)
@@ -31,72 +53,152 @@ export default function BodyViewer({ presentation, bodyMedia, badgeText }: BodyV
     video ? 'video' : frames.length >= 1 ? 'turntable' : 'turntable',
   )
   const [index, setIndex] = useState(0)
-  const touchStartRef = useRef({ x: 0, index: 0 })
+  const [dragging, setDragging] = useState(false)
+  const touchRef = useRef({ x: 0, leftover: 0 })
 
-  const onVideoTouchStart = () => {
+  const setFrame = (next: number, haptic: boolean) => {
+    setIndex((prev) => {
+      const normalized = wrapIndex(next, frames.length)
+      if (normalized === prev) return prev
+      if (haptic) tapHaptic()
+      return normalized
+    })
+  }
+
+  const enterTurntable = () => {
     setMode('turntable')
+    setDragging(false)
   }
 
   const onTurntableTouchStart = (e: CommonEvent) => {
     const touch = (e as unknown as ITouchEvent).touches[0]
     if (!touch) return
-    touchStartRef.current = { x: touch.clientX, index }
+    touchRef.current = { x: touch.clientX, leftover: 0 }
+    setDragging(true)
   }
 
   const onTurntableTouchMove = (e: CommonEvent) => {
     if (frames.length === 0) return
     const touch = (e as unknown as ITouchEvent).touches[0]
     if (!touch) return
-    const deltaX = touch.clientX - touchStartRef.current.x
-    const steps = Math.floor(Math.abs(deltaX) / FRAME_STEP_PX)
-    if (steps === 0) return
-    const dir = deltaX >= 0 ? -1 : 1
-    const raw = touchStartRef.current.index + dir * steps
-    const normalized = ((raw % frames.length) + frames.length) % frames.length
-    if (normalized !== index) setIndex(normalized)
+    const dx = touch.clientX - touchRef.current.x
+    touchRef.current.x = touch.clientX
+    let leftover = touchRef.current.leftover + dx
+    let steps = 0
+    while (leftover <= -FRAME_STEP_PX) {
+      leftover += FRAME_STEP_PX
+      steps += 1
+    }
+    while (leftover >= FRAME_STEP_PX) {
+      leftover -= FRAME_STEP_PX
+      steps -= 1
+    }
+    touchRef.current.leftover = leftover
+    if (steps !== 0) {
+      setIndex((prev) => {
+        const next = wrapIndex(prev + steps, frames.length)
+        if (next === prev) return prev
+        tapHaptic()
+        return next
+      })
+    }
   }
 
-  const isDemo = (presentation.provider_version ?? '').toLowerCase().startsWith('demo')
+  const onTurntableTouchEnd = () => {
+    setDragging(false)
+  }
+
+  // 演示判定只认服务端投影的 source_kind（红线：不按 provider_version 推断）。
+  const isDemo = presentation.source_kind === 'demo_example'
   const showVideo = mode === 'video' && Boolean(video)
   const showTurntable = !showVideo && frames.length > 0
   const showCompare = !isDemo && frames.length >= 8
   const showNoCompareHint = Boolean(video) && frames.length === 0
+  const canSteer = showTurntable && frames.length > 1
   const activeFrame = showTurntable ? frames[index] : null
   const compareFrame = showCompare ? frames[0] : null
 
   return (
     <View className="body-viewer">
-      <View className="body-viewer__stage">
-        {showVideo ? (
-          <Video
-            className="body-viewer__video"
-            src={video}
-            muted
-            autoplay
-            controls={false}
-            showCenterPlayBtn={false}
-            objectFit="contain"
-            onEnded={() => setMode('turntable')}
-            onTouchStart={onVideoTouchStart}
-          />
-        ) : null}
-        {showTurntable && activeFrame ? (
+      <View className={`body-viewer__stage ${dragging ? 'body-viewer__stage--dragging' : ''}`}>
+        <View className="body-viewer__glow" />
+        <View className="body-viewer__spot" />
+        <View className="body-viewer__ring" />
+        <View className="body-viewer__floor" />
+
+        <View className="body-viewer__figure">
+          {frames.length > 0 ? (
+            <View className={`body-viewer__turntable ${showTurntable ? 'body-viewer__turntable--on' : ''}`}>
+              {frames.map((frame, i) => (
+                <Image
+                  key={`${frame.yaw}-${frame.url}`}
+                  className={`body-viewer__frame ${showTurntable && i === index ? 'body-viewer__frame--on' : ''}`}
+                  src={frame.url}
+                  mode="aspectFit"
+                  lazyLoad={false}
+                />
+              ))}
+            </View>
+          ) : null}
+          {showVideo ? (
+            <Video
+              className="body-viewer__video"
+              src={video}
+              muted
+              autoplay
+              controls={false}
+              showCenterPlayBtn={false}
+              showPlayBtn={false}
+              showFullscreenBtn={false}
+              showProgress={false}
+              enableProgressGesture={false}
+              objectFit="contain"
+              onEnded={enterTurntable}
+              onError={enterTurntable}
+              onTouchStart={enterTurntable}
+            />
+          ) : null}
+        </View>
+
+        {showTurntable ? (
           <View
-            className="body-viewer__turntable"
+            className="body-viewer__pad"
             onTouchStart={onTurntableTouchStart}
             onTouchMove={onTurntableTouchMove}
+            onTouchEnd={onTurntableTouchEnd}
+            onTouchCancel={onTurntableTouchEnd}
             catchMove
+          />
+        ) : null}
+
+        {canSteer ? (
+          <View
+            className="body-viewer__steer body-viewer__steer--prev pressable"
+            ariaRole="button"
+            ariaLabel={LAB_COPY.prevAngle}
+            onClick={() => setFrame(index - 1, true)}
           >
-            <Image
-              key={`${activeFrame.yaw}-${activeFrame.url}`}
-              className="body-viewer__frame"
-              src={activeFrame.url}
-              mode="aspectFit"
-              lazyLoad={false}
-            />
+            <Text className="body-viewer__steer-mark">‹</Text>
           </View>
         ) : null}
+        {canSteer ? (
+          <View
+            className="body-viewer__steer body-viewer__steer--next pressable"
+            ariaRole="button"
+            ariaLabel={LAB_COPY.nextAngle}
+            onClick={() => setFrame(index + 1, true)}
+          >
+            <Text className="body-viewer__steer-mark">›</Text>
+          </View>
+        ) : null}
+
         {badgeText ? <Text className="example-badge body-viewer__badge">{badgeText}</Text> : null}
+        {activeFrame ? <Text className="body-viewer__angle">{angleLabel(activeFrame.yaw)}</Text> : null}
+        {showTurntable ? (
+          <Text className={`body-viewer__hint ${dragging ? 'body-viewer__hint--quiet' : ''}`}>
+            {LAB_COPY.dragHint}
+          </Text>
+        ) : null}
       </View>
 
       {showCompare && compareFrame ? (
@@ -115,7 +217,7 @@ export default function BodyViewer({ presentation, bodyMedia, badgeText }: BodyV
       ) : null}
 
       {showNoCompareHint ? (
-        <Text className="body-viewer__hint">{LAB_COPY.noCompare}</Text>
+        <Text className="body-viewer__note">{LAB_COPY.noCompare}</Text>
       ) : null}
     </View>
   )
