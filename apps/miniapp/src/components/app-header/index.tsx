@@ -14,6 +14,8 @@ interface AppHeaderProps {
   title?: string
   back?: boolean
   transparent?: boolean
+  /** 满出血页用：半透明毛玻璃栏悬浮在内容上，不留同高占位（内容从屏幕顶开始）。 */
+  overlay?: boolean
   onBack?: () => void
   right?: React.ReactNode
 }
@@ -50,7 +52,7 @@ export function getNavMetrics() {
   return measureNav()
 }
 
-export default function AppHeader({ title, back, transparent, onBack, right }: AppHeaderProps) {
+export default function AppHeader({ title, back, transparent, overlay, onBack, right }: AppHeaderProps) {
   const [nav, setNav] = useState(measureNav)
 
   useEffect(() => {
@@ -72,7 +74,7 @@ export default function AppHeader({ title, back, transparent, onBack, right }: A
   return (
     <View className="app-header-wrap">
       <View
-        className={`app-header ${transparent ? 'app-header--transparent' : ''}`}
+        className={`app-header ${transparent || overlay ? 'app-header--transparent' : ''}`}
         style={{
           paddingTop: `${nav.statusBar}px`,
           height: `${nav.navHeight}px`,
@@ -106,7 +108,7 @@ export default function AppHeader({ title, back, transparent, onBack, right }: A
           <View className="app-header__right">{right}</View>
         </View>
       </View>
-      <View className="app-header-spacer" style={{ height: `${nav.navHeight}px` }} />
+      {!overlay ? <View className="app-header-spacer" style={{ height: `${nav.navHeight}px` }} /> : null}
     </View>
   )
 }

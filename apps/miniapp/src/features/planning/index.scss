@@ -460,7 +460,8 @@
   display: flex;
   flex-direction: column;
   gap: 28rpx;
-  padding-top: 20rpx;
+  // overlay 导航：hero 照片从屏幕顶开始，导航悬浮在照片上（占位已由 AppHeader 去掉）
+  padding-top: 0;
 
   &__hero {
     display: flex;
@@ -468,14 +469,16 @@
     gap: 16rpx;
   }
 
+  // 全出血照片框：顶到状态栏、左右贴屏幕边，只留底部圆角；
+  // 内容其余部分仍在 page gutter 里，滚动后从毛玻璃导航下穿过。
   &__frame {
     position: relative;
     width: 100%;
-    height: 760rpx;
-    border-radius: var(--radius-lg);
+    height: 820rpx;
+    margin: 0 calc(-1 * var(--page-gutter));
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
     overflow: hidden;
     background: var(--moss-soft);
-    border: 1rpx solid var(--line);
   }
 
   &__img {

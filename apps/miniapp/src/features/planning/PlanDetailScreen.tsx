@@ -15,6 +15,7 @@ import RenderState from '../../components/render-state'
 import SourceImage from '../../components/source-image'
 import CompareSlider from '../../components/compare-slider'
 import PrimaryButton from '../../components/primary-button'
+import { getNavMetrics } from '../../components/app-header'
 import { boundBodyMedia, sortedVariants, stepActionText, stepDetailLines, variantRenderView } from './model'
 import './index.scss'
 
@@ -23,6 +24,11 @@ const CATEGORIES = [
   { key: 'makeup', label: '妆容' },
   { key: 'outfit', label: '穿搭' },
 ] as const
+
+// 页面用 overlay 导航（照片顶到屏幕顶）：错误态没有 hero，要自己让出导航高度。
+// px 计算是 rpx 规约的显式例外（与方案 tab hero 同一做法，基于真机测量）。
+const NAV = getNavMetrics()
+const ERROR_TOP_PX = NAV.navHeight + 24
 
 interface PlanDetailScreenProps {
   planSetId: string
@@ -109,21 +115,25 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
 
   if (failed && !planSet) {
     return (
-      <ErrorState
-        title={PLAN_DETAIL_COPY.loadFailed}
-        retryText={ERROR_COPY.retryAction}
-        onRetry={() => void load()}
-      />
+      <View style={{ paddingTop: `${ERROR_TOP_PX}px` }}>
+        <ErrorState
+          title={PLAN_DETAIL_COPY.loadFailed}
+          retryText={ERROR_COPY.retryAction}
+          onRetry={() => void load()}
+        />
+      </View>
     )
   }
 
   if (!variant || !render || !planSetId || !variantId) {
     return (
-      <ErrorState
-        title={PLAN_DETAIL_COPY.loadFailed}
-        retryText={ERROR_COPY.retryAction}
-        onRetry={() => void load()}
-      />
+      <View style={{ paddingTop: `${ERROR_TOP_PX}px` }}>
+        <ErrorState
+          title={PLAN_DETAIL_COPY.loadFailed}
+          retryText={ERROR_COPY.retryAction}
+          onRetry={() => void load()}
+        />
+      </View>
     )
   }
 

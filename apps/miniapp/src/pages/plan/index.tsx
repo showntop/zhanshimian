@@ -16,7 +16,7 @@ export default function PlanDetail() {
 
   return (
     <View className={pageClass}>
-      <AppHeader title={PLAN_DETAIL_COPY.title} back />
+      <AppHeader title={PLAN_DETAIL_COPY.title} back overlay />
       {ids ? <PlanDetailScreen planSetId={ids.planSetId} variantId={ids.variantId} /> : null}
     </View>
   )
