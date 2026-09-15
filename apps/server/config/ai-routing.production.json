@@ -81,22 +81,6 @@
       ],
       "data_retention": "zero"
     },
-    "volcengine/seedream-4.5": {
-      "vendor": "volcengine",
-      "protocol": "ark_image",
-      "model": "doubao-seedream-4-5-251128",
-      "base_url": "https://ark.cn-beijing.volces.com/api/v3",
-      "api_key_env": "VOLCENGINE_API_KEY",
-      "timeout_seconds": 180,
-      "output_image_cost": 0.25,
-      "max_input_images": 2,
-      "supports_multiple_reference_images": true,
-      "identity_preservation": true,
-      "output_mime_types": [
-        "image/jpeg"
-      ],
-      "data_retention": "zero"
-    },
     "demo/body-orbit": {
       "vendor": "demo",
       "protocol": "demo_orbit",
@@ -164,10 +148,6 @@
     "full_look_generation": {
       "policy": "balanced",
       "primary": "aliyun/wan2.7-image-pro",
-      "fallbacks": [
-        "volcengine/seedream-4.5"
-      ],
-      "max_switches": 1,
       "max_cost_cny": 0.6
     },
     "render_quality_evaluation": {
