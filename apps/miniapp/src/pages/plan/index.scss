@@ -1,0 +1,18 @@
+// 方案详情页外壳：照片铺满整屏，导航透明浮在画面上（顶部渐变遮罩压标题）。
+.page--plan {
+  height: 100vh;
+  overflow: hidden;
+  padding: 0;
+  background: var(--ink);
+
+  .app-header-spacer {
+    margin-bottom: 0;
+    height: 0 !important;
+  }
+
+  .app-header--transparent {
+    background: linear-gradient(180deg, rgba(244, 245, 242, 0.82) 0%, rgba(244, 245, 242, 0) 100%);
+    border-bottom-color: transparent;
+    backdrop-filter: none;
+  }
+}

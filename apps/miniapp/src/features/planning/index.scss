@@ -456,73 +456,152 @@
 }
 
 // ---------- 方案详情 ----------
-.plan-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 28rpx;
-  // overlay 导航：hero 照片从屏幕顶开始，导航悬浮在照片上（占位已由 AppHeader 去掉）
-  padding-top: 0;
+// 旧线（recovery/ui-0911）全屏沉浸视觉：照片铺满整屏，内容板从底部奶油渐变
+// 融进画面；步骤列表比旧线长（全量），收进板内 ScrollView。
+// 加载中/错误态的浅色整屏盖层（本页外壳是黑底沉浸页，状态组件不压照片）。
+.pd-plain {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  padding: 40rpx var(--page-gutter) 0;
+  background: var(--bg);
+}
+
+.pd {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
 
   &__hero {
+    position: absolute;
+    inset: 0;
+
+    &-frame {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--ink);
+
+      .cmp {
+        border-radius: 0;
+        background: var(--ink);
+      }
+
+      // 对比标签移到导航下方，不压底部内容板
+      .cmp__label {
+        top: calc(var(--pd-nav) + 12rpx);
+        bottom: auto;
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+        color: #ffffff;
+        font-size: 20rpx;
+        text-shadow: 0 2rpx 10rpx rgba(24, 28, 22, 0.45);
+      }
+
+      // SourceImage 填满对比层，去自身圆角（外层统一裁切）
+      .pd__hero-img {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+      }
+
+      // 生成图角标钉在导航下方右侧
+      .pd__hero-img .example-badge {
+        top: calc(var(--pd-nav) + 12rpx);
+        right: 24rpx;
+        bottom: auto;
+      }
+    }
+
+    &-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    &-empty-text {
+      font-size: 26rpx;
+      color: rgba(244, 245, 242, 0.72);
+    }
+  }
+
+  // 底部内容板：140rpx 透明渐起步，照片从这里融进奶油底；
+  // 板内三段——头（方案名+tab）、步骤 ScrollView（自适应可滑）、脚（CTA 常驻）
+  &__board {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 4;
     display: flex;
     flex-direction: column;
     gap: 16rpx;
-  }
-
-  // 全出血照片框：顶到状态栏、左右贴屏幕边，只留底部圆角；
-  // 内容其余部分仍在 page gutter 里，滚动后从毛玻璃导航下穿过。
-  &__frame {
-    position: relative;
-    width: 100%;
-    height: 820rpx;
-    margin: 0 calc(-1 * var(--page-gutter));
-    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-    overflow: hidden;
-    background: var(--moss-soft);
-  }
-
-  &__img {
-    width: 100%;
-    height: 100%;
-  }
-
-  &__frame-empty {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  &__frame-empty-text {
-    font-size: 26rpx;
-    color: var(--ink-2);
+    max-height: 76%;
+    padding: 140rpx var(--page-gutter) calc(20rpx + env(safe-area-inset-bottom));
+    background: linear-gradient(
+      180deg,
+      rgba(244, 245, 242, 0) 0%,
+      rgba(244, 245, 242, 0.45) 120rpx,
+      rgba(244, 245, 242, 0.9) 260rpx,
+      var(--bg) 400rpx
+    );
   }
 
   &__render-state {
     width: 100%;
   }
 
-  &__bound-note {
-    font-size: 22rpx;
-    text-align: center;
+  &__hint {
+    align-self: center;
+    font-size: 20rpx;
     color: var(--ink-3);
   }
 
-  &__board {
+  &__head {
     display: flex;
-    flex-direction: column;
-    gap: 18rpx;
-    padding: 28rpx;
-    border-radius: var(--radius-lg);
-    border: 1rpx solid var(--line);
-    background: var(--surface-strong);
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 20rpx;
   }
 
-  &__name {
-    font-size: 36rpx;
+  &__series {
+    flex-shrink: 0;
+    font-size: 30rpx;
     font-weight: 700;
     color: var(--ink);
+  }
+
+  &__tabs {
+    display: flex;
+    justify-content: flex-end;
+    gap: 28rpx;
+  }
+
+  &__tab {
+    padding: 4rpx 0;
+    font-size: 24rpx;
+    color: var(--ink-3);
+
+    &--active {
+      color: var(--ink);
+      font-weight: 600;
+      box-shadow: inset 0 -3rpx 0 var(--moss);
+    }
+  }
+
+  // 步骤区：板内唯一滚动容器，吃满头部与脚部之间的剩余高度
+  // （height:0 + flex 是微信 ScrollView 在弹性列里拿确定高度的既成写法，同 adv__list）
+  &__steps {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
   }
 
   &__desc {
@@ -540,24 +619,6 @@
     background: var(--moss-soft);
   }
 
-  &__tabs {
-    display: flex;
-    gap: 24rpx;
-    padding-top: 6rpx;
-  }
-
-  &__tab {
-    padding: 8rpx 4rpx;
-    font-size: 27rpx;
-    color: var(--ink-2);
-  }
-
-  &__tab--active {
-    font-weight: 700;
-    color: var(--ink);
-    border-bottom: 4rpx solid var(--moss);
-  }
-
   &__step {
     display: flex;
     flex-direction: column;
@@ -565,6 +626,7 @@
     padding: 20rpx;
     border-radius: var(--radius-md);
     border: 1rpx solid var(--line);
+    background: var(--surface-strong);
   }
 
   &__step-head {
@@ -627,18 +689,28 @@
     color: var(--ink-3);
   }
 
-  &__cta {
+  &__foot {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 14rpx;
-    padding-top: 10rpx;
+    gap: 10rpx;
+    padding-top: 4rpx;
+
+    .primary-button {
+      align-self: stretch;
+    }
   }
 
   &__feedback-entry {
     font-size: 25rpx;
     color: var(--ink-2);
     text-decoration: underline;
+  }
+
+  &__bound-note {
+    font-size: 22rpx;
+    text-align: center;
+    color: var(--ink-3);
   }
 }
 

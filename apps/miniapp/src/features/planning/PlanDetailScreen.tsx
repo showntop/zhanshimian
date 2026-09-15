@@ -1,8 +1,13 @@
-// 方案详情：对比左图严格来自方案集绑定的那一份报告，右图只用这一套自己的 render.media。
-// 渲染没就绪时给文字步骤与渲染状态，绝不拿旧图顶上——"上次那张"不是这次的证据。
+// 方案详情：旧线（recovery/ui-0911）全屏沉浸视觉在新数据模型上的恢复——
+// 照片铺满整屏、导航透明、底部奶油渐变内容板（可滑）叠在画面上。
+// 架构不让步的部分：
+// 1. 对比左图严格来自方案集绑定的那一份报告，右图只用这一套自己的 render.media；
+//    绑定不了就空态，绝不拿"手头最近一份报告"的照片凑对比；
+// 2. 渲染没就绪时给渲染状态条，绝不拿旧图顶上——"上次那张"不是这次的证据；
+// 3. 步骤是全量列表（旧线只摆当前分类第一条），收进底部板内滑动。
 import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
-import { Text, View } from '@tarojs/components'
+import { ScrollView, Text, View } from '@tarojs/components'
 import { ERROR_COPY, CHECKLIST_COPY, PLANNING_COPY, PLANS_COPY, PLAN_DETAIL_COPY, SOURCE_IMAGE_COPY, planSlotLabel } from '@zsm/core'
 import type { PlanSet, PlanStep, Report } from '@zsm/core'
 import { qualityApi } from '../../app/api/quality'
@@ -12,6 +17,7 @@ import { selectAndCreateExecution } from '../execution/start'
 import GenerationFeedback from '../feedback/GenerationFeedback'
 import ErrorState from '../../components/error-state'
 import RenderState from '../../components/render-state'
+import Skeleton from '../../components/skeleton'
 import SourceImage from '../../components/source-image'
 import CompareSlider from '../../components/compare-slider'
 import PrimaryButton from '../../components/primary-button'
@@ -25,10 +31,9 @@ const CATEGORIES = [
   { key: 'outfit', label: '穿搭' },
 ] as const
 
-// 页面用 overlay 导航（照片顶到屏幕顶）：错误态没有 hero，要自己让出导航高度。
-// px 计算是 rpx 规约的显式例外（与方案 tab hero 同一做法，基于真机测量）。
+// 满屏相框的宽高比：SourceImage 顶对齐自动铺满据此在裁底/裁侧之间选择
 const NAV = getNavMetrics()
-const ERROR_TOP_PX = NAV.navHeight + 24
+const PLAN_FRAME_ASPECT = NAV.windowWidth / NAV.windowHeight
 
 interface PlanDetailScreenProps {
   planSetId: string
@@ -113,9 +118,10 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
     }
   }
 
+  // 加载中与错误态：盖一层浅色整屏（本页外壳是黑底沉浸页，状态组件不压照片）
   if (failed && !planSet) {
     return (
-      <View style={{ paddingTop: `${ERROR_TOP_PX}px` }}>
+      <View className="pd-plain">
         <ErrorState
           title={PLAN_DETAIL_COPY.loadFailed}
           retryText={ERROR_COPY.retryAction}
@@ -125,9 +131,17 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
     )
   }
 
+  if (!planSet) {
+    return (
+      <View className="pd-plain">
+        <Skeleton rows={5} />
+      </View>
+    )
+  }
+
   if (!variant || !render || !planSetId || !variantId) {
     return (
-      <View style={{ paddingTop: `${ERROR_TOP_PX}px` }}>
+      <View className="pd-plain">
         <ErrorState
           title={PLAN_DETAIL_COPY.loadFailed}
           retryText={ERROR_COPY.retryAction}
@@ -138,88 +152,84 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
   }
 
   return (
-    <View className="plan-detail">
-      <View className="plan-detail__hero fade-up">
-        <View className="plan-detail__frame">
+    <View className="pd" style={{ ['--pd-nav' as string]: `${NAV.navHeight}px` }}>
+      {/* 满屏 hero：ready 时拖动对比，未 ready 单图（左）+ 板上状态条 */}
+      <View className="pd__hero">
+        <View className="pd__hero-frame">
           {bindingError || !leftMedia ? (
-            <View className="plan-detail__frame-empty">
-              <Text className="plan-detail__frame-empty-text">
-                {SOURCE_IMAGE_COPY.userPhotoEmpty}
-              </Text>
+            <View className="pd__hero-empty">
+              <Text className="pd__hero-empty-text">{SOURCE_IMAGE_COPY.userPhotoEmpty}</Text>
             </View>
           ) : render.kind === 'ready' ? (
             <CompareSlider
-              current={<SourceImage className="plan-detail__img" media={leftMedia} mode="aspectFill" />}
-              plan={<SourceImage className="plan-detail__img" media={render.media} mode="aspectFill" />}
+              current={<SourceImage className="pd__hero-img" media={leftMedia} anchor="top" frameAspect={PLAN_FRAME_ASPECT} />}
+              plan={<SourceImage className="pd__hero-img" media={render.media} anchor="top" frameAspect={PLAN_FRAME_ASPECT} />}
               currentLabel={PLANNING_COPY.currentLabel}
               planLabel={PLANNING_COPY.planLabel}
             />
           ) : (
-            <SourceImage className="plan-detail__img" media={leftMedia} mode="aspectFill" />
+            <SourceImage className="pd__hero-img" media={leftMedia} anchor="top" frameAspect={PLAN_FRAME_ASPECT} />
           )}
         </View>
-        {/* 渲染没就绪：状态条独立于左图呈现，文字步骤照常可读 */}
+      </View>
+
+      {/* 底部奶油渐变内容板：渲染状态 + 方案名 + 分类 tab + 步骤（可滑）+ CTA */}
+      <View className="pd__board">
         {render.kind !== 'ready' ? (
-          <View className="plan-detail__render-state">
+          <View className="pd__render-state">
             <RenderState view={render} />
           </View>
         ) : null}
-        <Text className="plan-detail__bound-note">{PLANNING_COPY.boundNote}</Text>
-      </View>
 
-      <View className="plan-detail__board fade-up delay-1">
-        <Text className="plan-detail__name">{planSlotLabel(variant.name, variant.slot)}</Text>
-        <Text className="plan-detail__desc">{variant.descriptor}</Text>
-        {variant.rationale ? <Text className="plan-detail__why">{variant.rationale}</Text> : null}
+        <Text className="pd__hint">{PLAN_DETAIL_COPY.boardHint}</Text>
 
-        {categories.length > 0 ? (
-          <>
-            <View className="plan-detail__tabs">
+        <View className="pd__head">
+          <Text className="pd__series">{planSlotLabel(variant.name, variant.slot)}</Text>
+          {categories.length > 1 ? (
+            <View className="pd__tabs">
               {CATEGORIES.filter((cat) => categories.includes(cat.key)).map((cat) => (
                 <Text
                   key={cat.key}
-                  className={`plan-detail__tab ${activeCategory === cat.key ? 'plan-detail__tab--active' : ''}`}
+                  className={`pd__tab ${activeCategory === cat.key ? 'pd__tab--active' : ''}`}
                   onClick={() => setActiveCategory(cat.key)}
                 >
                   {cat.label}
                 </Text>
               ))}
             </View>
+          ) : null}
+        </View>
 
-            {steps.map((step) => (
-              <View key={step.id} className="plan-detail__step">
-                <View className="plan-detail__step-head">
-                  <Text
-                    className={`plan-detail__step-action plan-detail__step-action--${step.action}`}
-                  >
-                    {stepActionText(step)}
-                  </Text>
-                  <Text className="plan-detail__step-title">{step.title}</Text>
-                </View>
-                {step.summary ? (
-                  <Text className="plan-detail__step-summary">{step.summary}</Text>
-                ) : null}
-                {stepDetailLines(step).length > 0 ? (
-                  <View className="plan-detail__step-details">
-                    {stepDetailLines(step).map((line) => (
-                      <View key={line.label} className="plan-detail__step-detail">
-                        <Text className="plan-detail__step-detail-label">{line.label}</Text>
-                        <Text className="plan-detail__step-detail-value">{line.value}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
+        <ScrollView className="pd__steps" scrollY enhanced showScrollbar={false}>
+          {variant.descriptor ? <Text className="pd__desc">{variant.descriptor}</Text> : null}
+          {variant.rationale ? <Text className="pd__why">{variant.rationale}</Text> : null}
+          {steps.map((step) => (
+            <View key={step.id} className="pd__step">
+              <View className="pd__step-head">
+                <Text className={`pd__step-action pd__step-action--${step.action}`}>
+                  {stepActionText(step)}
+                </Text>
+                <Text className="pd__step-title">{step.title}</Text>
               </View>
-            ))}
-            {steps.length === 0 ? (
-              <Text className="plan-detail__empty-step">{PLAN_DETAIL_COPY.emptyStep}</Text>
-            ) : null}
-          </>
-        ) : (
-          <Text className="plan-detail__empty-step">{PLAN_DETAIL_COPY.emptyStep}</Text>
-        )}
+              {step.summary ? <Text className="pd__step-summary">{step.summary}</Text> : null}
+              {stepDetailLines(step).length > 0 ? (
+                <View className="pd__step-details">
+                  {stepDetailLines(step).map((line) => (
+                    <View key={line.label} className="pd__step-detail">
+                      <Text className="pd__step-detail-label">{line.label}</Text>
+                      <Text className="pd__step-detail-value">{line.value}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ))}
+          {steps.length === 0 ? (
+            <Text className="pd__empty-step">{PLAN_DETAIL_COPY.emptyStep}</Text>
+          ) : null}
+        </ScrollView>
 
-        <View className="plan-detail__cta">
+        <View className="pd__foot">
           <PrimaryButton
             text={PLANS_COPY.cta}
             loading={selecting}
@@ -228,8 +238,9 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
           {/* 反馈绑定用户真正看到的那张 publication；没发布就没有入口 */}
           <GenerationFeedback
             publicationId={variant.render.publication_id}
-            className="plan-detail__feedback-entry"
+            className="pd__feedback-entry"
           />
+          <Text className="pd__bound-note">{PLANNING_COPY.boundNote}</Text>
         </View>
       </View>
     </View>
