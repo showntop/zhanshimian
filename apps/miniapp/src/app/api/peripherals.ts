@@ -51,9 +51,10 @@ export const peripherals = {
   listHairstyles: (): Promise<HairStyle[]> =>
     client.GET('/v1/hairstyles').then(dataOrThrow),
 
-  /** 异步生成：返回受理信封，状态只通过公开 Operation 观察。 */
+  /** 异步生成：返回受理信封，状态只通过公开 Operation 观察。
+   *  正脸来源：media_id（显式上传）优先，缺省回退 report_id 档案正脸。 */
   createHairPreview: (input: {
-    media_id: string
+    media_id?: string
     style_id: string
     report_id?: string
     scene?: string

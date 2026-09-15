@@ -1,6 +1,6 @@
-// 发型预览：推荐列表 + 三种照片来源 + 受理后唯一轮询 + 原图/效果对比 + 保存。
-// 预览是异步受理（202 + 公开 Operation）；恢复不靠本地引用，先问服务端
-// /v1/hair-previews/active，端点异常才退回列表里找仍在生成中的那一份。
+// 发型设计：推荐列表 + 三种照片来源（档案正脸/现拍/示例）+ 受理后唯一轮询 +
+// 原图/效果对比 + 保存。预览是异步受理（202 + 公开 Operation）；恢复不靠本地
+// 引用，先问服务端 /v1/hair-previews/active，端点异常才退回列表里找仍在生成中的那一份。
 import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
@@ -116,24 +116,42 @@ export default function Hair() {
   }
 
   const [pendingPath, setPendingPath] = useState('')
+  // 档案正脸回退：服务端 create 支持 report_id 缺省 media_id（media_id 优先）。
+  // 这里只取 id；报告还没出或取不到时保持空串，走「先拍一张」引导。
+  const [reportId, setReportId] = useState('')
+
+  useEffect(() => {
+    void qualityApi
+      .getCurrentReport()
+      .then((report) => {
+        if (report) setReportId(report.id)
+      })
+      .catch(() => {})
+  }, [])
 
   const generate = async (demo = false) => {
     if (busy) return
     setBusy(true)
     try {
-      let mediaId: string
+      let mediaId: string | undefined
+      let fallbackReportId: string | undefined
       if (demo) {
         const media = await qualityApi.createDemoMedia('face', `hair-demo:${Date.now()}`)
         mediaId = media.asset_id
-      } else {
-        if (!pendingPath) {
-          Taro.showToast({ title: '先上传一张正脸照', icon: 'none' })
-          return
-        }
+      } else if (pendingPath) {
         const image = await readLocalImage(pendingPath)
         mediaId = (await uploadMedia(mediaUpload, image, 'face')).id
+      } else if (reportId) {
+        fallbackReportId = reportId
+      } else {
+        Taro.showToast({ title: '先拍一张正脸照', icon: 'none' })
+        return
       }
-      const accepted = await peripherals.createHairPreview({ media_id: mediaId, style_id: styleId })
+      const accepted = await peripherals.createHairPreview({
+        media_id: mediaId,
+        report_id: fallbackReportId,
+        style_id: styleId,
+      })
       resourceCache.write(resourceKey('operation', accepted.operation.id), accepted.operation)
       setPreview(accepted.data)
       setMode('source')
@@ -164,7 +182,7 @@ export default function Hair() {
 
   return (
     <View className={pageClass}>
-      <AppHeader title="发型预览" back />
+      <AppHeader title="发型设计" back />
       <View className="hair">
         <View className={`hair__hero photo-hero photo-hero--bleed ${enter()}`}>
           <View className="hair__hero-frame">
@@ -182,8 +200,10 @@ export default function Hair() {
             {preview && IN_FLIGHT.has(preview.state) ? (
               <View className="hair__mask">
                 <View className="scan-sweep" />
-                <View className="hair__mask-spin spinner" />
-                <Text className="hair__mask-text">正在生成预览</Text>
+                <View className="hair__mask-card">
+                  <View className="hair__mask-spin spinner" />
+                  <Text className="hair__mask-text">正在生成预览</Text>
+                </View>
               </View>
             ) : null}
             {mode === 'result' && hasResult && preview?.source_media ? (

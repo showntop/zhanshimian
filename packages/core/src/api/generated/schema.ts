@@ -2947,11 +2947,11 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description 正脸照媒体 ID */
-                    media_id: string;
+                    /** @description 正脸照媒体 ID（选填；与 report_id 至少其一。缺省时回退 report 关联档案正脸） */
+                    media_id?: string;
                     /** @description 发型 ID（来自 GET /v1/hairstyles） */
                     style_id: string;
-                    /** @description 关联报告（选填） */
+                    /** @description 关联报告（选填；media_id 缺省时作为正脸照来源） */
                     report_id?: string;
                     /** @description 场景（选填） */
                     scene?: string;

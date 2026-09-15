@@ -129,7 +129,7 @@ export const EMPTY_COPY = {
   today: { title: '今天还没有方案', body: '看看今天适合怎么穿，一分钟生成。', action: '生成今日方案' },
   wardrobe: { title: '衣橱还是空的', body: '拍两张单品照，让方案用上你已有的衣服。', action: '添加单品' },
   advisor: { title: '形象助手', body: '任何穿着上的疑问，直接问。', action: '开始提问' },
-  hair: { title: '还没有发型预览', body: '选一个推荐发型，看看上身效果。', action: '去挑发型' },
+  hair: { title: '还没有发型设计', body: '选一个推荐发型，看看上身效果。', action: '去挑发型' },
   history: { title: '暂无记录', body: '完成后会出现在这里。', action: '' }
 } as const
 
@@ -316,7 +316,7 @@ export const HOME_COPY = {
   toolsTitle: '直接解决眼前的一件事',
   // 首页工具卡（1 张发型主卡 + 2 张安静卡）；key 与页面路由表对应，路由不进文案
   tools: [
-    { key: 'hair', label: '发型预览', desc: '先看效果再决定', badge: '推荐' },
+    { key: 'hair', label: '发型设计', desc: '先看效果再决定', badge: '推荐' },
     { key: 'outfit', label: '穿搭诊断', desc: '只指出最值得改的一处', badge: '' },
     { key: 'purchase', label: '购买判断', desc: '买之前先看适不适合', badge: '' },
   ],
@@ -349,7 +349,7 @@ export const TASK_DONE_COPY = {
   assessment: '形象分析完成，去看看报告',
   planSet: '三套方案已生成，去看看',
   renderRun: '方案形象图已生成',
-  hairPreview: '发型预览已生成',
+  hairPreview: '发型设计已生成',
   todayPlan: '今日搭配图已生成',
   bodyOrbit: '3D 形象已生成',
   fallback: '任务已完成'

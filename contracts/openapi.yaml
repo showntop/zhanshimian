@@ -801,18 +801,17 @@ paths:
             schema:
               type: object
               required:
-              - media_id
               - style_id
               properties:
                 media_id:
                   type: string
-                  description: 正脸照媒体 ID
+                  description: 正脸照媒体 ID（选填；与 report_id 至少其一。缺省时回退 report 关联档案正脸）
                 style_id:
                   type: string
                   description: 发型 ID（来自 GET /v1/hairstyles）
                 report_id:
                   type: string
-                  description: 关联报告（选填）
+                  description: 关联报告（选填；media_id 缺省时作为正脸照来源）
                 scene:
                   type: string
                   description: 场景（选填）

@@ -37,19 +37,31 @@
     left: 20rpx;
   }
 
+  // 生成中不盖死照片：只留扫描光带（.scan-sweep）滑过可见的正脸照，
+  // 状态收进一张磨砂小卡（--glass 本来是面板色，整面铺会变成空白挡板）。
   &__mask {
     position: absolute;
     inset: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 20rpx;
-    background: var(--glass);
+    justify-content: flex-end;
+    padding-bottom: 32rpx;
+    pointer-events: none;
+
+    &-card {
+      display: flex;
+      align-items: center;
+      gap: 16rpx;
+      padding: 16rpx 32rpx;
+      border-radius: 999rpx;
+      background: var(--glass);
+      backdrop-filter: blur(24rpx);
+    }
 
     &-spin {
-      width: 48rpx;
-      height: 48rpx;
+      width: 32rpx;
+      height: 32rpx;
       border-width: 4rpx;
     }
 
