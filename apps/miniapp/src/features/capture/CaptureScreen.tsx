@@ -20,6 +20,7 @@ import {
 } from '@zsm/core'
 import { uploadMedia } from '../../app/api/media-upload'
 import { mediaUpload } from '../../app/api/client'
+import { PublicApiError } from '../../app/api/result'
 import { qualityApi } from '../../app/api/quality'
 import { submitAssessment, assessmentSubmitErrorText } from '../assessment/start'
 import PrimaryButton from '../../components/primary-button'
@@ -113,7 +114,13 @@ export default function CaptureScreen() {
       const asset = await uploadMedia(mediaUpload, file, role)
       patch(role, { phase: 'ready', media: localPreview(role, filePath, asset.id), errorText: '' })
       return true
-    } catch {
+    } catch (error) {
+      // 真机排障依赖 vConsole：保留原始错误（域名 600002 / 签名 403 / sha256 不支持在此区分）。
+      // Error 对象在 vConsole 只显示 message，PublicApiError 的 code/statusCode 要展开打印。
+      const detail = error instanceof PublicApiError
+        ? `${error.code} status=${error.statusCode} req=${error.requestId || '-'}`
+        : error
+      console.warn('[capture] ingest failed', role, detail)
       // 保留 localPath 与 errorText：用户点"重试"是重传这一份，不必再拍一次
       patch(role, { phase: 'failed', errorText: CAPTURE_COPY.slotFailed })
       return false

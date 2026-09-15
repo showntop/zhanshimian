@@ -9,14 +9,15 @@ import AssessmentScreen from '../../features/assessment/AssessmentScreen'
 
 export default function Analysis() {
   const pageClass = usePageClass(true)
-  const [ids, setIds] = useState({ assessmentId: '', operationId: '' })
+  // 路由参数在 useLoad 前是空的：未到位前不渲染 Screen，否则挂载效应会拿空 id 误判跳走。
+  const [ids, setIds] = useState<{ assessmentId: string; operationId: string } | null>(null)
 
   useLoad((options) => { setIds({ assessmentId: options?.assessment_id ?? '', operationId: options?.operation_id ?? '' }) })
 
   return (
     <View className={pageClass}>
       <AppHeader title={ASSESSMENT_COPY.headerTitle} back={false} />
-      <AssessmentScreen assessmentId={ids.assessmentId} operationId={ids.operationId} />
+      {ids ? <AssessmentScreen assessmentId={ids.assessmentId} operationId={ids.operationId} /> : null}
     </View>
   )
 }

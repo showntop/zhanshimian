@@ -158,6 +158,8 @@ export const mediaUpload: MediaUploadPort = {
       timeout: 30000,
     })
     if (res.statusCode < 200 || res.statusCode >= 300) {
+      // 真机排障：COS 的错误体（XML）里才有 SignatureDoesNotMatch 这类具体原因
+      console.warn('[upload] putObject rejected', res.statusCode, typeof res.data === 'string' ? res.data.slice(0, 500) : res.data)
       throw new PublicApiError('upload_failed', ERROR_COPY.uploadFailed, res.statusCode, '', true)
     }
   },

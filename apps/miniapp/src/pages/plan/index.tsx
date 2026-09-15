@@ -9,14 +9,15 @@ import PlanDetailScreen from '../../features/planning/PlanDetailScreen'
 
 export default function PlanDetail() {
   const pageClass = usePageClass(true)
-  const [ids, setIds] = useState({ planSetId: '', variantId: '' })
+  // 路由参数在 useLoad 前是空的：未到位前不渲染 Screen，否则挂载效应会拿空 id 误判跳走。
+  const [ids, setIds] = useState<{ planSetId: string; variantId: string } | null>(null)
 
   useLoad((options) => { setIds({ planSetId: options?.plan_set_id ?? '', variantId: options?.variant_id ?? '' }) })
 
   return (
     <View className={pageClass}>
       <AppHeader title={PLAN_DETAIL_COPY.title} back />
-      <PlanDetailScreen planSetId={ids.planSetId} variantId={ids.variantId} />
+      {ids ? <PlanDetailScreen planSetId={ids.planSetId} variantId={ids.variantId} /> : null}
     </View>
   )
 }
