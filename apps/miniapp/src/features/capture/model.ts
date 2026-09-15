@@ -91,6 +91,25 @@ export function photosByRole(slots: CaptureSlots): PhotosByRole {
 }
 
 /**
+ * 批量补齐的选择数量：相机模式一次拍摄只返回 1 个临时文件
+ * （count 写多大微信都只给一张），多写只会换来误报；相册模式才允许多选。
+ */
+export function batchChooseCount(source: 'camera' | 'album', missingCount: number): number {
+  return source === 'camera' ? Math.min(1, missingCount) : missingCount
+}
+
+/**
+ * 实际返回的文件要填进哪些缺槽：按顺序填充，没回到文件的槽保持原状——
+ * 用户少选/只拍了一张不是那些槽的失败，不许给它们记 false。
+ */
+export function batchAssignmentRoles(
+  missing: readonly CaptureRole[],
+  fileCount: number,
+): readonly CaptureRole[] {
+  return missing.slice(0, Math.max(0, fileCount))
+}
+
+/**
  * Demo 拉取失败时的槽位恢复：进 demo 流程前的槽快照 → 失败后该落回的样子。
  * 之前有 ready 照片就原样回去（媒体与本地路径都还在，与 pick 的 revertTo 同一语义）；
  * 本来就没照片的槽才回 empty。直接清整槽的代价是：用户已有真实照片时，

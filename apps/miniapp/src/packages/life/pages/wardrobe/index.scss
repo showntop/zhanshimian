@@ -50,6 +50,7 @@
     background: var(--surface-strong); font-size: 22rpx; color: var(--ink);
   }
   &__outfit-wear { font-size: 22rpx; color: var(--moss); text-decoration: underline; }
+  &__outfit-empty { font-size: 22rpx; color: var(--moss); text-decoration: underline; }
 
   &__form { display: flex; flex-direction: column; gap: 20rpx; }
   &__form-photo {

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
-import { trackEvent, type WardrobeItem, type WardrobeOutfit } from '@zsm/core'
+import { trackEvent, WARDROBE_COPY, type WardrobeItem, type WardrobeOutfit } from '@zsm/core'
 import { usePageShell } from '../../../../hooks/use-page-visibility'
 import { peripherals } from '../../../../app/api/peripherals'
 import { mediaUpload } from '../../../../app/api/client'
@@ -204,11 +204,18 @@ export default function Wardrobe() {
                 <View className="wd__outfit-card">
                   <Text className="wd__outfit-title">{outfit.title}</Text>
                   <Text className="wd__outfit-note">{outfit.note}</Text>
-                  <View className="wd__outfit-items">
-                    {outfit.items.map((item) => (
-                      <Text key={item.id} className="wd__outfit-item">{item.name}</Text>
-                    ))}
-                  </View>
+                  {/* items 已在 api 边界归一（服务端可下发 null）；空组合给出下一步动作 */}
+                  {outfit.items.length > 0 ? (
+                    <View className="wd__outfit-items">
+                      {outfit.items.map((item) => (
+                        <Text key={item.id} className="wd__outfit-item">{item.name}</Text>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text className="wd__outfit-empty pressable" onClick={() => setAdding(true)}>
+                      {WARDROBE_COPY.outfitEmpty}
+                    </Text>
+                  )}
                   <Text className="wd__outfit-wear pressable" onClick={wear}>
                     {outfit.worn ? '已记录今天穿过' : '记录今天穿了'}
                   </Text>

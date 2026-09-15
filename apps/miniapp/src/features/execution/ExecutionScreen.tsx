@@ -4,7 +4,9 @@
 // 1. 乐观状态只在本地活着——服务端响应一到就整体替换，不做字段合并；
 // 2. version 冲突（409/412）先拉最新覆盖本地，再让用户重试，本地绝不"合并出"一个
 //    服务端没见过的版本；
-// 3. 网络失败回滚，但保留同一个 client_event_id——重试是同一笔事件，不是第二次勾选。
+// 3. 网络失败回滚，但保留同一个事件草稿（client_event_id + occurred_at 一起冻结）——
+//    重试是同一笔事件的原样重放，occurred_at 变一个字节都会被幂等层拦成 409；
+//    400 这类永久失败则丢掉草稿：重试同一笔必然再败，再点是一次新事件。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
@@ -18,12 +20,14 @@ import {
   allStepsDone,
   canSubmitExecutionFeedback,
   completedEventBody,
-  createClientEventId,
+  createEventDraft,
   executionEventBody,
   ifMatchVersion,
   isEventConflict,
+  isNetworkFailure,
   replaceExecutionFromServer,
   toggleStepLocal,
+  type ExecutionEventDraft,
 } from './model'
 import './index.scss'
 
@@ -39,8 +43,10 @@ export default function ExecutionScreen({ executionId }: ExecutionScreenProps) {
   )
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
-  // 网络失败后保留的 client_event_id：重试同一笔事件，而不是再勾一次
-  const pendingEventId = useRef<Record<string, string>>({})
+  // 网络失败后保留的事件草稿：重试同一笔事件（id 与 occurred_at 都不变），而不是再勾一次
+  const pendingDrafts = useRef<Record<string, ExecutionEventDraft>>({})
+  // 收尾事件同理：一笔 completed 在重试间共用同一个草稿
+  const pendingCompleteDraft = useRef<ExecutionEventDraft | null>(null)
   const executionRef = useRef<Execution | null>(null)
   executionRef.current = execution
 
@@ -73,14 +79,15 @@ export default function ExecutionScreen({ executionId }: ExecutionScreenProps) {
 
   /**
    * 一次勾选的完整事务：乐观更新 → 带当前 version 的 If-Match 发事件。
-   * 成功整体替换；版本冲突先对账再请用户重试；网络失败回滚但保留事件 id。
+   * 成功整体替换；版本冲突先对账再请用户重试；网络失败回滚但保留事件草稿，
+   * 重试是原样重放；永久失败（400 校验类等）回滚并丢草稿，再点是一笔新事件。
    */
   const toggle = async (step: ExecutionStep) => {
     const current = executionRef.current
     if (!current || busy) return
     const nextCompleted = !step.completed
-    // 重试沿用上次的 id；新的一次点击生成新的 id
-    const clientEventId = pendingEventId.current[step.id] ?? createClientEventId()
+    // 重试沿用上次的草稿；新的一次点击生成新的草稿
+    const draft = pendingDrafts.current[step.id] ?? createEventDraft()
     const optimistic = toggleStepLocal(current, step.id)
     setExecution(optimistic)
     if (nextCompleted) Taro.vibrateShort({ type: 'light' })
@@ -88,48 +95,70 @@ export default function ExecutionScreen({ executionId }: ExecutionScreenProps) {
     try {
       const result = await qualityApi.createExecutionEvent(
         current.id,
-        executionEventBody(step.id, nextCompleted, clientEventId, new Date().toISOString()),
-        `event:${clientEventId}`,
+        executionEventBody(step.id, nextCompleted, draft.clientEventId, draft.occurredAt),
+        `event:${draft.clientEventId}`,
         ifMatchVersion(current.version),
       )
-      delete pendingEventId.current[step.id]
+      delete pendingDrafts.current[step.id]
       applyServer(result.execution)
     } catch (error) {
       if (isEventConflict(error)) {
         // 版本冲突：别处已经推进。先对账，重试时是"对新版本再点一次"。
-        delete pendingEventId.current[step.id]
+        delete pendingDrafts.current[step.id]
         const fresh = await qualityApi.getExecution(current.id).catch(() => null)
         if (fresh) applyServer(fresh)
         Taro.showToast({ title: CHECKLIST_COPY.syncConflict, icon: 'none' })
-      } else {
-        // 网络失败：回滚到服务端最后确认的样子，保留事件 id 供重试
+      } else if (isNetworkFailure(error)) {
+        // 网络失败：回滚到服务端最后确认的样子，保留事件草稿供原样重试
         setExecution(current)
-        pendingEventId.current[step.id] = clientEventId
+        pendingDrafts.current[step.id] = draft
         Taro.showToast({ title: CHECKLIST_COPY.syncFailed, icon: 'none' })
+      } else {
+        // 永久失败（如 occurred_at 校验 400）：重试同一笔必然再败，
+        // 回滚并丢掉草稿——用户再点是一笔带新 occurred_at 的新事件
+        setExecution(current)
+        delete pendingDrafts.current[step.id]
+        Taro.showToast({ title: CHECKLIST_COPY.eventRejected, icon: 'none' })
       }
     } finally {
       setBusy(false)
     }
   }
 
-  /** 全部勾完后的收尾：completed 事件把执行推进终态，反馈入口随之打开。 */
+  /**
+   * 全部勾完后的收尾：completed 事件把执行推进终态，反馈入口随之打开。
+   * 失败三分支与 toggle 同构：冲突先对账、网络失败保留草稿原样重试、
+   * 永久失败丢草稿——只 toast 的话，超时重试会被幂等层 409 卡进死循环。
+   */
   const complete = async () => {
     const current = executionRef.current
     if (!current || busy) return
     setBusy(true)
+    const draft = pendingCompleteDraft.current ?? createEventDraft()
     try {
       const result = await qualityApi.createExecutionEvent(
         current.id,
-        completedEventBody(createClientEventId(), new Date().toISOString()),
+        completedEventBody(draft.clientEventId, draft.occurredAt),
         `event:complete:${current.id}:${current.version}`,
         ifMatchVersion(current.version),
       )
+      pendingCompleteDraft.current = null
       applyServer(result.execution)
     } catch (error) {
-      Taro.showToast({
-        title: isEventConflict(error) ? CHECKLIST_COPY.syncConflict : CHECKLIST_COPY.completeFailed,
-        icon: 'none',
-      })
+      if (isEventConflict(error)) {
+        // 412 后本地 version 已过期：先拉最新再允许重试，否则永远 412
+        pendingCompleteDraft.current = null
+        const fresh = await qualityApi.getExecution(current.id).catch(() => null)
+        if (fresh) applyServer(fresh)
+        Taro.showToast({ title: CHECKLIST_COPY.syncConflict, icon: 'none' })
+      } else if (isNetworkFailure(error)) {
+        // 响应丢失但服务端可能已落库：同一草稿 + 确定性幂等键，重试即重放
+        pendingCompleteDraft.current = draft
+        Taro.showToast({ title: CHECKLIST_COPY.completeFailed, icon: 'none' })
+      } else {
+        pendingCompleteDraft.current = null
+        Taro.showToast({ title: CHECKLIST_COPY.completeFailed, icon: 'none' })
+      }
     } finally {
       setBusy(false)
     }

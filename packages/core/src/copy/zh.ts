@@ -528,8 +528,15 @@ export const CHECKLIST_COPY = {
   completedNote: '这份执行已完成，可以聊聊哪里省时间、哪里别扭',
   syncConflict: '清单刚在其他地方更新过，已同步最新进度，请重试',
   syncFailed: '同步没有成功，已还原，再点一次即可',
+  eventRejected: '这一下没有记上，已还原，可以再点一次',
   completeFailed: '完成没有成功，请重试',
   selectFailed: '选择没有成功，请重试'
+} as const
+
+// ---------- 衣橱（只放新增文案；页面既有字符串的迁移归页面自己的任务） ----------
+export const WARDROBE_COPY = {
+  // 服务端可能下发 items=null 的组合：归一成空数组后的空态，必须带下一步动作
+  outfitEmpty: '这次组合没有配上单品，点这里去添加单品 ›'
 } as const
 
 export const PLAN_DETAIL_COPY = {

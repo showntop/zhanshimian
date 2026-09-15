@@ -880,6 +880,37 @@ paths:
           "$ref": "#/components/responses/Unauthorized"
         '500':
           "$ref": "#/components/responses/InternalError"
+  "/v1/hair-previews/active":
+    get:
+      operationId: getActiveHairPreview
+      summary: 当前进行中的发型预览
+      description: 返回当前仍在生成中的预览（含公开 Operation 引用），供客户端本地引用丢失时恢复任务展示；没有进行中的预览返回 404。
+      tags:
+      - Hair
+      parameters: []
+      responses:
+        '200':
+          description: 进行中的预览
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/Envelope"
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/HairPreview"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
   "/v1/hair-previews/{id}":
     get:
       operationId: getHairPreview

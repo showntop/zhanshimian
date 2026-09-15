@@ -7,6 +7,7 @@ import {
   generationFeedbackBody,
   generationTagLabel,
   executionTagLabel,
+  memoryPreferenceOf,
 } from '../src/features/feedback/model.ts'
 
 test('generation feedback binds the publication the user saw', () => {
@@ -61,6 +62,32 @@ test('comment and media are included only when they exist', () => {
     execution_id: 'e1',
     tags: ['too_formal'],
     media_asset_id: 'asset-2',
+    preference: { kind: 'less_formal', category: 'overall' },
+  })
+})
+
+test('memory tags are sent as structured preference, not just tags', () => {
+  // 服务端的偏好记忆只从结构化 preference 派生，只发标签等于白选
+  assert.deepEqual(memoryPreferenceOf(['too_formal']), { kind: 'less_formal', category: 'overall' })
+  assert.deepEqual(memoryPreferenceOf(['too_complex']), { kind: 'simplify', category: 'overall' })
+  assert.deepEqual(memoryPreferenceOf(['dislike_color']), { kind: 'avoid', category: 'color' })
+  assert.deepEqual(memoryPreferenceOf(['want_to_keep']), { kind: 'preserve', category: 'outfit' })
+  // 非记忆型标签不产生 preference，请求体里整段省略
+  assert.equal(memoryPreferenceOf(['easy_to_execute']), null)
+  assert.equal(memoryPreferenceOf([]), null)
+  const body = executionFeedbackBody({ execution_id: 'e1' }, ['easy_to_execute'], '', null)
+  assert.equal('preference' in body, false)
+})
+
+test('multiple memory tags resolve to one preference in fixed priority order', () => {
+  // 契约一次只带一条 preference：按映射表顺序取第一条命中的，与用户点选顺序无关
+  assert.deepEqual(memoryPreferenceOf(['want_to_keep', 'too_complex']), {
+    kind: 'simplify',
+    category: 'overall',
+  })
+  assert.deepEqual(memoryPreferenceOf(['dislike_color', 'too_formal']), {
+    kind: 'less_formal',
+    category: 'overall',
   })
 })
 

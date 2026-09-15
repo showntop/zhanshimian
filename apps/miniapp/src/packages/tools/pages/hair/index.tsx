@@ -1,6 +1,6 @@
 // 发型预览：推荐列表 + 三种照片来源 + 受理后唯一轮询 + 原图/效果对比 + 保存。
-// 预览是异步受理（202 + 公开 Operation）；恢复不靠本地引用，直接问服务端
-// 列表里仍在生成中的那一份。
+// 预览是异步受理（202 + 公开 Operation）；恢复不靠本地引用，先问服务端
+// /v1/hair-previews/active，端点异常才退回列表里找仍在生成中的那一份。
 import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
@@ -55,15 +55,25 @@ export default function Hair() {
     return item
   }, [])
 
-  // 恢复：服务端历史里仍在生成中的预览接上来（没有就不装任务态）
+  // 恢复：优先问服务端的进行中端点（最准）；它暂时不可用才退回列表里找
+  // （无参列表的语义是返回全部，含进行中）。都没有就不装任务态。
   const resume = useCallback(async () => {
+    const adopt = (item: HairPreview) => {
+      setPreview(item)
+      if (item.style_id) setStyleId(item.style_id)
+    }
+    try {
+      const active = await peripherals.getActiveHairPreview()
+      // 404 已归一成 null：明确「没有进行中」，不再往列表里翻
+      if (active) adopt(active)
+      return
+    } catch {
+      /* 端点异常：退回列表恢复 */
+    }
     try {
       const history = await peripherals.listHairPreviews()
       const active = history.find((item) => IN_FLIGHT.has(item.state))
-      if (active) {
-        setPreview(active)
-        if (active.style_id) setStyleId(active.style_id)
-      }
+      if (active) adopt(active)
     } catch {
       /* 无历史：保持新任务态 */
     }

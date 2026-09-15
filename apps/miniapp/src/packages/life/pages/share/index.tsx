@@ -24,6 +24,9 @@ export default function SharePage() {
   const [isOwner, setIsOwner] = useState(false)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
+  // 接收方打开时带进来的 token：ShareView 本身不带 token 字段，
+  // 二次转发必须沿用这个，否则拼出 token= 空串、再打开必失败
+  const [pageToken, setPageToken] = useState('')
   const { pageClass, enter } = usePageShell(!loading || Boolean(share), '', 'share')
 
   const loadByToken = useCallback(async (token: string) => {
@@ -59,6 +62,7 @@ export default function SharePage() {
 
   useLoad((options) => {
     if (options?.token) {
+      setPageToken(options.token)
       loadByToken(options.token)
       return
     }
@@ -77,10 +81,14 @@ export default function SharePage() {
     setFailed(true)
   })
 
-  useShareAppMessage(() => ({
-    title: snapshotTitle(share) || '我的形象方案',
-    path: `/packages/life/pages/share/index?token=${share && 'token' in share ? share.token : ''}`,
-  }))
+  useShareAppMessage(() => {
+    // 创建者转发用卡片自己的 token；接收方二次转发沿用页面带进来的 token
+    const token = share && 'token' in share && share.token ? share.token : pageToken
+    return {
+      title: snapshotTitle(share) || '我的形象方案',
+      path: `/packages/life/pages/share/index?token=${encodeURIComponent(token)}`,
+    }
+  })
 
   const revoke = async () => {
     if (!share || !('id' in share) || !share.id) return

@@ -17,6 +17,21 @@ export function createClientEventId(): string {
   return createIdempotencyKey('event')
 }
 
+/**
+ * 一次逻辑点击的事件草稿：client_event_id 与 occurred_at 一起生成、一起冻结。
+ * 同一笔事件的所有重试必须复用同一个草稿——服务端的幂等 fingerprint 是
+ * method+path+body，重试时 occurred_at 变一个字节，同一把 Idempotency-Key
+ * 就会被拦成 409 idempotency_conflict，到不了按 client_event_id 去重重放的逻辑。
+ */
+export interface ExecutionEventDraft {
+  clientEventId: string
+  occurredAt: string
+}
+
+export function createEventDraft(): ExecutionEventDraft {
+  return { clientEventId: createClientEventId(), occurredAt: new Date().toISOString() }
+}
+
 /** version → 强 ETag。服务端只接受 `"3"` 这一形状（引号可省略，但我们不省）。 */
 export function ifMatchVersion(version: number): string {
   return `"${version}"`
@@ -86,7 +101,12 @@ export function allStepsDone(execution: Pick<Execution, 'steps'>): boolean {
   return execution.steps.length > 0 && execution.steps.every((step) => step.completed)
 }
 
-/** 网络层失败的统一判定：没有状态码的错误都算网络/服务不可达。 */
+/**
+ * 网络层失败的统一判定。taro-fetch 已把超时/断网包成 PublicApiError(status=0)
+ * （network_failed），所以「不是 PublicApiError」不是网络失败的判据——
+ * 400 这类校验错误是永久失败，重试同一笔必然再败，调用方必须据此换分支。
+ */
 export function isNetworkFailure(error: unknown): boolean {
-  return !(error instanceof PublicApiError)
+  if (error instanceof PublicApiError) return error.statusCode === 0
+  return true
 }

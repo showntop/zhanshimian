@@ -8,8 +8,10 @@ import {
   canSubmitExecutionFeedback,
   completedEventBody,
   createClientEventId,
+  createEventDraft,
   executionEventBody,
   isEventConflict,
+  isNetworkFailure,
   replaceExecutionFromServer,
   toggleStepLocal,
   allStepsDone,
@@ -33,6 +35,35 @@ test('execution event keeps the same client id across retry', () => {
   const retry = executionEventBody('step-1', true, 'event-1', '2026-09-13T08:00:00Z')
   assert.deepEqual(first, retry)
   assert.equal(first.client_event_id, 'event-1')
+})
+
+test('event draft freezes client id and occurred_at so a retry replays byte-identical body', () => {
+  // 同一笔事件的所有重试共用同一个草稿：服务端幂等 fingerprint = method+path+body，
+  // occurred_at 变一个字节，同一把 Idempotency-Key 就会被拦成 409 而不是重放
+  const draft = createEventDraft()
+  const first = executionEventBody('step-1', true, draft.clientEventId, draft.occurredAt)
+  const retry = executionEventBody('step-1', true, draft.clientEventId, draft.occurredAt)
+  assert.deepEqual(first, retry)
+
+  const completedFirst = completedEventBody(draft.clientEventId, draft.occurredAt)
+  const completedRetry = completedEventBody(draft.clientEventId, draft.occurredAt)
+  assert.deepEqual(completedFirst, completedRetry)
+
+  // 新的一次点击是新的一笔：草稿不允许复用到下一次点击
+  const next = createEventDraft()
+  assert.notEqual(next.clientEventId, draft.clientEventId)
+})
+
+test('network failure is status 0, not the absence of PublicApiError', () => {
+  // taro-fetch 把超时/断网包成 PublicApiError(status=0)；400/500 是永久失败，
+  // 重试同一笔必然再败，调用方必须走另一个分支
+  assert.equal(isNetworkFailure(new PublicApiError('network_failed', '网络连接不上', 0, '', true)), true)
+  assert.equal(isNetworkFailure(new PublicApiError('validation_error', 'occurred_at 不合法', 400, '', false)), false)
+  assert.equal(isNetworkFailure(new PublicApiError('internal_error', '服务异常', 500, '', true)), false)
+  assert.equal(isNetworkFailure(new PublicApiError('version_conflict', '冲突', 412, '', false)), false)
+  // 非 PublicApiError（意料外异常）按网络失败处理：回滚保留草稿是最安全的分支
+  assert.equal(isNetworkFailure(new Error('boom')), true)
+  assert.equal(isNetworkFailure(null), true)
 })
 
 test('event body maps completion to step_completed and reopen to step_reopened', () => {

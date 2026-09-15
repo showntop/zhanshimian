@@ -26,6 +26,7 @@ import type { AdvisorMessage } from '@zsm/core'
 import { client } from './client'
 import { bodyOrThrow, dataOrThrow } from './result'
 import { createIdempotencyKey } from '../keys'
+import { normalizeOutfit } from '../../features/wardrobe/model'
 
 export type DiagnosisKind = 'outfit' | 'purchase'
 
@@ -66,6 +67,12 @@ export const peripherals = {
 
   getHairPreview: (id: string): Promise<HairPreview> =>
     client.GET('/v1/hair-previews/{id}', { params: { path: { id } } }).then(dataOrThrow),
+
+  /** 当前进行中的预览；404 表示没有进行中任务，这不是错误。 */
+  getActiveHairPreview: (): Promise<HairPreview | null> =>
+    client
+      .GET('/v1/hair-previews/active')
+      .then((result) => (result.response.status === 404 ? null : dataOrThrow(result))),
 
   listHairPreviews: (): Promise<HairPreview[]> =>
     client.GET('/v1/hair-previews').then(dataOrThrow),
@@ -137,15 +144,19 @@ export const peripherals = {
     await client.DELETE('/v1/wardrobe/items/{id}', { params: { path: { id } } })
   },
 
+  // outfit 的两个写路径服务端都不回填 items（nil slice → JSON null），统一在边界归一
   createWardrobeOutfit: (input: {
     title: string
     note?: string
     item_ids: string[]
   }): Promise<WardrobeOutfit> =>
-    client.POST('/v1/wardrobe/outfits', { body: input }).then(dataOrThrow),
+    client.POST('/v1/wardrobe/outfits', { body: input }).then(dataOrThrow).then(normalizeOutfit),
 
   wearWardrobeOutfit: (id: string): Promise<WardrobeOutfit> =>
-    client.POST('/v1/wardrobe/outfits/{id}/wear', { params: { path: { id } } }).then(dataOrThrow),
+    client
+      .POST('/v1/wardrobe/outfits/{id}/wear', { params: { path: { id } } })
+      .then(dataOrThrow)
+      .then(normalizeOutfit),
 
   // ---------- 顾问 ----------
   sendAdvisorMessage: (input: {

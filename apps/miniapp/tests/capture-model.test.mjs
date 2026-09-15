@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  batchAssignmentRoles,
+  batchChooseCount,
   captureReady,
   toAssessmentInput,
   assessmentIdempotencyKey,
@@ -81,4 +83,20 @@ test('a ready slot must carry media and a non-ready slot must not claim to', () 
   const slots = createSlots()
   assert.throws(() => updateSlot(slots, 'face', { phase: 'ready' }))
   assert.equal(updateSlot(slots, 'face', { phase: 'hashing', localPath: 'wxfile://t1' }).face.media, null)
+})
+
+test('batch choose count is one for camera and the full missing count for album', () => {
+  // 微信相机模式一次拍摄只返回 1 个临时文件，count 写多大都只给一张
+  assert.equal(batchChooseCount('camera', 3), 1)
+  assert.equal(batchChooseCount('camera', 1), 1)
+  assert.equal(batchChooseCount('album', 3), 3)
+  assert.equal(batchChooseCount('album', 2), 2)
+})
+
+test('batch assignment fills only the slots that actually got a file', () => {
+  // 单拍/少选时，没回到文件的槽保持原状，不能给它们记 false 误弹部分失败
+  assert.deepEqual(batchAssignmentRoles(['side', 'body'], 1), ['side'])
+  assert.deepEqual(batchAssignmentRoles(['face', 'side', 'body'], 2), ['face', 'side'])
+  assert.deepEqual(batchAssignmentRoles(['face', 'side', 'body'], 3), ['face', 'side', 'body'])
+  assert.deepEqual(batchAssignmentRoles(['face'], 0), [])
 })

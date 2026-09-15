@@ -29,6 +29,8 @@ import { mimeTypeOf, readLocalImage } from './local-file'
 import {
   CAPTURE_ROLES,
   assessmentIdempotencyKey,
+  batchAssignmentRoles,
+  batchChooseCount,
   captureReady,
   createSlots,
   demoRestoreSlot,
@@ -223,15 +225,16 @@ export default function CaptureScreen() {
 
   const batchFill = (source: 'camera' | 'album', missing: readonly CaptureRole[]) => {
     Taro.chooseMedia({
-      count: missing.length,
+      // 相机一次只出一张；少选/单拍留下的槽保持原状，不算失败
+      count: batchChooseCount(source, missing.length),
       mediaType: ['image'],
       sourceType: [source],
       sizeType: ['compressed'],
       success: (res) => {
-        const files = res.tempFiles.slice(0, missing.length)
+        const roles = batchAssignmentRoles(missing, res.tempFiles.length)
         void Promise.all(
-          missing.map((role, index) => {
-            const file = files[index]
+          roles.map((role, index) => {
+            const file = res.tempFiles[index]
             return file ? ingest(role, file.tempFilePath) : Promise.resolve(false)
           }),
         ).then((outcomes) => {
@@ -239,6 +242,11 @@ export default function CaptureScreen() {
             Taro.showToast({ title: CAPTURE_COPY.batchPartialFailure, icon: 'none' })
           }
         })
+      },
+      fail: (error) => {
+        // 用户取消是静默；真的打不开相机/相册才告知
+        if (error.errMsg.includes('cancel')) return
+        Taro.showToast({ title: CAPTURE_COPY.pickerFailed, icon: 'none' })
       },
     })
   }
