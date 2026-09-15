@@ -23,6 +23,7 @@ import { mediaUpload } from '../../app/api/client'
 import { PublicApiError } from '../../app/api/result'
 import { qualityApi } from '../../app/api/quality'
 import { submitAssessment, assessmentSubmitErrorText } from '../assessment/start'
+import { handleBillingError } from '../../services/billing'
 import PrimaryButton from '../../components/primary-button'
 import SourceImage from '../../components/source-image'
 import { mimeTypeOf, readLocalImage } from './local-file'
@@ -289,6 +290,8 @@ export default function CaptureScreen() {
     try {
       await submitAssessment(photos, assessmentIdempotencyKey(photos))
     } catch (error) {
+      // 402/429 等计费错误先走购买引导（弹层→标记→profile 购买层），其余才落通用提示
+      if (handleBillingError(error)) return
       Taro.showToast({ title: assessmentSubmitErrorText(error), icon: 'none' })
     } finally {
       setBusy(false)

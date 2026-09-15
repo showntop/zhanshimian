@@ -1,7 +1,7 @@
 // 文案红线测试：不出现「通勤」「颜值」「评分」；场景四席；空态必带下一步动作
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { APP_NAME, DEFAULT_NICKNAME, ERROR_COPY, EMPTY_COPY, SCENES, greetingByHour, FEEDBACK_WORDS, HOME_TITLE, PRIVACY_NOTE } from '../src/index.ts'
+import { APP_NAME, DEFAULT_NICKNAME, ERROR_COPY, EMPTY_COPY, SCENES, greetingByHour, FEEDBACK_WORDS, HOME_TITLE, PRIVACY_NOTE, TASK_DONE_COPY, taskDoneText } from '../src/index.ts'
 
 const FORBIDDEN = ['通勤', '颜值', '评分']
 
@@ -46,4 +46,16 @@ test('问候语分时段 + 首页标题保留', () => {
 test('产品名为 uplook，默认昵称与之对齐', () => {
   assert.equal(APP_NAME, 'uplook')
   assert.equal(DEFAULT_NICKNAME, 'uplook用户')
+})
+
+test('任务完成提醒：按 kind（render 按 subject_type）给具体文案', () => {
+  assert.equal(taskDoneText('assessment'), TASK_DONE_COPY.assessment)
+  assert.equal(taskDoneText('plan_set'), TASK_DONE_COPY.planSet)
+  assert.equal(taskDoneText('render', 'render_run'), TASK_DONE_COPY.renderRun)
+  assert.equal(taskDoneText('render', 'hair_preview'), TASK_DONE_COPY.hairPreview)
+  assert.equal(taskDoneText('render', 'today_plan'), TASK_DONE_COPY.todayPlan)
+  assert.equal(taskDoneText('body_orbit'), TASK_DONE_COPY.bodyOrbit)
+  // 后台一次性写入不打扰；未知 kind 落兜底文案
+  assert.equal(taskDoneText('execution_feedback'), '')
+  assert.equal(taskDoneText('something_new'), TASK_DONE_COPY.fallback)
 })

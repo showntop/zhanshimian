@@ -14,14 +14,19 @@ import {
   ERROR_COPY,
   HOME_COPY,
   HOME_TITLE,
+  OUTFIT_COPY,
   PRIVACY_NOTE,
+  PURCHASE_COPY,
   SCENES,
   greetingForNow,
   planSlotLabel,
+  taskDoneText,
+  trackEvent,
   type HomeBootstrap,
   type SceneCopy,
 } from '@zsm/core'
 import { qualityApi } from '../../app/api/quality'
+import { peripherals } from '../../app/api/peripherals'
 import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
 import { useOperationPolling } from '../../app/operations/use-operation-polling'
 import { usePageShell } from '../../hooks/use-page-visibility'
@@ -34,6 +39,10 @@ import './index.scss'
 
 const HOME_CACHE_KEY = resourceKey('home', 'current')
 const IN_FLIGHT = new Set(['accepted', 'running', 'retrying'])
+// 方案各套渲染的在途状态（RenderStatusView.state，与 PlansScreen 同一集合）
+const RENDER_IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
+// 发型预览在途状态（HairPreview.state；诊断类是同步接口，没有跨页在途态可读）
+const HAIR_IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
 
 // 工具卡文案在 HOME_COPY.tools（红线 5），这里只配 key → 路由
 const TOOL_PATHS: Record<(typeof HOME_COPY.tools)[number]['key'], string> = {
@@ -90,6 +99,10 @@ export default function Home() {
   )
   const [loading, setLoading] = useState(!boot)
   const [failed, setFailed] = useState(false)
+  // 工具卡 live 徽章：hair 在途（active 端点）；outfit/purchase 有上次诊断（latest 端点）
+  const [hairActive, setHairActive] = useState(false)
+  const [outfitReady, setOutfitReady] = useState(false)
+  const [purchaseReady, setPurchaseReady] = useState(false)
   const firstShow = useRef(true)
   // 轮询连续失败自停后：toast 只报一次（ref 去重），恢复靠回 tab 对账时 restartKey 重装
   const [pollRestart, setPollRestart] = useState(0)
@@ -116,8 +129,23 @@ export default function Home() {
     void load(false)
   }, [load])
 
-  // 首次 onShow 跳过（挂载时已拉）；此后每次回 tab 静默对账
+  // 工具卡徽章不走 bootstrap（聚合里没有它们）：hair 问 active 端点，
+  // outfit/purchase 问 latest 诊断。单个端点失败只当自己没数据，不拖垮其余两个。
+  const refreshToolBadges = useCallback(async () => {
+    const [hair, outfit, purchase] = await Promise.all([
+      peripherals.getActiveHairPreview().catch(() => null),
+      peripherals.getLatestDiagnosis('outfit').catch(() => null),
+      peripherals.getLatestDiagnosis('purchase').catch(() => null),
+    ])
+    setHairActive(Boolean(hair && HAIR_IN_FLIGHT.has(hair.state)))
+    setOutfitReady(Boolean(outfit))
+    setPurchaseReady(Boolean(purchase))
+  }, [])
+
+  // 首次 onShow 跳过静默对账（挂载时已拉）；此后每次回 tab 对账一次
   useDidShow(() => {
+    trackEvent('page_view', { page: 'home' })
+    void refreshToolBadges()
     if (firstShow.current) {
       firstShow.current = false
       return
@@ -138,16 +166,24 @@ export default function Home() {
     enabled: activeIds.length > 0,
     restartKey: pollRestart,
     onSettled: (operations) => {
+      // 到终态要给具体说法（旧线行为）：完成按 kind/subject_type 给文案；
       // 服务端的 active_operations 只含在途：失败终态一刷新就从 bootstrap 消失，
-      // 不吭声的话「正在分析」会悄悄翻回「开始形象分析」。终态里有失败就说出来。
+      // 不吭声的话「正在分析」会悄悄翻回「开始形象分析」。完成优先于失败。
+      const done = operations.find(
+        (operation) => operation.status === 'succeeded' && taskDoneText(operation.kind, operation.subject_type),
+      )
       const failedOperation = operations.find((operation) => operation.status === 'failed')
-      if (failedOperation) {
+      if (done) {
+        Taro.showToast({ title: taskDoneText(done.kind, done.subject_type), icon: 'none' })
+      } else if (failedOperation) {
         Taro.showToast({
           title: failedOperation.public_message || ANALYSIS_FAIL_COPY.timeoutBody,
           icon: 'none',
         })
       }
       void load(true)
+      // 终态可能就是工具卡盯着的那个任务（hair 渲染与方案渲染同 kind）：顺手对一次徽章
+      void refreshToolBadges()
     },
     onFetchFailure: () => {
       // 连续失败 5 次控制器自停（AGENTS 规约的失败态）：页面有内容不拆页，
@@ -170,6 +206,26 @@ export default function Home() {
   )
   const featured = planSet ? [...planSet.variants].sort((a, b) => a.slot - b.slot)[0] : undefined
   const findingsCount = (report?.findings ?? []).length
+
+  // 方案 Tab 角标（与 PlansScreen 同一规则：在途受理 + 各套在途渲染）。
+  // 首页是默认 tab、启动即挂载，方案 tab 懒挂载——首页不设的话，
+  // 在首页等待生成的用户不点方案 tab 永远看不到红点。
+  // 只数 plan_set 受理与当前方案集的渲染：hair/today 渲染与方案渲染同 kind，
+  // 而 OperationRef 没有 subject_type，按 kind 全数会把红点贴到错的 tab 上。
+  const planTaskCount =
+    (boot?.active_operations ?? []).filter(
+      (operation) => isActive(operation) && operation.kind === 'plan_set',
+    ).length +
+    (planSet?.variants ?? []).filter(
+      (variant) => RENDER_IN_FLIGHT.has(variant.render.state) && Boolean(variant.render.operation_id),
+    ).length
+  useEffect(() => {
+    if (planTaskCount > 0) {
+      Taro.setTabBarBadge({ index: 1, text: String(planTaskCount) }).catch(() => {})
+    } else {
+      Taro.removeTabBarBadge({ index: 1 }).catch(() => {})
+    }
+  }, [planTaskCount])
 
   return (
     <View className={pageClass}>
@@ -319,26 +375,45 @@ export default function Home() {
               <View className="section-rule" />
             </View>
             <View className="home__tools">
-              {HOME_COPY.tools.map((tool) => (
-                <View
-                  key={tool.key}
-                  className={`home__tool pressable ${tool.key === 'hair' ? 'home__tool--lead' : ''}`}
-                  onClick={() => void Taro.navigateTo({ url: TOOL_PATHS[tool.key] })}
-                >
-                  <View className="home__tool-copy">
-                    <Text className="home__tool-name">{tool.label}</Text>
-                    <Text className="home__tool-desc">{tool.desc}</Text>
+              {HOME_COPY.tools.map((tool) => {
+                // live 徽章覆盖静态 badge：hair 在途「生成中」（呼吸样式）；
+                // outfit/purchase 有上次诊断给「查看结果」（同步诊断没有跨页在途态）
+                const liveBadge =
+                  tool.key === 'hair' && hairActive
+                    ? HOME_COPY.toolLiveHair
+                    : tool.key === 'outfit' && outfitReady
+                      ? OUTFIT_COPY.lastResult
+                      : tool.key === 'purchase' && purchaseReady
+                        ? PURCHASE_COPY.lastResult
+                        : ''
+                const badge = liveBadge || tool.badge
+                return (
+                  <View
+                    key={tool.key}
+                    className={`home__tool pressable ${tool.key === 'hair' ? 'home__tool--lead' : ''}`}
+                    onClick={() => void Taro.navigateTo({ url: TOOL_PATHS[tool.key] })}
+                  >
+                    <View className="home__tool-copy">
+                      <Text className="home__tool-name">{tool.label}</Text>
+                      <Text className="home__tool-desc">{tool.desc}</Text>
+                    </View>
+                    {tool.key === 'hair' ? (
+                      <SourceImage
+                        className="home__tool-visual"
+                        reference={{ slug: 'natural', variant: 'hair' }}
+                        mode="aspectFit"
+                      />
+                    ) : null}
+                    {badge ? (
+                      <Text
+                        className={`home__tool-badge ${liveBadge === HOME_COPY.toolLiveHair ? 'home__tool-badge--live' : ''}`}
+                      >
+                        {badge}
+                      </Text>
+                    ) : null}
                   </View>
-                  {tool.key === 'hair' ? (
-                    <SourceImage
-                      className="home__tool-visual"
-                      reference={{ slug: 'natural', variant: 'hair' }}
-                      mode="aspectFit"
-                    />
-                  ) : null}
-                  {tool.badge ? <Text className="home__tool-badge">{tool.badge}</Text> : null}
-                </View>
-              ))}
+                )
+              })}
             </View>
           </View>
 

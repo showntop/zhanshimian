@@ -320,6 +320,8 @@ export const HOME_COPY = {
     { key: 'outfit', label: '穿搭诊断', desc: '只指出最值得改的一处', badge: '' },
     { key: 'purchase', label: '购买判断', desc: '买之前先看适不适合', badge: '' },
   ],
+  // 工具卡实时徽章：在途任务覆盖静态 badge（live 样式）；「上次结果」沿用各工具自己的 lastResult 文案
+  toolLiveHair: '生成中',
   scenesTitle: '按场合开始',
   sceneReadyNote: '已复用你的形象档案，不会再要照片',
   recentTitle: '最近方案',
@@ -340,6 +342,32 @@ export const HOME_COPY = {
   wardrobeEntry: '我的衣橱',
   wardrobeEntryDesc: '让方案用上你已有的衣服'
 } as const
+
+// ---------- 首页任务完成轻提醒 ----------
+// 轮询到终态时按 kind（render 再按 subject_type）给具体文案；execution_feedback 是后台写入，不打扰。
+export const TASK_DONE_COPY = {
+  assessment: '形象分析完成，去看看报告',
+  planSet: '三套方案已生成，去看看',
+  renderRun: '方案形象图已生成',
+  hairPreview: '发型预览已生成',
+  todayPlan: '今日搭配图已生成',
+  bodyOrbit: '3D 形象已生成',
+  fallback: '任务已完成'
+} as const
+
+/** 完成提醒文案；返回空串表示这类操作不提醒（execution_feedback 是后台一次性写入）。 */
+export function taskDoneText(kind: string, subjectType?: string): string {
+  if (kind === 'execution_feedback') return ''
+  if (kind === 'render') {
+    if (subjectType === 'hair_preview') return TASK_DONE_COPY.hairPreview
+    if (subjectType === 'today_plan') return TASK_DONE_COPY.todayPlan
+    return TASK_DONE_COPY.renderRun
+  }
+  if (kind === 'assessment') return TASK_DONE_COPY.assessment
+  if (kind === 'plan_set') return TASK_DONE_COPY.planSet
+  if (kind === 'body_orbit') return TASK_DONE_COPY.bodyOrbit
+  return TASK_DONE_COPY.fallback
+}
 
 // ---------- 形象档案补充资料 ----------
 export const PROFILE_SETUP_COPY = {
@@ -630,6 +658,10 @@ export const SCENE_BRIEF_COPY = {
   needArchiveTitle: '还没有形象报告',
   needArchiveBody: '先完成三图建档，才能生成场合方案。',
   needArchiveAction: '去建档',
+  // 无档案但分析在途：引导看进度，不能引导发起第二次建档（旧线 scene 页行为）
+  analyzingTitle: '正在分析你的照片',
+  analyzingBody: '分析完成后就能生成场合方案，不用重新建档。',
+  analyzingAction: '查看分析进度',
   loadFailed: '页面没有加载成功，请重试',
   submitFailed: '方案没有生成成功，请重试',
   scenes: {

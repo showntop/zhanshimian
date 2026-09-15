@@ -23,6 +23,7 @@ import { qualityApi } from '../../app/api/quality'
 import { PublicApiError } from '../../app/api/result'
 import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
 import { writePlanSetHandoff } from '../../app/plan-set-handoff'
+import { handleBillingError } from '../../services/billing'
 import EmptyState from '../../components/empty-state'
 import ErrorState from '../../components/error-state'
 import PhotoAnnotationLayer from '../../components/photo-annotation'
@@ -143,6 +144,8 @@ export default function ReportScreen({ reportId, onReady, enter = staticEnter }:
       writePlanSetHandoff(reportPlanSetHandoff(start))
       await Taro.switchTab({ url: PLANS_ROUTE })
     } catch (error) {
+      // 402/429 等计费错误先走购买引导（弹层→标记→profile 购买层），其余才落通用提示
+      if (handleBillingError(error)) return
       const message = error instanceof PublicApiError && error.message ? error.message : REPORT_COPY.planFailed
       Taro.showToast({ title: message, icon: 'none' })
     } finally {

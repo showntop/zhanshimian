@@ -1,9 +1,10 @@
 // 购买判断：单品图上传 + 同步诊断。空态不堆预览卡；结果是一句判断，不套报告卡。
-// 结果只活在页面 state；复访由服务端 GET /diagnostics/latest 恢复，不写会话存储。
+// 同步请求跨页存活：会话见 services/purchase-session（模块级 inflight + storage 草稿），
+// 退回首页再进入可恢复进行中/结论；复访先展示草稿，服务端 latest 只在更新时接管。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
-import { PURCHASE_COPY, type Diagnosis, type DisplayMedia } from '@zsm/core'
+import { BILLING_COPY, PURCHASE_COPY, type Diagnosis, type DisplayMedia } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { peripherals } from '../../../../app/api/peripherals'
 import { qualityApi } from '../../../../app/api/quality'
@@ -11,6 +12,13 @@ import { mediaUpload } from '../../../../app/api/client'
 import { uploadMedia } from '../../../../app/api/media-upload'
 import { readLocalImage } from '../../../../features/capture/local-file'
 import { handleBillingError } from '../../../../services/billing'
+import { billingErrorMessage } from '../../../../services/billing-error'
+import {
+  isDiagnosticDailyLimit,
+  sharedPurchaseSession,
+  type PurchaseResumeEvent,
+} from '../../../../services/purchase-session'
+import { readStorage, writeStorage } from '../../../../services/storage'
 import { splitAdviceTitle } from '../../../../services/advice-title'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
@@ -18,12 +26,17 @@ import SourceImage from '../../../../components/source-image'
 import ErrorState from '../../../../components/error-state'
 import './index.scss'
 
+// 会话单例挂在页面模块上：模块只装载一次，inflight 与草稿因此跨页存活。
+const purchaseSession = sharedPurchaseSession({ read: readStorage, write: writeStorage })
+
 export default function Purchase() {
   const [photoPath, setPhotoPath] = useState('')
   const [photoMedia, setPhotoMedia] = useState<DisplayMedia | null>(null)
   const [result, setResult] = useState<Diagnosis | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // 日限（429/402）体面错误态：明日再来 + 查看上次结果，不进计费购买链
+  const [limit, setLimit] = useState<{ title: string; body: string } | null>(null)
 
   const resumingRef = useRef(false)
   const freshStartRef = useRef(false)
@@ -34,21 +47,59 @@ export default function Purchase() {
     if (item.source_media) setPhotoMedia(item.source_media)
   }, [])
 
-  // 复访恢复：服务端 latest 就是唯一事实；本地不再存草稿与结论
+  // 日限与通用错误分流：日限进体面错误态（明日再来/查看上次结果），其余照旧。
+  const applyError = useCallback((e: unknown, fallback: string) => {
+    if (isDiagnosticDailyLimit(e)) {
+      const serverMsg = billingErrorMessage(e)
+      setLimit({
+        title: serverMsg || BILLING_COPY.rateLimited,
+        body: serverMsg && serverMsg !== BILLING_COPY.rateLimited ? BILLING_COPY.rateLimited : '',
+      })
+      setError('')
+      return
+    }
+    handleBillingError(e)
+    setError((e as Error)?.message || fallback)
+  }, [])
+
+  // 复访恢复：会话统一编排（草稿水合 → inflight 接管 → pending 续跑 → 后台校验），
+  // 事件在这里翻译成 setState；时序与防旧盖新判定都在 services/purchase-session。
   const resume = useCallback(async () => {
     if (resumingRef.current) return
     resumingRef.current = true
     try {
-      if (result || freshStartRef.current) return
-      const latest = await peripherals.getLatestDiagnosis('purchase')
-      if (latest) applySession(latest)
-    } catch {
-      /* 还没有判断过：保持开始页 */
+      await purchaseSession.resume(
+        {
+          getLatest: () => peripherals.getLatestDiagnosis('purchase'),
+          diagnose: peripherals.diagnose,
+        },
+        (event: PurchaseResumeEvent) => {
+          if (event.type === 'hydrate') {
+            const { draft } = event
+            if (draft.photoPath) setPhotoPath(draft.photoPath)
+            if (draft.result) applySession(draft.result)
+            return
+          }
+          if (event.type === 'busy') {
+            setBusy(event.busy)
+            if (event.busy) {
+              setError('')
+              setLimit(null)
+            }
+            return
+          }
+          if (event.type === 'result') {
+            applySession(event.item)
+            return
+          }
+          applyError(event.error, '判断没有成功，请重试')
+        },
+        { freshStart: () => freshStartRef.current },
+      )
     } finally {
       resumingRef.current = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applySession])
+  }, [applySession, applyError])
 
   useEffect(() => {
     void resume()
@@ -69,18 +120,30 @@ export default function Purchase() {
           setPhotoPath(file.tempFilePath)
           setPhotoMedia(null)
           setResult(null)
+          setError('')
+          setLimit(null)
           freshStartRef.current = true
+          // 草稿同步换成新图：进行中的旧请求落定时就不会再盖回来
+          purchaseSession.writeDraft({
+            pending: false,
+            photoPath: file.tempFilePath,
+            mediaId: '',
+            result: null,
+          })
         }
       },
     })
   }
 
   const analyze = async (demo = false) => {
-    if (busy) return
+    // inflight 期间重复发起一律被会话挡下（busy 只是本页实例的第二道闸）
+    if (purchaseSession.getInflight() || busy) return
     setBusy(true)
     setError('')
+    setLimit(null)
+    // 提到 try 外：catch 要用它判断「草稿是否已换图」
+    let mediaId = ''
     try {
-      let mediaId: string
       if (demo) {
         const media = await qualityApi.createDemoMedia('body', `purchase-demo:${Date.now()}`)
         mediaId = media.asset_id
@@ -98,11 +161,16 @@ export default function Purchase() {
           mediaId = photoMedia!.asset_id
         }
       }
-      const item = await peripherals.diagnose({ kind: 'purchase', media_id: mediaId })
-      applySession(item)
+      purchaseSession.markPending({ photoPath: demo ? '' : photoPath, mediaId })
+      const item = await purchaseSession.runDiagnose(mediaId, () =>
+        peripherals.diagnose({ kind: 'purchase', media_id: mediaId }),
+      )
+      // 飞行中重选了图：旧结论已被会话拒收，这里也不上屏
+      if (purchaseSession.read()?.result?.id === item.id) applySession(item)
     } catch (e) {
-      handleBillingError(e)
-      setError((e as Error).message || '判断没有成功，请重试')
+      // mediaId 为空说明上传/示例图就没走通，错误照常展示；非空但草稿已换图则静默
+      if (mediaId && purchaseSession.read()?.mediaId !== mediaId) return
+      applyError(e, '判断没有成功，请重试')
     } finally {
       setBusy(false)
     }
@@ -118,10 +186,28 @@ export default function Purchase() {
     }
   }
 
+  // 日限错误态的「查看上次结果」：历史进来就替换掉当前未完成的图片位
+  const viewHistory = async () => {
+    try {
+      const latest = await peripherals.getLatestDiagnosis('purchase')
+      if (!latest) return
+      purchaseSession.writeDraft({ photoPath: '' })
+      purchaseSession.markDone(latest)
+      setPhotoPath('')
+      applySession(latest)
+      setLimit(null)
+      setError('')
+    } catch {
+      /* 拉不到历史：保持日限错误态 */
+    }
+  }
+
   const retryFresh = () => {
     freshStartRef.current = true
+    purchaseSession.clearResult()
     setResult(null)
     setError('')
+    setLimit(null)
   }
 
   const shownMedia: DisplayMedia | null = photoMedia ?? result?.source_media ?? null
@@ -210,6 +296,16 @@ export default function Purchase() {
               <Text className="pk__result-alt pressable" onClick={retryFresh}>{PURCHASE_COPY.again}</Text>
             </View>
           </View>
+        ) : limit ? (
+          <>
+            <View className={`pk__hint ${enter(1)}`}>
+              <Text className="pk__hint-title">{limit.title}</Text>
+              {limit.body ? <Text className="pk__hint-desc">{limit.body}</Text> : null}
+            </View>
+            <View className={`pk__foot ${enter(2)}`}>
+              <PrimaryButton text={PURCHASE_COPY.lastResult} onClick={() => void viewHistory()} />
+            </View>
+          </>
         ) : (
           <>
             <View className={`pk__hint ${enter(1)}`}>

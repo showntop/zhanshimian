@@ -13,6 +13,7 @@ import { qualityApi } from '../../app/api/quality'
 import { PublicApiError } from '../../app/api/result'
 import { resourceCache } from '../../app/cache/resource-cache'
 import { writePlanSetHandoff } from '../../app/plan-set-handoff'
+import { handleBillingError } from '../../services/billing'
 import EmptyState from '../../components/empty-state'
 import ErrorState from '../../components/error-state'
 import Pill from '../../components/pill'
@@ -29,6 +30,9 @@ import './index.scss'
 const PLANS_TAB = '/pages/plans/index'
 const CAPTURE_ROUTE = '/pages/capture/index'
 
+/** 在途 Operation 状态（与 bootstrap active_operations 语义一致；failed 不在其中——失败允许重新建档） */
+const IN_FLIGHT = new Set(['accepted', 'running', 'retrying'])
+
 interface SceneBriefScreenProps {
   scene: string
 }
@@ -37,6 +41,7 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
   const fields = sceneFields(scene)
   const [reportId, setReportId] = useState('')
   const [noReport, setNoReport] = useState(false)
+  const [analyzingOperationId, setAnalyzingOperationId] = useState('')
   const [failed, setFailed] = useState(false)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -46,8 +51,18 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
   const loadReport = useCallback(async () => {
     try {
       const current = await qualityApi.getCurrentReport()
-      if (current) setReportId(current.id)
-      else setNoReport(true)
+      if (current) {
+        setReportId(current.id)
+        return
+      }
+      // 无档案要区分「分析在途」与「从未建档」：前者引导看进度，
+      // 把用户送去拍摄页等于引导发起第二次建档（bootstrap 失败按无在途处理）
+      const boot = await qualityApi.getHomeBootstrap().catch(() => null)
+      const analyzing = (boot?.active_operations ?? []).find(
+        (operation) => operation.kind === 'assessment' && IN_FLIGHT.has(operation.status),
+      )
+      setAnalyzingOperationId(analyzing?.id ?? '')
+      setNoReport(true)
     } catch {
       setFailed(true)
     }
@@ -96,6 +111,8 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
       })
       await Taro.switchTab({ url: PLANS_TAB })
     } catch (error) {
+      // 402/429 等计费错误先走购买引导（弹层→标记→profile 购买层），其余才落通用提示
+      if (handleBillingError(error)) return
       const message = error instanceof PublicApiError && error.message ? error.message : SCENE_BRIEF_COPY.submitFailed
       Taro.showToast({ title: message, icon: 'none' })
     } finally {
@@ -122,12 +139,21 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
   }
 
   if (noReport) {
+    const analyzing = Boolean(analyzingOperationId)
     return (
       <EmptyState
-        title={SCENE_BRIEF_COPY.needArchiveTitle}
-        description={SCENE_BRIEF_COPY.needArchiveBody}
-        actionText={SCENE_BRIEF_COPY.needArchiveAction}
-        onAction={() => void Taro.redirectTo({ url: CAPTURE_ROUTE })}
+        title={analyzing ? SCENE_BRIEF_COPY.analyzingTitle : SCENE_BRIEF_COPY.needArchiveTitle}
+        description={analyzing ? SCENE_BRIEF_COPY.analyzingBody : SCENE_BRIEF_COPY.needArchiveBody}
+        actionText={analyzing ? SCENE_BRIEF_COPY.analyzingAction : SCENE_BRIEF_COPY.needArchiveAction}
+        onAction={() =>
+          analyzing
+            ? void Taro.navigateTo({
+                url:
+                  `/pages/analysis/index?operation_id=${encodeURIComponent(analyzingOperationId)}` +
+                  `&assessment_id=`,
+              })
+            : void Taro.redirectTo({ url: CAPTURE_ROUTE })
+        }
       />
     )
   }

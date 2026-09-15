@@ -1,10 +1,11 @@
 // 穿搭诊断：场景 3 选 + 单图上传 + 同步诊断（锚点标注）+ 先改哪一处。
 // 空态：照片 hero → 导语 → 场景。结果：照片 → 一句建议 → 观察清单，不套报告卡。
-// 结果只活在页面 state；复访由服务端 GET /diagnostics/latest 恢复，不写会话存储。
+// 同步请求跨页存活：会话见 services/outfit-session（模块级 inflight + storage 草稿），
+// 退回首页再进入可恢复进行中/结论；复访先展示草稿，服务端 latest 只在更新时接管。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
-import { OUTFIT_COPY, type Diagnosis, type DisplayMedia } from '@zsm/core'
+import { BILLING_COPY, OUTFIT_COPY, type Diagnosis, type DisplayMedia } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { peripherals } from '../../../../app/api/peripherals'
 import { qualityApi } from '../../../../app/api/quality'
@@ -12,6 +13,13 @@ import { mediaUpload } from '../../../../app/api/client'
 import { uploadMedia } from '../../../../app/api/media-upload'
 import { readLocalImage } from '../../../../features/capture/local-file'
 import { handleBillingError } from '../../../../services/billing'
+import { billingErrorMessage } from '../../../../services/billing-error'
+import {
+  isDiagnosticDailyLimit,
+  sharedOutfitSession,
+  type OutfitResumeEvent,
+} from '../../../../services/outfit-session'
+import { readStorage, writeStorage } from '../../../../services/storage'
 import { splitAdviceTitle } from '../../../../services/advice-title'
 import AppHeader from '../../../../components/app-header'
 import PrimaryButton from '../../../../components/primary-button'
@@ -34,6 +42,9 @@ const CONTEXTS = [
   { key: 'date', label: '约会' },
 ] as const
 
+// 会话单例挂在页面模块上：模块只装载一次，inflight 与草稿因此跨页存活。
+const outfitSession = sharedOutfitSession({ read: readStorage, write: writeStorage })
+
 export default function Outfit() {
   const [scene, setScene] = useState<string>('daily')
   const [photoPath, setPhotoPath] = useState('')
@@ -41,6 +52,8 @@ export default function Outfit() {
   const [result, setResult] = useState<Diagnosis | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // 日限（429/402）体面错误态：明日再来 + 查看上次结果，不进计费购买链
+  const [limit, setLimit] = useState<{ title: string; body: string } | null>(null)
   // 所选照片真实宽高（onLoad 采集）：aspectFit 可视区锚点换算
   const [photoDims, setPhotoDims] = useState<{ w: number; h: number } | null>(null)
 
@@ -55,22 +68,60 @@ export default function Outfit() {
     if (item.source_media) setPhotoMedia(item.source_media)
   }, [])
 
-  // 复访恢复：服务端 latest 就是唯一事实；本地不再存草稿与结论
+  // 日限与通用错误分流：日限进体面错误态（明日再来/查看上次结果），其余照旧。
+  const applyError = useCallback((e: unknown, fallback: string) => {
+    if (isDiagnosticDailyLimit(e)) {
+      const serverMsg = billingErrorMessage(e)
+      setLimit({
+        title: serverMsg || BILLING_COPY.rateLimited,
+        body: serverMsg && serverMsg !== BILLING_COPY.rateLimited ? BILLING_COPY.rateLimited : '',
+      })
+      setError('')
+      return
+    }
+    handleBillingError(e)
+    setError((e as Error)?.message || fallback)
+  }, [])
+
+  // 复访恢复：会话统一编排（草稿水合 → inflight 接管 → pending 续跑 → 后台校验），
+  // 事件在这里翻译成 setState；时序与防旧盖新判定都在 services/outfit-session。
   const resume = useCallback(async () => {
     if (resumingRef.current) return
     resumingRef.current = true
     try {
-      if (result || freshStartRef.current) return
-      const latest = await peripherals.getLatestDiagnosis('outfit')
-      if (latest) applySession(latest)
-    } catch {
-      /* 还没有诊断过：保持开始页 */
+      await outfitSession.resume(
+        {
+          getLatest: () => peripherals.getLatestDiagnosis('outfit'),
+          diagnose: peripherals.diagnose,
+        },
+        (event: OutfitResumeEvent) => {
+          if (event.type === 'hydrate') {
+            const { draft } = event
+            if (draft.scene) setScene(draft.scene)
+            if (draft.photoPath) setPhotoPath(draft.photoPath)
+            if (draft.result) applySession(draft.result)
+            return
+          }
+          if (event.type === 'busy') {
+            setBusy(event.busy)
+            if (event.busy) {
+              setError('')
+              setLimit(null)
+            }
+            return
+          }
+          if (event.type === 'result') {
+            applySession(event.item)
+            return
+          }
+          applyError(event.error, '诊断没有成功，请重试')
+        },
+        { freshStart: () => freshStartRef.current },
+      )
     } finally {
       resumingRef.current = false
     }
-    // result 通过 ref 语义读取即可：这里只关心「有没有结论」
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applySession])
+  }, [applySession, applyError])
 
   useEffect(() => {
     void resume()
@@ -92,18 +143,31 @@ export default function Outfit() {
           setPhotoMedia(null)
           setResult(null)
           setPhotoDims(null)
+          setError('')
+          setLimit(null)
           freshStartRef.current = true
+          // 草稿同步换成新照片：进行中的旧请求落定时就不会再盖回来
+          outfitSession.writeDraft({
+            pending: false,
+            scene,
+            photoPath: file.tempFilePath,
+            mediaId: '',
+            result: null,
+          })
         }
       },
     })
   }
 
   const analyze = async (demo = false) => {
-    if (busy) return
+    // inflight 期间重复发起一律被会话挡下（busy 只是本页实例的第二道闸）
+    if (outfitSession.getInflight() || busy) return
     setBusy(true)
     setError('')
+    setLimit(null)
+    // 提到 try 外：catch 要用它判断「草稿是否已换照片」
+    let mediaId = ''
     try {
-      let mediaId: string
       if (demo) {
         const media = await qualityApi.createDemoMedia('body', `outfit-demo:${Date.now()}`)
         mediaId = media.asset_id
@@ -121,11 +185,16 @@ export default function Outfit() {
           mediaId = photoMedia!.asset_id
         }
       }
-      const item = await peripherals.diagnose({ kind: 'outfit', media_id: mediaId, scene })
-      applySession(item)
+      outfitSession.markPending({ scene, photoPath: demo ? '' : photoPath, mediaId })
+      const item = await outfitSession.runDiagnose(mediaId, () =>
+        peripherals.diagnose({ kind: 'outfit', media_id: mediaId, scene }),
+      )
+      // 飞行中重选了照片：旧结论已被会话拒收，这里也不上屏
+      if (outfitSession.read()?.result?.id === item.id) applySession(item)
     } catch (e) {
-      handleBillingError(e)
-      setError((e as Error).message || '诊断没有成功，请重试')
+      // mediaId 为空说明上传/示例图就没走通，错误照常展示；非空但草稿已换照片则静默
+      if (mediaId && outfitSession.read()?.mediaId !== mediaId) return
+      applyError(e, '诊断没有成功，请重试')
     } finally {
       setBusy(false)
     }
@@ -143,10 +212,28 @@ export default function Outfit() {
 
   const toPlans = () => Taro.switchTab({ url: '/pages/plans/index' })
 
+  // 日限错误态的「查看上次结果」：历史进来就替换掉当前未完成的照片位
+  const viewHistory = async () => {
+    try {
+      const latest = await peripherals.getLatestDiagnosis('outfit')
+      if (!latest) return
+      outfitSession.writeDraft({ photoPath: '' })
+      outfitSession.markDone(latest)
+      setPhotoPath('')
+      applySession(latest)
+      setLimit(null)
+      setError('')
+    } catch {
+      /* 拉不到历史：保持日限错误态 */
+    }
+  }
+
   const retryFresh = () => {
     freshStartRef.current = true
+    outfitSession.clearResult()
     setResult(null)
     setError('')
+    setLimit(null)
   }
 
   const shownMedia: DisplayMedia | null = photoMedia ?? result?.source_media ?? null
@@ -262,6 +349,16 @@ export default function Outfit() {
               </View>
             </View>
           </View>
+        ) : limit ? (
+          <>
+            <View className={`od__hint ${enter(1)}`}>
+              <Text className="od__hint-title">{limit.title}</Text>
+              {limit.body ? <Text className="od__hint-desc">{limit.body}</Text> : null}
+            </View>
+            <View className={`od__foot ${enter(2)}`}>
+              <PrimaryButton text={OUTFIT_COPY.lastResult} onClick={() => void viewHistory()} />
+            </View>
+          </>
         ) : (
           <>
             <View className={`od__hint ${enter(1)}`}>
@@ -283,7 +380,7 @@ export default function Outfit() {
           </>
         )}
 
-        {!result ? (
+        {!result && !limit ? (
           <View className={`od__foot ${enter(3)}`}>
             <PrimaryButton
               text={busy ? OUTFIT_COPY.busy : OUTFIT_COPY.start}

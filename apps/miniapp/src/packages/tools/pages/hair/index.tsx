@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
-import { IMAGE_BADGE_COPY, LOCAL_LOOK_SLUGS, type HairPreview, type HairStyle, type LookSlug } from '@zsm/core'
+import { LOCAL_LOOK_SLUGS, type HairPreview, type HairStyle, type LookSlug } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { peripherals } from '../../../../app/api/peripherals'
 import { qualityApi } from '../../../../app/api/quality'
@@ -90,7 +90,7 @@ export default function Hair() {
 
   // 受理后的状态只通过公开 Operation 观察；终态后拉一次完整预览
   const running = Boolean(preview && IN_FLIGHT.has(preview.state))
-  useOperationPolling({
+  const { operations } = useOperationPolling({
     operationIds: preview?.operation?.id ? [preview.operation.id] : [],
     enabled: running,
     onSettled: () => {
@@ -158,6 +158,9 @@ export default function Hair() {
   const styleName = preview?.style_name || STYLES.find((s) => s.id === styleId)?.name || ''
   const hasResult = preview?.state === 'ready' && Boolean(preview.media)
   const generating = running
+  // 失败原因优先用服务端愿意公开的那句（轮询到的 failed Operation），没有才回退固定文案
+  const failedOperation = operations.find((operation) => operation.status === 'failed')
+  const failureText = failedOperation?.public_message || '生成没有完成，请重试'
 
   return (
     <View className={pageClass}>
@@ -176,11 +179,6 @@ export default function Hair() {
                 anchor="top"
               />
             )}
-            {mode === 'result' && hasResult ? (
-              <View className="hair__badge layer-on-photo">
-                <Text>{IMAGE_BADGE_COPY.bundled}</Text>
-              </View>
-            ) : null}
             {preview && IN_FLIGHT.has(preview.state) ? (
               <View className="hair__mask">
                 <View className="scan-sweep" />
@@ -239,7 +237,7 @@ export default function Hair() {
 
         {preview?.state === 'failed' || preview?.state === 'unavailable' ? (
           <View className={`hair__failed ${enter()}`}>
-            <Text className="hair__failed-text">生成没有完成，请重试</Text>
+            <Text className="hair__failed-text">{failureText}</Text>
           </View>
         ) : null}
 

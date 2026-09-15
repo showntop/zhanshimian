@@ -26,6 +26,7 @@ import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
 import { takePlanSetHandoff } from '../../app/plan-set-handoff'
 import { useOperationPolling } from '../../app/operations/use-operation-polling'
 import { useShowOnce } from '../../hooks/use-page-visibility'
+import { handleBillingError } from '../../services/billing'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import { getNavMetrics } from '../../components/app-header'
 import CompareSlider from '../../components/compare-slider'
@@ -307,6 +308,8 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       }
       setBootstrapped(true)
     } catch (error) {
+      // 402/429 等计费错误先走购买引导（弹层→标记→profile 购买层），其余才落通用提示
+      if (handleBillingError(error)) return
       const message = error instanceof PublicApiError && error.message ? error.message : PLANNING_COPY.generateFailed
       Taro.showToast({ title: message, icon: 'none' })
     }
@@ -326,6 +329,7 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       if (planSetRef.current) await refreshPlanSet(planSetRef.current.id)
       void refreshOperations()
     } catch (error) {
+      if (handleBillingError(error)) return
       const message = error instanceof PublicApiError && error.message ? error.message : PLANNING_COPY.generateFailed
       Taro.showToast({ title: message, icon: 'none' })
     } finally {
