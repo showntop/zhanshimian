@@ -12,6 +12,7 @@ import (
 	providerai "github.com/zhanshimian/server/internal/provider/ai"
 	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
+	"github.com/zhanshimian/server/internal/storage"
 )
 
 // ErrQualityRejected marks a quality rejection that has been persisted and
@@ -303,7 +304,9 @@ func (h *Handler) commitRejected(ctx context.Context, lease domain.TaskLease, wo
 // runner 重试而不是一次性废掉 run。
 func (h *Handler) loadReference(ctx context.Context, asset domain.MediaAsset, role string) (providerai.ImageInput, error) {
 	input := providerai.ImageInput{AssetID: asset.ID, Role: role, MIMEType: asset.MIMEType}
-	reader, err := h.service.objects.Open(ctx, asset.ObjectKey)
+	// 数据万象下载时压缩（未开通 CI 回退原图）+ 本地编辑预算兜底：
+	// 原图内联帧会撑爆生成请求体与超时。
+	reader, err := storage.OpenProcessedOr(ctx, h.service.objects, asset.ObjectKey, providerai.EditCOSProcess)
 	if err != nil {
 		return providerai.ImageInput{}, &taskrunner.TaskError{Class: domain.ErrorTransient, Code: "render_reference_unavailable"}
 	}
@@ -312,7 +315,9 @@ func (h *Handler) loadReference(ctx context.Context, asset domain.MediaAsset, ro
 	if err != nil {
 		return providerai.ImageInput{}, &taskrunner.TaskError{Class: domain.ErrorTransient, Code: "render_reference_unavailable"}
 	}
+	data, mime := providerai.ConstrainEditImage(data, asset.MIMEType)
 	input.Data = data
+	input.MIMEType = mime
 	return input, nil
 }
 

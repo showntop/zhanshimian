@@ -15,6 +15,7 @@ import (
 	"github.com/zhanshimian/server/internal/config"
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/provider"
+	providerai "github.com/zhanshimian/server/internal/provider/ai"
 	identitypayment "github.com/zhanshimian/server/internal/provider/payment"
 	"github.com/zhanshimian/server/internal/repository/postgres"
 	"github.com/zhanshimian/server/internal/service/account"
@@ -64,6 +65,8 @@ func (p mediaPresenter) Present(ctx context.Context, asset domain.MediaAsset) (a
 }
 
 // imageLoader 从对象库读照片字节，供 assessment worker 提取图片。
+// 优先走数据万象下载时压缩（未开通 CI 自动回退原图），再用本地预算
+// 约束兜底，避免原图 base64 撑爆 AI 请求体。
 type imageLoader struct {
 	objects storage.ObjectStorage
 }
@@ -71,7 +74,7 @@ type imageLoader struct {
 func (l imageLoader) Load(ctx context.Context, items []domain.PhotoSetItem) ([]assessment.ImageInput, error) {
 	images := make([]assessment.ImageInput, 0, len(items))
 	for _, item := range items {
-		rc, err := l.objects.Open(ctx, item.Asset.ObjectKey)
+		rc, err := storage.OpenProcessedOr(ctx, l.objects, item.Asset.ObjectKey, providerai.VisionCOSProcess)
 		if err != nil {
 			return nil, fmt.Errorf("load %s: %w", item.Asset.ObjectKey, err)
 		}
@@ -80,7 +83,8 @@ func (l imageLoader) Load(ctx context.Context, items []domain.PhotoSetItem) ([]a
 		if err != nil {
 			return nil, err
 		}
-		images = append(images, assessment.ImageInput{Role: string(item.Role), MIMEType: item.Asset.MIMEType, Data: data})
+		data, mime := providerai.ConstrainVisionImage(data, item.Asset.MIMEType)
+		images = append(images, assessment.ImageInput{Role: string(item.Role), MIMEType: mime, Data: data})
 	}
 	return images, nil
 }
