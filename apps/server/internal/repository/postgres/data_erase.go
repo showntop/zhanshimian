@@ -29,6 +29,7 @@ var deleteUserDataQueries = []string{
 	`DELETE FROM advisor_conversations WHERE user_id=$1`,
 	`DELETE FROM diagnostics WHERE user_id=$1`,
 	`DELETE FROM hair_previews WHERE user_id=$1`,
+	`DELETE FROM body_presentations WHERE user_id=$1`,
 	`DELETE FROM product_events WHERE user_id=$1`,
 	`DELETE FROM operations WHERE user_id=$1`,
 	`DELETE FROM analysis_runs WHERE user_id=$1`,

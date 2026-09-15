@@ -40,6 +40,7 @@ func TestBaselineCreatesOnlyNewSchema(t *testing.T) {
 	want := []string{
 		"advisor_conversations", "advisor_messages", "analysis_runs",
 		"billing_ledger", "billing_orders", "billing_reservations", "billing_usage", "billing_wallets",
+		"body_presentations",
 		"diagnostics", "execution_events", "execution_feedback", "execution_steps",
 		"executions", "generation_feedback", "hair_previews",
 		"idempotency_keys", "media_assets", "object_gc_jobs", "operations",
@@ -161,7 +162,7 @@ func TestResetThenMigrateRebuildsFromScratch(t *testing.T) {
 		t.Fatal(err)
 	}
 	rows.Close()
-	if tableCount != 49 {
-		t.Fatalf("rebuilt table count = %d, want 49", tableCount)
+	if tableCount != 50 {
+		t.Fatalf("rebuilt table count = %d, want 50", tableCount)
 	}
 }
