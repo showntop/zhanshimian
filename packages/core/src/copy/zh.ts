@@ -425,6 +425,9 @@ export const ME_COPY = {
   },
   taskWorking: '进行中',
   taskFailed: '未完成，点击查看',
+  // 卡片只展示最近一条；其余收进「全部」弹层
+  taskAllAction: '全部',
+  taskAllTitle: '全部任务',
   archiveTitle: '形象档案',
   latestReport: '最近的分析报告',
   viewAction: '查看',

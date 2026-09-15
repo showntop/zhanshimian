@@ -60,6 +60,25 @@ function visibleOperations(operations: readonly OperationRef[]): OperationRef[] 
   )
 }
 
+/** 任务行：卡片与「全部」弹层共用同一套行渲染。 */
+function TaskRow({ operation }: { operation: OperationRef }) {
+  const taskFailed = operation.status === 'failed'
+  return (
+    <View className="me__row pressable" onClick={() => openOperation(operation)}>
+      <View className="me__row-main">
+        <Text className="me__row-label">{ME_COPY.taskKindLabels[operation.kind]}</Text>
+      </View>
+      <Text
+        className={`me__row-value ${
+          taskFailed ? 'me__row-value--warn' : 'me__row-value--moss'
+        }`}
+      >
+        {taskFailed ? ME_COPY.taskFailed : ME_COPY.taskWorking}
+      </Text>
+    </View>
+  )
+}
+
 /** 点击行进到各自的归属页：失败态的重试也在归属页里完成。 */
 function openOperation(operation: OperationRef): void {
   switch (operation.kind) {
@@ -102,6 +121,7 @@ export default function Profile() {
   const [account, setAccount] = useState<MeAccount | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [buyOpen, setBuyOpen] = useState(false)
+  const [tasksOpen, setTasksOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [nameOpen, setNameOpen] = useState(false)
   const [nicknameDraft, setNicknameDraft] = useState('')
@@ -161,6 +181,8 @@ export default function Profile() {
   const billing = boot?.billing ?? account?.billing ?? null
   const summary = profile ?? boot?.profile_summary ?? null
   const tasks = visibleOperations(boot?.active_operations ?? [])
+  // 卡片只放最近一条（列表首位），其余收进「全部」弹层
+  const latestTask = tasks[0] ?? null
   const nickname = account?.nickname?.trim() || DEFAULT_NICKNAME
 
   // 头像：账户头像优先（URL 先过 userImage 严格校验），回退报告正脸照，再退首字母圆块
@@ -333,32 +355,20 @@ export default function Profile() {
               </View>
             </View>
 
-            {tasks.length > 0 ? (
+            {latestTask ? (
               <View className={`me__card ${enter(1)}`}>
-                <Text className="me__section">{ME_COPY.tasksTitle}</Text>
-                {tasks.map((operation) => {
-                  const taskFailed = operation.status === 'failed'
-                  return (
-                    <View
-                      key={operation.id}
-                      className="me__row pressable"
-                      onClick={() => openOperation(operation)}
+                <View className="me__section-head">
+                  <Text className="me__section">{ME_COPY.tasksTitle}</Text>
+                  {tasks.length > 1 ? (
+                    <Text
+                      className="me__section-action pressable"
+                      onClick={() => setTasksOpen(true)}
                     >
-                      <View className="me__row-main">
-                        <Text className="me__row-label">
-                          {ME_COPY.taskKindLabels[operation.kind]}
-                        </Text>
-                      </View>
-                      <Text
-                        className={`me__row-value ${
-                          taskFailed ? 'me__row-value--warn' : 'me__row-value--moss'
-                        }`}
-                      >
-                        {taskFailed ? ME_COPY.taskFailed : ME_COPY.taskWorking}
-                      </Text>
-                    </View>
-                  )
-                })}
+                      {ME_COPY.taskAllAction}
+                    </Text>
+                  ) : null}
+                </View>
+                <TaskRow operation={latestTask} />
               </View>
             ) : null}
 
@@ -463,6 +473,17 @@ export default function Profile() {
         )}
       </View>
 
+      <BottomSheet
+        open={tasksOpen}
+        title={ME_COPY.taskAllTitle}
+        onClose={() => setTasksOpen(false)}
+      >
+        <View className="me__task-sheet">
+          {tasks.map((operation) => (
+            <TaskRow key={operation.id} operation={operation} />
+          ))}
+        </View>
+      </BottomSheet>
       <BottomSheet
         open={nameOpen}
         title={PROFILE_SETUP_COPY.editName}

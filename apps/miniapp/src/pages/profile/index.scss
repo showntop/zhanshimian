@@ -132,6 +132,31 @@
     margin-bottom: 12rpx;
   }
 
+  // 分区标题行：标题 + 右侧动作（任务卡的「全部」）
+  &__section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12rpx;
+
+    .me__section {
+      margin-bottom: 0;
+    }
+  }
+
+  &__section-action {
+    flex-shrink: 0;
+    font-size: 24rpx;
+    font-weight: 600;
+    color: var(--moss);
+  }
+
+  // 「全部任务」弹层：行渲染与卡片一致，仅去掉末行分隔线的继承规则已由 me__row 兜底
+  &__task-sheet {
+    display: flex;
+    flex-direction: column;
+  }
+
   &__row {
     display: flex;
     align-items: center;
