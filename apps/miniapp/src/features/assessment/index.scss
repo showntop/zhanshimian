@@ -1,154 +1,298 @@
-// 分析进度页：三张来源照片 + 服务端进度 + 三步指示器。
+// 分析进度页：拱形相框 + 渐变扫描光带 + 进度微光 + 三步指示器（视觉沿用 09-11 旧线）。
+// 旧线硬编码色值一律映射 design tokens；扫描光带 .scan-sweep 复用 @zsm/design 基座的唯一定义。
+// 动效参数对齐 packages/design/src/motion.ts：scan 2000ms / archReveal 600ms / stepPulse 1600ms /
+// 品牌缓动 cubic-bezier(.2,.8,.2,1)。
 // 页面外壳（.page 内边距、AppHeader）归 pages/analysis，这里只管内容。
 .assessment-screen {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 32rpx;
-  padding-top: 28rpx;
+  padding-top: 16rpx;
 
-  // ---------- 本次分析用的三张照片 ----------
-  &__photos {
-    display: flex;
-    gap: 12rpx;
+  // ---------- 拱形相框：主照片 + 扫描光带 + 拍立得角卡 + 状态标记 ----------
+  &__portrait {
+    width: 600rpx;
   }
 
-  &__photo {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10rpx;
+  &__arch {
+    position: relative;
+    height: 620rpx;
+    border-radius: 300rpx 300rpx 40rpx 40rpx;
+    // 旧线 #edf1e6→#f4f3eb→#f1efe6 的暖绿渐变，映射到 moss-soft / cream
+    background: linear-gradient(180deg, var(--moss-soft) 0%, var(--cream) 58%, var(--moss-soft) 100%);
+    border: 1rpx solid var(--line);
+    overflow: hidden;
+
+    // 主照片按宽铺满、顶部锚定（SourceImage anchor=top），避免全身照居中切头。
+    // 嵌在 arch 下提权：覆掉 .source-image 基座的 radius-md（拱形自己裁圆角）。
+    .assessment-screen__hero {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 0;
+      animation: assessment-hero-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    // 侧脸/全身角卡：拍立得式叠在拱形底部两角（SourceImage 投影，角标/弱化语义保留）
+    .assessment-screen__mini {
+      position: absolute;
+      bottom: 30rpx;
+      z-index: 3;
+      width: 148rpx;
+      height: 196rpx;
+      border-radius: 18rpx;
+      border: 5rpx solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 10rpx 26rpx rgba(37, 39, 37, 0.22);
+      animation: assessment-mini-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    .assessment-screen__mini--0 {
+      left: 30rpx;
+      transform: rotate(-5deg);
+      animation-delay: 0.16s;
+    }
+
+    .assessment-screen__mini--1 {
+      right: 30rpx;
+      transform: rotate(5deg);
+      animation-delay: 0.28s;
+    }
+
+    // 进度过 70% 角卡归位（声明在 --0/--1 之后，同特异性下赢）
+    .assessment-screen__mini--rest {
+      transform: rotate(0deg);
+      opacity: 0.92;
+    }
   }
 
-  &__photo-img {
-    width: 100%;
-    height: 240rpx;
-    border-radius: var(--radius-md);
+  &__arch--settle .assessment-screen__mini {
+    transform: rotate(0deg);
   }
 
-  // 缺图就空着：这里是「这张不可用」，不是「这张暂时用别的顶上」
-  &__photo-empty {
-    width: 100%;
-    height: 240rpx;
+  // 缓存没有照片（冷启动）：拱形里留可见的空，不拿别的图顶上
+  &__hero-empty {
+    position: absolute;
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 16rpx;
-    border-radius: var(--radius-md);
-    border: 1rpx dashed var(--line);
-    background: var(--moss-soft);
+    padding: 0 64rpx;
   }
 
-  &__photo-empty-text {
-    font-size: 22rpx;
-    line-height: 1.5;
+  &__hero-empty-text {
+    font-size: 24rpx;
+    line-height: 1.6;
     text-align: center;
     color: var(--ink-2);
   }
 
-  &__photo-label {
-    font-size: 24rpx;
-    color: var(--ink-2);
+  &__mark {
+    position: absolute;
+    bottom: 40rpx;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    padding: 8rpx 20rpx;
+    border-radius: 999rpx;
+    // 旧线 rgba(30,35,29,.55)，token --badge 是同一组色的 .62
+    background: var(--badge);
+    color: #ffffff;
+    font-size: 20rpx;
+    letter-spacing: 1rpx;
+    white-space: nowrap;
   }
 
-  // ---------- 阶段文案（服务端 public_message / stage_code） ----------
-  &__stage {
+  // ---------- 阶段文案（服务端 public_message / 阶段码表） ----------
+  &__stage-block {
     display: flex;
     flex-direction: column;
-    gap: 8rpx;
     align-items: center;
-    text-align: center;
+    gap: 8rpx;
   }
 
-  &__stage-text {
+  &__stage {
     font-size: 34rpx;
     font-weight: 600;
     line-height: 1.4;
     color: var(--ink);
+    text-align: center;
+    // 阶段切换：轻柔淡入上移（key 变更时重放）
+    animation: assessment-stage-swap 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 
   &__stage-note {
     font-size: 24rpx;
     color: var(--ink-2);
+    text-align: center;
   }
 
-  // ---------- 进度 ----------
+  // ---------- 进度：宽度只认服务端 progress_bps，停着就是真的停着 ----------
   &__progress {
-    display: flex;
-    align-items: center;
-    gap: 16rpx;
+    width: 100%;
   }
 
   &__track {
-    flex: 1;
     height: 12rpx;
-    border-radius: var(--radius-pill);
+    border-radius: 999rpx;
     background: var(--moss-soft);
     overflow: hidden;
   }
 
-  // 宽度由服务端 progress_bps 直接决定，没有补间：数字停着就是真的停着
   &__fill {
+    position: relative;
     height: 100%;
-    border-radius: var(--radius-pill);
-    background: var(--moss);
-    transition: width 0.3s ease-out;
+    min-width: 24rpx;
+    border-radius: 999rpx;
+    // 旧线 moss→#6e8c57 的单向渐变，映射到 moss-deep→moss
+    background: linear-gradient(90deg, var(--moss-deep) 0%, var(--moss) 100%);
+    transition: width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    overflow: hidden;
+
+    // 微光流动：0% 也有生命感，暗示任务在跑（低透明度慢速，不刺眼）
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0) 100%);
+      transform: translateX(-100%);
+      animation: assessment-shimmer 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+    }
   }
 
-  &__percent {
-    min-width: 84rpx;
-    text-align: right;
-    font-size: 26rpx;
+  &__progress-meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-top: 14rpx;
+    padding: 0 6rpx;
+  }
+
+  &__num {
+    font-size: 44rpx;
+    font-weight: 700;
+    color: var(--moss);
     font-variant-numeric: tabular-nums;
-    color: var(--ink-2);
   }
 
-  // ---------- 三步指示器 ----------
-  &__steps {
-    display: flex;
-    align-items: center;
-    gap: 12rpx;
-  }
-
-  &__step {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 10rpx;
-  }
-
-  &__step-dot {
-    width: 14rpx;
-    height: 14rpx;
-    border-radius: 50%;
-    background: var(--disabled);
-  }
-
-  &__step-label {
-    font-size: 24rpx;
+  &__eta {
+    font-size: 20rpx;
     color: var(--ink-3);
   }
 
-  &__step--done &__step-dot {
-    background: var(--moss);
+  // ---------- 三步指示器：阶段码 → 第几步，不认识的码全不亮 ----------
+  &__steps {
+    display: flex;
+    width: 100%;
+    padding: 8rpx 24rpx 0;
   }
 
-  &__step--done &__step-label {
+  &__step-item {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14rpx;
+  }
+
+  // 节点间连接线：从上一个圆心到当前圆心
+  &__step-line {
+    position: absolute;
+    top: 24rpx;
+    right: 50%;
+    width: 100%;
+    height: 2rpx;
+    background: var(--line);
+    z-index: 0;
+    transition: background 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    &--done {
+      background: rgba(88, 115, 68, 0.55); // moss 55%（无对应透明度 token）
+    }
+  }
+
+  &__step-dot {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48rpx;
+    height: 48rpx;
+    border-radius: 999rpx;
+    background: var(--surface-strong);
+    border: 2rpx solid var(--line);
+    transition:
+      background 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+      border-color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    &--done {
+      background: var(--moss);
+      border-color: var(--moss);
+
+      .assessment-screen__step-dot-text {
+        color: #ffffff;
+      }
+    }
+
+    &--current {
+      background: var(--moss-soft);
+      border-color: var(--moss);
+      animation: assessment-step-pulse 1.6s ease-in-out infinite;
+
+      .assessment-screen__step-dot-text {
+        color: var(--moss);
+      }
+    }
+  }
+
+  &__step-dot-text {
+    font-size: 20rpx;
+    font-weight: 700;
+    color: var(--ink-3);
+    transition: color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  &__step-label {
+    font-size: 22rpx;
     color: var(--ink-2);
+    transition: color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    &--current {
+      color: var(--moss);
+      font-weight: 600;
+    }
   }
 
-  &__step--active &__step-dot {
-    background: var(--moss);
-    box-shadow: 0 0 0 6rpx var(--moss-soft);
+  // ---------- 提示与不锁人出口 ----------
+  &__tip {
+    font-size: 24rpx;
+    color: var(--ink-3);
+    text-align: center;
   }
 
-  &__step--active &__step-label {
-    font-weight: 600;
-    color: var(--ink);
+  // 次级文字链，弱于进度主信息（TextLink 默认是 moss 强调色，这里压回三级墨）
+  &__wander {
+    margin-top: 24rpx;
+
+    .text-link {
+      color: var(--ink-3);
+      font-weight: 400;
+    }
   }
 
-  // ---------- 页脚 ----------
+  // ---------- 即将打开报告（跳转前唯一一帧，只留一行说明） ----------
+  &__opening {
+    padding-top: 320rpx;
+    font-size: 28rpx;
+    color: var(--ink-2);
+    text-align: center;
+  }
+
+  // ---------- 网络错误分支的页脚（EmptyState / ErrorState 归组件自己） ----------
   &__foot {
     display: flex;
     flex-direction: column;
@@ -156,20 +300,116 @@
     gap: 16rpx;
     padding-top: 16rpx;
   }
+}
+
+// ---------- 业务失败：标题 + 本次照片胶片条 + 公开文案 + 一个明确动作 ----------
+.assessment-fail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20rpx;
+  width: 100%;
+  padding: 64rpx 24rpx 0;
+
+  &__title {
+    font-size: 36rpx;
+    font-weight: 700;
+    color: var(--ink);
+    text-align: center;
+  }
+
+  &__film {
+    display: flex;
+    gap: 16rpx;
+    margin: 8rpx 0 12rpx;
+  }
+
+  &__thumb {
+    width: 120rpx;
+    height: 160rpx;
+    border-radius: var(--radius-md);
+  }
+
+  &__reason {
+    font-size: 26rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+    text-align: center;
+  }
+
+  &__action {
+    margin-top: 24rpx;
+    width: 60%;
+  }
 
   &__request-id {
     font-size: 22rpx;
     color: var(--ink-3);
   }
+}
 
-  &__privacy {
-    font-size: 22rpx;
-    text-align: center;
-    color: var(--ink-3);
+@keyframes assessment-stage-swap {
+  from {
+    opacity: 0;
+    transform: translateY(10rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
+@keyframes assessment-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes assessment-hero-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+// 只动 opacity，避免覆盖角卡的 rotate
+@keyframes assessment-mini-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes assessment-step-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(88, 115, 68, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 0 10rpx rgba(88, 115, 68, 0);
+  }
+}
+
+// 基座另有全局 0.01ms 压缩兜底；这里按旧线把无限/入场动效直接关掉，双保险
 @media (prefers-reduced-motion: reduce) {
+  .assessment-screen__fill::after,
+  .assessment-screen__hero,
+  .assessment-screen__mini,
+  .assessment-screen__stage,
+  .assessment-screen__step-dot--current {
+    animation: none;
+  }
+
   .assessment-screen__fill {
     transition: none;
   }

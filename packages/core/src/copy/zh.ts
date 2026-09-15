@@ -254,6 +254,10 @@ export const ASSESSMENT_COPY = {
   photosMissing: '这张照片暂不可用',
   openingReport: '报告已经准备好，正在打开…',
   retryingNote: '服务端正在重试这一步',
+  // 拱形相框上的状态标记与进度旁的静态预期：只说一次，不随进度跳变
+  markAnalyzing: 'AI 分析中',
+  markSettling: '即将完成',
+  eta: '通常需要 1-2 分钟',
   privacy: '照片全程加密，只有你能看到',
   wander: '先去逛逛，不用守在这里 ›',
   requestIdLabel: '请求编号',

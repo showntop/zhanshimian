@@ -9,8 +9,7 @@ import SceneBriefScreen from '../../features/planning/SceneBriefScreen'
 
 export default function Scene() {
   const pageClass = usePageClass(true)
-  // 路由参数在 useLoad 前是空的：未到位前不渲染 Screen，否则挂载效应会拿空 scene 误判跳走。
-  // 空串是合法值（未知场景，由 Screen 负责回方案 tab），所以用 null 区分「还没到位」。
+  // 路由参数在 useLoad 前为空：未到位前不渲染 Screen（空串是合法值，用 null 区分「还没到位」）。
   const [scene, setScene] = useState<string | null>(null)
 
   useLoad((options) => { setScene(options?.scene ?? '') })
