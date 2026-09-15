@@ -126,13 +126,15 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   /**
    * 整体刷新：revalidate 合并同 key 并发，到达前界面继续显示当前值。
    * 响应无条件整体替换——不做"挑几个字段合并"的客户端拼装。
+   * 唯一例外是 stale 着陆：交接/切场景已经把目光换到别的方案集（ref 已走、
+   * 响应才到），旧响应不得盖回——否则交接当帧的生成中行会被旧集顶掉。
    */
   const refreshPlanSet = useCallback(async (id: string): Promise<PlanSet | null> => {
     try {
       const next = await resourceCache.revalidate(resourceKey('plan-set', id), () =>
         qualityApi.getPlanSet(id),
       )
-      setPlanSet(next)
+      if (planSetIdRef.current === id) setPlanSet(next)
       setFailed(false)
       return next
     } catch (error) {
