@@ -162,14 +162,20 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	root.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(cfg.AssetDir))))
 	root.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadDir))))
 	root.Handle("/", httpapi.New(httpapi.Dependencies{
-		Media:        mediaSvc,
-		Operations:   operationSvc,
-		Home:         home.New(store, home.NewClock()),
+		Media:      mediaSvc,
+		Operations: operationSvc,
+		Home: home.New(store, home.NewClock(), home.Dependencies{
+			Reports:  homeReportReader{inner: assessmentSvc},
+			PlanSets: core.Planning,
+			Today:    homeTodayReader{inner: todaySvc},
+			Billing:  ordersSvc,
+			Media:    newHomeMediaSigner(objects, cfg.PublicBaseURL, cfg.AssetURLTTL),
+		}),
 		Idempotency:  store,
 		DeleteObject: deleteObjectAdapter{objects: objects}.Delete,
 		Events:       eventWriterAdapter{store: store},
 		Jobs:         store,
-		Demo:         demoMediaAdapter{store: store, objects: objects, assetDir: cfg.AssetDir},
+		Demo:         demoMediaAdapter{store: store, objects: objects, assetDir: cfg.AssetDir, presenter: newMediaPresenter(objects, cfg)},
 
 		Account:    accountSvc,
 		Billing:    ordersSvc,

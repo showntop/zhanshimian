@@ -136,12 +136,12 @@ func (a *API) createDemoMedia(w http.ResponseWriter, r *http.Request) {
 	if kind == "" {
 		kind = input.Kind
 	}
-	asset, err := a.demo.CreateDemoMedia(r.Context(), currentUser(r).ID, kind)
+	media, err := a.demo.CreateDemoMedia(r.Context(), currentUser(r).ID, kind)
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return
 	}
-	writeData(w, http.StatusCreated, publicMediaAsset(asset))
+	writeData(w, http.StatusCreated, publicMedia(media))
 }
 
 func publicMediaAsset(asset domain.MediaAsset) mediaAssetDTO {

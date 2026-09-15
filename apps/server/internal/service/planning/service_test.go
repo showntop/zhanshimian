@@ -261,6 +261,7 @@ func (b *billingFake) Reserve(_ context.Context, userID, operationID string, pro
 type fakeStore struct {
 	found        bool
 	planSet      domain.PlanSet
+	list         []domain.PlanSet
 	getCalls     int
 	listCalls    int
 	listScene    *domain.Scene
@@ -290,6 +291,9 @@ func (f *fakeStore) Get(_ context.Context, userID, planSetID string) (domain.Pla
 func (f *fakeStore) List(_ context.Context, _ string, _ string, scene *domain.Scene) ([]domain.PlanSet, error) {
 	f.listCalls++
 	f.listScene = scene
+	if f.list != nil {
+		return f.list, nil
+	}
 	return []domain.PlanSet{f.planSet}, nil
 }
 
@@ -353,10 +357,14 @@ func validPublishedPlanSet() domain.PlanSet {
 }
 
 type fakeRenderReader struct {
-	views map[string]domain.RenderRunView
+	views     map[string]domain.RenderRunView
+	calls     int
+	requested []string
 }
 
-func (f fakeRenderReader) ListCurrentByVariantIDs(context.Context, string, []string) (map[string]domain.RenderRunView, error) {
+func (f *fakeRenderReader) ListCurrentByVariantIDs(_ context.Context, _ string, variantIDs []string) (map[string]domain.RenderRunView, error) {
+	f.calls++
+	f.requested = variantIDs
 	return f.views, nil
 }
 
@@ -368,15 +376,20 @@ func TestGetPlanSetProjectsReadyPartialAcrossVariants(t *testing.T) {
 		{ID: "v-2", Key: domain.VariantWarm, Slot: 2},
 		{ID: "v-3", Key: domain.VariantNatural, Slot: 3},
 	}
+	runID := "run-1"
+	publicationID := "pub-1"
 	views := map[string]domain.RenderRunView{
 		"v-1": {Render: domain.RenderStatusView{State: domain.RenderStateReady, OperationID: "op-1",
-			Media: &domain.RenderMediaView{SourceKind: domain.SourceKindGeneratedPreview, DisplayLabel: domain.DisplayLabelStyleReference}}},
+			RenderRunID: &runID, PublicationID: &publicationID,
+			Media: &domain.RenderMediaView{AssetID: "asset-1", URL: "https://signed.example/preview.jpg",
+				SourceKind: domain.SourceKindGeneratedPreview, DisplayLabel: domain.DisplayLabelStyleReference}}},
 		"v-2": {Render: domain.RenderStatusView{State: domain.RenderStateGenerating, OperationID: "op-2"}},
-		"v-3": {Render: domain.RenderStatusView{State: domain.RenderStateFailed, OperationID: "op-3"}},
+		"v-3": {Render: domain.RenderStatusView{State: domain.RenderStateFailed, OperationID: "op-3", Retryable: true}},
 	}
+	renders := &fakeRenderReader{views: views}
 	svc := NewService(Dependencies{
 		Reports: fakeReports{}, Operations: &fakeStarter{}, Store: store,
-		Renders: fakeRenderReader{views: views},
+		Renders: renders,
 	})
 	got, err := svc.GetPlanSet(context.Background(), "user-1", store.planSet.ID)
 	if err != nil {
@@ -385,13 +398,58 @@ func TestGetPlanSetProjectsReadyPartialAcrossVariants(t *testing.T) {
 	if got.RenderState != "ready_partial" {
 		t.Fatalf("plan set state = %q, want ready_partial", got.RenderState)
 	}
-	if got.Variants[0].RenderState != domain.RenderStateReady || got.Variants[0].RenderOperationID != "op-1" {
-		t.Fatalf("ready variant projection = %#v", got.Variants[0])
+	ready := got.Variants[0].Render
+	if ready == nil || ready.State != domain.RenderStateReady || ready.OperationID != "op-1" {
+		t.Fatalf("ready variant projection = %#v", ready)
 	}
-	if got.Variants[2].HasRenderMedia {
+	if ready.PublicationID == nil || *ready.PublicationID != "pub-1" || ready.Media == nil || ready.Media.URL == "" {
+		t.Fatalf("ready variant must carry publication and signed media: %#v", ready)
+	}
+	if got.Variants[2].Render == nil || got.Variants[2].Render.Media != nil {
 		t.Fatal("failed variant must not carry media")
 	}
-	if got.Variants[1].RenderState != domain.RenderStateGenerating {
-		t.Fatalf("generating variant state = %q", got.Variants[1].RenderState)
+	if !got.Variants[2].Render.Retryable {
+		t.Fatal("failed variant must pass through the render failure policy's retryable flag")
+	}
+	if got.Variants[1].Render == nil || got.Variants[1].Render.State != domain.RenderStateGenerating {
+		t.Fatalf("generating variant state = %#v", got.Variants[1].Render)
+	}
+}
+
+// 列表与详情走同一条合并:跨方案集一次批量读取,各套分别聚合整体状态。
+func TestListPlanSetsMergesRenderStateInOneBatch(t *testing.T) {
+	first := validPublishedPlanSet()
+	first.Variants = []domain.PlanVariant{{ID: "v-1", Slot: 1}, {ID: "v-2", Slot: 2}, {ID: "v-3", Slot: 3}}
+	second := validPublishedPlanSet()
+	second.ID = "10000000-0000-0000-0000-000000000002"
+	second.Variants = []domain.PlanVariant{{ID: "v-4", Slot: 1}, {ID: "v-5", Slot: 2}, {ID: "v-6", Slot: 3}}
+	store := &fakeStore{planSet: first, list: []domain.PlanSet{first, second}}
+	views := map[string]domain.RenderRunView{
+		"v-1": {Render: domain.RenderStatusView{State: domain.RenderStateReady, OperationID: "op-1"}},
+		"v-2": {Render: domain.RenderStatusView{State: domain.RenderStateGenerating, OperationID: "op-2"}},
+	}
+	renders := &fakeRenderReader{views: views}
+	svc := NewService(Dependencies{
+		Reports: fakeReports{}, Operations: &fakeStarter{}, Store: store, Renders: renders,
+	})
+	got, err := svc.ListPlanSets(context.Background(), "user-1", first.ReportID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if renders.calls != 1 {
+		t.Fatalf("render reads = %d, want 1 batched call", renders.calls)
+	}
+	if len(renders.requested) != 6 {
+		t.Fatalf("requested variant IDs = %v, want all 6 across both sets", renders.requested)
+	}
+	if got[0].RenderState != "ready_partial" {
+		t.Fatalf("first set state = %q, want ready_partial", got[0].RenderState)
+	}
+	// 第二套没有任何渲染头:各 variant 无渲染视图,整体仍在 rendering。
+	if got[1].RenderState != "rendering" {
+		t.Fatalf("second set state = %q, want rendering", got[1].RenderState)
+	}
+	if got[1].Variants[0].Render != nil {
+		t.Fatalf("variant without render head must stay nil, got %#v", got[1].Variants[0].Render)
 	}
 }

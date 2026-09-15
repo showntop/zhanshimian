@@ -18,6 +18,7 @@ import (
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/service/account"
+	"github.com/zhanshimian/server/internal/service/assessment"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/storage"
 )
@@ -149,6 +150,54 @@ func newMediaAPI(t *testing.T, store *httpObjectStore) (*API, *httpRepoFake) {
 	t.Helper()
 	repo := newHTTPRepoFake()
 	return &API{media: media.New(repo, store, 10<<20, 15*time.Minute), logger: discardLogger()}, repo
+}
+
+type fakeDemoCreator struct {
+	media assessment.PresentedMedia
+	err   error
+}
+
+func (f fakeDemoCreator) CreateDemoMedia(context.Context, string, string) (assessment.PresentedMedia, error) {
+	return f.media, f.err
+}
+
+// POST /v1/media/demo 的契约响应是 DisplayMedia（asset_id/url/url_expires_at/
+// mime_type/source_kind/display_label），客户端闸门按此校验；mediaAssetDTO
+// 形状会让「用示例照片体验」全部失败。
+func TestCreateDemoMediaReturnsDisplayMedia(t *testing.T) {
+	expires := time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)
+	api := &API{
+		demo: fakeDemoCreator{media: assessment.PresentedMedia{
+			AssetID: "asset-demo-1", URL: "https://signed.example/demo", URLExpiresAt: expires,
+			MIMEType: "image/jpeg", SourceKind: "demo_example", DisplayLabel: "效果示例",
+		}},
+		logger: discardLogger(),
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/media/demo", api.createDemoMedia)
+
+	raw, err := json.Marshal(map[string]any{"role": "face"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/media/demo", bytes.NewReader(raw))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), userKey, domain.User{ID: "user-1"}))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	assertStatus(t, rec, http.StatusCreated)
+	assertJSONPath(t, rec, "data.asset_id", "asset-demo-1")
+	assertJSONPath(t, rec, "data.url", "https://signed.example/demo")
+	assertJSONPath(t, rec, "data.url_expires_at", "2026-09-15T12:00:00Z")
+	assertJSONPath(t, rec, "data.mime_type", "image/jpeg")
+	assertJSONPath(t, rec, "data.source_kind", "demo_example")
+	assertJSONPath(t, rec, "data.display_label", "效果示例")
+	// 旧 mediaAssetDTO 键不得出现。
+	assertJSONDoesNotContainKey(t, rec, "byte_size")
+	assertJSONDoesNotContainKey(t, rec, "sha256")
+	assertJSONDoesNotContainKey(t, rec, "purpose")
+	assertJSONDoesNotContainKey(t, rec, "state")
 }
 
 func createIntentID(t *testing.T, api *API, userID string) string {

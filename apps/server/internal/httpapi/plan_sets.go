@@ -258,7 +258,7 @@ func publicPlanSet(planSet domain.PlanSet) planSetResponse {
 			OutcomeTags:    nonNilStrings(variant.OutcomeTags),
 			DifferenceTags: nonNilStrings(variant.DifferenceTags),
 			Steps:          steps,
-			Render:         planningRenderStatus(),
+			Render:         renderStatusOf(variant),
 			CreatedAt:      formatPublicTime(variant.CreatedAt),
 		})
 	}
@@ -310,23 +310,28 @@ func publicPlanStep(step domain.PlanStep) planStepPayload {
 	}
 }
 
-// planningRenderStatus reports the pre-rendering state: the Rendering plan
-// fills operation/media/publication fields once it consumes the RenderSpec.
+// planningRenderStatus 是该 variant 尚无渲染头时的占位状态:从未触发渲染,
+// 没有 operation/媒体/发布可投影。
 func planningRenderStatus() renderStatusDTO {
 	return renderStatusDTO{State: "unavailable", Retryable: false}
 }
 
 // renderStatusOf projects the variant's current rendering state from the
-// planning read model merged by the service layer.
+// planning read model merged by the service layer. 各字段的真值来源:
+// state/operation_id/retryable/render_run_id/publication_id 直接透传渲染读
+// 模型(retryable 已是渲染失败策略判定后的值);media 由渲染媒体查询随批量读
+// 一并签名返回,ready 时嵌出。
 func renderStatusOf(variant domain.PlanVariant) renderStatusDTO {
-	if variant.RenderState == "" {
+	if variant.Render == nil {
 		return planningRenderStatus()
 	}
 	return renderStatusDTO{
-		State:       variant.RenderState,
-		Retryable:   false,
-		OperationID: nilIfEmpty(variant.RenderOperationID),
-		// media 由渲染媒体查询单独返回;方案列表内不嵌签名 URL。
+		State:         variant.Render.State,
+		Retryable:     variant.Render.Retryable,
+		OperationID:   nilIfEmpty(variant.Render.OperationID),
+		RenderRunID:   variant.Render.RenderRunID,
+		PublicationID: variant.Render.PublicationID,
+		Media:         renderMediaDTO(variant.Render.Media),
 	}
 }
 
@@ -334,7 +339,7 @@ func planSetState(planSet domain.PlanSet) string {
 	if planSet.RenderState != "" {
 		return planSet.RenderState
 	}
-	// 渲染尚未开始:刚发布仍是 planning 阶段。
+	// 渲染只读端口未装配(如单测)时读模型不带聚合状态,退回 planning。
 	return "planning"
 }
 

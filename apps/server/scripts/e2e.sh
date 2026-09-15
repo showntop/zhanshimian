@@ -174,12 +174,17 @@ curl -fsS "$render_media_url" -o "$downloaded_jpeg"
 test "$(od -An -tx1 -N2 "$downloaded_jpeg" | tr -d ' \n')" = "ffd8"
 rm -f "$downloaded_jpeg"
 
-# ---- 5. Home 返回 active_operations,不返回 active_tasks ----
+# ---- 5. Home 返回契约键(report/plan_set/today_plan),不返回 active_tasks ----
 home_json="$(curl -fsS "$api_base/v1/home/bootstrap" -H "Authorization: Bearer $token")"
 printf '%s' "$home_json" | jq -e '
   (.data.active_operations | type == "array") and
   (.data | has("active_tasks") | not) and
-  (.data.current_report.id == "'"$report_id"'")' >/dev/null
+  (.data | has("current_report") | not) and
+  (.data.report.id == "'"$report_id"'") and
+  (.data.report.source_media.face.media.url | length) > 0 and
+  (.data.plan_set.id == "'"$planset_id"'") and
+  (.data.plan_set.variants | length) == 3 and
+  (.data.billing.credits | type == "number")' >/dev/null
 
 # ---- 6. 外围 Reader:不携带任何本地恢复 ID 也能读取当前 grounding ----
 # 发型目录表未进 baseline(交接跟进项),adapter 对缺表降级为空目录;
@@ -207,15 +212,24 @@ advisor_json="$(curl -fsS -X POST "$api_base/v1/advisor/messages" \
   -H "Authorization: Bearer $token" -H 'content-type: application/json' \
   -d '{"content":"今天这套还想更利落一点"}')"
 printf '%s' "$advisor_json" | jq -e '.data.content | length > 0' >/dev/null
-outfit_media_id="$(curl -fsS -X POST "$api_base/v1/media/demo" \
-  -H "Authorization: Bearer $token" -H 'content-type: application/json' -d '{"kind":"outfit"}' | jq -r '.data.id')"
+outfit_demo="$(curl -fsS -X POST "$api_base/v1/media/demo" \
+  -H "Authorization: Bearer $token" -H 'content-type: application/json' -d '{"kind":"outfit"}')"
+# 契约:createDemoMedia 返回 DisplayMedia(demo_example/效果示例 + 签名 URL)。
+printf '%s' "$outfit_demo" | jq -e '
+  (.data.asset_id | type == "string" and length > 0) and
+  (.data.url | type == "string" and length > 0) and
+  (.data.url_expires_at | type == "string" and length > 0) and
+  .data.source_kind == "demo_example" and
+  .data.display_label == "效果示例" and
+  (.data | has("id") | not)' >/dev/null
+outfit_media_id="$(printf '%s' "$outfit_demo" | jq -r '.data.asset_id')"
 outfit_json="$(curl -fsS -X POST "$api_base/v1/diagnostics" \
   -H "Authorization: Bearer $token" -H 'content-type: application/json' \
   -d "{\"kind\":\"outfit\",\"media_id\":\"$outfit_media_id\",\"scene\":\"daily\"}")"
 printf '%s' "$outfit_json" | jq -e '.data.findings | length >= 1' >/dev/null
 outfit_diagnostic_id="$(printf '%s' "$outfit_json" | jq -r '.data.id')"
 product_media_id="$(curl -fsS -X POST "$api_base/v1/media/demo" \
-  -H "Authorization: Bearer $token" -H 'content-type: application/json' -d '{"kind":"product"}' | jq -r '.data.id')"
+  -H "Authorization: Bearer $token" -H 'content-type: application/json' -d '{"kind":"product"}' | jq -r '.data.asset_id')"
 curl -fsS -X POST "$api_base/v1/diagnostics" \
   -H "Authorization: Bearer $token" -H 'content-type: application/json' \
   -d "{\"kind\":\"purchase\",\"media_id\":\"$product_media_id\",\"scene\":\"daily\"}" \

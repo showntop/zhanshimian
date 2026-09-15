@@ -112,8 +112,42 @@ func (s *Service) GetPlanSet(ctx context.Context, userID, planSetID string) (dom
 	if err != nil {
 		return domain.PlanSet{}, err
 	}
+	if err := s.mergeRenders(ctx, userID, &planSet); err != nil {
+		return domain.PlanSet{}, err
+	}
+	return planSet, nil
+}
+
+// ListPlanSets 返回报告下的方案集列表;渲染状态跨方案集一次批量合并,
+// 不按方案集逐个查询。
+func (s *Service) ListPlanSets(ctx context.Context, userID, reportID string, scene *domain.Scene) ([]domain.PlanSet, error) {
+	sets, err := s.deps.Store.List(ctx, userID, reportID, scene)
+	if err != nil {
+		return nil, err
+	}
+	if s.deps.Renders == nil || len(sets) == 0 {
+		return sets, nil
+	}
+	variantIDs := make([]string, 0, len(sets)*3)
+	for _, planSet := range sets {
+		for _, variant := range planSet.Variants {
+			variantIDs = append(variantIDs, variant.ID)
+		}
+	}
+	current, err := s.deps.Renders.ListCurrentByVariantIDs(ctx, userID, variantIDs)
+	if err != nil {
+		return nil, err
+	}
+	for index := range sets {
+		mergeRenderViews(&sets[index], current)
+	}
+	return sets, nil
+}
+
+// mergeRenders 为单套方案集批量读取并合并各 variant 的当前渲染视图。
+func (s *Service) mergeRenders(ctx context.Context, userID string, planSet *domain.PlanSet) error {
 	if s.deps.Renders == nil {
-		return planSet, nil
+		return nil
 	}
 	variantIDs := make([]string, 0, len(planSet.Variants))
 	for _, variant := range planSet.Variants {
@@ -121,25 +155,33 @@ func (s *Service) GetPlanSet(ctx context.Context, userID, planSetID string) (dom
 	}
 	current, err := s.deps.Renders.ListCurrentByVariantIDs(ctx, userID, variantIDs)
 	if err != nil {
-		return domain.PlanSet{}, err
+		return err
 	}
+	mergeRenderViews(planSet, current)
+	return nil
+}
+
+// mergeRenderViews 把渲染读模型的当前视图挂到各 variant 上(整份视图透传,
+// state/operation/retryable/media/publication 都取自渲染侧事实),并聚合整体状态。
+func mergeRenderViews(planSet *domain.PlanSet, current map[string]domain.RenderRunView) {
 	for index := range planSet.Variants {
 		if view, ok := current[planSet.Variants[index].ID]; ok {
-			planSet.Variants[index].RenderState = view.Render.State
-			planSet.Variants[index].RenderOperationID = view.Render.OperationID
-			planSet.Variants[index].HasRenderMedia = view.Render.Media != nil
+			status := view.Render
+			planSet.Variants[index].Render = &status
 		}
 	}
 	planSet.RenderState = planSetRenderState(planSet.Variants)
-	return planSet, nil
 }
 
 // planSetRenderState:全部 ready→ready;至少一个 ready 且其余失败/生成中→
-// ready_partial;全部终态失败→failed;其余→rendering。
+// ready_partial;全部终态失败→failed;其余(含全部尚未触发渲染)→rendering。
 func planSetRenderState(variants []domain.PlanVariant) string {
 	ready, failed, total := 0, 0, len(variants)
 	for _, variant := range variants {
-		switch variant.RenderState {
+		if variant.Render == nil {
+			continue
+		}
+		switch variant.Render.State {
 		case domain.RenderStateReady:
 			ready++
 		case domain.RenderStateFailed, domain.RenderStateUnavailable:
@@ -156,10 +198,6 @@ func planSetRenderState(variants []domain.PlanVariant) string {
 	default:
 		return "rendering"
 	}
-}
-
-func (s *Service) ListPlanSets(ctx context.Context, userID, reportID string, scene *domain.Scene) ([]domain.PlanSet, error) {
-	return s.deps.Store.List(ctx, userID, reportID, scene)
 }
 
 func (s *Service) newID() string {

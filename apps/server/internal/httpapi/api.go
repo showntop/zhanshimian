@@ -45,9 +45,9 @@ type API struct {
 	runtime         RuntimeInfo
 }
 
-// HomeService 是首页聚合的最小依赖：只读模型一次调用。
+// HomeService 是首页聚合的最小依赖：一次调用返回契约 HomeBootstrap 投影。
 type HomeService interface {
-	Bootstrap(context.Context, string) (home.Snapshot, error)
+	Bootstrap(context.Context, string) (home.Bootstrap, error)
 }
 
 // Dependencies 承载全部 HTTP 依赖；New 只做路由注册与协议翻译。

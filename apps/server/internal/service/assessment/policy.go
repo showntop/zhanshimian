@@ -74,6 +74,19 @@ func LookupPublicFailure(code string) (PublicFailure, bool) {
 	return PublicFailure{}, false
 }
 
+// classifyTaskFailure 把内部失败码翻译成对客户端公开的安抚文案与重试标记,
+// 让 publicFailures / photoPublicMessage 目录成为唯一事实来源。目录未收录的
+// code 一律保守:不可重试 + 通用文案,不泄露内部细节(厂商、模型、堆栈)。
+func classifyTaskFailure(class domain.ErrorClass, code string) (message string, retryable bool) {
+	if failure, ok := LookupPublicFailure(code); ok {
+		return failure.Message, failure.Retryable
+	}
+	if class == domain.ErrorQualityRejected {
+		return "这次未能形成可靠报告，请重新拍摄后再试", false
+	}
+	return "分析暂时未完成，请稍后重试", false
+}
+
 func (Policy) EvidenceThreshold(policyVersion string) (float64, error) {
 	threshold, ok := evidenceConfidenceByPolicy[policyVersion]
 	if !ok {

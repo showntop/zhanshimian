@@ -13,20 +13,22 @@ import (
 )
 
 type fakeHomeService struct {
-	snapshot home.Snapshot
-	err      error
+	bootstrap home.Bootstrap
+	err       error
 }
 
-func (f fakeHomeService) Bootstrap(context.Context, string) (home.Snapshot, error) {
-	return f.snapshot, f.err
+func (f fakeHomeService) Bootstrap(context.Context, string) (home.Bootstrap, error) {
+	return f.bootstrap, f.err
 }
 
 func TestHomeBootstrapReturnsOperationsNotTasks(t *testing.T) {
 	api := &API{
-		home: fakeHomeService{snapshot: home.Snapshot{
+		home: fakeHomeService{bootstrap: home.Bootstrap{
+			ProfileSummary: &domain.ProfileSummary{HeightCM: 170, Role: "设计师", Budget: "1000-3000"},
 			ActiveOperations: []domain.OperationRef{
 				{ID: "operation-1", Kind: domain.OperationRender, Status: domain.OperationRunning},
 			},
+			Billing: &domain.BillingSummary{Credits: 2, SKUs: []domain.BillingSKU{}},
 		}},
 		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
@@ -42,6 +44,13 @@ func TestHomeBootstrapReturnsOperationsNotTasks(t *testing.T) {
 	assertJSONPath(t, rec, "data.active_operations.0.id", "operation-1")
 	assertJSONPath(t, rec, "data.active_operations.0.kind", "render")
 	assertJSONPath(t, rec, "data.active_operations.0.status", "running")
+	assertJSONPath(t, rec, "data.profile_summary.height_cm", float64(170))
+	assertJSONPath(t, rec, "data.profile_summary.role", "设计师")
+	assertJSONPath(t, rec, "data.billing.credits", float64(2))
 	assertJSONDoesNotContainKey(t, rec, "active_tasks")
 	assertJSONDoesNotContainKey(t, rec, "task")
+	// 契约键是 profile_summary/report/plan_set/today_plan，不是旧读模型键。
+	assertJSONDoesNotContainKey(t, rec, "current_report")
+	assertJSONDoesNotContainKey(t, rec, "recent_plan")
+	assertJSONDoesNotContainKey(t, rec, "today")
 }

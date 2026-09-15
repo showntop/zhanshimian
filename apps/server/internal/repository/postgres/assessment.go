@@ -55,7 +55,7 @@ func (s *Store) CreateOrReuseAssessment(ctx context.Context, params CreateAssess
 		if err != nil {
 			return CreatedAssessment{}, err
 		}
-		task, err := getAssessmentTask(ctx, tx, params.UserID, params.AnalysisInputHash)
+		task, err := getAssessmentTask(ctx, tx, params.UserID, run.OperationID)
 		if err != nil {
 			return CreatedAssessment{}, err
 		}
@@ -94,7 +94,11 @@ func (s *Store) CreateOrReuseAssessment(ctx context.Context, params CreateAssess
 	if err != nil {
 		return CreatedAssessment{}, err
 	}
-	task, err := insertAssessmentTask(ctx, tx, params, op.ID, run.ID, generation, payload)
+	dedupeKey, err := nextAssessmentDedupeKey(ctx, tx, params.UserID, params.AnalysisInputHash)
+	if err != nil {
+		return CreatedAssessment{}, err
+	}
+	task, err := insertAssessmentTask(ctx, tx, params, op.ID, run.ID, generation, payload, dedupeKey)
 	if err != nil {
 		return CreatedAssessment{}, err
 	}
@@ -343,9 +347,9 @@ func (s *Store) FinishRunFailure(ctx context.Context, userID, runID string, outc
 	}
 	if _, err = tx.Exec(ctx, `
 		UPDATE operations
-		SET status='failed', error_code=$3, trace_id=$4, retryable=false,
+		SET status='failed', error_code=$3, trace_id=$4, public_message=$5, retryable=$6,
 		    finished_at=now(), updated_at=now(), version=version+1
-		WHERE id=$1::uuid AND user_id=$2::uuid`, opID, userID, nullIfEmpty(failure.Code), traceID); err != nil {
+		WHERE id=$1::uuid AND user_id=$2::uuid`, opID, userID, nullIfEmpty(failure.Code), traceID, failure.PublicMessage, failure.Retryable); err != nil {
 		return err
 	}
 	if _, err = tx.Exec(ctx, `
@@ -480,7 +484,7 @@ func insertAssessmentRun(ctx context.Context, tx pgx.Tx, params CreateAssessment
 		params.AnalyzerSchemaVersion, params.QualityPolicyVersion))
 }
 
-func insertAssessmentTask(ctx context.Context, tx pgx.Tx, params CreateAssessmentParams, operationID, runID string, generation int64, payload []byte) (domain.Task, error) {
+func insertAssessmentTask(ctx context.Context, tx pgx.Tx, params CreateAssessmentParams, operationID, runID string, generation int64, payload []byte, dedupeKey string) (domain.Task, error) {
 	return scanAssessmentTask(tx.QueryRow(ctx, `
 		INSERT INTO tasks(
 			user_id,operation_id,type,subject_type,subject_id,subject_generation,
@@ -489,7 +493,26 @@ func insertAssessmentTask(ctx context.Context, tx pgx.Tx, params CreateAssessmen
 			$1::uuid,$2::uuid,'assessment','analysis_run',$3::uuid,$4,
 			1,$5,$6,'queued',$7,''
 		) RETURNING`+assessmentTaskReturning,
-		params.UserID, operationID, runID, generation, payload, "assessment:"+params.AnalysisInputHash, params.MaxTaskAttempts))
+		params.UserID, operationID, runID, generation, payload, dedupeKey, params.MaxTaskAttempts))
+}
+
+// nextAssessmentDedupeKey 首个任务用语义基键;同输入已有历史任务(终态失败/
+// 拒绝后同图重提)时派生 :retry:N 代际键——tasks 表 UNIQUE(user_id,dedupe_key)
+// 不允许复用。计数在 per-(user,hash) 咨询锁内读取,与 planning StartWithTask
+// 的代际派生同语义:并发双方数到相同的 N、派生相同的键,唯一索引只放行一个。
+func nextAssessmentDedupeKey(ctx context.Context, tx pgx.Tx, userID, inputHash string) (string, error) {
+	base := "assessment:" + inputHash
+	var prior int
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM tasks
+		WHERE user_id=$1::uuid AND (dedupe_key=$2 OR strpos(dedupe_key, $2 || ':')=1)`,
+		userID, base).Scan(&prior); err != nil {
+		return "", err
+	}
+	if prior == 0 {
+		return base, nil
+	}
+	return fmt.Sprintf("%s:retry:%d", base, prior), nil
 }
 
 const assessmentTaskReturning = `
@@ -498,12 +521,21 @@ const assessmentTaskReturning = `
 	attempt, max_attempts, available_at, progress_bps, stage_code,
 	error_class, error_code, created_at, updated_at, finished_at`
 
+// getAnalysisRunByHash 只返回可复用的 run:在途(outcome IS NULL)或已发布。
+// 终态 failed/rejected 的 run 留在历史中,同输入重提走新 run 与新 operation
+// (见 003_analysis_run_retry.sql 的在途部分唯一索引)。
 func getAnalysisRunByHash(ctx context.Context, q assessmentQuerier, userID, inputHash string) (domain.AnalysisRun, error) {
-	return scanAnalysisRun(q.QueryRow(ctx, analysisRunSelect+` WHERE user_id=$1::uuid AND input_hash=$2`, userID, inputHash))
+	return scanAnalysisRun(q.QueryRow(ctx, analysisRunSelect+`
+		WHERE user_id=$1::uuid AND input_hash=$2
+		  AND (outcome IS NULL OR outcome='published')
+		ORDER BY created_at DESC, id DESC LIMIT 1`, userID, inputHash))
 }
 
-func getAssessmentTask(ctx context.Context, q assessmentQuerier, userID, inputHash string) (domain.Task, error) {
-	return scanAssessmentTask(q.QueryRow(ctx, assessmentTaskSelect+` WHERE user_id=$1::uuid AND dedupe_key=$2`, userID, "assessment:"+inputHash))
+// getAssessmentTask 返回 run 关联 operation 下的任务(每个 assessment
+// operation 恰有一个任务);重开代际的 dedupe_key 带 :retry:N 后缀,
+// 不能再按语义基键查。
+func getAssessmentTask(ctx context.Context, q assessmentQuerier, userID, operationID string) (domain.Task, error) {
+	return scanAssessmentTask(q.QueryRow(ctx, assessmentTaskSelect+` WHERE user_id=$1::uuid AND operation_id=$2::uuid`, userID, operationID))
 }
 
 func currentProfileGeneration(ctx context.Context, q assessmentQuerier, userID string) (int64, error) {
@@ -664,10 +696,14 @@ func supersedeAssessmentTx(ctx context.Context, tx pgx.Tx, userID, operationID, 
 func failAssessmentTx(ctx context.Context, tx pgx.Tx, userID, runID, operationID, taskID string, failure *domain.TaskFailure) error {
 	code := ""
 	class := ""
+	publicMessage := ""
+	retryable := false
 	runOutcome := domain.AnalysisOutcomeFailed
 	if failure != nil {
 		code = failure.Code
 		class = string(failure.Class)
+		publicMessage = failure.PublicMessage
+		retryable = failure.Retryable
 		if failure.Class == domain.ErrorQualityRejected {
 			runOutcome = domain.AnalysisOutcomeRejected
 		}
@@ -679,9 +715,10 @@ func failAssessmentTx(ctx context.Context, tx pgx.Tx, userID, runID, operationID
 	}
 	if _, err := tx.Exec(ctx, `
 		UPDATE operations
-		SET status='failed', error_code=$3, trace_id=COALESCE(trace_id, $4), retryable=false,
+		SET status='failed', error_code=$3, trace_id=COALESCE(trace_id, $4),
+		    public_message=$5, retryable=$6,
 		    finished_at=now(), updated_at=now(), version=version+1
-		WHERE id=$1::uuid AND user_id=$2::uuid`, operationID, userID, nullIfEmpty(code), uuid.NewString()); err != nil {
+		WHERE id=$1::uuid AND user_id=$2::uuid`, operationID, userID, nullIfEmpty(code), uuid.NewString(), publicMessage, retryable); err != nil {
 		return err
 	}
 	_, err := tx.Exec(ctx, `

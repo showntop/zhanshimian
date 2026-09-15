@@ -25,9 +25,22 @@ import (
 )
 
 // mediaPresenter 把 MediaAsset 投影成可渲染媒体：签 URL + 来源/角标映射。
+// COS 走短时签名；本地存储没有签名能力时回退 PUBLIC_BASE_URL + /uploads/
+// 公开路径（与 bodyURLSigner 同一做法，开发环境可播）。
 type mediaPresenter struct {
-	signer storage.SignedURLStorage
-	ttl    time.Duration
+	signer        storage.SignedURLStorage
+	ttl           time.Duration
+	publicBaseURL string
+}
+
+// newMediaPresenter 为读路径装配媒体呈现器：支持签名的存储走签名，
+// 否则回退公开前缀拼接。
+func newMediaPresenter(objects storage.ObjectStorage, cfg config.Config) mediaPresenter {
+	var signer storage.SignedURLStorage
+	if s, ok := objects.(storage.SignedURLStorage); ok {
+		signer = s
+	}
+	return mediaPresenter{signer: signer, ttl: cfg.AssetURLTTL, publicBaseURL: strings.TrimRight(cfg.PublicBaseURL, "/")}
 }
 
 func (p mediaPresenter) Present(ctx context.Context, asset domain.MediaAsset) (assessment.PresentedMedia, error) {
@@ -42,6 +55,9 @@ func (p mediaPresenter) Present(ctx context.Context, asset domain.MediaAsset) (a
 			return presented, err
 		}
 		presented.URL = url
+		presented.URLExpiresAt = time.Now().Add(p.ttl).UTC()
+	} else if p.publicBaseURL != "" {
+		presented.URL = p.publicBaseURL + "/uploads/" + strings.TrimPrefix(asset.ObjectKey, "/")
 		presented.URLExpiresAt = time.Now().Add(p.ttl).UTC()
 	}
 	return presented, nil
@@ -140,11 +156,13 @@ func (a deleteObjectAdapter) Delete(key string) error {
 
 // demoMediaAdapter 提供 Demo 媒体（POST /v1/media/demo）：
 // 内置 assets/looks/*.png 写入对象存储（worker 与签名 URL 都按真实对象取），
-// 再落 origin=demo 的媒体行，展示侧映射为 效果示例。
+// 再落 origin=demo 的媒体行，展示侧映射为 效果示例；创建后即刻呈现为
+// DisplayMedia（含签名/回退 URL），满足契约 createDemoMedia 响应。
 type demoMediaAdapter struct {
-	store    *postgres.Store
-	objects  storage.ObjectStorage
-	assetDir string
+	store     *postgres.Store
+	objects   storage.ObjectStorage
+	assetDir  string
+	presenter mediaPresenter
 }
 
 var demoKinds = map[string]bool{"face": true, "side": true, "body": true, "outfit": true, "product": true, "wardrobe": true}
@@ -162,14 +180,14 @@ func demoBundledAsset(kind string) (file, ext, mime string) {
 	}
 }
 
-func (a demoMediaAdapter) CreateDemoMedia(ctx context.Context, userID, kind string) (domain.MediaAsset, error) {
+func (a demoMediaAdapter) CreateDemoMedia(ctx context.Context, userID, kind string) (assessment.PresentedMedia, error) {
 	if !demoKinds[kind] {
-		return domain.MediaAsset{}, fmt.Errorf("%w: unsupported photo kind", account.ErrValidation)
+		return assessment.PresentedMedia{}, fmt.Errorf("%w: unsupported photo kind", account.ErrValidation)
 	}
 	bundled, ext, mime := demoBundledAsset(kind)
 	file, err := os.Open(filepath.Join(a.assetDir, bundled))
 	if err != nil {
-		return domain.MediaAsset{}, fmt.Errorf("open bundled demo asset: %w", err)
+		return assessment.PresentedMedia{}, fmt.Errorf("open bundled demo asset: %w", err)
 	}
 	defer file.Close()
 
@@ -177,9 +195,18 @@ func (a demoMediaAdapter) CreateDemoMedia(ctx context.Context, userID, kind stri
 	sum := sha256.New()
 	counter := &countingReader{reader: io.TeeReader(file, sum)}
 	if _, err := a.objects.Save(ctx, objectKey, counter); err != nil {
-		return domain.MediaAsset{}, fmt.Errorf("save demo object: %w", err)
+		return assessment.PresentedMedia{}, fmt.Errorf("save demo object: %w", err)
 	}
-	return a.store.InsertDemoMedia(ctx, userID, kind, objectKey, hex.EncodeToString(sum.Sum(nil)), counter.n, mime)
+	asset, err := a.store.InsertDemoMedia(ctx, userID, kind, objectKey, hex.EncodeToString(sum.Sum(nil)), counter.n, mime)
+	if err != nil {
+		return assessment.PresentedMedia{}, err
+	}
+	presented, err := a.presenter.Present(ctx, asset)
+	if err != nil {
+		return assessment.PresentedMedia{}, err
+	}
+	presented.AssetID = asset.ID
+	return presented, nil
 }
 
 type countingReader struct {

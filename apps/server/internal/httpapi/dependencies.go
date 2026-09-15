@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/service/assessment"
 )
 
 // AccountService 是登录/会话/账号的最小依赖（service/account 的 Service）。
@@ -41,7 +42,8 @@ type JobsReader interface {
 	HealthJobs(ctx context.Context) (domain.JobsHealth, error)
 }
 
-// DemoMediaCreator 是 Demo 媒体行的窄写入端口。
+// DemoMediaCreator 是 Demo 媒体的窄写入端口：创建即呈现为 DisplayMedia
+// （source_kind=demo_example、display_label=效果示例、URL 已签/回退）。
 type DemoMediaCreator interface {
-	CreateDemoMedia(ctx context.Context, userID, kind string) (domain.MediaAsset, error)
+	CreateDemoMedia(ctx context.Context, userID, kind string) (assessment.PresentedMedia, error)
 }

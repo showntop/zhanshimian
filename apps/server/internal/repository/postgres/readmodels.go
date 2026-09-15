@@ -41,36 +41,44 @@ func (s *Store) ReadHome(ctx context.Context, userID string, now time.Time) (hom
 		return snap, err
 	}
 
-	report, err := s.readHomeReport(ctx, userID)
-	if err == nil {
-		snap.CurrentReport = report
-	} else if !isNotFound(err) {
-		return snap, err
-	}
-
-	todayCard, err := s.readHomeToday(ctx, userID)
-	if err == nil {
-		snap.Today = todayCard
-	} else if !isNotFound(err) {
-		return snap, err
-	}
-
-	recent, err := s.readHomeRecentPlan(ctx, userID)
-	if err == nil {
-		snap.RecentPlan = recent
-	} else if !isNotFound(err) {
-		return snap, err
-	}
-
 	operations, err := s.readHomeActiveOperations(ctx, userID)
 	if err != nil {
 		return snap, err
 	}
 	snap.ActiveOperations = operations
 
-	// Billing 需要账单服务的日用量/SKU/支付配置，不是纯 SQL 投影；
-	// 由 home service 在 Task 3 组合，Reader 不越权读 config。
+	// 报告/方案集/今日/权益不是纯 SQL 投影：分别经 assessment/planning/
+	// today/billing 的公开读路径由 home service 组合，Reader 不越权。
 	return snap, nil
+}
+
+// LatestPublishedPlanSetID 定位用户最近一个已发布方案集（发布判定与
+// planning 读模型同一 guard：关联 operation 已 succeeded）。
+func (s *Store) LatestPublishedPlanSetID(ctx context.Context, userID string) (string, error) {
+	var id string
+	err := s.pool.QueryRow(ctx, `
+		SELECT ps.id::text FROM plan_sets ps
+		WHERE ps.user_id=$1::uuid AND `+planningPublishedGuard+`
+		ORDER BY ps.created_at DESC, ps.id DESC
+		LIMIT 1`, userID).Scan(&id)
+	if err != nil {
+		return "", mapNotFound(err)
+	}
+	return id, nil
+}
+
+// MediaObjectInfo 按资产 ID 读对象定位；越权/不存在/已删除一律 ErrNotFound。
+func (s *Store) MediaObjectInfo(ctx context.Context, userID, assetID string) (home.MediaObject, error) {
+	var object home.MediaObject
+	err := s.pool.QueryRow(ctx, `
+		SELECT object_key, mime_type
+		FROM media_assets
+		WHERE user_id=$1::uuid AND id=$2::uuid AND state<>'deleted'`, userID, assetID).
+		Scan(&object.ObjectKey, &object.MIMEType)
+	if err != nil {
+		return home.MediaObject{}, mapNotFound(err)
+	}
+	return object, nil
 }
 
 func (s *Store) readHomeProfile(ctx context.Context, userID string) (*domain.ProfileSummary, error) {
@@ -89,50 +97,6 @@ func (s *Store) readHomeProfile(ctx context.Context, userID string) (*domain.Pro
 	}
 	p.WeightKG, p.BustCM, p.WaistCM, p.HipCM = weight, bust, waist, hip
 	return &p, nil
-}
-
-func (s *Store) readHomeReport(ctx context.Context, userID string) (*domain.ReportCard, error) {
-	var card domain.ReportCard
-	err := s.pool.QueryRow(ctx, `
-		SELECT r.id::text, r.priority_title, r.priority_copy, r.impression_tags, r.created_at
-		FROM user_profiles up
-		JOIN reports r ON r.user_id = up.user_id AND r.id = up.current_report_id
-		WHERE up.user_id=$1::uuid`, userID).
-		Scan(&card.ID, &card.PriorityTitle, &card.PriorityCopy, &card.ImpressionTags, &card.CreatedAt)
-	if err != nil {
-		return nil, mapNotFound(err)
-	}
-	return &card, nil
-}
-
-func (s *Store) readHomeToday(ctx context.Context, userID string) (*domain.TodayCard, error) {
-	var card domain.TodayCard
-	err := s.pool.QueryRow(ctx, `
-		SELECT id::text, title, summary, active, state
-		FROM today_plans WHERE user_id=$1::uuid AND active
-		ORDER BY updated_at DESC LIMIT 1`, userID).
-		Scan(&card.ID, &card.Title, &card.Summary, &card.Active, &card.State)
-	if err != nil {
-		return nil, mapNotFound(err)
-	}
-	return &card, nil
-}
-
-func (s *Store) readHomeRecentPlan(ctx context.Context, userID string) (*domain.PlanVariantCard, error) {
-	var card domain.PlanVariantCard
-	err := s.pool.QueryRow(ctx, `
-		SELECT pv.id::text, pv.plan_set_id::text, pv.name, pv.slot, pv.descriptor, pv.recommended,
-		       (rh.current_publication_id IS NOT NULL)
-		FROM plan_selections ps
-		JOIN plan_variants pv ON pv.user_id=ps.user_id AND pv.id=ps.plan_variant_id
-		LEFT JOIN render_heads rh ON rh.user_id=pv.user_id AND rh.plan_variant_id=pv.id
-		WHERE ps.user_id=$1::uuid
-		ORDER BY ps.created_at DESC LIMIT 1`, userID).
-		Scan(&card.ID, &card.PlanSetID, &card.Name, &card.Slot, &card.Descriptor, &card.Recommended, &card.HasRenderMedia)
-	if err != nil {
-		return nil, mapNotFound(err)
-	}
-	return &card, nil
 }
 
 func (s *Store) readHomeActiveOperations(ctx context.Context, userID string) ([]domain.OperationRef, error) {

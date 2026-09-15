@@ -44,7 +44,56 @@ func TestPostPlanSetsReturnsPublishedPlanSetOnReuse(t *testing.T) {
 	assertJSONPath(t, res, "data.id", published.ID)
 	assertJSONPath(t, res, "data.scene", "daily")
 	assertJSONPath(t, res, "data.variants.0.key", "sharp")
+	// 从未触发渲染的 variant:占位 unavailable,其余渲染字段一律为 null。
 	assertJSONPath(t, res, "data.variants.0.render.state", "unavailable")
+	assertJSONPath(t, res, "data.variants.0.render.retryable", false)
+	assertJSONPath(t, res, "data.variants.0.render.operation_id", nil)
+	assertJSONPath(t, res, "data.variants.0.render.media", nil)
+	assertJSONPath(t, res, "data.variants.0.render.render_run_id", nil)
+	assertJSONPath(t, res, "data.variants.0.render.publication_id", nil)
+}
+
+// 渲染读模型合并后,variant 渲染字段必须透传真实状态:ready 嵌签名媒体与
+// publication_id,failed 透传渲染失败策略判定后的 retryable;整体 state 取聚合值。
+func TestGetPlanSetProjectsRenderReadModel(t *testing.T) {
+	published := planningPublishedPlanSet()
+	published.RenderState = "ready_partial"
+	published.Variants[0].Render = &domain.RenderStatusView{
+		State:         domain.RenderStateReady,
+		Retryable:     false,
+		OperationID:   "30000000-0000-0000-0000-000000000010",
+		RenderRunID:   stringPtr("40000000-0000-0000-0000-000000000010"),
+		PublicationID: stringPtr("50000000-0000-0000-0000-000000000010"),
+		Media: &domain.RenderMediaView{
+			AssetID:      "60000000-0000-0000-0000-000000000010",
+			URL:          "https://signed.example/preview.jpg",
+			URLExpiresAt: timeFixture(),
+			SourceKind:   domain.SourceKindGeneratedPreview,
+			DisplayLabel: domain.DisplayLabelStyleReference,
+		},
+	}
+	published.Variants[1].Render = &domain.RenderStatusView{
+		State:       domain.RenderStateFailed,
+		Retryable:   true,
+		OperationID: "30000000-0000-0000-0000-000000000011",
+		RenderRunID: stringPtr("40000000-0000-0000-0000-000000000011"),
+	}
+	api := newPlanSetAPI(t, fakePlanSetService{get: published})
+	res := api.Do(http.MethodGet, "/v1/plan-sets/"+published.ID, "", nil)
+	assertStatus(t, res, http.StatusOK)
+	assertJSONPath(t, res, "data.state", "ready_partial")
+	assertJSONPath(t, res, "data.variants.0.render.state", "ready")
+	assertJSONPath(t, res, "data.variants.0.render.operation_id", "30000000-0000-0000-0000-000000000010")
+	assertJSONPath(t, res, "data.variants.0.render.render_run_id", "40000000-0000-0000-0000-000000000010")
+	assertJSONPath(t, res, "data.variants.0.render.publication_id", "50000000-0000-0000-0000-000000000010")
+	assertJSONPath(t, res, "data.variants.0.render.media.url", "https://signed.example/preview.jpg")
+	assertJSONPath(t, res, "data.variants.0.render.media.source_kind", "generated_preview")
+	assertJSONPath(t, res, "data.variants.0.render.media.display_label", "风格参考")
+	assertJSONPath(t, res, "data.variants.1.render.state", "failed")
+	assertJSONPath(t, res, "data.variants.1.render.retryable", true)
+	assertJSONPath(t, res, "data.variants.1.render.media", nil)
+	assertJSONPath(t, res, "data.variants.1.render.publication_id", nil)
+	assertJSONPath(t, res, "data.variants.2.render.state", "unavailable")
 }
 
 // 语义键尚未发布、但同键操作已在途(dedupe 命中)时,必须重放在途 operation

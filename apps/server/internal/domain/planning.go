@@ -96,10 +96,9 @@ type PlanVariant struct {
 	Steps          []PlanStep
 	CreatedAt      time.Time
 
-	// 读投影字段:由 Planning read model 合并当前渲染状态,不落库。
-	RenderState       string
-	RenderOperationID string
-	HasRenderMedia    bool
+	// 读投影字段:由 Planning read model 合并的当前渲染视图,不落库。
+	// nil 表示该 variant 尚无渲染头(从未触发渲染或读模型未装配)。
+	Render *RenderStatusView
 }
 
 type PlanStep struct {

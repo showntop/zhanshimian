@@ -202,11 +202,8 @@ func TestReadHomeReturnsOperationsNotTasks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snap.CurrentReport == nil || snap.CurrentReport.ID != f.reportID {
-		t.Fatalf("home missing current report: %#v", snap.CurrentReport)
-	}
-	if snap.RecentPlan == nil || snap.RecentPlan.ID != f.variantID {
-		t.Fatalf("home missing recent plan")
+	if snap.Profile == nil {
+		t.Fatalf("home missing profile summary: %#v", snap.Profile)
 	}
 	if snap.ActiveOperations == nil {
 		t.Fatalf("active_operations must never be nil")
@@ -222,6 +219,61 @@ func TestReadHomeReturnsOperationsNotTasks(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("in-flight operation missing from home: %#v", snap.ActiveOperations)
+	}
+}
+
+func TestLatestPublishedPlanSetIDStaysInTenant(t *testing.T) {
+	f := newReadModelFixture(t)
+	ctx := context.Background()
+
+	id, err := f.store.LatestPublishedPlanSetID(ctx, f.userA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != f.planSetID {
+		t.Fatalf("latest plan set = %q, want %q", id, f.planSetID)
+	}
+	if _, err := f.store.LatestPublishedPlanSetID(ctx, f.userB); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("cross-tenant latest plan set = %v, want ErrNotFound", err)
+	}
+}
+
+func TestMediaObjectInfoRequiresOwnedLiveAsset(t *testing.T) {
+	f := newReadModelFixture(t)
+	ctx := context.Background()
+
+	var assetID, wantKey string
+	if err := f.store.pool.QueryRow(ctx, `
+		SELECT ma.id::text, ma.object_key
+		FROM render_publications rp
+		JOIN render_candidates rc ON rc.user_id=rp.user_id AND rc.id=rp.candidate_id
+		JOIN media_assets ma ON ma.user_id=rc.user_id AND ma.id=rc.asset_id
+		WHERE rp.user_id=$1::uuid AND rp.id=$2::uuid`, f.userA, f.publicationID).
+		Scan(&assetID, &wantKey); err != nil {
+		t.Fatal(err)
+	}
+
+	object, err := f.store.MediaObjectInfo(ctx, f.userA, assetID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if object.ObjectKey != wantKey || object.MIMEType == "" {
+		t.Fatalf("media object = %#v", object)
+	}
+	if _, err := f.store.MediaObjectInfo(ctx, f.userB, assetID); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("cross-tenant media object = %v, want ErrNotFound", err)
+	}
+	if _, err := f.store.MediaObjectInfo(ctx, f.userA, uuid.NewString()); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("unknown media object = %v, want ErrNotFound", err)
+	}
+
+	if _, err := f.store.pool.Exec(ctx, `
+		UPDATE media_assets SET state='deleted', deleted_at=now()
+		WHERE user_id=$1::uuid AND id=$2::uuid`, f.userA, assetID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.store.MediaObjectInfo(ctx, f.userA, assetID); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("deleted media object = %v, want ErrNotFound", err)
 	}
 }
 

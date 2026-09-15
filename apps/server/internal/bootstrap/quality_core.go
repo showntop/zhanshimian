@@ -25,11 +25,7 @@ type qualityCore struct {
 // 并把三个 handler 合并进同一个 worker registry。API 侧取 Service，
 // Worker 侧取 Registry；两者共享同一批 store / 对象库 / AI runtime。
 func wireQualityCore(cfg config.Config, store *postgres.Store, objects storage.ObjectStorage, ai AIBundle) (*qualityCore, error) {
-	var signer storage.SignedURLStorage
-	if s, ok := objects.(storage.SignedURLStorage); ok {
-		signer = s
-	}
-	presenter := mediaPresenter{signer: signer, ttl: cfg.AssetURLTTL}
+	presenter := newMediaPresenter(objects, cfg)
 	aiRuntime := structuredRuntimeAdapter{runtime: ai.Runtime}
 	providers := providerai.NewAssessmentProviders(aiRuntime)
 
@@ -51,11 +47,6 @@ func wireQualityCore(cfg config.Config, store *postgres.Store, objects storage.O
 		return nil, err
 	}
 
-	planningBundle, err := WirePlanning(cfg, store, aiRuntime)
-	if err != nil {
-		return nil, err
-	}
-
 	qualityPolicy := rendering.QualityPolicy{Version: "render-quality-v1"}
 	if cfg.Environment == "production" {
 		qualityPolicy, err = LoadRenderingQualityPolicy("config/render-quality-policy.v1.json")
@@ -64,6 +55,13 @@ func wireQualityCore(cfg config.Config, store *postgres.Store, objects storage.O
 		}
 	}
 	renderingBundle, err := WireRendering(cfg, store, objects, runtimeImageCaller{ai.Runtime}, aiRuntime, qualityPolicy)
+	if err != nil {
+		return nil, err
+	}
+
+	// 渲染 Service 即 Planning 的渲染只读端口:方案读模型经它合并各 variant
+	// 的当前渲染状态(含签名媒体 URL)。
+	planningBundle, err := WirePlanning(cfg, store, aiRuntime, renderingBundle.Service)
 	if err != nil {
 		return nil, err
 	}

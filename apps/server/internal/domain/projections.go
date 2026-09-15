@@ -58,35 +58,6 @@ type ProfileSummary struct {
 	HipCM    *float64 `json:"hip_cm,omitempty"`
 }
 
-// ReportCard 是首页的报告摘要卡。
-type ReportCard struct {
-	ID             string    `json:"id"`
-	PriorityTitle  string    `json:"priority_title"`
-	PriorityCopy   string    `json:"priority_copy"`
-	ImpressionTags []string  `json:"impression_tags"`
-	CreatedAt      time.Time `json:"created_at"`
-}
-
-// TodayCard 是首页的今日方案摘要卡。
-type TodayCard struct {
-	ID      string `json:"id"`
-	Title   string `json:"title"`
-	Summary string `json:"summary"`
-	Active  bool   `json:"active"`
-	State   string `json:"state"`
-}
-
-// PlanVariantCard 是首页的最近方案变体摘要卡。
-type PlanVariantCard struct {
-	ID             string `json:"id"`
-	PlanSetID      string `json:"plan_set_id"`
-	Name           string `json:"name"`
-	Slot           int    `json:"slot"`
-	Descriptor     string `json:"descriptor"`
-	Recommended    bool   `json:"recommended"`
-	HasRenderMedia bool   `json:"has_render_media"`
-}
-
 // ProfileSnapshot 是 grounding 用的结构化档案快照（非 UI 摘要，保留偏好原文）。
 type ProfileSnapshot struct {
 	Role        string

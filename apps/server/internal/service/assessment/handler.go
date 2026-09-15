@@ -176,6 +176,11 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 }
 
 func (h *Handler) Commit(ctx context.Context, lease domain.TaskLease, result domain.TaskResult) (domain.CommitOutcome, error) {
+	if result.Disposition == domain.TaskDomainFail && result.Failure != nil && result.Failure.PublicMessage == "" {
+		// 任务运行器合成的失败(transient 重试耗尽、panic/timeout、permanent 上抛)
+		// 不经过 stageRejection,在写总入口统一补公开文案与重试标记。
+		enrichTaskFailure(result.Failure)
+	}
 	return h.repo.CommitAssessment(ctx, lease, result)
 }
 
@@ -187,13 +192,23 @@ func (h *Handler) stageRejection(err error) (domain.TaskResult, error) {
 func publicTaskFailure(err error) *domain.TaskFailure {
 	var public *PublicFailure
 	if errors.As(err, &public) && public != nil {
-		return &domain.TaskFailure{Class: domain.ErrorQualityRejected, Code: public.Code}
+		return newTaskFailure(domain.ErrorQualityRejected, public.Code)
 	}
 	var rejected *PhotoRejectedError
 	if errors.As(err, &rejected) && rejected != nil {
-		return &domain.TaskFailure{Class: domain.ErrorQualityRejected, Code: rejected.Code}
+		return newTaskFailure(domain.ErrorQualityRejected, rejected.Code)
 	}
-	return &domain.TaskFailure{Class: domain.ErrorQualityRejected, Code: "assessment_rejected"}
+	return newTaskFailure(domain.ErrorQualityRejected, "assessment_rejected")
+}
+
+func newTaskFailure(class domain.ErrorClass, code string) *domain.TaskFailure {
+	failure := &domain.TaskFailure{Class: class, Code: code}
+	enrichTaskFailure(failure)
+	return failure
+}
+
+func enrichTaskFailure(failure *domain.TaskFailure) {
+	failure.PublicMessage, failure.Retryable = classifyTaskFailure(failure.Class, failure.Code)
 }
 
 func toAIImages(images []ImageInput) []ai.ImageInput {

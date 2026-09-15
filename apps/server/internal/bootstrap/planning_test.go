@@ -19,7 +19,7 @@ func TestPlanningDefinitionPinsBudgetAndLease(t *testing.T) {
 }
 
 func TestWirePlanningRegistersPlanSetGenerationHandler(t *testing.T) {
-	bundle, err := WirePlanning(validPlanningConfig("test"), nil, &fakePlanningRuntime{})
+	bundle, err := WirePlanning(validPlanningConfig("test"), nil, &fakePlanningRuntime{}, nil)
 	if err != nil {
 		t.Fatalf("WirePlanning: %v", err)
 	}
@@ -46,13 +46,13 @@ func TestWirePlanningRegistersPlanSetGenerationHandler(t *testing.T) {
 func TestProductionBootstrapRequiresPlanningCapabilities(t *testing.T) {
 	cfg := validPlanningConfig("production")
 	delete(cfg.AIRouting.Routes, "plan_grounding_verification")
-	_, err := WirePlanning(cfg, nil, &fakePlanningRuntime{})
+	_, err := WirePlanning(cfg, nil, &fakePlanningRuntime{}, nil)
 	if err == nil {
 		t.Fatal("expected missing capability error")
 	}
 	cfg = validPlanningConfig("production")
 	delete(cfg.AIRouting.Routes, "plan_set_generation")
-	if _, err = WirePlanning(cfg, nil, &fakePlanningRuntime{}); err == nil {
+	if _, err = WirePlanning(cfg, nil, &fakePlanningRuntime{}, nil); err == nil {
 		t.Fatal("expected missing plan_set_generation error")
 	}
 }

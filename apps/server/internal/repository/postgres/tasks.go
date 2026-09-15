@@ -129,7 +129,14 @@ func (s *Store) CommitLeasedTask(ctx context.Context, lease domain.TaskLease, su
 }
 
 func (s *Store) Fail(ctx context.Context, lease domain.TaskLease, failure domain.TaskFailure, availableAt time.Time) (bool, error) {
-	tag, err := s.pool.Exec(ctx, `
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	var status string
+	err = tx.QueryRow(ctx, `
 		UPDATE tasks
 		SET
 			status = CASE
@@ -151,11 +158,29 @@ func (s *Store) Fail(ctx context.Context, lease domain.TaskLease, failure domain
 				ELSE now()
 			END,
 			updated_at = now()
-		WHERE `+leaseGuard, lease.ID, lease.LeaseToken, lease.LeaseOwner, string(failure.Class), failure.Code, availableAt)
+		WHERE `+leaseGuard+`
+		RETURNING status`, lease.ID, lease.LeaseToken, lease.LeaseOwner, string(failure.Class), failure.Code, availableAt).
+		Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	// 退避重试期间同步公开 Operation 状态,客户端轮询能看到"重试中"而不是
+	// 进度冻结。终态(failed/superseded)的 Operation 写总仍归各域 commit
+	// 路径(如 failAssessmentTx),这里只覆盖 retry_wait,避免双写打架。
+	if status == string(domain.TaskRetryWait) {
+		if _, err = tx.Exec(ctx, `
+			UPDATE operations
+			SET status='retrying', retryable=true, updated_at=now(), version=version+1
+			WHERE id=$1::uuid AND user_id=$2::uuid
+			  AND status NOT IN ('succeeded','failed','cancelled','superseded')`,
+			lease.OperationID, lease.UserID); err != nil {
+			return false, err
+		}
+	}
+	return true, tx.Commit(ctx)
 }
 
 func scanTaskLease(row rowScanner) (domain.TaskLease, error) {

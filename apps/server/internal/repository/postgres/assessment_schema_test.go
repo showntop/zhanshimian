@@ -152,7 +152,7 @@ func assertUniqueConstraint(t *testing.T, db *pgxpool.Pool, table string, userID
 			t.Fatalf("first analysis_runs insert: %v", err)
 		}
 		err = insertAnalysisRun(db, userID, photoSetID, opID, value)
-		assertConstraint(t, err, "analysis_runs_user_id_input_hash_key")
+		assertConstraint(t, err, "analysis_runs_inflight_input_uidx")
 		assertSQLState(t, err, "23505")
 	default:
 		t.Fatalf("unsupported table %s column %s", table, column)

@@ -177,6 +177,51 @@ func TestFailRetryableTaskMovesToRetryWait(t *testing.T) {
 	}
 }
 
+func TestFailRetryWaitMarksOperationRetrying(t *testing.T) {
+	store, pool := newTaskStore(t)
+	enqueueTask(t, pool, "assessment")
+	lease, ok, err := store.Claim(context.Background(), "worker-a", 30*time.Second, []domain.TaskType{"assessment"})
+	if err != nil || !ok {
+		t.Fatalf("claim: ok=%v err=%v", ok, err)
+	}
+	updated, err := store.Fail(context.Background(), lease, domain.TaskFailure{Class: domain.ErrorTransient, Code: "provider_timeout"}, time.Now().Add(15*time.Second))
+	if err != nil || !updated {
+		t.Fatalf("fail: updated=%v err=%v", updated, err)
+	}
+	var status string
+	var retryable bool
+	if err := pool.QueryRow(context.Background(), `
+		SELECT status, retryable FROM operations WHERE id=$1::uuid`, lease.OperationID).Scan(&status, &retryable); err != nil {
+		t.Fatalf("load operation: %v", err)
+	}
+	if status != string(domain.OperationRetrying) {
+		t.Fatalf("operation status = %s, want retrying", status)
+	}
+	if !retryable {
+		t.Fatal("operation retryable = false, want true while retrying")
+	}
+}
+
+func TestFailTerminalLeavesOperationToDomainWriter(t *testing.T) {
+	store, pool := newTaskStore(t)
+	enqueueTask(t, pool, "assessment")
+	lease, ok, err := store.Claim(context.Background(), "worker-a", 30*time.Second, []domain.TaskType{"assessment"})
+	if err != nil || !ok {
+		t.Fatalf("claim: ok=%v err=%v", ok, err)
+	}
+	updated, err := store.Fail(context.Background(), lease, domain.TaskFailure{Class: domain.ErrorPermanent, Code: "gone"}, time.Time{})
+	if err != nil || !updated {
+		t.Fatalf("fail: updated=%v err=%v", updated, err)
+	}
+	var status string
+	if err := pool.QueryRow(context.Background(), `SELECT status FROM operations WHERE id=$1::uuid`, lease.OperationID).Scan(&status); err != nil {
+		t.Fatalf("load operation: %v", err)
+	}
+	if status != string(domain.OperationAccepted) {
+		t.Fatalf("operation status = %s, want untouched %s (terminal writes belong to the domain commit path)", status, domain.OperationAccepted)
+	}
+}
+
 func TestFailPermanentTaskAndQualityRejected(t *testing.T) {
 	store, pool := newTaskStore(t)
 	cases := []domain.ErrorClass{domain.ErrorPermanent, domain.ErrorQualityRejected}

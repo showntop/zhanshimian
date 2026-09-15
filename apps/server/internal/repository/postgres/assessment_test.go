@@ -42,6 +42,186 @@ func TestCreateOrReuseAssessmentReturnsSameRunAndOperation(t *testing.T) {
 	}
 }
 
+func TestCreateOrReuseAssessmentFailedRunStartsNewRunAndOperation(t *testing.T) {
+	store, fixture := newAssessmentStore(t)
+	first, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	lease := claimAssessmentTask(t, store, "worker-1")
+	outcome, err := store.CommitAssessment(ctx, lease, domain.TaskResult{
+		Disposition: domain.TaskDomainFail,
+		Failure:     &domain.TaskFailure{Class: domain.ErrorPermanent, Code: "provider_failed"},
+	})
+	if err != nil || outcome != domain.CommitApplied {
+		t.Fatalf("fail first: outcome=%s err=%v", outcome, err)
+	}
+
+	second, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
+	if err != nil {
+		t.Fatalf("second create: %v", err)
+	}
+	if second.Reused {
+		t.Fatal("terminal failed run must not be reused")
+	}
+	if second.Run.ID == first.Run.ID || second.Operation.ID == first.Operation.ID || second.Task.ID == first.Task.ID {
+		t.Fatalf("resubmit must open new run/operation/task, got run=%s op=%s task=%s",
+			second.Run.ID, second.Operation.ID, second.Task.ID)
+	}
+	if second.Task.DedupeKey == first.Task.DedupeKey {
+		t.Fatalf("retry task must derive a new dedupe key, got %s", second.Task.DedupeKey)
+	}
+	if got := countRows(t, store.pool, "analysis_runs"); got != 2 {
+		t.Fatalf("analysis_runs = %d, want 2", got)
+	}
+	var firstOutcome string
+	if err := store.pool.QueryRow(ctx, `SELECT outcome FROM analysis_runs WHERE id=$1::uuid`, first.Run.ID).Scan(&firstOutcome); err != nil {
+		t.Fatalf("load first run: %v", err)
+	}
+	if firstOutcome != string(domain.AnalysisOutcomeFailed) {
+		t.Fatalf("first run outcome = %s, want failed", firstOutcome)
+	}
+	if second.Run.Outcome != nil {
+		t.Fatalf("second run outcome = %s, want in-flight", *second.Run.Outcome)
+	}
+	if second.Operation.Status != domain.OperationAccepted {
+		t.Fatalf("second operation status = %s, want accepted", second.Operation.Status)
+	}
+	if second.Task.Status != domain.TaskQueued {
+		t.Fatalf("second task status = %s, want queued", second.Task.Status)
+	}
+
+	// 第二代也失败后再提:第三代继续开新,dedupe 键继续按代际派生。
+	lease = claimAssessmentTask(t, store, "worker-2")
+	if lease.ID != second.Task.ID {
+		t.Fatalf("claimed %s, want second task %s", lease.ID, second.Task.ID)
+	}
+	if _, err := store.CommitAssessment(ctx, lease, domain.TaskResult{
+		Disposition: domain.TaskDomainFail,
+		Failure:     &domain.TaskFailure{Class: domain.ErrorPermanent, Code: "provider_failed"},
+	}); err != nil {
+		t.Fatalf("fail second: %v", err)
+	}
+	third, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
+	if err != nil {
+		t.Fatalf("third create: %v", err)
+	}
+	if third.Run.ID == first.Run.ID || third.Run.ID == second.Run.ID {
+		t.Fatal("third create reused a terminal run")
+	}
+	if third.Task.DedupeKey == first.Task.DedupeKey || third.Task.DedupeKey == second.Task.DedupeKey {
+		t.Fatalf("third task dedupe key %s collides with a prior generation", third.Task.DedupeKey)
+	}
+	if got := countRows(t, store.pool, "analysis_runs"); got != 3 {
+		t.Fatalf("analysis_runs = %d, want 3", got)
+	}
+}
+
+func TestCreateOrReuseAssessmentRejectedRunStartsNewRun(t *testing.T) {
+	store, fixture := newAssessmentStore(t)
+	first, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	lease := claimAssessmentTask(t, store, "worker-1")
+	outcome, err := store.CommitAssessment(ctx, lease, domain.TaskResult{
+		Disposition: domain.TaskDomainFail,
+		Failure:     &domain.TaskFailure{Class: domain.ErrorQualityRejected, Code: "photo_content_rejected"},
+	})
+	if err != nil || outcome != domain.CommitApplied {
+		t.Fatalf("reject first: outcome=%s err=%v", outcome, err)
+	}
+
+	second, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
+	if err != nil {
+		t.Fatalf("second create: %v", err)
+	}
+	if second.Reused || second.Run.ID == first.Run.ID {
+		t.Fatal("terminal rejected run must not be reused")
+	}
+	if got := countRows(t, store.pool, "analysis_runs"); got != 2 {
+		t.Fatalf("analysis_runs = %d, want 2", got)
+	}
+}
+
+func TestCreateOrReuseAssessmentPublishedRunIsReused(t *testing.T) {
+	store, fixture := newAssessmentStore(t)
+	created, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	reportID, err := store.PrepareReport(ctx, validPublishParams(store, created, fixture))
+	if err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	lease := claimAssessmentTask(t, store, "worker-1")
+	outcome, err := store.CommitAssessment(ctx, lease, domain.TaskResult{
+		Disposition: domain.TaskPublish, ResultType: "report", ResultID: reportID,
+	})
+	if err != nil || outcome != domain.CommitApplied {
+		t.Fatalf("publish: outcome=%s err=%v", outcome, err)
+	}
+
+	again, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
+	if err != nil {
+		t.Fatalf("reuse create: %v", err)
+	}
+	if !again.Reused {
+		t.Fatal("published run must be reused")
+	}
+	if again.Run.ID != created.Run.ID || again.Operation.ID != created.Operation.ID || again.Task.ID != created.Task.ID {
+		t.Fatalf("published reuse must return the same run/operation/task, got %+v", again)
+	}
+	if got := countRows(t, store.pool, "analysis_runs"); got != 1 {
+		t.Fatalf("analysis_runs = %d, want 1", got)
+	}
+}
+
+func TestCommitAssessmentDomainFailWritesPublicFailureFields(t *testing.T) {
+	t.Run("retryable catalog failure", func(t *testing.T) {
+		store, fixture := newAssessmentStore(t)
+		created, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
+		if err != nil {
+			t.Fatalf("create: %v", err)
+		}
+		lease := claimAssessmentTask(t, store, "worker-1")
+		_, err = store.CommitAssessment(ctx, lease, domain.TaskResult{
+			Disposition: domain.TaskDomainFail,
+			Failure: &domain.TaskFailure{
+				Class:         domain.ErrorQualityRejected,
+				Code:          "report_evidence_insufficient",
+				PublicMessage: "这次未能形成可靠报告，请重新拍摄后再试",
+				Retryable:     true,
+			},
+		})
+		if err != nil {
+			t.Fatalf("commit: %v", err)
+		}
+		assertOperationPublicFailure(t, store, created.Operation.ID, "这次未能形成可靠报告，请重新拍摄后再试", true)
+	})
+	t.Run("non retryable catalog failure", func(t *testing.T) {
+		store, fixture := newAssessmentStore(t)
+		created, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
+		if err != nil {
+			t.Fatalf("create: %v", err)
+		}
+		lease := claimAssessmentTask(t, store, "worker-1")
+		_, err = store.CommitAssessment(ctx, lease, domain.TaskResult{
+			Disposition: domain.TaskDomainFail,
+			Failure: &domain.TaskFailure{
+				Class:         domain.ErrorQualityRejected,
+				Code:          "photo_content_rejected",
+				PublicMessage: "照片不符合拍摄要求，请按提示重新拍摄",
+				Retryable:     false,
+			},
+		})
+		if err != nil {
+			t.Fatalf("commit: %v", err)
+		}
+		assertOperationPublicFailure(t, store, created.Operation.ID, "照片不符合拍摄要求，请按提示重新拍摄", false)
+	})
+}
+
 func TestPrepareAndCommitReportAreTenantSafeAndLeaseGuarded(t *testing.T) {
 	store, fixture := newAssessmentStore(t)
 	created, err := store.CreateOrReuseAssessment(ctx, fixture.createParams())
@@ -489,6 +669,20 @@ func assertAssessmentDomainFail(t *testing.T, store *Store, created CreatedAsses
 	}
 	if errorClass != string(wantClass) || errorCode != wantCode {
 		t.Fatalf("task error = %s/%s, want %s/%s", errorClass, errorCode, wantClass, wantCode)
+	}
+}
+
+func assertOperationPublicFailure(t *testing.T, store *Store, operationID, wantMessage string, wantRetryable bool) {
+	t.Helper()
+	var message string
+	var retryable bool
+	if err := store.pool.QueryRow(ctx, `
+		SELECT public_message, retryable FROM operations WHERE id=$1::uuid`, operationID).
+		Scan(&message, &retryable); err != nil {
+		t.Fatalf("load operation public failure: %v", err)
+	}
+	if message != wantMessage || retryable != wantRetryable {
+		t.Fatalf("public failure = %q/retryable=%v, want %q/retryable=%v", message, retryable, wantMessage, wantRetryable)
 	}
 }
 

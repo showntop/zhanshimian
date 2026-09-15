@@ -86,9 +86,14 @@ type TaskLease struct {
 	LeaseExpiresAt time.Time
 }
 
+// TaskFailure 是任务的失败分类。Class/Code 面向内部台账;PublicMessage 与
+// Retryable 面向客户端(operations.public_message / operations.retryable),
+// 由各域的公开失败目录在提交写总前填充,缺省为零值(不展示、不可重试)。
 type TaskFailure struct {
-	Class ErrorClass
-	Code  string
+	Class         ErrorClass
+	Code          string
+	PublicMessage string
+	Retryable     bool
 }
 
 type TaskResult struct {
