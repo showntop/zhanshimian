@@ -86,6 +86,9 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   const [acceptOperationId, setAcceptOperationId] = useState(
     () => handoff?.operationId ?? routeOperationId ?? '',
   )
+  // 受理是否在途：独立状态，绝不从当前 view 推导——切场景会改写 planSet/planSetId，
+  // 推导式会把在途受理误判「不在途」，轮询与进度一起丢（切走再切回就显示旧方案）
+  const [acceptPending, setAcceptPending] = useState(() => Boolean(handoff?.operationId ?? routeOperationId))
   const [report, setReport] = useState<Report | null>(null)
   // 受理 operation 到达终态失败时上屏的公开文案（'' = 没有失败）；
   // 规划在途的 404 不算失败——那是方案集还没发布的预期状态
@@ -116,12 +119,21 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   planSetIdRef.current = planSetId
   const acceptOperationIdRef = useRef(acceptOperationId)
   acceptOperationIdRef.current = acceptOperationId
+  const acceptPendingRef = useRef(acceptPending)
+  acceptPendingRef.current = acceptPending
   const sceneRef = useRef(scene)
   sceneRef.current = scene
   const reportRef = useRef(report)
   reportRef.current = report
   // 切场景乱序保护：后发的请求赢，先到的慢响应不得盖回去
   const sceneReqRef = useRef(0)
+  // 受理的场景归属：OperationRef 不带场景，受理时记下。用 ref 而不是
+  // planSetSceneKey(planSetId) 回查——切场景会改写 planSetId，回查必然串场。
+  const acceptSceneRef = useRef('')
+  // 受理归属的方案集 id：同理不能拿 planSetId 回查
+  const acceptPlanSetIdRef = useRef(
+    (handoff?.operationId ?? routeOperationId) ? (handoff?.planSetId ?? routePlanSetId ?? '') : '',
+  )
 
   /**
    * 整体刷新：revalidate 合并同 key 并发，到达前界面继续显示当前值。
@@ -144,7 +156,8 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       if (
         error instanceof PublicApiError &&
         error.statusCode === 404 &&
-        acceptOperationIdRef.current
+        acceptOperationIdRef.current &&
+        acceptPendingRef.current
       ) {
         return null
       }
@@ -199,6 +212,7 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       setAcceptFailed('')
       setFailed(false)
       setAcceptOperationId(next.operationId ?? '')
+      setAcceptPending(Boolean(next.operationId))
       setPlanSetId(next.planSetId)
       // 换了一份集才清内容（进生成中行/拉取分支）；
       // 同一份集（200 复用、答案没改）保留已渲染内容，后台对账不闪屏
@@ -206,6 +220,9 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       setBootstrapped(true)
       const handoffScene = resourceCache.read<string>(planSetSceneKey(next.planSetId))
       if (handoffScene) setScene(handoffScene)
+      // 受理在途才记场景与归属 id；200 复用（没有任务在跑）不算受理
+      acceptSceneRef.current = next.operationId ? handoffScene ?? '' : ''
+      acceptPlanSetIdRef.current = next.operationId ? next.planSetId : ''
       // 200 复用（没有任务在跑）：立刻对账展示已发布集
       if (!next.operationId) void refreshPlanSet(next.planSetId)
     },
@@ -282,10 +299,10 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
 
   const view = planSet ? planSetView(planSet) : null
 
-  // 受理中的操作（ planning 或「有 id 无数据」）才是「在途」；
-  // 它的场景归属来自侧信道（受理时 Brief 页写入，OperationRef 本身不带场景）
-  const acceptInFlight = Boolean(acceptOperationId && (view?.kind === 'planning' || (!planSet && planSetId)))
-  const acceptScene = acceptInFlight ? resourceCache.read<string>(planSetSceneKey(planSetId)) : undefined
+  // 受理在途 = 有未到终态的受理任务（显式 pending，不从当前 view 推导）
+  const acceptInFlight = Boolean(acceptOperationId && acceptPending)
+  // 受理场景从 ref 取：planSetId 在切场景时被改写，侧信道回查会串场
+  const acceptScene = acceptInFlight ? acceptSceneRef.current || undefined : undefined
   // 归属不到当前受理的在途操作：无法定位场景，走顶部全局提示
   const foreignPlanSetOps = activePlanSetOps.filter((id) => id !== acceptOperationId)
 
@@ -311,11 +328,26 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       const accept = acceptId ? operations.find((op) => op.id === acceptId) : undefined
       if (accept && (accept.status === 'failed' || accept.status === 'cancelled' || accept.status === 'superseded')) {
         // 固定幂等键 24h 内只会重放同一份失败：记下场景，
-        // 下次发起换新键（Brief 页与 generateGeneral 读同一个标记）
-        const failedScene = resourceCache.read<string>(planSetSceneKey(planSetIdRef.current)) ?? 'general'
+        // 下次发起换新键（Brief 页与 generateGeneral 读同一个标记）。
+        // 场景优先取受理归属 ref（planSetId 可能已被切场景改写）
+        const failedScene =
+          acceptSceneRef.current ||
+          resourceCache.read<string>(planSetSceneKey(planSetIdRef.current)) ||
+          'general'
         resourceCache.write(planSetRetryMarkerKey(failedScene), '1')
         setAcceptFailed(accept.public_message || PLANNING_COPY.retryFailedBody)
+        setAcceptPending(false)
         return
+      }
+      if (accept) {
+        // 受理成功终态：不再在途。用户还停在这个场景就把新发布的集顶上来
+        // （切走了不拽回——切过去时 switchScene 会取到最新已发布集）
+        setAcceptPending(false)
+        const acceptedPlanSetId = acceptPlanSetIdRef.current
+        if (acceptedPlanSetId && sceneRef.current === acceptSceneRef.current) {
+          setPlanSetId(acceptedPlanSetId)
+          void refreshPlanSet(acceptedPlanSetId)
+        }
       }
       // 所有被盯的 operation 都到终态了：整体刷新方案集看新状态
       const id = planSetRef.current?.id ?? planSetIdRef.current
@@ -416,11 +448,17 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       if (start.accepted) {
         resourceCache.write(resourceKey('operation', start.operation.id), start.operation)
         setAcceptOperationId(start.operation.id)
+        setAcceptPending(true)
+        acceptSceneRef.current = 'general'
+        acceptPlanSetIdRef.current = start.data.id
         setPlanSetId(start.data.id)
       } else {
         // 复用已发布方案集：没有任务在跑，旧的受理 id 必须清掉，
         // 否则轮询会盯上那份已终态的 operation 把失败卡又顶回来
         setAcceptOperationId('')
+        setAcceptPending(false)
+        acceptSceneRef.current = ''
+        acceptPlanSetIdRef.current = ''
         setPlanSetId(start.planSet.id)
       }
       setBootstrapped(true)
@@ -434,8 +472,10 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
 
   /** 受理失败的「重新生成」：回它自己的场景——场景方案回 Brief 页（预填上次答案改完重发），general 原地重发。 */
   const regenerateAccepted = () => {
-    if (acceptScene && acceptScene !== 'general') {
-      void Taro.navigateTo({ url: `${SCENE_ROUTE}?scene=${acceptScene}` })
+    // 场景取受理归属 ref 而不是 pending 门控的 acceptScene：失败后 pending 已落，门控值必然为空
+    const failedScene = acceptSceneRef.current
+    if (failedScene && failedScene !== 'general') {
+      void Taro.navigateTo({ url: `${SCENE_ROUTE}?scene=${failedScene}` })
       return
     }
     void generateGeneral()
@@ -585,13 +625,15 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         {foreignPlanSetOps.length > 0 ? (
           <Text className="plans__inflight-banner">{PLANNING_COPY.inFlightBanner}</Text>
         ) : null}
-        {acceptFailed ? (
+        {acceptFailed && acceptSceneRef.current === scene ? (
           <View className="plans__scene-empty fade-up">
             <Text className="plans__scene-empty-title">{PLANNING_COPY.retryFailedTitle}</Text>
             <Text className="plans__scene-empty-desc">{acceptFailed}</Text>
             <PrimaryButton text={PLANNING_COPY.regenerateAction} onClick={regenerateAccepted} />
           </View>
-        ) : acceptOperationId ? (
+        ) : acceptInFlight && acceptSceneRef.current === scene ? (
+          // 生成中只归受理所属的场景：别的场景走空态/骨架，
+          // 在途受理由 foreignPlanSetOps 的横幅提示
           <View className="plans__scene-empty">
             <View className="plans__generating">
               <View className="plans__generating-spin spinner" />
@@ -656,6 +698,15 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
 
       {foreignPlanSetOps.length > 0 ? (
         <Text className="plans__inflight-banner">{PLANNING_COPY.inFlightBanner}</Text>
+      ) : null}
+
+      {/* 当前场景有在途受理但屏上还是旧方案集（重新设计提交后切走又切回）：
+          内容继续可读，进度行钉在内容上方，不静默 */}
+      {acceptInFlight && acceptSceneRef.current === scene && planSet?.id !== acceptPlanSetIdRef.current ? (
+        <View className="plans__generating">
+          <View className="plans__generating-spin spinner" />
+          <Text className="plans__generating-text">{PLANNING_COPY.sceneGenerating}</Text>
+        </View>
       ) : null}
 
       {switching ? (
