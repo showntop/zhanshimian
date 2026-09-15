@@ -745,17 +745,25 @@
     }
   }
 
-  // ---------- 最近方案（紧凑行卡） ----------
+  // ---------- 最近方案（续看入口：圆角图框 + 文案分层 + 行动链接） ----------
   &__recent {
     display: flex;
     align-items: center;
-    gap: 24rpx;
-    padding: 20rpx 24rpx;
+    gap: 26rpx;
+    padding: 26rpx 28rpx;
+
+    &-visual {
+      width: 160rpx;
+      height: 200rpx;
+      flex-shrink: 0;
+      overflow: hidden;
+      border-radius: var(--radius-md);
+      background: var(--moss-soft);
+    }
 
     &-img {
-      width: 120rpx;
-      height: 150rpx;
-      flex-shrink: 0;
+      width: 100%;
+      height: 100%;
 
       .example-badge {
         left: 50%;
@@ -774,13 +782,13 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 8rpx;
+      gap: 10rpx;
       min-width: 0;
     }
 
     &-name {
-      font-size: 28rpx;
-      font-weight: 600;
+      font-size: 30rpx;
+      font-weight: 700;
       color: var(--ink);
     }
 
@@ -792,6 +800,13 @@
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
+    }
+
+    &-link {
+      margin-top: 2rpx;
+      font-size: 22rpx;
+      font-weight: 650;
+      color: var(--moss);
     }
 
     &-arrow {

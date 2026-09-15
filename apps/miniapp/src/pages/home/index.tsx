@@ -456,15 +456,18 @@ export default function Home() {
                   })
                 }
               >
-                <SourceImage
-                  className="home__recent-img"
-                  media={featured.render.media}
-                  anchor="top"
-                  frameAspect={120 / 150}
-                />
+                <View className="home__recent-visual">
+                  <SourceImage
+                    className="home__recent-img"
+                    media={featured.render.media}
+                    anchor="top"
+                    frameAspect={120 / 150}
+                  />
+                </View>
                 <View className={`home__recent-copy ${enter(3)}`}>
                   <Text className="home__recent-name">{planSlotLabel(featured.name, featured.slot)}</Text>
                   <Text className="home__recent-why">{featured.rationale}</Text>
+                  <Text className="home__recent-link">{HOME_COPY.continuePlan}</Text>
                 </View>
                 <Text className="home__recent-arrow">›</Text>
               </View>
