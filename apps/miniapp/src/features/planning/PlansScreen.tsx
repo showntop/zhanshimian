@@ -10,7 +10,7 @@
 // 3. 对比左图只用方案集绑定的报告（boundBodyMedia），绑定不了就退单图，
 //    绝不拿"手头最近一份报告"的照片凑对比。
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Taro from '@tarojs/taro'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
 import {
   EMPTY_COPY,
@@ -23,7 +23,7 @@ import type { DisplayMedia, PlanSet, PlanVariant, Report } from '@zsm/core'
 import { qualityApi } from '../../app/api/quality'
 import { PublicApiError } from '../../app/api/result'
 import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
-import { takePlanSetHandoff } from '../../app/plan-set-handoff'
+import { takePlanSetHandoff, type PlanSetHandoff } from '../../app/plan-set-handoff'
 import { useOperationPolling } from '../../app/operations/use-operation-polling'
 import { useShowOnce } from '../../hooks/use-page-visibility'
 import { handleBillingError } from '../../services/billing'
@@ -40,6 +40,9 @@ import TextLink from '../../components/text-link'
 import {
   boundBodyMedia,
   createIdempotencyKey,
+  inFlightPlanSetOperationIds,
+  planSetRetryMarkerKey,
+  planSetSceneKey,
   planSetView,
   sortedVariants,
   variantRenderView,
@@ -49,6 +52,7 @@ import './index.scss'
 const HOME_ROUTE = '/pages/home/index'
 const SCENE_ROUTE = '/pages/scene/index'
 const PLAN_ROUTE = '/pages/plan/index'
+const CAPTURE_ROUTE = '/pages/capture/index'
 
 /** 渲染还在动的状态集合：这些 operation 值得盯。 */
 const RENDER_IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
@@ -91,6 +95,8 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   const [scene, setScene] = useState<string>('general')
   const [bootstrapped, setBootstrapped] = useState(Boolean(planSetId))
   const [analyzingOperationId, setAnalyzingOperationId] = useState('')
+  // bootstrap 里在途的方案集受理 id（含别的场景提交的）：进轮询与「制作中」呈现
+  const [activePlanSetOps, setActivePlanSetOps] = useState<string[]>([])
   const [failed, setFailed] = useState(false)
   // 切场景请求在途：tab 已高亮、数据未到期间给内联指示，不让旧内容冒充新场景
   const [switching, setSwitching] = useState(false)
@@ -106,6 +112,10 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   planSetIdRef.current = planSetId
   const acceptOperationIdRef = useRef(acceptOperationId)
   acceptOperationIdRef.current = acceptOperationId
+  const sceneRef = useRef(scene)
+  sceneRef.current = scene
+  const reportRef = useRef(report)
+  reportRef.current = report
   // 切场景乱序保护：后发的请求赢，先到的慢响应不得盖回去
   const sceneReqRef = useRef(0)
 
@@ -137,13 +147,23 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     }
   }, [])
 
+  /** 在途方案集受理对账：bootstrap.active_operations 是唯一事实来源。 */
+  const refreshInFlightOps = useCallback(async () => {
+    const boot = await qualityApi.getHomeBootstrap().catch(() => null)
+    setActivePlanSetOps(inFlightPlanSetOperationIds(boot?.active_operations ?? []))
+    return boot
+  }, [])
+
   /** Tab 入口：先问当前报告，再列 general 的方案集；报告都没有时区分"在分析"与"未建档"。 */
   const bootstrap = useCallback(async () => {
     setBootstrapped(false)
     try {
-      const current = await qualityApi.getCurrentReport()
+      const [current, boot] = await Promise.all([
+        qualityApi.getCurrentReport(),
+        qualityApi.getHomeBootstrap().catch(() => null),
+      ])
+      setActivePlanSetOps(inFlightPlanSetOperationIds(boot?.active_operations ?? []))
       if (!current) {
-        const boot = await qualityApi.getHomeBootstrap().catch(() => null)
         const assessment = (boot?.active_operations ?? []).find(
           (op) => op.kind === 'assessment' && (op.status === 'accepted' || op.status === 'running' || op.status === 'retrying'),
         )
@@ -166,6 +186,33 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       setBootstrapped(true)
     }
   }, [refreshPlanSet])
+
+  /** 交接条落地：清失败、换受理 id、高亮跟随受理时写入的侧信道场景。 */
+  const applyHandoff = useCallback(
+    (next: PlanSetHandoff) => {
+      setAcceptFailed('')
+      setFailed(false)
+      setAcceptOperationId(next.operationId ?? '')
+      setPlanSetId(next.planSetId)
+      // 换了一份集才清内容（进生成中行/拉取分支）；
+      // 同一份集（200 复用、答案没改）保留已渲染内容，后台对账不闪屏
+      if (planSetRef.current?.id !== next.planSetId) setPlanSet(null)
+      setBootstrapped(true)
+      const handoffScene = resourceCache.read<string>(planSetSceneKey(next.planSetId))
+      if (handoffScene) setScene(handoffScene)
+      // 200 复用（没有任务在跑）：立刻对账展示已发布集
+      if (!next.operationId) void refreshPlanSet(next.planSetId)
+    },
+    [refreshPlanSet],
+  )
+
+  // tab 页常驻：useState 初始化只在首次挂载消费交接条，
+  // 「方案页 → Brief 页 → 提交 → switchTab 回来」的受理会无声丢失。
+  // 每次 onShow 都取一次；取走即清，首次挂载已取过时这里是空操作。
+  useDidShow(() => {
+    const next = takePlanSetHandoff()
+    if (next) applyHandoff(next)
+  })
 
   // 只自动跑一次：切场景把 planSetId 清回 '' 时不得再次 bootstrap 把场景顶回去；
   // 失败重试走 retryLoad 显式调用。
@@ -229,11 +276,19 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
 
   const view = planSet ? planSetView(planSet) : null
 
-  /** 值得盯的 operation：受理中的方案集 + 各套在途渲染。 */
+  // 受理中的操作（ planning 或「有 id 无数据」）才是「在途」；
+  // 它的场景归属来自侧信道（受理时 Brief 页写入，OperationRef 本身不带场景）
+  const acceptInFlight = Boolean(acceptOperationId && (view?.kind === 'planning' || (!planSet && planSetId)))
+  const acceptScene = acceptInFlight ? resourceCache.read<string>(planSetSceneKey(planSetId)) : undefined
+  // 归属不到当前受理的在途操作：无法定位场景，走顶部全局提示
+  const foreignPlanSetOps = activePlanSetOps.filter((id) => id !== acceptOperationId)
+
+  /** 值得盯的 operation：受理中的方案集 + bootstrap 在途受理 + 各套在途渲染。 */
   const watchedIds: string[] = []
-  if (acceptOperationId && (view?.kind === 'planning' || (!planSet && planSetId))) {
+  if (acceptInFlight) {
     watchedIds.push(acceptOperationId)
   }
+  for (const id of foreignPlanSetOps) watchedIds.push(id)
   for (const variant of planSet?.variants ?? []) {
     if (RENDER_IN_FLIGHT.has(variant.render.state) && variant.render.operation_id) {
       watchedIds.push(variant.render.operation_id)
@@ -249,12 +304,34 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       const acceptId = acceptOperationIdRef.current
       const accept = acceptId ? operations.find((op) => op.id === acceptId) : undefined
       if (accept && (accept.status === 'failed' || accept.status === 'cancelled' || accept.status === 'superseded')) {
+        // 固定幂等键 24h 内只会重放同一份失败：记下场景，
+        // 下次发起换新键（Brief 页与 generateGeneral 读同一个标记）
+        const failedScene = resourceCache.read<string>(planSetSceneKey(planSetIdRef.current)) ?? 'general'
+        resourceCache.write(planSetRetryMarkerKey(failedScene), '1')
         setAcceptFailed(accept.public_message || PLANNING_COPY.retryFailedBody)
         return
       }
       // 所有被盯的 operation 都到终态了：整体刷新方案集看新状态
       const id = planSetRef.current?.id ?? planSetIdRef.current
       if (id) void refreshPlanSet(id)
+      // 在途受理对账；新发布的方案集可能就在当前场景（跨会话回来、无受理 id 可盯时），
+      // 静默重取当前场景列表——取到不同的新集才替换，空列表不动已渲染内容
+      void refreshInFlightOps()
+      const currentReport = reportRef.current
+      if (currentReport) {
+        const currentScene = sceneRef.current as PlanSet['scene']
+        void qualityApi
+          .listPlanSets(currentReport.id, currentScene)
+          .then((list) => {
+            const latest = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
+            if (latest && latest.id !== planSetIdRef.current) {
+              setPlanSetId(latest.id)
+              setPlanSet(latest)
+              void refreshPlanSet(latest.id)
+            }
+          })
+          .catch(() => {})
+      }
     },
   })
 
@@ -315,14 +392,18 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     if (!report) return
     setAcceptFailed('')
     try {
+      // 与 Brief 页同一条规则：上次固定键受理到终态 failed 后换新键重发，在途/双击仍用固定键
+      const retryKey = planSetRetryMarkerKey('general')
+      const fresh = Boolean(resourceCache.read<string>(retryKey))
       const start = await qualityApi.createPlanSet(
         {
           report_id: report.id,
           scene: 'general',
           brief: { focus: 'balanced', preparation: 'closet', impression: 'natural' },
         },
-        `plan-set:${report.id}`,
+        fresh ? createIdempotencyKey(`plan-set:${report.id}`) : `plan-set:${report.id}`,
       )
+      if (fresh) resourceCache.remove(retryKey)
       if (start.accepted) {
         resourceCache.write(resourceKey('operation', start.operation.id), start.operation)
         setAcceptOperationId(start.operation.id)
@@ -340,6 +421,15 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       const message = error instanceof PublicApiError && error.message ? error.message : PLANNING_COPY.generateFailed
       Taro.showToast({ title: message, icon: 'none' })
     }
+  }
+
+  /** 受理失败的「重新生成」：回它自己的场景——场景方案回 Brief 页（预填上次答案改完重发），general 原地重发。 */
+  const regenerateAccepted = () => {
+    if (acceptScene && acceptScene !== 'general') {
+      void Taro.navigateTo({ url: `${SCENE_ROUTE}?scene=${acceptScene}` })
+      return
+    }
+    void generateGeneral()
   }
 
   /** 单套重试：新幂等键发新请求；旧键重放只会拿回同一份失败。 */
@@ -414,6 +504,9 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
           onClick={() => void switchScene(tab.key)}
         >
           {tab.label}
+          {acceptScene === tab.key ? (
+            <Text className="plans__tab-pending">{PLANNING_COPY.tabInFlightSuffix}</Text>
+          ) : null}
         </Text>
       ))}
     </ScrollView>
@@ -480,11 +573,14 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     return (
       <View className="plans">
         {sceneTabs}
+        {foreignPlanSetOps.length > 0 ? (
+          <Text className="plans__inflight-banner">{PLANNING_COPY.inFlightBanner}</Text>
+        ) : null}
         {acceptFailed ? (
           <View className="plans__scene-empty fade-up">
             <Text className="plans__scene-empty-title">{PLANNING_COPY.retryFailedTitle}</Text>
             <Text className="plans__scene-empty-desc">{acceptFailed}</Text>
-            <PrimaryButton text={PLANNING_COPY.regenerateAction} onClick={() => void generateGeneral()} />
+            <PrimaryButton text={PLANNING_COPY.regenerateAction} onClick={regenerateAccepted} />
           </View>
         ) : acceptOperationId ? (
           <View className="plans__scene-empty">
@@ -523,7 +619,14 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         title={PLANNING_COPY.retryFailedTitle}
         description={PLANNING_COPY.retryFailedBody}
         actionText={PLANNING_COPY.regenerateAction}
-        onAction={() => void generateGeneral()}
+        onAction={() => {
+          // 回方案集自己的场景：场景方案回 Brief 页改答案重发，不能顶到 general
+          if (planSet && planSet.scene !== 'general') {
+            void Taro.navigateTo({ url: `${SCENE_ROUTE}?scene=${planSet.scene}` })
+          } else {
+            void generateGeneral()
+          }
+        }}
       />
     )
   }
@@ -541,6 +644,10 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   return (
     <View className="plans">
       {sceneTabs}
+
+      {foreignPlanSetOps.length > 0 ? (
+        <Text className="plans__inflight-banner">{PLANNING_COPY.inFlightBanner}</Text>
+      ) : null}
 
       {switching ? (
         <View className="plans__generating">
@@ -668,6 +775,21 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
                 ? PLANNING_COPY.ctaNoteDemo
                 : PLANNING_COPY.ctaNote}
             </Text>
+            {/* 重新设计入口：场景回 Brief 页预填改答案；general 的 brief 固定，
+                只有重拍出新报告才会出新方案，入口直白说明 */}
+            {scene === 'general' ? (
+              <TextLink
+                className="plans__redesign"
+                text={PLANNING_COPY.updateGeneralLink}
+                onClick={() => void Taro.navigateTo({ url: CAPTURE_ROUTE })}
+              />
+            ) : (
+              <TextLink
+                className="plans__redesign"
+                text={PLANNING_COPY.redesignAction}
+                onClick={() => void Taro.navigateTo({ url: `${SCENE_ROUTE}?scene=${scene}` })}
+              />
+            )}
           </View>
         ) : null}
         </>

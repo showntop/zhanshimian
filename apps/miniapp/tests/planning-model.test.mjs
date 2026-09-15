@@ -5,7 +5,9 @@ import assert from 'node:assert/strict'
 import {
   boundBodyMedia,
   createIdempotencyKey,
+  inFlightPlanSetOperationIds,
   planSetView,
+  sceneBriefPrefill,
   sceneBriefRequest,
   sortedVariants,
   stepDetailLines,
@@ -192,4 +194,36 @@ test('scene brief answers become a typed request or nothing at all', () => {
   )
   // 未知场景没有问题表，同样拒绝构造
   assert.equal(sceneBriefRequest('r1', 'general', {}), null)
+})
+
+test('in-flight plan-set accepts are the only operations worth watching', () => {
+  const ops = [
+    { id: 'op-1', kind: 'plan_set', status: 'accepted' },
+    { id: 'op-2', kind: 'plan_set', status: 'running' },
+    { id: 'op-3', kind: 'plan_set', status: 'retrying' },
+    { id: 'op-4', kind: 'plan_set', status: 'failed' },
+    { id: 'op-5', kind: 'plan_set', status: 'succeeded' },
+    { id: 'op-6', kind: 'assessment', status: 'running' },
+    { id: 'op-7', kind: 'render', status: 'accepted' },
+  ]
+  assert.deepEqual(inFlightPlanSetOperationIds(ops), ['op-1', 'op-2', 'op-3'])
+  assert.deepEqual(inFlightPlanSetOperationIds([]), [])
+})
+
+test('a published brief prefills the scene brief page, table-checked field by field', () => {
+  // 上次提交的 brief 原样预填回来
+  assert.deepEqual(
+    sceneBriefPrefill('interview', { when: 'today', format: 'video', preparation: 'closet', impression: 'reliable' }),
+    { when: 'today', format: 'video', preparation: 'closet', impression: 'reliable' },
+  )
+  // 表外的值（契约演进丢掉的枚举）丢弃，宁可少填不填错
+  assert.deepEqual(
+    sceneBriefPrefill('interview', { when: 'yesterday', format: 'video', preparation: 'closet', impression: 'reliable' }),
+    { format: 'video', preparation: 'closet', impression: 'reliable' },
+  )
+  // 缺字段 / 非对象 / general 与未知场景：返回空，不虚构答案
+  assert.deepEqual(sceneBriefPrefill('interview', { when: 'today' }), { when: 'today' })
+  assert.deepEqual(sceneBriefPrefill('interview', null), {})
+  assert.deepEqual(sceneBriefPrefill('general', { focus: 'balanced' }), {})
+  assert.deepEqual(sceneBriefPrefill('mars', { when: 'today' }), {})
 })

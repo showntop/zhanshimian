@@ -75,6 +75,26 @@
     }
   }
 
+  // tab 内「· 制作中」：受理在途的场景标记，弱化一档不抢 tab 本身
+  &__tab-pending {
+    margin-left: 4rpx;
+    font-size: 20rpx;
+    color: var(--ink-3);
+  }
+
+  // 顶部全局提示：在途受理定位不到具体场景时（跨会话），告知不静默
+  &__inflight-banner {
+    font-size: 22rpx;
+    color: var(--moss);
+    padding: 0 8rpx;
+  }
+
+  // 坞内「重新设计 / 更新形象方案」链接：居中弱动作，不与主 CTA 同级
+  &__redesign {
+    align-self: center;
+    font-size: 24rpx;
+  }
+
   // 场景空态：已建档但该场合无方案时，保留 tab 结构只替换内容区，
   // 引导生成该场合方案（而不是错误地让用户重新建档）
   &__scene-empty {

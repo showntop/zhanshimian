@@ -1,7 +1,7 @@
 // 场合 Brief：单页几问，答案只活在组件 state 与 POST body 里。
 // 修改答案重新提交会创建一份新的方案集（服务端按幂等键与内容决定复用或受理），
 // 本地不存任何 Brief——存了就成了会过期的第二份答案。
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import {
@@ -9,6 +9,7 @@ import {
   SCENE_BRIEF_COPY,
   SCENES,
 } from '@zsm/core'
+import type { PlanSet } from '@zsm/core'
 import { qualityApi } from '../../app/api/quality'
 import { PublicApiError } from '../../app/api/result'
 import { resourceCache } from '../../app/cache/resource-cache'
@@ -22,6 +23,7 @@ import {
   createIdempotencyKey,
   planSetRetryMarkerKey,
   planSetSceneKey,
+  sceneBriefPrefill,
   sceneBriefRequest,
   sceneFields,
 } from './model'
@@ -71,6 +73,29 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
   useEffect(() => {
     void loadReport()
   }, [loadReport])
+
+  // 「重新设计」入口：用该场景最新方案集的 brief 预填答案（逐字段对表校验，缺题留空）。
+  // 预填只发生一次，且不覆盖用户已经点过的选项（late response 不得回写）。
+  const prefilledRef = useRef(false)
+  useEffect(() => {
+    if (!reportId || prefilledRef.current) return
+    prefilledRef.current = true
+    let cancelled = false
+    void qualityApi
+      .listPlanSets(reportId, scene as PlanSet['scene'])
+      .then((list) => {
+        if (cancelled) return
+        const latest = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
+        if (!latest) return
+        const prefill = sceneBriefPrefill(scene, latest.brief)
+        if (Object.keys(prefill).length === 0) return
+        setAnswers((prev) => (Object.keys(prev).length > 0 ? prev : prefill))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [reportId, scene])
 
   // general 与未知场景都没有 Brief 页：回方案 tab。导航是副作用，不进渲染期。
   useEffect(() => {

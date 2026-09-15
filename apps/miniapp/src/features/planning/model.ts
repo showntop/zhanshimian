@@ -7,6 +7,7 @@
 import {
   PLAN_DETAIL_COPY,
   SCENE_BRIEF_COPY,
+  type HomeBootstrap,
   type SceneBriefScene,
 } from '@zsm/core'
 import type {
@@ -160,6 +161,42 @@ export function stepActionText(step: Pick<PlanStep, 'action'>): string {
 export function sceneFields(scene: string) {
   if (!(scene in SCENE_BRIEF_COPY.scenes)) return null
   return SCENE_BRIEF_COPY.scenes[scene as SceneBriefScene].fields
+}
+
+// 公开 OperationRef：core 没有单独命名导出，从 HomeBootstrap 派生（与 pages/profile 同一条规则）。
+type OperationRef = HomeBootstrap['active_operations'][number]
+
+/** 受理在途状态（与 bootstrap active_operations 语义一致；failed 不在其中——失败允许重新发起）。 */
+const PLAN_SET_IN_FLIGHT = new Set(['accepted', 'running', 'retrying'])
+
+/**
+ * bootstrap active_operations 里在途的方案集受理 id。
+ * 方案页据此进轮询与「制作中」呈现；OperationRef 不带场景，
+ * 能定位到场景的只有侧信道（planSetSceneKey，受理时写入），定位不了的走全局提示。
+ */
+export function inFlightPlanSetOperationIds(operations: readonly OperationRef[]): string[] {
+  return operations
+    .filter((operation) => operation.kind === 'plan_set' && PLAN_SET_IN_FLIGHT.has(operation.status))
+    .map((operation) => operation.id)
+}
+
+/**
+ * 已发布方案集的 brief → Brief 页预填答案（「重新设计」入口）。
+ * 逐字段对照文案表校验，表外的 key/值一律丢弃——契约演进丢枚举时宁可少填不填错；
+ * general / 未知场景没有问题表，返回空对象。
+ */
+export function sceneBriefPrefill(scene: string, brief: unknown): Record<string, string> {
+  const fields = sceneFields(scene)
+  if (!fields || !brief || typeof brief !== 'object') return {}
+  const source = brief as Record<string, unknown>
+  const answers: Record<string, string> = {}
+  for (const field of fields) {
+    const value = source[field.key]
+    if (typeof value === 'string' && field.options.some((option) => option.value === value)) {
+      answers[field.key] = value
+    }
+  }
+  return answers
 }
 
 /**

@@ -22,6 +22,7 @@ import {
   planSlotLabel,
   taskDoneText,
   trackEvent,
+  type DisplayMedia,
   type HomeBootstrap,
   type SceneCopy,
 } from '@zsm/core'
@@ -103,6 +104,8 @@ export default function Home() {
   const [hairActive, setHairActive] = useState(false)
   const [outfitReady, setOutfitReady] = useState(false)
   const [purchaseReady, setPurchaseReady] = useState(false)
+  // 发卡右侧视觉：用户已有出图的设计时展示最近一次效果，否则保持内置参考位
+  const [hairLatestMedia, setHairLatestMedia] = useState<DisplayMedia | null>(null)
   const firstShow = useRef(true)
   // 轮询连续失败自停后：toast 只报一次（ref 去重），恢复靠回 tab 对账时 restartKey 重装
   const [pollRestart, setPollRestart] = useState(0)
@@ -132,14 +135,17 @@ export default function Home() {
   // 工具卡徽章不走 bootstrap（聚合里没有它们）：hair 问 active 端点，
   // outfit/purchase 问 latest 诊断。单个端点失败只当自己没数据，不拖垮其余两个。
   const refreshToolBadges = useCallback(async () => {
-    const [hair, outfit, purchase] = await Promise.all([
+    const [hair, outfit, purchase, hairHistory] = await Promise.all([
       peripherals.getActiveHairPreview().catch(() => null),
       peripherals.getLatestDiagnosis('outfit').catch(() => null),
       peripherals.getLatestDiagnosis('purchase').catch(() => null),
+      peripherals.listHairPreviews().catch(() => []),
     ])
     setHairActive(Boolean(hair && HAIR_IN_FLIGHT.has(hair.state)))
     setOutfitReady(Boolean(outfit))
     setPurchaseReady(Boolean(purchase))
+    // 最近一张已出图的设计（列表新到旧）：media 走投影自带「风格参考」角标，不手动叠标
+    setHairLatestMedia(hairHistory.find((preview) => preview.state === 'ready' && preview.media)?.media ?? null)
   }, [])
 
   // 首次 onShow 跳过静默对账（挂载时已拉）；此后每次回 tab 对账一次
@@ -398,11 +404,15 @@ export default function Home() {
                       <Text className="home__tool-desc">{tool.desc}</Text>
                     </View>
                     {tool.key === 'hair' ? (
-                      <SourceImage
-                        className="home__tool-visual"
-                        reference={{ slug: 'natural', variant: 'hair' }}
-                        mode="aspectFit"
-                      />
+                      hairLatestMedia ? (
+                        <SourceImage className="home__tool-visual" media={hairLatestMedia} mode="aspectFit" />
+                      ) : (
+                        <SourceImage
+                          className="home__tool-visual"
+                          reference={{ slug: 'natural', variant: 'hair' }}
+                          mode="aspectFit"
+                        />
+                      )
                     ) : null}
                     {badge ? (
                       <Text

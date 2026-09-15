@@ -639,7 +639,13 @@ export const PLANNING_COPY = {
   sceneGenerating: '正在从你的报告生成三套方案，通常需要 1-2 分钟',
   sceneLoading: '正在载入该场合的方案…',
   planOfPrefix: '第',
-  planOfSuffix: '套'
+  planOfSuffix: '套',
+  // 已发布方案集的「重新设计」：场景回 Brief 页预填改答案；general 只能重拍（brief 固定，见 PlansScreen）
+  redesignAction: '重新设计',
+  updateGeneralLink: '照片或状态变了？重新拍摄后会生成新方案 ›',
+  // 场景方案受理在途：tab 标记后缀 + 顶部全局提示（定位不到场景的在途操作）
+  tabInFlightSuffix: '· 制作中',
+  inFlightBanner: '有方案正在制作中，完成后会自动更新'
 } as const
 
 /** 方案名 + 序号：「第 2 套 · 暖意」。序号来自 slot，不靠列表位置。 */
