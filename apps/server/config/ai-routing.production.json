@@ -12,7 +12,14 @@
       },
       "timeout_seconds": 240,
       "input_cost_per_million": 20,
-      "output_cost_per_million": 100
+      "output_cost_per_million": 100,
+      "max_input_images": 3,
+      "supports_multiple_reference_images": true,
+      "identity_comparison": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
     },
     "aliyun/qwen3.7-plus": {
       "vendor": "aliyun",
@@ -102,75 +109,47 @@
     "appearance_analysis": {
       "policy": "quality_first",
       "primary": "aliyun/kimi-k3",
-      "fallbacks": [
-        "aliyun/qwen3.7-plus",
-        "aliyun/qwen3.7-flash"
-      ],
       "max_cost_cny": 0.6,
       "max_input_images": 3
     },
     "photo_quality_check": {
-      "policy": "value_first",
-      "primary": "aliyun/qwen3.7-plus",
-      "fallbacks": [
-        "aliyun/qwen3.7-flash"
-      ],
-      "max_cost_cny": 0.04,
+      "policy": "quality_first",
+      "primary": "aliyun/kimi-k3",
+      "max_cost_cny": 0.6,
       "max_input_images": 3
     },
     "photo_identity_consistency": {
-      "policy": "value_first",
-      "primary": "aliyun/qwen3.7-flash",
-      "fallbacks": [
-        "aliyun/qwen3.7-plus"
-      ],
-      "max_cost_cny": 0.04,
+      "policy": "quality_first",
+      "primary": "aliyun/kimi-k3",
+      "max_cost_cny": 0.6,
       "max_input_images": 3
     },
     "report_evidence_verification": {
-      "policy": "value_first",
-      "primary": "aliyun/qwen3.7-flash",
-      "fallbacks": [
-        "aliyun/qwen3.7-plus"
-      ],
-      "max_cost_cny": 0.04,
+      "policy": "quality_first",
+      "primary": "aliyun/kimi-k3",
+      "max_cost_cny": 0.6,
       "max_input_images": 3
     },
     "photo_check": {
-      "policy": "value_first",
-      "primary": "aliyun/qwen3.7-flash",
-      "fallbacks": [
-        "aliyun/qwen3.7-plus"
-      ],
-      "max_cost_cny": 0.04
+      "policy": "quality_first",
+      "primary": "aliyun/kimi-k3",
+      "max_cost_cny": 0.6
     },
     "outfit_diagnosis": {
-      "policy": "value_first",
-      "primary": "aliyun/qwen3.7-flash",
-      "fallbacks": [
-        "aliyun/qwen3.7-plus"
-      ]
+      "policy": "quality_first",
+      "primary": "aliyun/kimi-k3"
     },
     "purchase_diagnosis": {
-      "policy": "value_first",
-      "primary": "aliyun/qwen3.7-flash",
-      "fallbacks": [
-        "aliyun/qwen3.7-plus"
-      ]
+      "policy": "quality_first",
+      "primary": "aliyun/kimi-k3"
     },
     "advisor_chat": {
-      "policy": "value_first",
-      "primary": "aliyun/qwen3.7-flash",
-      "fallbacks": [
-        "aliyun/qwen3.7-plus"
-      ]
+      "policy": "quality_first",
+      "primary": "aliyun/kimi-k3"
     },
     "today_plan": {
-      "policy": "value_first",
-      "primary": "aliyun/qwen3.7-flash",
-      "fallbacks": [
-        "aliyun/qwen3.7-plus"
-      ]
+      "policy": "quality_first",
+      "primary": "aliyun/kimi-k3"
     },
     "hair_edit": {
       "policy": "quality_first",
@@ -193,28 +172,19 @@
     },
     "render_quality_evaluation": {
       "policy": "balanced",
-      "primary": "aliyun/qwen3.7-plus",
-      "fallbacks": [
-        "aliyun/qwen3.7-flash"
-      ],
+      "primary": "aliyun/kimi-k3",
       "max_switches": 1,
-      "max_cost_cny": 0.3
+      "max_cost_cny": 0.6
     },
     "plan_set_generation": {
       "policy": "quality_first",
       "primary": "aliyun/kimi-k3",
-      "fallbacks": [
-        "aliyun/qwen3.7-plus"
-      ],
       "max_cost_cny": 0.6
     },
     "plan_grounding_verification": {
       "policy": "quality_first",
-      "primary": "aliyun/qwen3.7-plus",
-      "fallbacks": [
-        "aliyun/qwen3.7-flash"
-      ],
-      "max_cost_cny": 0.3
+      "primary": "aliyun/kimi-k3",
+      "max_cost_cny": 0.6
     },
     "body_orbit": {
       "policy": "quality_first",
