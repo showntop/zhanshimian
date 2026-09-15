@@ -75,7 +75,7 @@ type imageLoader struct {
 func (l imageLoader) Load(ctx context.Context, items []domain.PhotoSetItem) ([]assessment.ImageInput, error) {
 	images := make([]assessment.ImageInput, 0, len(items))
 	for _, item := range items {
-		rc, processed, err := storage.OpenProcessedOr(ctx, l.objects, item.Asset.ObjectKey, providerai.VisionCOSProcess)
+		rc, err := storage.OpenProcessedOr(ctx, l.objects, item.Asset.ObjectKey, providerai.VisionCOSProcess)
 		if err != nil {
 			return nil, fmt.Errorf("load %s: %w", item.Asset.ObjectKey, err)
 		}
@@ -84,10 +84,9 @@ func (l imageLoader) Load(ctx context.Context, items []domain.PhotoSetItem) ([]a
 		if err != nil {
 			return nil, err
 		}
-		declared := item.Asset.MIMEType
-		if processed {
-			declared = "image/jpeg" // 数据万象 imageMogr2 .../format/jpg 的产出格式
-		}
+		// MIME 以字节内容为准：资产声明按扩展名猜测（PNG 常没有 .png 后缀），
+		// CI 处理产出又恒为 JPEG，声明值两头都靠不住。
+		declared := providerai.SniffImageMIME(data, item.Asset.MIMEType)
 		data, mime := providerai.ConstrainVisionImage(data, declared)
 		images = append(images, assessment.ImageInput{Role: string(item.Role), MIMEType: mime, Data: data})
 	}
@@ -102,7 +101,7 @@ type diagnosticImageLoader struct {
 }
 
 func (l diagnosticImageLoader) Load(ctx context.Context, media domain.MediaInput) (diagnostic.Image, error) {
-	rc, processed, err := storage.OpenProcessedOr(ctx, l.objects, media.ObjectKey, providerai.VisionCOSProcess)
+	rc, err := storage.OpenProcessedOr(ctx, l.objects, media.ObjectKey, providerai.VisionCOSProcess)
 	if err != nil {
 		return diagnostic.Image{}, fmt.Errorf("load %s: %w", media.ObjectKey, err)
 	}
@@ -111,10 +110,7 @@ func (l diagnosticImageLoader) Load(ctx context.Context, media domain.MediaInput
 	if err != nil {
 		return diagnostic.Image{}, err
 	}
-	declared := media.MIMEType
-	if processed {
-		declared = "image/jpeg"
-	}
+	declared := providerai.SniffImageMIME(data, media.MIMEType)
 	data, mime := providerai.ConstrainVisionImage(data, declared)
 	return diagnostic.Image{AssetID: media.AssetID, MIMEType: mime, Data: data}, nil
 }

@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/jpeg"
 	_ "image/png"
+	"net/http"
 )
 
 const (
@@ -22,6 +23,17 @@ const (
 	// EditCOSProcess 是编辑/渲染参考图的数据万象规则：长边 1536、JPEG 85。
 	EditCOSProcess = "imageMogr2/thumbnail/1536x/format/jpg/quality/85"
 )
+
+// SniffImageMIME 以字节内容为准确定图片 MIME。客户端声明是按扩展名猜的，
+// 可能是错的（PNG 临时文件常没有 .png 后缀）；数据万象处理产出也未必等于
+// 原声明格式。嗅探不出 JPEG/PNG 时保留声明值，交给下游校验给出明确拒绝。
+func SniffImageMIME(data []byte, declared string) string {
+	detected := http.DetectContentType(data)
+	if detected == "image/jpeg" || detected == "image/png" {
+		return detected
+	}
+	return declared
+}
 
 type imageBudget struct {
 	maxEdge      int

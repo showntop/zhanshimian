@@ -1,9 +1,11 @@
 package media
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"testing"
@@ -33,6 +35,55 @@ func TestCompleteUploadRejectsHeadMismatch(t *testing.T) {
 	_, err = svc.CompleteUploadIntent(context.Background(), "u1", intent.ID)
 	if !errors.Is(err, ErrUploadMetadataMismatch) {
 		t.Fatalf("CompleteUploadIntent error = %v, want ErrUploadMetadataMismatch", err)
+	}
+	if repo.completeCalls != 0 {
+		t.Fatalf("completeCalls = %d, want 0", repo.completeCalls)
+	}
+}
+
+// 声明按扩展名猜错（PNG 字节声明 image/jpeg）时，完成上传应纠正为嗅探值。
+func TestCompleteUploadCorrectsWrongDeclaredMIME(t *testing.T) {
+	repo := newMediaRepoFake()
+	store := matchingObjectStore()
+	svc := New(repo, store, 10<<20, 15*time.Minute)
+	intent, err := svc.CreateUploadIntent(context.Background(), "u1", CreateIntentInput{
+		Purpose:  domain.MediaPurposeFace,
+		MIMEType: "image/jpeg",
+		ByteSize: 20,
+		SHA256:   strings.Repeat("b", 64),
+	})
+	if err != nil {
+		t.Fatalf("CreateUploadIntent: %v", err)
+	}
+	pngBytes := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3}
+	store.bodies = map[string][]byte{intent.ObjectKey: pngBytes}
+	asset, err := svc.CompleteUploadIntent(context.Background(), "u1", intent.ID)
+	if err != nil {
+		t.Fatalf("CompleteUploadIntent: %v", err)
+	}
+	if asset.MIMEType != "image/png" {
+		t.Fatalf("declared jpeg over PNG bytes must be corrected to image/png, got %s", asset.MIMEType)
+	}
+}
+
+// 非 JPEG/PNG 字节在上传完成时就拒掉，而不是拖到分析阶段。
+func TestCompleteUploadRejectsUnsupportedBytes(t *testing.T) {
+	repo := newMediaRepoFake()
+	store := matchingObjectStore()
+	svc := New(repo, store, 10<<20, 15*time.Minute)
+	intent, err := svc.CreateUploadIntent(context.Background(), "u1", CreateIntentInput{
+		Purpose:  domain.MediaPurposeFace,
+		MIMEType: "image/jpeg",
+		ByteSize: 20,
+		SHA256:   strings.Repeat("b", 64),
+	})
+	if err != nil {
+		t.Fatalf("CreateUploadIntent: %v", err)
+	}
+	store.bodies = map[string][]byte{intent.ObjectKey: []byte("plain text, not an image")}
+	_, err = svc.CompleteUploadIntent(context.Background(), "u1", intent.ID)
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("CompleteUploadIntent error = %v, want ErrValidation", err)
 	}
 	if repo.completeCalls != 0 {
 		t.Fatalf("completeCalls = %d, want 0", repo.completeCalls)
@@ -201,6 +252,7 @@ func (r *mediaRepoFake) CompleteUploadIntent(ctx context.Context, in domain.Comp
 type objectStoreFake struct {
 	head    domain.ObjectMetadata
 	objects map[string]domain.ObjectMetadata
+	bodies  map[string][]byte
 	err     error
 }
 
@@ -242,4 +294,15 @@ func (s *objectStoreFake) HeadObject(_ context.Context, key string) (domain.Obje
 		return domain.ObjectMetadata{}, fmt.Errorf("missing object %s", key)
 	}
 	return meta, nil
+}
+
+func (s *objectStoreFake) Open(_ context.Context, key string) (io.ReadCloser, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if body, ok := s.bodies[key]; ok {
+		return io.NopCloser(bytes.NewReader(body)), nil
+	}
+	// 默认给 JPEG 魔数：让嗅探在不在意内容的既有用例里落到声明的 jpeg。
+	return io.NopCloser(bytes.NewReader([]byte{0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4})), nil
 }

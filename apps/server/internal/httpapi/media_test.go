@@ -339,9 +339,25 @@ func (s *httpObjectStore) HeadObject(_ context.Context, key string) (domain.Obje
 	return meta, nil
 }
 
+func (s *httpObjectStore) Open(_ context.Context, key string) (io.ReadCloser, error) {
+	meta, ok := s.objects[key]
+	if !ok {
+		return nil, fmt.Errorf("missing object")
+	}
+	if meta.MIMEType == "image/png" {
+		return io.NopCloser(bytes.NewReader([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1})), nil
+	}
+	return io.NopCloser(bytes.NewReader([]byte{0xFF, 0xD8, 0xFF, 0xE0, 1})), nil
+}
+
 type combinedObjectStore struct {
 	storage.ObjectStorage
 	media.ObjectStore
+}
+
+// Open 二义消解：上传完成的嗅探读走 fake（测试不落真实字节）。
+func (c combinedObjectStore) Open(ctx context.Context, key string) (io.ReadCloser, error) {
+	return c.ObjectStore.Open(ctx, key)
 }
 
 type sessionMediaRepo struct {

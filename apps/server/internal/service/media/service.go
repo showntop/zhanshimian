@@ -3,6 +3,8 @@ package media
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -77,7 +79,32 @@ func (s *Service) complete(ctx context.Context, userID, intentID string) (domain
 	if err := validateObject(intent, meta); err != nil {
 		return domain.MediaAsset{}, false, err
 	}
+	// MIME 以服务端嗅探为准：客户端声明是按扩展名猜的（PNG 临时文件常常
+	// 没有 .png 后缀），猜错的声明会让下游技术校验误判「照片格式无法确认」。
+	// 不是 JPEG/PNG 的字节在上传完成时就拒掉，而不是拖到分析阶段才报。
+	detected, err := s.sniffMIME(ctx, intent.ObjectKey)
+	if err != nil {
+		return domain.MediaAsset{}, false, err
+	}
+	if detected != "image/jpeg" && detected != "image/png" {
+		return domain.MediaAsset{}, false, fmt.Errorf("%w: 仅支持 JPEG 或 PNG，请更换照片后重试", ErrValidation)
+	}
+	meta.MIMEType = detected
 	return s.repo.CompleteUploadIntent(ctx, domain.CompleteUploadIntent{
 		UserID: userID, IntentID: intentID, Metadata: meta,
 	})
+}
+
+func (s *Service) sniffMIME(ctx context.Context, objectKey string) (string, error) {
+	rc, err := s.objects.Open(ctx, objectKey)
+	if err != nil {
+		return "", fmt.Errorf("open upload object: %w", err)
+	}
+	defer func() { _ = rc.Close() }()
+	head := make([]byte, 512)
+	n, err := io.ReadAtLeast(rc, head, 1)
+	if err != nil {
+		return "", fmt.Errorf("read upload object: %w", err)
+	}
+	return http.DetectContentType(head[:n]), nil
 }

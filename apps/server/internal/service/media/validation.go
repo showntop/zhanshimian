@@ -41,7 +41,8 @@ func validateCreate(in CreateIntentInput, maxBytes int64) error {
 }
 
 func validateObject(intent domain.UploadIntent, meta domain.ObjectMetadata) error {
-	if intent.ObjectKey != meta.ObjectKey || intent.MIMEType != meta.MIMEType ||
+	// MIME 不在完整性校验内：声明值是客户端按扩展名猜的，以服务端嗅探为准。
+	if intent.ObjectKey != meta.ObjectKey ||
 		intent.ByteSize != meta.ByteSize || intent.SHA256 != meta.SHA256 {
 		return ErrUploadMetadataMismatch
 	}

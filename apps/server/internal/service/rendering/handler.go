@@ -306,7 +306,7 @@ func (h *Handler) loadReference(ctx context.Context, asset domain.MediaAsset, ro
 	input := providerai.ImageInput{AssetID: asset.ID, Role: role, MIMEType: asset.MIMEType}
 	// 数据万象下载时压缩（未开通 CI 回退原图）+ 本地编辑预算兜底：
 	// 原图内联帧会撑爆生成请求体与超时。
-	reader, processed, err := storage.OpenProcessedOr(ctx, h.service.objects, asset.ObjectKey, providerai.EditCOSProcess)
+	reader, err := storage.OpenProcessedOr(ctx, h.service.objects, asset.ObjectKey, providerai.EditCOSProcess)
 	if err != nil {
 		return providerai.ImageInput{}, &taskrunner.TaskError{Class: domain.ErrorTransient, Code: "render_reference_unavailable"}
 	}
@@ -315,10 +315,7 @@ func (h *Handler) loadReference(ctx context.Context, asset domain.MediaAsset, ro
 	if err != nil {
 		return providerai.ImageInput{}, &taskrunner.TaskError{Class: domain.ErrorTransient, Code: "render_reference_unavailable"}
 	}
-	declared := asset.MIMEType
-	if processed {
-		declared = "image/jpeg"
-	}
+	declared := providerai.SniffImageMIME(data, asset.MIMEType)
 	data, mime := providerai.ConstrainEditImage(data, declared)
 	input.Data = data
 	input.MIMEType = mime
