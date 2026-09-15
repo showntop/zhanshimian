@@ -75,7 +75,7 @@ type imageLoader struct {
 func (l imageLoader) Load(ctx context.Context, items []domain.PhotoSetItem) ([]assessment.ImageInput, error) {
 	images := make([]assessment.ImageInput, 0, len(items))
 	for _, item := range items {
-		rc, err := storage.OpenProcessedOr(ctx, l.objects, item.Asset.ObjectKey, providerai.VisionCOSProcess)
+		rc, processed, err := storage.OpenProcessedOr(ctx, l.objects, item.Asset.ObjectKey, providerai.VisionCOSProcess)
 		if err != nil {
 			return nil, fmt.Errorf("load %s: %w", item.Asset.ObjectKey, err)
 		}
@@ -84,7 +84,11 @@ func (l imageLoader) Load(ctx context.Context, items []domain.PhotoSetItem) ([]a
 		if err != nil {
 			return nil, err
 		}
-		data, mime := providerai.ConstrainVisionImage(data, item.Asset.MIMEType)
+		declared := item.Asset.MIMEType
+		if processed {
+			declared = "image/jpeg" // 数据万象 imageMogr2 .../format/jpg 的产出格式
+		}
+		data, mime := providerai.ConstrainVisionImage(data, declared)
 		images = append(images, assessment.ImageInput{Role: string(item.Role), MIMEType: mime, Data: data})
 	}
 	return images, nil
@@ -98,7 +102,7 @@ type diagnosticImageLoader struct {
 }
 
 func (l diagnosticImageLoader) Load(ctx context.Context, media domain.MediaInput) (diagnostic.Image, error) {
-	rc, err := storage.OpenProcessedOr(ctx, l.objects, media.ObjectKey, providerai.VisionCOSProcess)
+	rc, processed, err := storage.OpenProcessedOr(ctx, l.objects, media.ObjectKey, providerai.VisionCOSProcess)
 	if err != nil {
 		return diagnostic.Image{}, fmt.Errorf("load %s: %w", media.ObjectKey, err)
 	}
@@ -107,7 +111,11 @@ func (l diagnosticImageLoader) Load(ctx context.Context, media domain.MediaInput
 	if err != nil {
 		return diagnostic.Image{}, err
 	}
-	data, mime := providerai.ConstrainVisionImage(data, media.MIMEType)
+	declared := media.MIMEType
+	if processed {
+		declared = "image/jpeg"
+	}
+	data, mime := providerai.ConstrainVisionImage(data, declared)
 	return diagnostic.Image{AssetID: media.AssetID, MIMEType: mime, Data: data}, nil
 }
 

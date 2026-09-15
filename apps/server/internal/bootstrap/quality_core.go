@@ -124,7 +124,7 @@ func wireHairHandler(store *postgres.Store, objects storage.ObjectStorage, ai AI
 type hairSourceLoader struct{ objects storage.ObjectStorage }
 
 func (l hairSourceLoader) Load(ctx context.Context, work hair.PreviewWork) (hair.SourceImage, error) {
-	reader, err := storage.OpenProcessedOr(ctx, l.objects, work.SourceObjectKey, providerai.EditCOSProcess)
+	reader, processed, err := storage.OpenProcessedOr(ctx, l.objects, work.SourceObjectKey, providerai.EditCOSProcess)
 	if err != nil {
 		return hair.SourceImage{}, err
 	}
@@ -133,7 +133,11 @@ func (l hairSourceLoader) Load(ctx context.Context, work hair.PreviewWork) (hair
 	if err != nil {
 		return hair.SourceImage{}, err
 	}
-	data, mime := providerai.ConstrainEditImage(data, work.SourceMIMEType)
+	declared := work.SourceMIMEType
+	if processed {
+		declared = "image/jpeg"
+	}
+	data, mime := providerai.ConstrainEditImage(data, declared)
 	return hair.SourceImage{MIMEType: mime, Data: data}, nil
 }
 
