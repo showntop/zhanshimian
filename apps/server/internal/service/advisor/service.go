@@ -10,12 +10,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/limits"
 )
 
 // 顾问用量限额（与 legacy billing_rules decideAdvisor 一致）。
-const (
-	limitAdvisorPerDay  = 20
-	limitAdvisorPerHour = 10
+// USAGE_ADVISOR_PER_DAY / USAGE_ADVISOR_PER_HOUR 可覆盖，0 = 不限（内测用）。
+var (
+	limitAdvisorPerDay  = limits.FromEnv(limits.EnvAdvisorPerDay, 20)
+	limitAdvisorPerHour = limits.FromEnv(limits.EnvAdvisorPerHour, 10)
 )
 
 var (
@@ -93,10 +95,10 @@ func (s *Service) charge(ctx context.Context, userID string) error {
 		return nil
 	}
 	return s.usage.ApplyBilling(ctx, userID, time.Now(), 0, func(snap domain.BillingSnapshot) (domain.BillingDecision, error) {
-		if snap.DayAdvisor+1 > limitAdvisorPerDay {
+		if limitAdvisorPerDay > 0 && snap.DayAdvisor+1 > limitAdvisorPerDay {
 			return domain.BillingDecision{}, fmt.Errorf("%w: 今日咨询次数已用完，明天再来", ErrRateLimited)
 		}
-		if snap.HourAdvisor+1 > limitAdvisorPerHour {
+		if limitAdvisorPerHour > 0 && snap.HourAdvisor+1 > limitAdvisorPerHour {
 			return domain.BillingDecision{}, fmt.Errorf("%w: 咨询过于频繁，请稍后再试", ErrRateLimited)
 		}
 		return domain.BillingDecision{DayAdvisorDelta: 1, HourAdvisorDelta: 1}, nil

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/limits"
 	"github.com/zhanshimian/server/internal/service/account"
 )
 
@@ -79,7 +80,8 @@ type Writer interface {
 
 // 诊断是同步 AI 端点，必须自带成本闸门：每用户每自然日（UTC，与 billing
 // 摘要的 daily_remaining 同一口径）最多 8 次，与 limitDiagnosticPerDay 对齐。
-const DailyLimitPerDay = 8
+// DailyLimitPerDay 为每个用户每日诊断上限；USAGE_DIAGNOSTIC_PER_DAY 可覆盖，0 = 不限。
+var DailyLimitPerDay = limits.FromEnv(limits.EnvDiagnosticPerDay, 8)
 
 type Service struct {
 	reader  Reader
@@ -112,7 +114,7 @@ func (s *Service) Run(ctx context.Context, userID string, input RunInput) (Diagn
 	if err != nil {
 		return Diagnosis{}, err
 	}
-	if count >= DailyLimitPerDay {
+	if DailyLimitPerDay > 0 && count >= DailyLimitPerDay {
 		return Diagnosis{}, fmt.Errorf("%w: 今日诊断已达上限，明天再来", account.ErrRateLimited)
 	}
 	grounding, err := s.reader.ReadDiagnosticGrounding(ctx, userID, input.ReportID, input.Kind)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/limits"
 	"github.com/zhanshimian/server/internal/repository"
 	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
@@ -108,8 +109,9 @@ func (s *Service) WithUsageLimits(counter UsageCounter) *Service {
 	return s
 }
 
-// limitAssessmentPerDay 与 legacy billing_rules limitAnalysisPerDay 一致。
-const limitAssessmentPerDay = 2
+// limitAssessmentPerDay 与 legacy billing_rules limitAnalysisPerDay 一致；
+// 环境变量 USAGE_ANALYSIS_PER_DAY 可覆盖，0 = 不限（内测用）。
+var limitAssessmentPerDay = limits.FromEnv(limits.EnvAnalysisPerDay, 2)
 
 // checkDailyLimit 按服务器本地自然日计数本用户已创建的 assessment
 // operation：达到上限即拒绝（旧线 decideAnalysis 的日限语义）。
@@ -126,7 +128,7 @@ func (s *Service) checkDailyLimit(ctx context.Context, userID string) error {
 	if err != nil {
 		return err
 	}
-	if count >= limitAssessmentPerDay {
+	if limitAssessmentPerDay > 0 && count >= limitAssessmentPerDay {
 		return fmt.Errorf("%w: 今日形象分析次数已用完，明天再来", billing.ErrRateLimited)
 	}
 	return nil

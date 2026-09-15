@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/limits"
 	"github.com/zhanshimian/server/internal/service/billing"
 )
 
@@ -16,9 +17,10 @@ import (
 var ErrValidation = errors.New("rendering validation error")
 
 // 用量限额（与 legacy billing_rules decideLook 一致）：look 8 次/日 + 在途并发 2。
-const (
-	limitRenderRunsPerDay = 8
-	limitLooksConcurrent  = 2
+// USAGE_RENDER_RUNS_PER_DAY / USAGE_RENDER_CONCURRENCY 可覆盖，0 = 不限（内测用）。
+var (
+	limitRenderRunsPerDay = limits.FromEnv(limits.EnvRenderRunsPerDay, 8)
+	limitLooksConcurrent  = limits.FromEnv(limits.EnvRenderConcurrency, 2)
 )
 
 // lookConcurrencySubjects 是在途并发计数口径：render_run（方案效果图）、
@@ -94,14 +96,14 @@ func (s *Service) checkUsageLimits(ctx context.Context, userID string) error {
 	if err != nil {
 		return err
 	}
-	if created >= limitRenderRunsPerDay {
+	if limitRenderRunsPerDay > 0 && created >= limitRenderRunsPerDay {
 		return fmt.Errorf("%w: 今日形象方案制作次数已用完，明天再来", billing.ErrRateLimited)
 	}
 	active, err := s.usage.CountActiveOperations(ctx, userID, lookConcurrencySubjects)
 	if err != nil {
 		return err
 	}
-	if active >= limitLooksConcurrent {
+	if limitLooksConcurrent > 0 && active >= limitLooksConcurrent {
 		return fmt.Errorf("%w: 请等待当前形象方案制作完成后再试", billing.ErrRateLimited)
 	}
 	return nil
