@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
 )
 
@@ -38,8 +39,69 @@ func TestHandlerPreparesOnlyAfterAllGatesPass(t *testing.T) {
 	}
 }
 
-func TestHandlerEnqueuesSecondContentAttemptAfterQualityReject(t *testing.T) {
+func TestHandlerCommitAutoStartsRendersAfterPublish(t *testing.T) {
 	deps := validHandlerDependencies()
+	deps.renders = &fakeRenderStarter{}
+	handler := NewHandlerForTest(deps)
+	lease := validGenerateLease(1)
+	result, err := handler.Execute(context.Background(), lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := handler.Commit(context.Background(), lease, result)
+	if err != nil || outcome != domain.CommitApplied {
+		t.Fatalf("outcome=%s err=%v", outcome, err)
+	}
+	// 发布的每个 variant 各触发一次；幂等键稳定（重放由渲染侧幂等吞掉）
+	if len(deps.renders.keys) != len(deps.store.command.RenderSpecs) {
+		t.Fatalf("render starts = %d, want %d", len(deps.renders.keys), len(deps.store.command.RenderSpecs))
+	}
+	for _, key := range deps.renders.keys {
+		if !strings.HasPrefix(key, "auto-render:"+result.ResultID+":") {
+			t.Fatalf("idempotency key = %q", key)
+		}
+	}
+}
+
+func TestHandlerCommitToleratesRenderStartFailure(t *testing.T) {
+	deps := validHandlerDependencies()
+	deps.renders = &fakeRenderStarter{err: errors.New("provider down")}
+	handler := NewHandlerForTest(deps)
+	lease := validGenerateLease(1)
+	result, err := handler.Execute(context.Background(), lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 触发失败只记日志：已发布的提交结果不受影响，且其余 variant 继续尝试
+	outcome, err := handler.Commit(context.Background(), lease, result)
+	if err != nil || outcome != domain.CommitApplied {
+		t.Fatalf("outcome=%s err=%v", outcome, err)
+	}
+	if len(deps.renders.keys) != len(deps.store.command.RenderSpecs) {
+		t.Fatalf("render starts = %d, want all attempted", len(deps.renders.keys))
+	}
+}
+
+func TestHandlerCommitStopsRenderStartsOnRateLimit(t *testing.T) {
+	deps := validHandlerDependencies()
+	deps.renders = &fakeRenderStarter{err: billing.ErrRateLimited}
+	handler := NewHandlerForTest(deps)
+	lease := validGenerateLease(1)
+	result, err := handler.Execute(context.Background(), lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := handler.Commit(context.Background(), lease, result)
+	if err != nil || outcome != domain.CommitApplied {
+		t.Fatalf("outcome=%s err=%v", outcome, err)
+	}
+	// 日限 429：本批剩余不再点，继续点只会拿到同一个拒绝
+	if len(deps.renders.keys) != 1 {
+		t.Fatalf("render starts = %d, want 1", len(deps.renders.keys))
+	}
+}
+
+func TestHandlerEnqueuesSecondContentAttemptAfterQualityReject(t *testing.T) {	deps := validHandlerDependencies()
 	deps.generator.output = invalidDifferenceCandidate()
 	handler := NewHandlerForTest(deps)
 	result, err := handler.Execute(context.Background(), validGenerateLease(1))
@@ -304,10 +366,11 @@ type handlerDepsBundle struct {
 	verifier   *fakeVerifier
 	operations *fakeOpWriter
 	enqueuer   *fakeEnqueuer
+	renders    *fakeRenderStarter
 }
 
 func (b handlerDepsBundle) toDeps() HandlerDeps {
-	return HandlerDeps{
+	deps := HandlerDeps{
 		Reports:    fakeReports{report: validReport("20000000-0000-0000-0000-000000000001")},
 		Generator:  b.generator,
 		Verifier:   b.verifier,
@@ -317,6 +380,22 @@ func (b handlerDepsBundle) toDeps() HandlerDeps {
 		Memories:   &fakeMemories{},
 		NewIDs:     func() string { return "70000000-0000-0000-0000-000000000099" },
 	}
+	// 接口塞 typed nil 会绕过 startRenders 的 nil 守卫，未装配就是真 nil
+	if b.renders != nil {
+		deps.Renders = b.renders
+	}
+	return deps
+}
+
+// fakeRenderStarter 记录每次自动触发的幂等键；err 非空时原样返回。
+type fakeRenderStarter struct {
+	keys []string
+	err  error
+}
+
+func (f *fakeRenderStarter) StartRun(_ context.Context, _, _ string, idempotencyKey string) error {
+	f.keys = append(f.keys, idempotencyKey)
+	return f.err
 }
 
 func validHandlerDependencies() handlerDepsBundle {

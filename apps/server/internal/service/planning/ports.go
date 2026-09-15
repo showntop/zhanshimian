@@ -89,6 +89,13 @@ type CurrentRenderReader interface {
 	ListCurrentByVariantIDs(ctx context.Context, userID string, variantIDs []string) (map[string]domain.RenderRunView, error)
 }
 
+// RenderStarter 是方案集发布后整批触发形象图渲染的窄端口(rendering.Service
+// 经 bootstrap 适配满足)。幂等键由调用方给稳定值:规划任务崩溃重放时
+// 渲染侧按键幂等,不会重复扣费。nil 容忍:未装配时发布后不自动触发。
+type RenderStarter interface {
+	StartRun(ctx context.Context, userID, variantID, idempotencyKey string) error
+}
+
 // The cross-boundary DTOs below live in domain (frozen contract shared with
 // the postgres adapter); planning re-exposes them under the frozen names.
 type (

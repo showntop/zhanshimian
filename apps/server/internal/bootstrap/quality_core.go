@@ -67,7 +67,7 @@ func wireQualityCore(cfg config.Config, store *postgres.Store, objects storage.O
 
 	// 渲染 Service 即 Planning 的渲染只读端口:方案读模型经它合并各 variant
 	// 的当前渲染状态(含签名媒体 URL)。
-	planningBundle, err := WirePlanning(cfg, store, aiRuntime, renderingBundle.Service)
+	planningBundle, err := WirePlanning(cfg, store, aiRuntime, renderingBundle.Service, NewPlanningRenderStarter(renderingBundle.Service))
 	if err != nil {
 		return nil, err
 	}

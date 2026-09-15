@@ -85,7 +85,8 @@ func (s *Service) WithUsageLimits(counter UsageCounter) *Service {
 
 // checkUsageLimits 恢复旧线 decideLook 的双闸：先日限（服务器本地自然日
 // 计数今日已创建 render_run），后在途并发（非终态 look operation）。
-func (s *Service) checkUsageLimits(ctx context.Context, userID string) error {
+// auto=true（方案发布后的整批自动触发）只保留日限，并发闸跳过（见 StartRunCommand.Auto）。
+func (s *Service) checkUsageLimits(ctx context.Context, userID string, auto bool) error {
 	if s.usage == nil {
 		return nil
 	}
@@ -98,6 +99,9 @@ func (s *Service) checkUsageLimits(ctx context.Context, userID string) error {
 	}
 	if limitRenderRunsPerDay > 0 && created >= limitRenderRunsPerDay {
 		return fmt.Errorf("%w: 今日形象方案制作次数已用完，明天再来", billing.ErrRateLimited)
+	}
+	if auto {
+		return nil
 	}
 	active, err := s.usage.CountActiveOperations(ctx, userID, lookConcurrencySubjects)
 	if err != nil {
@@ -123,7 +127,7 @@ func (s *Service) StartRun(ctx context.Context, cmd StartRunCommand) (StartRunRe
 		return StartRunResult{}, err
 	}
 	// 限额先于落库与扣费：超限不创建 run、不 Reserve（旧线 authorize 次序）。
-	if err := s.checkUsageLimits(ctx, cmd.UserID); err != nil {
+	if err := s.checkUsageLimits(ctx, cmd.UserID, cmd.Auto); err != nil {
 		return StartRunResult{}, err
 	}
 	created, err := s.repo.CreateRun(ctx, CreateRunCommand{

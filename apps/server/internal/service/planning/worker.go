@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 
 	"github.com/google/uuid"
 
 	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
 )
 
@@ -48,6 +50,8 @@ type HandlerDeps struct {
 	Tasks      TaskEnqueuer
 	Store      PlanSetStore
 	Memories   PreferenceMemoryReader
+	// Renders 是发布后的形象图自动触发端口；nil 时只产文字方案（降级/单测）。
+	Renders    RenderStarter
 	NewIDs     func() string
 }
 
@@ -225,7 +229,11 @@ func (h *Handler) executeRejection(ctx context.Context, lease domain.TaskLease, 
 func (h *Handler) Commit(ctx context.Context, lease domain.TaskLease, result domain.TaskResult) (domain.CommitOutcome, error) {
 	switch result.Disposition {
 	case domain.TaskPublish, domain.TaskDomainFail:
-		return h.deps.Store.CommitPrepared(ctx, lease, result)
+		outcome, err := h.deps.Store.CommitPrepared(ctx, lease, result)
+		if err == nil && outcome == domain.CommitApplied && result.Disposition == domain.TaskPublish {
+			h.startRenders(ctx, lease.Task.UserID, result.ResultID)
+		}
+		return outcome, err
 	case domain.TaskEnqueueNext:
 		staged := h.consume(lease)
 		if staged == nil {
@@ -242,6 +250,32 @@ func (h *Handler) Commit(ctx context.Context, lease domain.TaskLease, result dom
 		})
 	default:
 		return domain.CommitSuperseded, fmt.Errorf("unsupported disposition %q", result.Disposition)
+	}
+}
+
+// startRenders 在方案集发布后整批触发形象图渲染：文字方案已经可读，
+// 任何一套触发失败只记日志——已发布的方案操作绝不被渲染拖回失败。
+// 幂等键稳定（auto-render:{planSetID}:{variantID}）：任务崩溃重放由渲染侧
+// 按键幂等吞掉，不重复扣费。遇日限 429 停止本批剩余，继续点只会拿到同一个拒绝。
+func (h *Handler) startRenders(ctx context.Context, userID, planSetID string) {
+	if h.deps.Renders == nil {
+		return
+	}
+	planSet, err := h.deps.Store.Get(ctx, userID, planSetID)
+	if err != nil {
+		slog.Warn("plan renders auto-start skipped: plan set unreadable",
+			"plan_set_id", planSetID, "error", err)
+		return
+	}
+	for _, variant := range planSet.Variants {
+		if err := h.deps.Renders.StartRun(ctx, userID, variant.ID,
+			fmt.Sprintf("auto-render:%s:%s", planSetID, variant.ID)); err != nil {
+			slog.Warn("plan render auto-start failed",
+				"plan_set_id", planSetID, "variant_id", variant.ID, "error", err)
+			if errors.Is(err, billing.ErrRateLimited) {
+				return
+			}
+		}
 	}
 }
 

@@ -93,6 +93,11 @@ type StartRunCommand struct {
 	UserID         string
 	PlanVariantID  string
 	IdempotencyKey string
+	// Auto 为 true 时是方案发布后的整批自动触发：跳过在途并发闸
+	// （手动 look 的用户槽位语义，整批 3 套连发第三个必撞；
+	// 渲染任务在 tasks 表排队、worker 串行消费，不放并发不冲击厂商）。
+	// 日限与计费 Reserve 不跳过。
+	Auto bool
 }
 
 type StartRunResult struct {

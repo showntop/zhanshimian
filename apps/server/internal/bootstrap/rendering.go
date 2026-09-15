@@ -10,6 +10,7 @@ import (
 	"github.com/zhanshimian/server/internal/provider"
 	providerai "github.com/zhanshimian/server/internal/provider/ai"
 	"github.com/zhanshimian/server/internal/repository/postgres"
+	"github.com/zhanshimian/server/internal/service/planning"
 	"github.com/zhanshimian/server/internal/service/rendering"
 	"github.com/zhanshimian/server/internal/service/taskrunner"
 	"github.com/zhanshimian/server/internal/storage"
@@ -195,4 +196,19 @@ func renderRouterModels(cfg config.Config) map[string]providerai.RouterModel {
 		}
 	}
 	return models
+}
+
+// NewPlanningRenderStarter 把渲染 Service 适配成规划发布后的自动触发窄端口；
+// Auto=true 只跳在途并发闸（见 rendering.StartRunCommand.Auto），日限与计费保留。
+func NewPlanningRenderStarter(svc *rendering.Service) planning.RenderStarter {
+	return planningRenderStarter{svc: svc}
+}
+
+type planningRenderStarter struct{ svc *rendering.Service }
+
+func (a planningRenderStarter) StartRun(ctx context.Context, userID, variantID, idempotencyKey string) error {
+	_, err := a.svc.StartRun(ctx, rendering.StartRunCommand{
+		UserID: userID, PlanVariantID: variantID, IdempotencyKey: idempotencyKey, Auto: true,
+	})
+	return err
 }

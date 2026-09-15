@@ -39,7 +39,8 @@ type PlanningBundle struct {
 // WirePlanning assembles the planning service, handler and registry from the
 // postgres adapter and the capability-routed AI runtime. renders 是渲染读模型
 // 的只读端口(渲染 Service 即满足该接口);为 nil 时方案读模型不合并渲染状态。
-func WirePlanning(cfg config.Config, store *postgres.Store, runtime ai.StructuredRuntime, renders planning.CurrentRenderReader) (*PlanningBundle, error) {
+// autoRenders 是发布后整批触发形象图渲染的端口;为 nil 时只产文字方案。
+func WirePlanning(cfg config.Config, store *postgres.Store, runtime ai.StructuredRuntime, renders planning.CurrentRenderReader, autoRenders planning.RenderStarter) (*PlanningBundle, error) {
 	if err := validatePlanningRoutes(cfg); err != nil {
 		return nil, err
 	}
@@ -53,6 +54,7 @@ func WirePlanning(cfg config.Config, store *postgres.Store, runtime ai.Structure
 		Tasks:      operations,
 		Store:      store,
 		Memories:   store,
+		Renders:    autoRenders,
 	})
 	registry, err := taskrunner.NewRegistry(
 		[]taskrunner.Definition{def},
