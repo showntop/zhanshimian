@@ -2,7 +2,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  anchorBoxInFrame,
   reportAvailableRoles,
   defaultReportRole,
   reportFindings,
@@ -188,24 +187,4 @@ test('available roles skip missing photos and the default role follows the first
   // 一张可用照片都没有：没有默认角色，页面显示整体空态
   assert.equal(defaultReportRole({ source_media: {} }), null)
   assert.equal(defaultReportRole(null), null)
-})
-
-test('anchor boxes map onto the letterboxed photo, never past the frame', () => {
-  // 照片比相框更宽：aspectFit 按宽贴满，上下留白——锚框跟着照片走，不跟着相框走
-  const wide = anchorBoxInFrame({ w: 2000, h: 1000 }, { x: 0.25, y: 0.5, w: 0.5, h: 0.25 }, 686, 900)
-  assert.deepEqual(wide, { left: 171.5, top: 450, width: 343, height: 85.75 })
-
-  // 照片比相框更高：按高贴满，左右留白
-  const tall = anchorBoxInFrame({ w: 1000, h: 2000 }, { x: 0, y: 0, w: 1, h: 1 }, 686, 900)
-  assert.deepEqual(tall, { left: 118, top: 0, width: 450, height: 900 })
-
-  // 整张照片的锚框正好铺满可见照片区
-  assert.deepEqual(
-    anchorBoxInFrame({ w: 686, h: 900 }, { x: 0, y: 0, w: 1, h: 1 }, 686, 900),
-    { left: 0, top: 0, width: 686, height: 900 },
-  )
-
-  // 照片尺寸未知（onLoad 未发生）时不画框：宁可没有框，不可有错位的框
-  assert.equal(anchorBoxInFrame(undefined, { x: 0, y: 0, w: 1, h: 1 }, 686, 900), null)
-  assert.equal(anchorBoxInFrame({ w: 0, h: 0 }, { x: 0, y: 0, w: 1, h: 1 }, 686, 900), null)
 })

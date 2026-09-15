@@ -119,44 +119,6 @@ export function reportFindingsOnRole(
   )
 }
 
-/** 相框内的矩形，单位与传入的 frameW/frameH 一致（调用方用 rpx）。 */
-export interface FrameRect {
-  left: number
-  top: number
-  width: number
-  height: number
-}
-
-/**
- * 归一化锚框 → aspectFit 相框里的实际矩形。
- *
- * 照片用 aspectFit 展示（整张可见、居中留白）：锚框画出去的每一条边都落在照片上。
- * 服务端保证锚框在照片内（x+w≤1、y+h≤1），aspectFit 保证照片在相框内，
- * 两层合起来锚框永远可见——不需要对裁切做任何"大概在这"的猜测。
- *
- * 照片尺寸还没拿到（onLoad 未发生）时返回 null：画不出准确位置的框宁可不画。
- */
-export function anchorBoxInFrame(
-  dims: { w: number; h: number } | undefined,
-  anchor: { x: number; y: number; w: number; h: number },
-  frameW: number,
-  frameH: number,
-): FrameRect | null {
-  if (!dims || dims.w <= 0 || dims.h <= 0) return null
-  const scale = Math.min(frameW / dims.w, frameH / dims.h)
-  const shownW = dims.w * scale
-  const shownH = dims.h * scale
-  const offX = (frameW - shownW) / 2
-  const offY = (frameH - shownH) / 2
-  return {
-    left: offX + anchor.x * shownW,
-    top: offY + anchor.y * shownH,
-    width: anchor.w * shownW,
-    height: anchor.h * shownH,
-  }
-}
-
-
 /**
  * 「查看方案」的请求体：一份绑定当前报告、选项全默认的日常方案集。
  *

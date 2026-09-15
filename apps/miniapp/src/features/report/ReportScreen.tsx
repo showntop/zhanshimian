@@ -7,9 +7,11 @@
 // 3. 证据落不了地的 finding 仍然在文字列表里（文字不依赖照片），
 //    但不会出现在照片上指着一个不存在的位置；
 // 4. 「查看方案」走 createPlanSet + 内存交接条（方案页在 tabBar 里，switchTab 不带 query）。
-import { useCallback, useEffect, useState } from 'react'
+//
+// 视觉沿用 09-11 旧线：全出血 Swiper hero + 骑缝胶片条 + 上叠内容板 + 固定底部 CTA。
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
-import { Text, View } from '@tarojs/components'
+import { Swiper, SwiperItem, Text, View } from '@tarojs/components'
 import {
   CAPTURE_COPY,
   ERROR_COPY,
@@ -25,10 +27,11 @@ import EmptyState from '../../components/empty-state'
 import ErrorState from '../../components/error-state'
 import PhotoAnnotationLayer from '../../components/photo-annotation'
 import PrimaryButton from '../../components/primary-button'
+import Skeleton from '../../components/skeleton'
 import SourceImage from '../../components/source-image'
 import {
-  anchorBoxInFrame,
   defaultReportRole,
+  reportAvailableRoles,
   reportFindings,
   reportFindingsOnRole,
   reportPhotoForFinding,
@@ -36,7 +39,6 @@ import {
   reportPlanSetIdempotencyKey,
   reportPlanSetRequest,
   reportSourcePhoto,
-  REPORT_ROLE_ORDER,
   type ReportRole,
 } from './model'
 import './index.scss'
@@ -44,8 +46,11 @@ import './index.scss'
 const CAPTURE_ROUTE = '/pages/capture/index'
 const PLANS_ROUTE = '/pages/plans/index'
 
-/** 相框尺寸（rpx）：内容区满宽，高度按窗口高度换算，照片以顶对齐铺满。 */
-function heroFrame(): { w: number; h: number; aspect: number } {
+// 照片按宽铺满、顶部锚定（全身照保留头部，多出的从底部裁）。
+// 切换来源照片时只有相框内的图片滑动。hero 高度约 72% 视口：
+// 相框高只在这里算一次，标注层 frameW/frameH 与实际渲染框是同一个值。
+const HERO_FULL_W = 750
+const HERO_H = (() => {
   let windowWidth = 375
   let windowHeight = 667
   try {
@@ -55,17 +60,22 @@ function heroFrame(): { w: number; h: number; aspect: number } {
   } catch {
     /* 开发环境兜底 */
   }
-  const h = Math.round((windowHeight * 0.62 * 750) / windowWidth)
-  return { w: 686, h, aspect: 686 / h }
-}
+  return Math.round((windowHeight * 0.72 * HERO_FULL_W) / (windowWidth || 375))
+})()
+const HERO_ASPECT = HERO_FULL_W / HERO_H
 
 interface ReportScreenProps {
   /** 路由上的报告 id；没有就取「当前报告」 */
   reportId?: string
+  /** 内容首次上屏（成功/失败/空态都算）时通知外壳，驱动入场动画的 ready 时序 */
+  onReady?: () => void
+  /** 外壳 usePageShell 的 enter：入场播完返回空串，避免微信重播挂在节点上的 CSS animation */
+  enter?: (delay?: 1 | 2 | 3) => string
 }
 
-export default function ReportScreen({ reportId }: ReportScreenProps) {
-  const frame = heroFrame()
+const staticEnter = (delay?: 1 | 2 | 3) => (delay ? `fade-up delay-${delay}` : 'fade-up')
+
+export default function ReportScreen({ reportId, onReady, enter = staticEnter }: ReportScreenProps) {
   // 有路由 id 时先吃缓存立刻上屏，再向服务端对一次账
   const [report, setReport] = useState<ReportType | null>(() =>
     reportId ? resourceCache.read<ReportType>(resourceKey('report', reportId)) ?? null : null,
@@ -99,8 +109,16 @@ export default function ReportScreen({ reportId }: ReportScreenProps) {
     void load()
   }, [load])
 
-  const findings = reportFindings(report)
-  const activeFinding = findings.find((finding) => finding.id === activeFindingId) ?? null
+  // ready 时序：内容（或失败/空态）首次到达才点亮。外壳恒 ready 会让
+  // page--settled 提前钉住，数据晚到时 fade-up 被 animation:none 压掉，
+  // 入场动画形同虚设——这里只发一次，重绘/对账不重复触发。
+  const arrived = Boolean(report) || failed || !loading
+  const readyFiredRef = useRef(false)
+  useEffect(() => {
+    if (!arrived || readyFiredRef.current) return
+    readyFiredRef.current = true
+    onReady?.()
+  }, [arrived, onReady])
 
   const pickRole = (role: ReportRole) => {
     setActiveRole(role)
@@ -145,8 +163,8 @@ export default function ReportScreen({ reportId }: ReportScreenProps) {
   if (!report) {
     if (loading) {
       return (
-        <View className="report-screen report-screen--loading">
-          <View className="spinner" />
+        <View className="report-screen">
+          <Skeleton rows={5} />
         </View>
       )
     }
@@ -160,8 +178,18 @@ export default function ReportScreen({ reportId }: ReportScreenProps) {
     )
   }
 
-  const annotated = activeRole ? reportFindingsOnRole(report, activeRole) : []
-  const annotationItems = annotated.map((finding) => ({
+  const findings = reportFindings(report)
+  // 胶片条与 hero 只出现有照片的角色：空格可点但没有内容是死交互
+  const photoRoles = reportAvailableRoles(report)
+  const currentRole: ReportRole | null =
+    activeRole && photoRoles.includes(activeRole) ? activeRole : photoRoles[0] ?? null
+  // 当前照片名下的建议按 finding 自己声明的角色归位；证据落不了地的留在文字列表。
+  // 一张照片都没有时文字列表兜底全量——报告宁可有缺口，不可有假的对应，但文字不丢。
+  const roleFindings = currentRole
+    ? findings.filter((finding) => finding.source_photo.role === currentRole)
+    : findings
+
+  const toAnnotationItem = (finding: ReportFinding) => ({
     id: finding.id,
     label: finding.label,
     categoryLabel: reportCategoryLabel(finding.category),
@@ -169,147 +197,180 @@ export default function ReportScreen({ reportId }: ReportScreenProps) {
     // 锚框中心：服务端给的是归一化矩形，标注层只认一个点
     anchorX: finding.anchor.x + finding.anchor.w / 2,
     anchorY: finding.anchor.y + finding.anchor.h / 2,
-  }))
-  const activeRoleMedia = activeRole ? reportSourcePhoto(report, activeRole) : null
+  })
 
   return (
     <View className="report-screen">
       {/* ---------- 来源照片：这张照片是所有锚点的坐标系 ---------- */}
-      <View className="report-screen__hero fade-up">
-        <View className="report-screen__hero-frame">
-          {activeRoleMedia ? (
-            <>
-              <SourceImage
-                className="report-screen__hero-img"
-                media={activeRoleMedia}
-                anchor="top"
-                frameAspect={frame.aspect}
-                onLoad={(event) => {
-                  const w = Number(event.detail.width)
-                  const h = Number(event.detail.height)
-                  if (w > 0 && h > 0 && activeRole) {
-                    setPhotoDims((prev) => ({ ...prev, [activeRole]: { w, h } }))
-                  }
-                }}
-              />
-              {annotationItems.length > 0 ? (
-                <PhotoAnnotationLayer
-                  items={annotationItems}
-                  activeId={activeFindingId ?? ''}
-                  frameW={frame.w}
-                  frameH={frame.h}
-                  photoDims={activeRole ? photoDims[activeRole] : undefined}
-                  objectPosition="top"
-                  onTap={(item) => setActiveFindingId((prev) => (prev === item.id ? null : item.id))}
-                />
-              ) : null}
-            </>
-          ) : (
-            <View className="report-screen__hero-empty">
-              <Text className="report-screen__hero-empty-title">{REPORT_COPY.evidenceEmpty}</Text>
-              <Text className="report-screen__hero-empty-hint">{REPORT_COPY.evidenceEmptyHint}</Text>
-            </View>
-          )}
-          {activeRole ? (
-            <Text className="report-screen__hero-label">
-              {CAPTURE_COPY.shots[activeRole].label}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* 换片胶卷：三个角色固定出现，缺照片的是空格，不是别的照片 */}
-        <View className="report-screen__film">
-          {REPORT_ROLE_ORDER.map((role) => {
-            const media = reportSourcePhoto(report, role)
-            const isActive = activeRole === role
-            return (
-              <View
-                key={role}
-                className={[
-                  'report-screen__film-item pressable',
-                  isActive ? 'report-screen__film-item--active' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                onClick={() => pickRole(role)}
-              >
-                {media ? (
-                  <SourceImage className="report-screen__film-img" media={media} mode="aspectFill" />
-                ) : (
-                  <View className="report-screen__film-empty" />
-                )}
-                <Text className="report-screen__film-label">
-                  {CAPTURE_COPY.shots[role].label}
-                </Text>
-              </View>
-            )
-          })}
-        </View>
-      </View>
-
-      {/* ---------- 综合印象与综合建议 ---------- */}
-      {report.impression_tags.length > 0 ? (
-        <View className="report-screen__tags fade-up delay-1">
-          <Text className="report-screen__section-title">{REPORT_COPY.tagsTitle}</Text>
-          <View className="report-screen__tag-row">
-            {report.impression_tags.map((tag) => (
-              <Text key={tag} className="report-screen__tag">
-                {tag}
-              </Text>
-            ))}
+      <View className={`report-screen__hero ${enter()}`}>
+        {photoRoles.length === 0 ? (
+          <View className="report-screen__hero-empty" style={{ height: `${HERO_H}rpx` }}>
+            <Text className="report-screen__hero-empty-title">{REPORT_COPY.evidenceEmpty}</Text>
+            <Text className="report-screen__hero-empty-hint">{REPORT_COPY.evidenceEmptyHint}</Text>
           </View>
-        </View>
-      ) : null}
-
-      <View className="report-screen__priority fade-up delay-1">
-        <Text className="report-screen__section-title">{REPORT_COPY.priorityTitle}</Text>
-        <Text className="report-screen__priority-title">{report.priority_title}</Text>
-        <Text className="report-screen__priority-copy">{report.priority_copy}</Text>
-      </View>
-
-      {/* ---------- 可提升点：文字永远完整；照片标注只是它的一个视图 ---------- */}
-      <View className="report-screen__findings fade-up delay-2">
-        <Text className="report-screen__section-title">{REPORT_COPY.findingsTitle}</Text>
-        {findings.length === 0 ? (
-          <Text className="report-screen__empty-findings">{REPORT_COPY.emptyFindings}</Text>
         ) : (
-          findings.map((finding) => {
-            const expanded = finding.id === activeFindingId
-            return (
-              <View
-                key={finding.id}
-                className={[
-                  'report-screen__finding',
-                  expanded ? 'report-screen__finding--active' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                onClick={() => pickFinding(finding)}
-              >
-                <View className="report-screen__finding-head">
-                  <Text className="report-screen__finding-cat">
-                    {reportCategoryLabel(finding.category)}
-                  </Text>
-                  <Text className="report-screen__finding-label">{finding.label}</Text>
-                </View>
-                {expanded ? (
-                  <View className="report-screen__finding-detail">
-                    <Text className="report-screen__finding-line">
-                      {`${REPORT_COPY.findingsObservationTitle}：${finding.visible_observation}`}
-                    </Text>
-                    <Text className="report-screen__finding-line">
-                      {`${REPORT_COPY.findingsAdviceTitle}：${finding.recommendation}`}
-                    </Text>
+          <Swiper
+            className="report-screen__swiper"
+            style={{ height: `${HERO_H}rpx` }}
+            current={Math.max(0, photoRoles.indexOf(currentRole ?? 'body'))}
+            onChange={(event) => {
+              const role = photoRoles[event.detail.current]
+              if (role) pickRole(role)
+            }}
+          >
+            {photoRoles.map((role) => {
+              const annotated = reportFindingsOnRole(report, role)
+              return (
+                <SwiperItem key={role} className="report-screen__slide">
+                  <View className="report-screen__hero-frame">
+                    <SourceImage
+                      className="report-screen__hero-img"
+                      media={reportSourcePhoto(report, role)}
+                      anchor="top"
+                      frameAspect={HERO_ASPECT}
+                      onLoad={(event) => {
+                        const w = Number(event.detail.width)
+                        const h = Number(event.detail.height)
+                        if (w > 0 && h > 0) {
+                          setPhotoDims((prev) =>
+                            prev[role]?.w === w && prev[role]?.h === h
+                              ? prev
+                              : { ...prev, [role]: { w, h } },
+                          )
+                        }
+                      }}
+                    />
+                    {annotated.length > 0 ? (
+                      <PhotoAnnotationLayer
+                        items={annotated.map(toAnnotationItem)}
+                        activeId={role === currentRole ? activeFindingId ?? '' : ''}
+                        frameW={HERO_FULL_W}
+                        frameH={HERO_H}
+                        photoDims={photoDims[role]}
+                        objectPosition="top"
+                        onTap={(item) => {
+                          const finding = annotated.find((entry) => entry.id === item.id)
+                          if (finding) pickFinding(finding)
+                        }}
+                      />
+                    ) : null}
                   </View>
-                ) : null}
-              </View>
-            )
-          })
+                </SwiperItem>
+              )
+            })}
+          </Swiper>
         )}
       </View>
 
+      {/* 内容板：向上叠住照片底边，胶片条骑跨接缝作为照片与报告的铰链 */}
+      <View className={`report-screen__sheet ${enter(1)}`}>
+        {photoRoles.length > 1 ? (
+          <View className="report-screen__film">
+            {photoRoles.map((role) => {
+              const active = role === currentRole
+              return (
+                <View
+                  key={role}
+                  className={[
+                    'report-screen__film-item pressable',
+                    active ? 'report-screen__film-item--active' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => pickRole(role)}
+                >
+                  <View className="report-screen__film-thumb">
+                    <SourceImage
+                      className="report-screen__film-img"
+                      media={reportSourcePhoto(report, role)}
+                      anchor="top"
+                    />
+                  </View>
+                  <Text className="report-screen__film-label">
+                    {CAPTURE_COPY.shots[role].label}
+                  </Text>
+                </View>
+              )
+            })}
+          </View>
+        ) : null}
+
+        {/* ---------- 综合印象与综合建议 ---------- */}
+        {report.impression_tags.length > 0 ? (
+          <View className="report-screen__summary-row">
+            <Text className="report-screen__summary-label">{REPORT_COPY.tagsTitle}</Text>
+            <View className="report-screen__summary-chips">
+              {report.impression_tags.slice(0, 3).map((tag) => (
+                <Text key={tag} className="report-screen__chip">
+                  {tag}
+                </Text>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        <View className="report-screen__priority">
+          <Text className="report-screen__priority-copy">
+            {report.priority_title ? (
+              <Text className="report-screen__priority-lead">{report.priority_title}</Text>
+            ) : null}
+            {report.priority_copy}
+          </Text>
+        </View>
+
+        {/* ---------- 可提升点：文字永远完整；照片标注只是它的一个视图 ---------- */}
+        <View className="report-screen__section">
+          <View className="report-screen__section-head">
+            <Text className="section-title">
+              {currentRole
+                ? `${CAPTURE_COPY.shots[currentRole].label} · ${roleFindings.length} 个${REPORT_COPY.findingsTitle}`
+                : REPORT_COPY.findingsTitle}
+            </Text>
+            <View className="section-rule" />
+          </View>
+          {roleFindings.length > 0 ? (
+            roleFindings.map((finding, index) => {
+              const active = finding.id === activeFindingId
+              return (
+                <View
+                  key={finding.id}
+                  id={`finding-${finding.id}`}
+                  className={[
+                    'report-screen__finding pressable',
+                    active ? 'report-screen__finding--active' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => pickFinding(finding)}
+                >
+                  <View className="report-screen__finding-head">
+                    <View className="report-screen__finding-title">
+                      <Text className="report-screen__finding-index">{index + 1}</Text>
+                      <Text className="report-screen__finding-cat">
+                        {reportCategoryLabel(finding.category)}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text className="report-screen__finding-label">{finding.label}</Text>
+                  <Text className="report-screen__finding-detail">
+                    {finding.visible_observation || finding.label}
+                  </Text>
+                  {finding.recommendation ? (
+                    <Text className="report-screen__finding-detail">{finding.recommendation}</Text>
+                  ) : null}
+                </View>
+              )
+            })
+          ) : (
+            <View className="report-screen__empty-findings">
+              <Text>{REPORT_COPY.emptyFindings}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+
       {/* ---------- 下一步 ---------- */}
-      <View className="report-screen__cta fade-up delay-3">
+      <View className={`report-screen__cta ${enter(2)}`}>
         <PrimaryButton
           text={REPORT_COPY.viewPlans}
           loading={planning}

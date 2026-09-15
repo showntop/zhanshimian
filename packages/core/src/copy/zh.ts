@@ -296,6 +296,8 @@ export const HOME_COPY = {
   viewReport: '查看报告与建议 ›',
   startArchive: '开始形象档案',
   startAnalysis: '开始形象分析',
+  // 分析进行中的主按钮：状态 + 动作，与纯链接 viewProgress 区分开
+  analyzingAction: '正在分析，查看进度',
   archiveTitle: '三张照片，建立只属于你的形象档案',
   archiveBody: '正脸、45° 侧脸、正面全身。不用化妆，也不需要刻意摆姿势。',
   photoPrivacy: '照片与建议只对你可见，可随时删除',
@@ -305,10 +307,20 @@ export const HOME_COPY = {
     { title: '4 个可提升点', desc: '每条都标回来源照片' },
     { title: '3 套可执行方案', desc: '按场景、预算和现实条件生成' },
   ],
+  // 新用户 hero 右侧三张堆叠图的角注（照片 → 理解 → 方案）
+  previewCaptions: ['照片', '理解', '方案'],
   toolsTitle: '直接解决眼前的一件事',
+  // 首页工具卡（1 张发型主卡 + 2 张安静卡）；key 与页面路由表对应，路由不进文案
+  tools: [
+    { key: 'hair', label: '发型预览', desc: '先看效果再决定', badge: '推荐' },
+    { key: 'outfit', label: '穿搭诊断', desc: '只指出最值得改的一处', badge: '' },
+    { key: 'purchase', label: '购买判断', desc: '买之前先看适不适合', badge: '' },
+  ],
   scenesTitle: '按场合开始',
   sceneReadyNote: '已复用你的形象档案，不会再要照片',
   recentTitle: '最近方案',
+  // 报告 hero 行动行里「N 个可提升点」的量词后缀，数字由页面填
+  findingsSuffix: '个可提升点',
   continuePlan: '继续这套方案 ›',
   viewProgress: '查看进度 ›',
   planningLink: '你的三套方案正在规划 ›',
@@ -316,6 +328,7 @@ export const HOME_COPY = {
   analysisLabel: '分析',
   looksLabel: '形象图',
   billingUnit: '次',
+  todayEyebrow: '今日造型',
   emptyTodayLink: '先看今天怎么穿 ›',
   lifeTitle: '顾问与衣橱',
   advisorEntry: '和顾问聊聊',
@@ -358,6 +371,48 @@ export const PROFILE_SETUP_COPY = {
   optional: '选填',
   roles: ['产品经理', '设计师', '咨询顾问', '学生'],
   budgets: ['500 以内', '500–1500', '1500 以上']
+} as const
+
+// ---------- 我的（Tab） ----------
+// 账户 hero、任务中心、形象档案、基本资料、更多 五个分区的页面级文案；
+// 编辑资料/改名弹层的文案沿用 PROFILE_SETUP_COPY，权益沿用 BILLING_COPY。
+export const ME_COPY = {
+  // hero 身份行：没有报告时不编造标签，只说这是什么
+  archiveIdentity: '你的形象档案',
+  viewReportLink: '查看最近报告 ›',
+  startArchiveLink: '开始建档 ›',
+  // 任务中心（简化版）：公开 OperationRef 只有 kind/status，没有进度百分比。
+  // 键集合与契约 kind 枚举一致；execution_feedback 是后台一次性写入，页面不列出。
+  tasksTitle: '进行中的任务',
+  taskKindLabels: {
+    assessment: '形象分析',
+    plan_set: '形象方案',
+    render: '形象图',
+    execution_feedback: '反馈提交',
+    body_orbit: '3D 形象'
+  },
+  taskWorking: '进行中',
+  taskFailed: '未完成，点击查看',
+  archiveTitle: '形象档案',
+  latestReport: '最近的分析报告',
+  viewAction: '查看',
+  noArchive: '未建档',
+  myPlans: '我的方案',
+  updateArchive: '更新形象档案',
+  updateArchiveHint: '重拍三张',
+  basicsTitle: '基本资料',
+  measurements: '三围',
+  unfilled: '未填写',
+  moreTitle: '更多',
+  labEntry: '体验实验室',
+  labEntryHint: 'AR / 3D / 试衣',
+  wardrobeEntry: '我的衣橱',
+  wardrobeEntryHint: '轻量版',
+  deleteAllHint: '全部删除',
+  privacyNote: '照片与建议只对你可见',
+  nicknameRequired: '请填写称呼',
+  saveFailed: '保存没有成功，请重试',
+  avatarFailed: '头像没有更新成功，请重试'
 } as const
 
 // ---------- 形象报告 ----------
@@ -538,6 +593,12 @@ export const PLANNING_COPY = {
   currentLabel: '原本',
   planLabel: '方案',
   compareHint: '左右拖动，看原本和方案',
+  // 悬浮坞 CTA 下方的来源说明（红线 2：生成来源必须显式说，整句放这里不拼串）
+  ctaNote: '形象图由 AI 基于你的照片生成',
+  ctaNoteDemo: '当前为效果示例，接入真实图像模型后展示本人效果',
+  // 场景空态里的生成中行 / 切场景载入行
+  sceneGenerating: '正在从你的报告生成三套方案，通常需要 1-2 分钟',
+  sceneLoading: '正在载入该场合的方案…',
   planOfPrefix: '第',
   planOfSuffix: '套'
 } as const

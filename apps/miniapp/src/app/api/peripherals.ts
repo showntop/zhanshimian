@@ -173,6 +173,11 @@ export const peripherals = {
     client.GET('/v1/body-presentations/{id}', { params: { path: { id } } }).then(dataOrThrow),
 
   // ---------- 身份与账单 ----------
+  getMe: (): Promise<MeAccount> => client.GET('/v1/me').then(dataOrThrow),
+
+  getMyProfile: (): Promise<UserProfile | null> =>
+    client.GET('/v1/me/profile').then(dataOrThrow),
+
   updateMyProfile: (profile: UserProfile): Promise<UserProfile> =>
     client.PUT('/v1/me/profile', { body: profile }).then(dataOrThrow),
 
