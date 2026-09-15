@@ -8,8 +8,10 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import {
+  ANALYSIS_FAIL_COPY,
   APP_NAME,
   APP_SLOGAN,
+  ERROR_COPY,
   HOME_COPY,
   HOME_TITLE,
   PRIVACY_NOTE,
@@ -89,6 +91,9 @@ export default function Home() {
   const [loading, setLoading] = useState(!boot)
   const [failed, setFailed] = useState(false)
   const firstShow = useRef(true)
+  // 轮询连续失败自停后：toast 只报一次（ref 去重），恢复靠回 tab 对账时 restartKey 重装
+  const [pollRestart, setPollRestart] = useState(0)
+  const pollHalted = useRef(false)
   // 内容上屏后才播入场、播完钉住：切 tab 回来不重播 fade-up（防已渲染图片被藏）
   const { pageClass, enter } = usePageShell(Boolean(boot), 'page--tab', 'home')
 
@@ -117,6 +122,12 @@ export default function Home() {
       firstShow.current = false
       return
     }
+    // 轮询曾连续失败 5 次自停（控制器 stop 后 refresh 是空操作）：
+    // 借这次对账换 restartKey 把它重新装起来，用户回 tab 即恢复，不用重进小程序
+    if (pollHalted.current) {
+      pollHalted.current = false
+      setPollRestart((key) => key + 1)
+    }
     void load(true)
   })
 
@@ -125,7 +136,26 @@ export default function Home() {
   useOperationPolling({
     operationIds: activeIds,
     enabled: activeIds.length > 0,
-    onSettled: () => void load(true),
+    restartKey: pollRestart,
+    onSettled: (operations) => {
+      // 服务端的 active_operations 只含在途：失败终态一刷新就从 bootstrap 消失，
+      // 不吭声的话「正在分析」会悄悄翻回「开始形象分析」。终态里有失败就说出来。
+      const failedOperation = operations.find((operation) => operation.status === 'failed')
+      if (failedOperation) {
+        Taro.showToast({
+          title: failedOperation.public_message || ANALYSIS_FAIL_COPY.timeoutBody,
+          icon: 'none',
+        })
+      }
+      void load(true)
+    },
+    onFetchFailure: () => {
+      // 连续失败 5 次控制器自停（AGENTS 规约的失败态）：页面有内容不拆页，
+      // toast 一次告知；恢复入口是回 tab 时的 restartKey 重装（见 useDidShow）
+      if (pollHalted.current) return
+      pollHalted.current = true
+      Taro.showToast({ title: ERROR_COPY.network, icon: 'none' })
+    },
   })
 
   const report = boot?.report ?? null

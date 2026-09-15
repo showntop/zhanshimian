@@ -13,7 +13,7 @@ import { resolveBaseURL } from '../../config/runtime'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
 import type { MediaUploadPort } from './media-upload'
 import { TaroResponse, installTaroFetchRuntime } from './taro-fetch'
-import { PublicApiError, dataOrThrow } from './result'
+import { PublicApiError, dataOrThrow, isEmptySuccessStatus } from './result'
 
 export const baseURL = resolveBaseURL()
 
@@ -113,6 +113,9 @@ export const client = createGeneratedApiClient({ baseUrl: baseURL })
 client.use({
   async onResponse({ response }) {
     if (!response.ok) return response
+    // 204/205 没有响应体（「删除我的数据」成功就回 204）：没有 JSON 可解，
+    // 原样交回 openapi-fetch 的空体分支；硬解只会让 JSON.parse('') 把成功炸成失败。
+    if (isEmptySuccessStatus(response.status)) return response
     const payload: unknown = await response.json()
     const transformed = await transformBody(payload)
     return new TaroResponse(transformed, response.status, response.headers) as unknown as Response

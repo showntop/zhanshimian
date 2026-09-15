@@ -24,7 +24,7 @@ import type {
 } from '@zsm/core'
 import { CAPTURE_COPY } from '@zsm/core'
 import { client } from './client'
-import { bodyOrThrow, dataOrThrow, PublicApiError } from './result'
+import { bodyOrThrow, dataOrThrow, noContentOrThrow, PublicApiError } from './result'
 
 /** 契约里 `/v1/media/demo` 的 role 枚举；与建档页的槽位角色同形但不互相依赖。 */
 export type DemoMediaRole = 'face' | 'side' | 'body'
@@ -177,9 +177,8 @@ export const qualityApi = {
 
   getHomeBootstrap: (): Promise<HomeBootstrap> => client.GET('/v1/home/bootstrap').then(dataOrThrow),
 
-  /** 「删除我的数据」：服务端清空全部业务数据；客户端随后清本地 UI 偏好。 */
+  /** 「删除我的数据」：服务端清空全部业务数据，成功回 204 空体；客户端随后清本地 UI 偏好。 */
   deleteMyData: async (): Promise<void> => {
-    const result = await client.DELETE('/v1/me/data')
-    bodyOrThrow(result)
+    noContentOrThrow(await client.DELETE('/v1/me/data'))
   },
 }

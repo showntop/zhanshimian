@@ -31,6 +31,7 @@ import {
   assessmentIdempotencyKey,
   captureReady,
   createSlots,
+  demoRestoreSlot,
   photosByRole,
   updateSlot,
   type CaptureRole,
@@ -155,15 +156,29 @@ export default function CaptureScreen() {
     })
   }
 
-  // 槽即操作：空槽/失败槽 → 系统面板或重传；已就绪槽 → 重拍 / 换图 / 看大图
+  // 槽即操作：空槽 → 系统面板；失败槽 → 重传或换一张；已就绪槽 → 重拍 / 换图 / 看大图
   const onSlotTap = (role: CaptureRole) => {
     if (working || busy) return
     setFocusRole(role)
     const slot = slots[role]
     if (slot.phase === 'failed') {
-      // 本地文件还在就重传那一份，不在（比如拍照失败）就重新选
-      if (slot.localPath) void ingest(role, slot.localPath)
-      else pick(role)
+      // 本地文件不在（比如拍照失败）只能重新选
+      if (!slot.localPath) {
+        pick(role)
+        return
+      }
+      // 重传与换一张两个出口都给：临时文件会被微信清理，
+      // 只给「重传同一文件」就是把用户困进永远失败的死循环
+      Taro.showActionSheet({
+        itemList: [CAPTURE_COPY.actionRetry, CAPTURE_COPY.actionReplace],
+        success: (res) => {
+          if (res.tapIndex === 0) void ingest(role, slot.localPath)
+          else if (res.tapIndex === 1) pick(role)
+        },
+        fail: () => {
+          /* 用户取消 */
+        },
+      })
       return
     }
     if (slot.phase !== 'ready') {
@@ -229,6 +244,9 @@ export default function CaptureScreen() {
   const useDemoPhotos = async () => {
     if (working || busy) return
     setBusy(true)
+    // 进 demo 流程前的整页快照：哪个角色失败就恢复哪个槽（与 pick 的 revertTo 同一语义），
+    // 绝不整槽清空——用户已有 ready 真实照片时，一次示例拉取失败不能把已有照片一起丢掉
+    const before = slots
     const outcomes = await Promise.all(
       CAPTURE_ROLES.map(async (role) => {
         patch(role, { phase: 'uploading', errorText: '' })
@@ -237,7 +255,7 @@ export default function CaptureScreen() {
           patch(role, { phase: 'ready', media, localPath: '', errorText: '' })
           return true
         } catch {
-          patch(role, { phase: 'empty', media: null, localPath: '' })
+          patch(role, demoRestoreSlot(before[role]))
           return false
         }
       }),
@@ -374,7 +392,8 @@ function slotStateText(slot: CaptureSlot): string {
     case 'ready':
       return slot.localPath ? CAPTURE_COPY.slotReadyHint : CAPTURE_COPY.slotDemoHint
     case 'failed':
-      return CAPTURE_COPY.actionRetry
+      // 失败原因优先（「可以重试或换一张」正是失败槽的两个出口），没有才退回动作名
+      return slot.errorText || CAPTURE_COPY.actionRetry
     case 'hashing':
       return CAPTURE_COPY.phaseHashing
     case 'uploading':

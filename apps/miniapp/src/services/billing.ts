@@ -1,19 +1,25 @@
 import Taro from '@tarojs/taro'
 import { ApiError, BILLING_COPY, type BillingOrder, type BillingSKU } from '@zsm/core'
 import { peripherals } from '../app/api/peripherals'
+import { billingErrorKind, billingErrorMessage } from './billing-error'
 import { STORAGE_KEYS, writeStorage } from './storage'
 
-export function isInsufficientCredits(error: unknown): error is ApiError {
-  return error instanceof ApiError && (error.code === 'insufficient_credits' || error.statusCode === 402)
+export function isInsufficientCredits(error: unknown): boolean {
+  return billingErrorKind(error) === 'insufficient_credits'
 }
 
+/**
+ * 计费类错误的一次性处理；返回 true 表示已处理，调用方直接收工。
+ * 错误类识别在 ./billing-error（接口错误是 PublicApiError，core ApiError 只认
+ * 本文件自造的 payment_*）——曾用 instanceof 只判 core 类，402 分支整链失效。
+ */
 export function handleBillingError(error: unknown): boolean {
-  if (!(error instanceof ApiError)) return false
-  if (error.code === 'insufficient_credits' || error.statusCode === 402) {
+  const kind = billingErrorKind(error)
+  if (kind === 'insufficient_credits') {
     writeStorage(STORAGE_KEYS.openCreditSheet, '1')
     Taro.showModal({
       title: BILLING_COPY.insufficientTitle,
-      content: error.message || BILLING_COPY.insufficientBody,
+      content: billingErrorMessage(error) || BILLING_COPY.insufficientBody,
       confirmText: BILLING_COPY.buyAction,
       success: (res) => {
         if (res.confirm) Taro.switchTab({ url: '/pages/profile/index' })
@@ -21,11 +27,11 @@ export function handleBillingError(error: unknown): boolean {
     })
     return true
   }
-  if (error.code === 'rate_limited' || error.statusCode === 429) {
-    Taro.showToast({ title: error.message || BILLING_COPY.rateLimited, icon: 'none' })
+  if (kind === 'rate_limited') {
+    Taro.showToast({ title: billingErrorMessage(error) || BILLING_COPY.rateLimited, icon: 'none' })
     return true
   }
-  if (error.code === 'payment_unavailable') {
+  if (kind === 'payment_unavailable') {
     Taro.showToast({ title: BILLING_COPY.paymentUnavailable, icon: 'none' })
     return true
   }

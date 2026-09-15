@@ -1,8 +1,8 @@
 // 场合 Brief：单页几问，答案只活在组件 state 与 POST body 里。
 // 修改答案重新提交会创建一份新的方案集（服务端按幂等键与内容决定复用或受理），
 // 本地不存任何 Brief——存了就成了会过期的第二份答案。
-import { useEffect, useState } from 'react'
-import Taro, { useLoad } from '@tarojs/taro'
+import { useCallback, useEffect, useState } from 'react'
+import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import {
   ERROR_COPY,
@@ -11,12 +11,19 @@ import {
 } from '@zsm/core'
 import { qualityApi } from '../../app/api/quality'
 import { PublicApiError } from '../../app/api/result'
+import { resourceCache } from '../../app/cache/resource-cache'
 import { writePlanSetHandoff } from '../../app/plan-set-handoff'
 import EmptyState from '../../components/empty-state'
 import ErrorState from '../../components/error-state'
 import Pill from '../../components/pill'
 import PrimaryButton from '../../components/primary-button'
-import { sceneBriefRequest, sceneFields } from './model'
+import {
+  createIdempotencyKey,
+  planSetRetryMarkerKey,
+  planSetSceneKey,
+  sceneBriefRequest,
+  sceneFields,
+} from './model'
 import './index.scss'
 
 const PLANS_TAB = '/pages/plans/index'
@@ -34,17 +41,26 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
 
-  useLoad(() => {
-    void (async () => {
-      try {
-        const current = await qualityApi.getCurrentReport()
-        if (current) setReportId(current.id)
-        else setNoReport(true)
-      } catch {
-        setFailed(true)
-      }
-    })()
-  })
+  // 外壳等路由参数到位才挂载本屏，页面 onLoad 早于本屏挂载——
+  // 后注册的 useLoad 不会再触发，数据拉取只能走挂载 effect。
+  const loadReport = useCallback(async () => {
+    try {
+      const current = await qualityApi.getCurrentReport()
+      if (current) setReportId(current.id)
+      else setNoReport(true)
+    } catch {
+      setFailed(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadReport()
+  }, [loadReport])
+
+  // general 与未知场景都没有 Brief 页：回方案 tab。导航是副作用，不进渲染期。
+  useEffect(() => {
+    if (!fields) void Taro.switchTab({ url: PLANS_TAB })
+  }, [fields])
 
   const sceneLabel = SCENES.find((s) => s.id === scene)?.label ?? ''
   const answered = fields ? fields.filter((field) => answers[field.key]).length : 0
@@ -60,7 +76,20 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
     if (!request) return
     setBusy(true)
     try {
-      const start = await qualityApi.createPlanSet(request, `plan-set:${reportId}:${scene}`)
+      // 上一次受理已到终态 failed 时，固定键 24h 内只会重放同一份失败：换新键重新受理。
+      // 在途/双击仍用固定键保幂等（busy 护栏之外的第二道）。
+      const retryKey = planSetRetryMarkerKey(scene)
+      const fresh = Boolean(resourceCache.read<string>(retryKey))
+      const start = await qualityApi.createPlanSet(
+        request,
+        fresh ? createIdempotencyKey(`plan-set:${reportId}:${scene}`) : `plan-set:${reportId}:${scene}`,
+      )
+      if (fresh) resourceCache.remove(retryKey)
+      if (start.accepted) {
+        // 方案 tab 常驻、受理窗内方案集还没落库：场景经侧信道留给它，
+        // 规划失败时「重新生成」才知道回到哪个场合
+        resourceCache.write(planSetSceneKey(start.data.id), scene)
+      }
       writePlanSetHandoff({
         planSetId: start.accepted ? start.data.id : start.planSet.id,
         operationId: start.accepted ? start.operation.id : null,
@@ -75,8 +104,7 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
   }
 
   if (!fields) {
-    // general 与未知场景都没有 Brief 页：回方案 tab
-    void Taro.switchTab({ url: PLANS_TAB })
+    // 上面的 effect 正在回方案 tab，这一帧留空
     return <View className="scene-brief" />
   }
 
@@ -87,15 +115,7 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
         retryText={ERROR_COPY.retryAction}
         onRetry={() => {
           setFailed(false)
-          void (async () => {
-            try {
-              const current = await qualityApi.getCurrentReport()
-              if (current) setReportId(current.id)
-              else setNoReport(true)
-            } catch {
-              setFailed(true)
-            }
-          })()
+          void loadReport()
         }}
       />
     )

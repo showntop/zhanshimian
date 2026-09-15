@@ -90,6 +90,19 @@ export function photosByRole(slots: CaptureSlots): PhotosByRole {
   return photos
 }
 
+/**
+ * Demo 拉取失败时的槽位恢复：进 demo 流程前的槽快照 → 失败后该落回的样子。
+ * 之前有 ready 照片就原样回去（媒体与本地路径都还在，与 pick 的 revertTo 同一语义）；
+ * 本来就没照片的槽才回 empty。直接清整槽的代价是：用户已有真实照片时，
+ * 点一次「先用效果示例体验」失败就把已有照片一起丢掉。
+ */
+export function demoRestoreSlot(slot: CaptureSlot): Partial<Omit<CaptureSlot, 'role'>> {
+  if (slot.media) {
+    return { phase: 'ready', media: slot.media, localPath: slot.localPath, errorText: '' }
+  }
+  return { phase: 'empty', media: null, localPath: '', errorText: '' }
+}
+
 /** 三个角色齐备且互不相同——同一张照片占两个槽不算建好档。 */
 export function captureReady(photos: PhotosByRole): boolean {
   try {

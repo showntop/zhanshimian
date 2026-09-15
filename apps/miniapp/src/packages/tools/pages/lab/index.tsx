@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import {
-  ApiError,
   IMAGE_BADGE_COPY,
   LAB_COPY,
   type BodyPresentation,
@@ -17,6 +16,7 @@ import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility
 import { useOperationPolling } from '../../../../app/operations/use-operation-polling'
 import { peripherals } from '../../../../app/api/peripherals'
 import { qualityApi } from '../../../../app/api/quality'
+import { PublicApiError } from '../../../../app/api/result'
 import { resourceCache, resourceKey } from '../../../../app/cache/resource-cache'
 import { handleBillingError } from '../../../../services/billing'
 import AppHeader from '../../../../components/app-header'
@@ -215,7 +215,9 @@ export default function Lab() {
       }))
     } catch (error) {
       if (handleBillingError(error)) return
-      if (error instanceof ApiError && (error.code === 'capability_unavailable' || error.statusCode === 503)) {
+      // 接口错误一律是 PublicApiError（core 的 ApiError 只认 billing 自造的 payment_*）：
+      // 判错类会让「能力未开放」永远落不到 waitlist 分支，只剩一句 toast。
+      if (error instanceof PublicApiError && (error.code === 'capability_unavailable' || error.statusCode === 503)) {
         setStatus((prev) => ({
           available: false,
           active: null,

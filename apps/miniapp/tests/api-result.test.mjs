@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { bodyOrThrow, dataOrThrow, PublicApiError } from '../src/app/api/result.ts'
+import { bodyOrThrow, dataOrThrow, isEmptySuccessStatus, noContentOrThrow, PublicApiError } from '../src/app/api/result.ts'
 
 test('dataOrThrow unwraps the envelope', () => {
   const data = dataOrThrow({
@@ -68,4 +68,33 @@ test('a thrown PublicApiError exposes only public fields', () => {
   for (const leaked of ['vendor', 'model', 'trace_id', 'provider_key', 'stack_detail']) {
     assert.equal(leaked in error, false, `${leaked} leaked onto the public error`)
   }
+})
+
+test('204/205 count as empty success bodies, everything else still parses', () => {
+  // 「删除我的数据」成功就是 204 空体：中间件靠这个判定跳过 JSON 解析，
+  // 把空体送进 JSON.parse('') 只会把一次成功的删除炸成 SyntaxError。
+  assert.equal(isEmptySuccessStatus(204), true)
+  assert.equal(isEmptySuccessStatus(205), true)
+  assert.equal(isEmptySuccessStatus(200), false)
+  assert.equal(isEmptySuccessStatus(404), false)
+})
+
+test('noContentOrThrow treats 204 without data as success, not as request_failed', () => {
+  // openapi-fetch 对 204 给的是 { data: undefined }：走 bodyOrThrow 会把成功误判成
+  // 'request_failed'——「删除我的数据」客户端 100% 报失败（数据其实已删）就是这么来的。
+  assert.doesNotThrow(() => noContentOrThrow({ response: { status: 204 } }))
+  assert.doesNotThrow(() => noContentOrThrow({ data: { ok: true }, response: { status: 200 } }))
+  assert.throws(
+    () =>
+      noContentOrThrow({
+        error: { error: { code: 'unauthorized', message: '登录已过期' } },
+        response: { status: 401 },
+      }),
+    (error) => {
+      assert.ok(error instanceof PublicApiError)
+      assert.equal(error.code, 'unauthorized')
+      assert.equal(error.statusCode, 401)
+      return true
+    },
+  )
 })

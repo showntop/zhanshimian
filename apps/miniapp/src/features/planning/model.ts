@@ -162,6 +162,24 @@ export function sceneFields(scene: string) {
   return SCENE_BRIEF_COPY.scenes[scene as SceneBriefScene].fields
 }
 
+/**
+ * 受理场景侧信道的缓存 key。受理中的方案集还没落库（GET 404 规划窗），
+ * 方案 tab 从交接条拿不到场景；场合 Brief 受理成功时把场景写在这个 key 下，
+ * 方案 tab 消费交接条时读取——规划失败的「重新生成」才知道回到哪个场合。
+ */
+export function planSetSceneKey(planSetId: string): string {
+  return `plan-set-scene:${planSetId}`
+}
+
+/**
+ * 重试标记的缓存 key：记录「这个场景固定幂等键的受理已到终态 failed」。
+ * 24h 内重放固定键只会拿回同一份失败，下一次主动生成必须换新幂等键；
+ * 新受理成功（或复用到已发布方案集）后由发起方清掉。
+ */
+export function planSetRetryMarkerKey(scene: string): string {
+  return `plan-set-retry:${scene}`
+}
+
 /** 每个场景臂对应的 Brief 类型。 */
 type BriefOf<S extends CreatePlanSetRequest['scene']> = Extract<CreatePlanSetRequest, { scene: S }>['brief']
 

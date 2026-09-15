@@ -2,6 +2,7 @@
 // 失败只按 retryable 分成「重新发起」和「重新拍摄」两种恢复动作。
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import {
   assessmentEndedBody,
   assessmentPhotoSlots,
@@ -12,6 +13,7 @@ import {
   assessmentStageLine,
   assessmentStepOf,
 } from '../src/features/assessment/model.ts'
+import { assessmentIdempotencyKey } from '../src/features/capture/model.ts'
 import { ASSESSMENT_STAGE_COPY } from '@zsm/core'
 
 const display = (id) => ({
@@ -110,14 +112,46 @@ test('failure splits into retry and reshoot by retryability alone', () => {
 })
 
 test('a retry never reuses the first submission key', () => {
-  const photos = { face: display('face-1'), side: display('side-1'), body: display('body-1') }
+  const photos = {
+    // 真实 asset id 是 36 字符 UUID：旧实现把三个 id 拼进键里会顶破服务端 128 上限
+    face: display('0f5a1b6e-9c2d-4e8f-a1b2-c3d4e5f60718'),
+    side: display('1a6b2c7f-0d3e-5f9a-b2c3-d4e5f6071829'),
+    body: display('2b7c3d8a-1e4f-6a0b-c3d4-e5f60718293a'),
+  }
   // 首提的键已被服务端和那次失败的受理绑在一起：复用只会把同一份失败原样重放回来，
   // 用户按一百次也还是那一份结果。所以重发必须换键，且换出来的键要能区分第几次。
   const first = assessmentRetryKey(photos, 1)
-  assert.notEqual(first, 'assessment:face-1:side-1:body-1')
+  assert.notEqual(first, assessmentIdempotencyKey(photos))
   assert.notEqual(first, assessmentRetryKey(photos, 2))
   assert.equal(first, assessmentRetryKey(photos, 1))
-  assert.match(first, /face-1/)
+})
+
+test('retry keys stay within the server 128-char limit and hash the photo ids', () => {
+  // 服务端 validIdempotencyKey 的上限是 128（apps/server/internal/httpapi/idempotency.go）；
+  // 旧键 `assessment-retry:` + 三个 UUID + 序号 ≥ 129，重试永远 400——这条断言就是防它回来。
+  const photos = {
+    face: display('0f5a1b6e-9c2d-4e8f-a1b2-c3d4e5f60718'),
+    side: display('1a6b2c7f-0d3e-5f9a-b2c3-d4e5f6071829'),
+    body: display('2b7c3d8a-1e4f-6a0b-c3d4-e5f60718293a'),
+  }
+  for (const attempt of [1, 12, 123]) {
+    const key = assessmentRetryKey(photos, attempt)
+    assert.ok(key.length <= 128, `key for attempt ${attempt} exceeds the server limit: ${key.length}`)
+  }
+  // 键里不再出现原始 asset id：id 长度与键长脱钩，长 id 也不会再把键顶破
+  const key = assessmentRetryKey(photos, 1)
+  assert.equal(key.includes('0f5a1b6e'), false)
+  // 哈希实现对照 node:crypto 的标准 sha256 钉死：同三张照片同 attempt 键稳定
+  const joined = [
+    '0f5a1b6e-9c2d-4e8f-a1b2-c3d4e5f60718',
+    '1a6b2c7f-0d3e-5f9a-b2c3-d4e5f6071829',
+    '2b7c3d8a-1e4f-6a0b-c3d4-e5f60718293a',
+  ].join(':')
+  const digest = createHash('sha256').update(joined, 'utf8').digest('hex').slice(0, 32)
+  assert.equal(key, `assessment-retry:${digest}:1`)
+  // 换一张照片就换一把键：重发语义仍绑在本次提交的三张照片上
+  const other = { ...photos, body: display('3c8d4e9b-2f5a-7b1c-d4e5-f60718293a4b') }
+  assert.notEqual(assessmentRetryKey(other, 1), key)
 })
 
 test('cancelled and superseded explain themselves differently', () => {
