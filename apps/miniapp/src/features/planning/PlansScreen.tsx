@@ -79,6 +79,9 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     () => handoff?.operationId ?? routeOperationId ?? '',
   )
   const [report, setReport] = useState<Report | null>(null)
+  // 受理 operation 到达终态失败时上屏的公开文案（'' = 没有失败）；
+  // 规划在途的 404 不算失败——那是方案集还没发布的预期状态
+  const [acceptFailed, setAcceptFailed] = useState('')
   // 对比左图的来源报告：与当前报告不是同一份时单独拉取，不污染 report
   // （report 是「当前」语义，切场景、生成方案都靠它）
   const [boundReport, setBoundReport] = useState<Report | null>(null)
@@ -101,6 +104,8 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   planSetRef.current = planSet
   const planSetIdRef = useRef(planSetId)
   planSetIdRef.current = planSetId
+  const acceptOperationIdRef = useRef(acceptOperationId)
+  acceptOperationIdRef.current = acceptOperationId
   // 切场景乱序保护：后发的请求赢，先到的慢响应不得盖回去
   const sceneReqRef = useRef(0)
 
@@ -116,7 +121,17 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       setPlanSet(next)
       setFailed(false)
       return next
-    } catch {
+    } catch (error) {
+      // 受理在途期间方案集还没发布，404 是预期应答不是网络错误；
+      // 界面停在生成中视图，由受理 operation 的轮询推向终态。
+      // 没有受理 operation 可盯的 404 才是真「没找到」。
+      if (
+        error instanceof PublicApiError &&
+        error.statusCode === 404 &&
+        acceptOperationIdRef.current
+      ) {
+        return null
+      }
       setFailed(true)
       return null
     }
@@ -228,7 +243,15 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   const { refresh: refreshOperations } = useOperationPolling({
     operationIds: watchedIds,
     enabled: watchedIds.length > 0,
-    onSettled: () => {
+    onSettled: (operations) => {
+      // 受理 operation 终态失败：方案集永远不会发布，刷新只会再拿 404。
+      // 把公开失败文案直接上屏，给「重新生成」而不是误导性的网络错误。
+      const acceptId = acceptOperationIdRef.current
+      const accept = acceptId ? operations.find((op) => op.id === acceptId) : undefined
+      if (accept && (accept.status === 'failed' || accept.status === 'cancelled' || accept.status === 'superseded')) {
+        setAcceptFailed(accept.public_message || PLANNING_COPY.retryFailedBody)
+        return
+      }
       // 所有被盯的 operation 都到终态了：整体刷新方案集看新状态
       const id = planSetRef.current?.id ?? planSetIdRef.current
       if (id) void refreshPlanSet(id)
@@ -290,6 +313,7 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   /** general 空态 → 生成形象方案（受理后原地进入 planning 视图）。 */
   const generateGeneral = async () => {
     if (!report) return
+    setAcceptFailed('')
     try {
       const start = await qualityApi.createPlanSet(
         {
@@ -304,6 +328,9 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         setAcceptOperationId(start.operation.id)
         setPlanSetId(start.data.id)
       } else {
+        // 复用已发布方案集：没有任务在跑，旧的受理 id 必须清掉，
+        // 否则轮询会盯上那份已终态的 operation 把失败卡又顶回来
+        setAcceptOperationId('')
         setPlanSetId(start.planSet.id)
       }
       setBootstrapped(true)
@@ -447,12 +474,19 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   }
 
   // 已建档但当前场景还没有方案集：保留场景 tab，只替换内容区——
-  // 受理中的给生成中行，切换中的给骨架，其余给该场景的空态卡（含「生成形象方案」）。
+  // 受理失败的给失败卡（公开文案 + 重新生成），受理中的给生成中行，
+  // 切换中的给骨架，其余给该场景的空态卡（含「生成形象方案」）。
   if (!planSet) {
     return (
       <View className="plans">
         {sceneTabs}
-        {acceptOperationId ? (
+        {acceptFailed ? (
+          <View className="plans__scene-empty fade-up">
+            <Text className="plans__scene-empty-title">{PLANNING_COPY.retryFailedTitle}</Text>
+            <Text className="plans__scene-empty-desc">{acceptFailed}</Text>
+            <PrimaryButton text={PLANNING_COPY.regenerateAction} onClick={() => void generateGeneral()} />
+          </View>
+        ) : acceptOperationId ? (
           <View className="plans__scene-empty">
             <View className="plans__generating">
               <View className="plans__generating-spin spinner" />
