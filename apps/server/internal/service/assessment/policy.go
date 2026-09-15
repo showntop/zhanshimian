@@ -84,6 +84,10 @@ func classifyTaskFailure(class domain.ErrorClass, code string) (message string, 
 	if class == domain.ErrorQualityRejected {
 		return "这次未能形成可靠报告，请重新拍摄后再试", false
 	}
+	if class == domain.ErrorTransient || class == domain.ErrorThrottled {
+		// 瞬时故障重试耗尽（如 AI 通道故障）：照片本身没问题，应给「重新发起」而非「重新拍摄」。
+		return "分析暂时未完成，请稍后重试", true
+	}
 	return "分析暂时未完成，请稍后重试", false
 }
 
