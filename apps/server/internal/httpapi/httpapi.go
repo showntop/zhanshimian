@@ -71,7 +71,7 @@ func New(deps Dependencies, logger *slog.Logger, devLoginEnabled bool, runtime R
 	mux.Handle("GET /v1/operations", api.auth(http.HandlerFunc(api.listOperations)))
 	mux.Handle("GET /v1/home/bootstrap", api.auth(http.HandlerFunc(api.homeBootstrap)))
 
-	mux.Handle("POST /v1/media/upload-intents", api.auth(api.requireIdempotency(http.HandlerFunc(api.createUploadIntent))))
+	mux.Handle("POST /v1/media/upload-intents", api.auth(api.requireIdempotencyWithReplayGuard(http.HandlerFunc(api.createUploadIntent), uploadGrantStillFresh)))
 	mux.Handle("POST /v1/media/upload-intents/{id}/complete", api.auth(api.requireIdempotency(http.HandlerFunc(api.completeUploadIntent))))
 	mux.Handle("POST /v1/media/demo", api.auth(http.HandlerFunc(api.createDemoMedia)))
 

@@ -159,9 +159,10 @@ func (c *COS) PresignUpload(ctx context.Context, intent domain.UploadIntent, ttl
 	if ttl <= 0 {
 		ttl = 15 * time.Minute
 	}
+	// Content-Length 不能进签名头也不能要求客户端回传：微信小程序网络层
+	// 自管理 Content-Length，回传值被改写或缺失都会让 COS 判签名不符（403）。
 	headers := http.Header{}
 	headers.Set("Content-Type", intent.MIMEType)
-	headers.Set("Content-Length", strconv.FormatInt(intent.ByteSize, 10))
 	headers.Set("x-cos-meta-sha256", intent.SHA256)
 	signed, err := c.client.Object.GetPresignedURL(ctx, http.MethodPut, key, c.secretID, c.secretKey, ttl, &cos.PresignedURLOptions{Header: &headers})
 	if err != nil {
@@ -172,7 +173,6 @@ func (c *COS) PresignUpload(ctx context.Context, intent domain.UploadIntent, ttl
 		URL:    signed.String(),
 		Headers: map[string]string{
 			"Content-Type":      intent.MIMEType,
-			"Content-Length":    strconv.FormatInt(intent.ByteSize, 10),
 			"x-cos-meta-sha256": intent.SHA256,
 		},
 		ExpiresAt: time.Now().Add(ttl),

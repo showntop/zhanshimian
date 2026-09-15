@@ -93,6 +93,27 @@ func TestAbortIdempotencyAllowsRetry(t *testing.T) {
 	}
 }
 
+func TestInvalidateIdempotencyDropsCompletedRecord(t *testing.T) {
+	store, userID := newIdempotencyStore(t)
+	in := beginInput(userID, "key-1", strings.Repeat("e", 64))
+	if _, _, err := store.BeginIdempotency(context.Background(), in); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CompleteIdempotency(context.Background(), userID, in.Key, 201, json.RawMessage(`{"data":{"id":"asset-1"}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.InvalidateIdempotency(context.Background(), userID, in.Key); err != nil {
+		t.Fatal(err)
+	}
+	_, outcome, err := store.BeginIdempotency(context.Background(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outcome != domain.IdempotencyBeginStarted {
+		t.Fatalf("after invalidate outcome = %s, want started（已完成记录必须可作废）", outcome)
+	}
+}
+
 func TestBeginIdempotencyTwentyConcurrentSameRequest(t *testing.T) {
 	store, userID := newIdempotencyStore(t)
 	in := beginInput(userID, "key-race", strings.Repeat("d", 64))

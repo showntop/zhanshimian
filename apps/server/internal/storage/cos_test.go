@@ -57,8 +57,12 @@ func TestCOSPresignUploadIncludesRequiredHeaders(t *testing.T) {
 	if grant.Method != "PUT" {
 		t.Fatalf("method = %s", grant.Method)
 	}
-	if grant.Headers["Content-Type"] != "image/jpeg" || grant.Headers["Content-Length"] != "20" || grant.Headers["x-cos-meta-sha256"] != sha {
+	if grant.Headers["Content-Type"] != "image/jpeg" || grant.Headers["x-cos-meta-sha256"] != sha {
 		t.Fatalf("headers = %#v", grant.Headers)
+	}
+	// Content-Length 由客户端网络层自管理，签名头里出现它会让微信小程序 PUT 必现 403。
+	if _, ok := grant.Headers["Content-Length"]; ok {
+		t.Fatalf("Content-Length must not be a signed header: %#v", grant.Headers)
 	}
 	if !strings.Contains(grant.URL, "/users/u1/uploads/i1") || !strings.Contains(grant.URL, "q-signature=") {
 		t.Fatalf("unexpected signed URL: %s", grant.URL)

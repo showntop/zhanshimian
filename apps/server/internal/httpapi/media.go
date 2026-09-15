@@ -1,9 +1,11 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/service/media"
@@ -38,6 +40,26 @@ type mediaAssetDTO struct {
 	SHA256    string `json:"sha256"`
 	State     string `json:"state"`
 	CreatedAt string `json:"created_at"`
+}
+
+// 预签名 URL 过期后重放同一响应必然 403：重放前校验 expires_at 还有余量。
+// 解析不出时间按新鲜处理，不误伤这条路由之外的重放语义。
+func uploadGrantStillFresh(_ int, body []byte) bool {
+	var payload struct {
+		Data struct {
+			Upload struct {
+				ExpiresAt string `json:"expires_at"`
+			} `json:"upload"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return true
+	}
+	expires, err := time.Parse("2006-01-02T15:04:05Z", payload.Data.Upload.ExpiresAt)
+	if err != nil {
+		return true
+	}
+	return time.Until(expires) > time.Minute
 }
 
 func (a *API) createUploadIntent(w http.ResponseWriter, r *http.Request) {

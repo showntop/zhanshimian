@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -32,6 +33,34 @@ func TestIdempotencyReplaysSuccessfulResponse(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatalf("handler calls = %d, want 1", calls)
+	}
+}
+
+func TestIdempotencyStaleReplayIsInvalidatedAndReexecuted(t *testing.T) {
+	calls := 0
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		writeData(w, http.StatusCreated, map[string]string{"id": fmt.Sprintf("asset-%d", calls)})
+	})
+	api := &API{idempotency: newMemoryIdempotencyStore(), logger: discardLogger()}
+	// 模拟「存储响应里的预签名 URL 已过期」：guard 只认最新一份响应为新鲜
+	handler := api.requireIdempotencyWithReplayGuard(next, func(_ int, body []byte) bool {
+		return !strings.Contains(string(body), `"asset-1"`)
+	})
+	first := requestWithKey(t, handler, "key-1", `{"purpose":"face"}`)
+	second := requestWithKey(t, handler, "key-1", `{"purpose":"face"}`)
+	third := requestWithKey(t, handler, "key-1", `{"purpose":"face"}`)
+	if first.Code != http.StatusCreated || !strings.Contains(first.Body.String(), `"asset-1"`) {
+		t.Fatalf("first status = %d body=%s", first.Code, first.Body.String())
+	}
+	if calls != 2 {
+		t.Fatalf("handler calls = %d, want 2（过期重放必须作废重跑）", calls)
+	}
+	if !strings.Contains(second.Body.String(), `"asset-2"`) {
+		t.Fatalf("stale replay was not invalidated: %s", second.Body.String())
+	}
+	if second.Body.String() != third.Body.String() {
+		t.Fatalf("fresh replay mismatch\nsecond %s\nthird  %s", second.Body.String(), third.Body.String())
 	}
 }
 
@@ -393,6 +422,13 @@ func (s *memoryIdempotencyStore) AbortIdempotency(_ context.Context, userID, key
 		return nil
 	}
 	delete(s.rows, id)
+	return nil
+}
+
+func (s *memoryIdempotencyStore) InvalidateIdempotency(_ context.Context, userID, key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.rows, s.rowKey(userID, key))
 	return nil
 }
 

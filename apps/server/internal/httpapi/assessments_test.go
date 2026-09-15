@@ -210,6 +210,10 @@ func (startedIdempotencyStore) AbortIdempotency(context.Context, string, string)
 	return nil
 }
 
+func (startedIdempotencyStore) InvalidateIdempotency(context.Context, string, string) error {
+	return nil
+}
+
 type httpAssessmentRepo struct {
 	report domain.AssessmentReport
 }

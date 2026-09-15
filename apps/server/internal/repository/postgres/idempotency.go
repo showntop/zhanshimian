@@ -78,6 +78,16 @@ func (s *Store) AbortIdempotency(ctx context.Context, userID, key string) error 
 	return err
 }
 
+// InvalidateIdempotency 删除任意状态的记录：存储的响应已失效（如预签名上传 URL 过期）
+// 时让下一次 Begin 重新执行，而不是把失效响应无限重放。Abort 只清 in_progress，管不到这里。
+func (s *Store) InvalidateIdempotency(ctx context.Context, userID, key string) error {
+	_, err := s.pool.Exec(ctx, `
+		DELETE FROM idempotency_keys
+		WHERE user_id=$1::uuid AND key=$2`,
+		userID, key)
+	return err
+}
+
 func insertIdempotency(ctx context.Context, s *Store, in domain.BeginIdempotency) (domain.IdempotencyRecord, error) {
 	return scanIdempotency(s.pool.QueryRow(ctx, `
 		INSERT INTO idempotency_keys (user_id, key, request_fingerprint, status, scope, expires_at)

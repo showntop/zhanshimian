@@ -24,9 +24,16 @@ type IdempotencyStore interface {
 	BeginIdempotency(context.Context, domain.BeginIdempotency) (domain.IdempotencyRecord, domain.IdempotencyBeginOutcome, error)
 	CompleteIdempotency(context.Context, string, string, int, json.RawMessage) error
 	AbortIdempotency(context.Context, string, string) error
+	InvalidateIdempotency(context.Context, string, string) error
 }
 
 func (a *API) requireIdempotency(next http.Handler) http.Handler {
+	return a.requireIdempotencyWithReplayGuard(next, nil)
+}
+
+// replayFresh 非空时在重放前校验存储的响应是否仍然有效（如预签名上传 URL 未过期）；
+// 返回 false 则作废旧记录、按新请求重新执行——重放一张过期 URL 只会让客户端必然失败。
+func (a *API) requireIdempotencyWithReplayGuard(next http.Handler, replayFresh func(status int, body []byte) bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if a.idempotency == nil {
 			a.internalError(w, r, errIdempotencyUnavailable)
@@ -44,33 +51,44 @@ func (a *API) requireIdempotency(next http.Handler) http.Handler {
 		}
 		fingerprint := requestFingerprint(r.Method, r.URL.EscapedPath(), canonicalJSON(body))
 		userID := currentUser(r).ID
-		record, outcome, err := a.idempotency.BeginIdempotency(r.Context(), domain.BeginIdempotency{
+		begin := domain.BeginIdempotency{
 			UserID:             userID,
 			Key:                key,
 			RequestFingerprint: fingerprint,
 			Scope:              r.Method + " " + r.URL.EscapedPath(),
 			ExpiresAt:          time.Now().Add(idempotencyTTL),
-		})
-		if err != nil {
-			a.internalError(w, r, err)
-			return
 		}
-		switch outcome {
-		case domain.IdempotencyBeginReplay:
-			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			w.WriteHeader(record.ResponseStatus)
-			_, _ = w.Write(record.ResponseBody)
-			return
-		case domain.IdempotencyBeginInProgress:
-			writeError(w, r, http.StatusConflict, "idempotency_in_progress", "相同请求仍在处理中，请稍后重试")
-			return
-		case domain.IdempotencyBeginConflict:
-			writeError(w, r, http.StatusConflict, "idempotency_conflict", "相同幂等键已被用于不同请求")
-			return
-		case domain.IdempotencyBeginStarted:
-		default:
-			a.internalError(w, r, errUnexpectedIdempotencyOutcome)
-			return
+		for {
+			record, outcome, err := a.idempotency.BeginIdempotency(r.Context(), begin)
+			if err != nil {
+				a.internalError(w, r, err)
+				return
+			}
+			switch outcome {
+			case domain.IdempotencyBeginReplay:
+				if replayFresh != nil && !replayFresh(record.ResponseStatus, record.ResponseBody) {
+					if err := a.idempotency.InvalidateIdempotency(r.Context(), userID, key); err != nil {
+						a.internalError(w, r, err)
+						return
+					}
+					continue
+				}
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				w.WriteHeader(record.ResponseStatus)
+				_, _ = w.Write(record.ResponseBody)
+				return
+			case domain.IdempotencyBeginInProgress:
+				writeError(w, r, http.StatusConflict, "idempotency_in_progress", "相同请求仍在处理中，请稍后重试")
+				return
+			case domain.IdempotencyBeginConflict:
+				writeError(w, r, http.StatusConflict, "idempotency_conflict", "相同幂等键已被用于不同请求")
+				return
+			case domain.IdempotencyBeginStarted:
+			default:
+				a.internalError(w, r, errUnexpectedIdempotencyOutcome)
+				return
+			}
+			break
 		}
 
 		captured := &captureResponseWriter{ResponseWriter: w, status: http.StatusOK}
