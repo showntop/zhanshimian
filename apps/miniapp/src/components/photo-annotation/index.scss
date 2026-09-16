@@ -70,7 +70,10 @@
   font-size: 20rpx;
   font-weight: 700;
   line-height: 1.3;
-  white-space: normal;
+  // 锁单行：连线起点按单行胶囊高 46rpx 计算，折行会让线头偏离中心
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .anno__drawer {

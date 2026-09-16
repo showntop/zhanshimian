@@ -32,6 +32,7 @@ import Skeleton from '../../components/skeleton'
 import SourceImage from '../../components/source-image'
 import {
   defaultReportRole,
+  findingAnchorPoint,
   reportAvailableRoles,
   reportFindings,
   reportFindingsOnRole,
@@ -197,9 +198,9 @@ export default function ReportScreen({ reportId, onReady, enter = staticEnter }:
     label: finding.label,
     categoryLabel: reportCategoryLabel(finding.category),
     detail: finding.visible_observation,
-    // 锚框中心：服务端给的是归一化矩形，标注层只认一个点
-    anchorX: finding.anchor.x + finding.anchor.w / 2,
-    anchorY: finding.anchor.y + finding.anchor.h / 2,
+    // 锚点是区域框不是点：取上下半身的语义边中点（领口/发际、裤脚/鞋），
+    // 几何中心会落在 T 恤正中/大腿中段（见 model.findingAnchorPoint）
+    ...findingAnchorPoint(finding),
   })
 
   return (

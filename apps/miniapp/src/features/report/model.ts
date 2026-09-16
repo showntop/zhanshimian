@@ -154,3 +154,23 @@ export function reportPlanSetHandoff(start: PlanSetStart): PlanSetHandoff {
   if (!start.accepted) return { planSetId: start.planSet.id, operationId: null }
   return { planSetId: start.data.id, operationId: start.operation.id }
 }
+
+/**
+ * finding 锚框 → 标注层的落点（归一化坐标）。
+ *
+ * 服务端的 anchor 是区域矩形不是点：直接取几何中心会落在「T 恤正中、
+ * 大腿中段」这类没有语义的位置。按框在照片里的上下半身取语义边——
+ * 框在上半身取顶边中点（领口/发际/眉心），下半身取底边中点（裤脚/鞋），
+ * 横跨大半身的整身框留在中心。
+ */
+export function findingAnchorPoint(
+  finding: Pick<ReportFinding, 'anchor'>,
+): { anchorX: number; anchorY: number } {
+  const { x, y, w, h } = finding.anchor
+  const centerX = x + w / 2
+  const centerY = y + h / 2
+  if (h >= 0.5) return { anchorX: centerX, anchorY: centerY }
+  return centerY < 0.5
+    ? { anchorX: centerX, anchorY: y }
+    : { anchorX: centerX, anchorY: y + h }
+}

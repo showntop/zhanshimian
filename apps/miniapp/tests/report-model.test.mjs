@@ -2,6 +2,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  findingAnchorPoint,
   reportAvailableRoles,
   defaultReportRole,
   reportFindings,
@@ -187,4 +188,35 @@ test('available roles skip missing photos and the default role follows the first
   // 一张可用照片都没有：没有默认角色，页面显示整体空态
   assert.equal(defaultReportRole({ source_media: {} }), null)
   assert.equal(defaultReportRole(null), null)
+})
+
+// 锚点语义化：区域框取上下半身的语义边中点，不再用几何中心
+// （用例是 9.16 生产报告的真实锚框：T恤→领口、下装鞋履→裤脚、整身框→中心）
+test('upper-half anchor box lands on its top edge (collar/hairline)', () => {
+  // 黑色圆领T恤：框 y28%~60%，应指领口（顶边中点）而不是胸口正中
+  assert.deepEqual(
+    findingAnchorPoint({ anchor: { x: 0.24, y: 0.28, w: 0.51, h: 0.32 } }),
+    { anchorX: 0.495, anchorY: 0.28 },
+  )
+  // 顶部蓬松短发：框 y14%~38%，应指发顶而不是额心
+  assert.deepEqual(
+    findingAnchorPoint({ anchor: { x: 0.27, y: 0.14, w: 0.47, h: 0.24 } }),
+    { anchorX: 0.505, anchorY: 0.14 },
+  )
+})
+
+test('lower-half anchor box lands on its bottom edge (cuffs/shoes)', () => {
+  // 全黑下装与鞋履：框 y58%~96%，应指裤脚/鞋而不是大腿中段
+  assert.deepEqual(
+    findingAnchorPoint({ anchor: { x: 0.31, y: 0.58, w: 0.36, h: 0.38 } }),
+    { anchorX: 0.49, anchorY: 0.96 },
+  )
+})
+
+test('full-body anchor box keeps its geometric center', () => {
+  // 整体配色偏深：框高 69% 横跨大半身，留中心
+  assert.deepEqual(
+    findingAnchorPoint({ anchor: { x: 0.23, y: 0.27, w: 0.53, h: 0.69 } }),
+    { anchorX: 0.495, anchorY: 0.615 },
+  )
 })

@@ -66,7 +66,9 @@ interface PhotoAnnotationLayerProps {
 }
 
 const CAP_W = 180
-const CAP_H = 56
+// 胶囊实际行高（padding 10×2 + 20rpx 字 × 1.3 行高，标签已锁单行）：
+// 连线起点要落在胶囊正中，假设值和实际值对不上线头就会偏离
+const CAP_H = 46
 const EDGE = 16
 
 export default function PhotoAnnotationLayer({
