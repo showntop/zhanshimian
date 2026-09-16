@@ -185,8 +185,6 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
           </View>
         ) : null}
 
-        <Text className="pd__hint">{PLAN_DETAIL_COPY.boardHint}</Text>
-
         <View className="pd__head">
           <Text className="pd__series">{planSlotLabel(variant.name, variant.slot)}</Text>
           {categories.length > 1 ? (
@@ -203,6 +201,9 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
             </View>
           ) : null}
         </View>
+
+        {/* hint 放实色区（板头之后）：压在板顶渐变的半透明区会浮在照片脸上 */}
+        <Text className="pd__hint">{PLAN_DETAIL_COPY.boardHint}</Text>
 
         <View className="pd__steps">
           {variant.descriptor ? <Text className="pd__desc">{variant.descriptor}</Text> : null}

@@ -560,6 +560,8 @@
   // 板在文档流（margin-top 让出首屏照片区）：上滑整板盖过照片，全量步骤
   // 随页面滚动展开——不嵌板内 ScrollView：微信 ScrollView 在只有 max-height
   // 的父级里拿不到确定高度，会塌成 0（步骤不可见、上滑/切分类全没反应）。
+  // min-height 与 margin-top 凑满一屏：数据少、板身短时板底也必须到达屏底，
+  // 否则 fixed 满屏的 hero 会从板底漏出来（滚到一半看见另一截照片）
   &__board {
     position: relative;
     z-index: 4;
@@ -567,6 +569,7 @@
     flex-direction: column;
     gap: 16rpx;
     margin-top: 62vh;
+    min-height: 38vh;
     padding: 140rpx var(--page-gutter) calc(20rpx + env(safe-area-inset-bottom));
     background: linear-gradient(
       180deg,
