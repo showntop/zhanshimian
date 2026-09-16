@@ -121,7 +121,7 @@ export const ERROR_COPY = {
 
 // ---------- 空态文案骨架（必须带下一步动作） ----------
 export const EMPTY_COPY = {
-  report: { title: '还没有形象报告', body: '拍三张照片，几分钟拿到你的第一份形象分析。', action: '开始分析' },
+  report: { title: '还没有形象报告', body: '拍三张照片，几分钟拿到你的第一份形象分析。', action: '去建档' },
   plans: { title: '这个场合还没有方案', body: '选定一份形象报告后，即可生成对应场合的穿搭方案。', action: '去选报告' },
   plansNeedArchive: { title: '还没有方案', body: '先完成三图建档，或在场景页生成场合方案。', action: '去建档' },
   plansAnalyzing: { title: '正在分析你的照片', body: '分析完成后就可以生成方案，现在不用重新建档。', action: '查看分析进度' },
@@ -133,7 +133,10 @@ export const EMPTY_COPY = {
   history: { title: '暂无记录', body: '完成后会出现在这里。', action: '' }
 } as const
 
-// ---------- 图片身份标注（红线 2：AI 生成图像必须显式标识） ----------
+// ---------- 图片身份标注 ----------
+// 「原本」保留在屏（用户本人照片的对比语义）；「风格参考」「效果示例」
+// 按 2026-09-16 owner 决策不再上屏（见 AGENTS.md 红线 2），
+// 文本仍由 source_kind 投影，供埋点与类型判别使用。
 export const IMAGE_BADGE_COPY = {
   original: '原本',
   bundled: '风格参考',
@@ -299,7 +302,7 @@ export const HOME_COPY = {
   reportReady: '形象档案已就绪',
   viewReport: '查看报告与建议 ›',
   startArchive: '开始形象档案',
-  startAnalysis: '开始形象分析',
+  startAnalysis: '开始三图建档',
   // 分析进行中的主按钮：状态 + 动作，与纯链接 viewProgress 区分开
   analyzingAction: '正在分析，查看进度',
   archiveTitle: '三张照片，建立只属于你的形象档案',
