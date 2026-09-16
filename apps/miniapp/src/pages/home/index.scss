@@ -516,6 +516,13 @@
       border-radius: 0;
       background-position: center top;
 
+      // 焦点裁切：矮横框里竖图按宽铺满后默认只露照片顶端一截
+      // （脑门+眼睛）。把整图向上移 10%，可视窗口落在脸的位置——
+      // 满幅出血融合不变，脸不再被裁掉
+      .source-image__img {
+        transform: translateY(-10%);
+      }
+
       // 参考图不放大铺边（组件的 .example-soft 已统一为轻模糊档，
       // 这里 cover 铺满，无需裁边）
       .example-soft {

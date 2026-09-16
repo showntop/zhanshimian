@@ -59,11 +59,6 @@ const TOOL_ICONS: Record<(typeof HOME_COPY.tools)[number]['key'], string> = {
   purchase: '/assets/icons/tool-purchase.png',
 }
 
-// 发型卡右侧相框的宽高比（卡右区 54%×686rpx 宽 / ≥210rpx 高）：
-// SourceImage 据此决定 cover 按宽还是按高——竖图按高铺满 + 两侧模糊衬底，
-// 只按宽铺满时矮框里只剩照片顶端一截（脸被裁掉）
-const HAIR_VISUAL_ASPECT = 370 / 210
-
 const SCENE_ICONS: Record<SceneCopy['id'], string> = {
   interview: '/assets/icons/scene-interview.png',
   wedding: '/assets/icons/scene-wedding.png',
@@ -438,18 +433,12 @@ export default function Home() {
                     </View>
                     {tool.key === 'hair' ? (
                       hairLatestMedia ? (
-                        <SourceImage
-                          className="home__tool-visual"
-                          media={hairLatestMedia}
-                          anchor="top"
-                          frameAspect={HAIR_VISUAL_ASPECT}
-                        />
+                        <SourceImage className="home__tool-visual" media={hairLatestMedia} anchor="top" />
                       ) : (
                         <SourceImage
                           className="home__tool-visual"
                           reference={{ slug: 'natural', variant: 'hair' }}
                           anchor="top"
-                          frameAspect={HAIR_VISUAL_ASPECT}
                         />
                       )
                     ) : null}
