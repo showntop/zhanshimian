@@ -307,7 +307,7 @@ export const HOME_COPY = {
   photoPrivacy: '照片与建议只对你可见，可随时删除',
   processTitle: '建档后会得到什么',
   process: [
-    { title: '当前形象标签', desc: '先看清现在的整体印象' },
+    { title: '当前形象标签', desc: '看清现在的整体印象' },
     { title: '4 个可提升点', desc: '每条都标回来源照片' },
     { title: '3 套可执行方案', desc: '按场景、预算和现实条件生成' },
   ],
