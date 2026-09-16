@@ -12,8 +12,8 @@ interface BodyViewerProps {
   presentation: BodyPresentation
   /** 对比滑杆底层「原本」：服务端下发的带类型媒体，角标由投影决定。 */
   bodyMedia: DisplayMedia | null
-  /** 上层生成帧的说法：demo 供应商 → 效果示例，否则 AI 风格预览。 */
-  badgeText: string
+  /** 上层生成帧的说法（可选；2026-09-16 起生成/示例角标不再上屏，调用方一般不传）。 */
+  badgeText?: string
 }
 
 const FRAME_STEP_PX = 16

@@ -1,14 +1,14 @@
-// 图片来源的 UI 实现（AGENTS.md 红线 2 / 3）：服务端只下发带类型的 DisplayMedia，
-// 这里把它投影成可渲染的图 + 角标 + 弱化；投影不出来就渲染可见空态，绝不回退内置图。
+// 图片来源的 UI 实现：服务端只下发带类型的 DisplayMedia，这里把它投影成
+// 可渲染的图 + 弱化；投影不出来就渲染可见空态，绝不回退内置图。
 //
-// 与旧 ExampleImage 的两点关键差别：
-// 1. 角标来自 `projectDisplayMedia`（即 `source_kind`），不看 provider、不看 URL；
-// 2. 不再用 useRef 钉住上一张图的 URL。旧实现会在新 URL 无效时继续显示旧图，
-//    报告换了人还留着上一个人的照片——这正是要消灭的"钉住旧图"。
+// 角标（2026-09-16 owner 决策）：生成图/示例图/Demo 的「风格参考」「效果示例」
+// 不再上屏——AI 生成内容无显式标识的法规风险由 owner 知悉并承担；
+// 来源真实性不依赖角标文字，依赖 source_kind 强类型、埋点与 example-soft 弱化。
+// 用户本人照片保留「原本」角标（对比语义，非 AI 标识）。
 //
 // 两种模式互斥（类型层面就互斥，不能同时传）：
 // - `media`：服务端 DisplayMedia，走投影；
-// - `reference`：包内静态参考位，走 exampleImage，强制「风格参考」角标 + 弱化。
+// - `reference`：包内静态参考位，走 exampleImage。
 //
 // 人像裁切：微信 aspectFill 只能居中裁，全身照放进矮框会切头。
 // anchor="top" 改为 cover + 顶对齐（先按宽铺满裁底；图比相框更扁时改按高铺满裁侧）。
@@ -141,7 +141,7 @@ function SourceImage(props: SourceImageProps) {
         fadeIn={false}
         onLoad={handleLoad}
       />
-      {image.badge ? (
+      {image.badge && image.isUserPhoto ? (
         <View className="example-badge">
           <Text>{image.badge}</Text>
         </View>

@@ -11,14 +11,14 @@
 ## 产品红线（违反即返工）
 
 1. **不打颜值分/身材分**、不身材羞辱、不做医学结论、不用警示红；一律用「可提升点」式尊重表达。
-2. **生成图来源必须显式标识**：
-   - 生成图必须携带 source_kind=generated_preview，用户角标统一“风格参考”；
-   - Demo 使用 demo_example + “效果示例”；内置图使用 bundled_reference + “风格参考”。
+2. **生成图来源真实性**：
+   - 生成图必须携带 source_kind=generated_preview；Demo 使用 demo_example；内置图使用 bundled_reference。
+   - 角标（2026-09-16 owner 决策）：「风格参考」「效果示例」**不再上屏**——AI 生成内容无显式标识违反《人工智能生成合成内容标识办法》，该法规风险由 owner 知悉并决定承担；用户本人照片保留「原本」角标；CTA 下保留文字来源说明「形象图由 AI 基于你的照片生成」。
    - 来源真实性依赖强类型和埋点，不依赖角标文字或 URL。
 3. **数据真实性**（移植自原型 `utils/media.js` 契约，实现在 `packages/core/src/media/truth.ts`）：
    - `lookImage(v)` 严格模式：无效 URL / webp 一律返回 `''`，绝不隐式回退内置图；
    - `userImage(v)` 用户照片无效时保持可见的空；
-   - `exampleImage(slug, variant)` 是唯一返回内置模特图的入口，调用点必须叠 `.example-badge` + `.example-soft`；
+   - `exampleImage(slug, variant)` 是唯一返回内置模特图的入口，调用点必须叠 `.example-soft` 弱化（角标已按 2026-09-16 决策取消，见红线 2）；
    - Demo 内容只经服务端（`/v1/media/demo`、Demo Provider）进入，客户端绝不注入。
 4. **错误态与内容不同屏**；空态/错误态必须给出下一步动作（重试/返回/重新拍摄）。
 5. 文案红线：产品名「uplook」（不另起中文品牌名），品牌标语「今天最好看」；首页保留「你好，我是你的私人形象顾问」；场景叫「日常」不叫「通勤」。文案统一放 `packages/core/src/copy/zh.ts`。

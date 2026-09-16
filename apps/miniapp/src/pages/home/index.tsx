@@ -14,7 +14,6 @@ import {
   ERROR_COPY,
   HOME_COPY,
   HOME_TITLE,
-  IMAGE_BADGE_COPY,
   OUTFIT_COPY,
   PRIVACY_NOTE,
   PURCHASE_COPY,
@@ -270,9 +269,6 @@ export default function Home() {
                     <Text className="home__hero-desc">{HOME_COPY.archiveBody}</Text>
                   </View>
                   <View className="home__hero-preview">
-                    {/* 组级「风格参考」角标：三张分挂会跟着旋转角度东倒西歪、
-                        半张被裁；整组一个标识既合规又干净。单卡角标在 SCSS 里隐藏 */}
-                    <Text className="home__preview-badge">{IMAGE_BADGE_COPY.bundled}</Text>
                     <View className="home__preview-slice home__preview-slice--1">
                       <SourceImage
                         className="home__preview-image"

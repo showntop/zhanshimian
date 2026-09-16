@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import {
-  IMAGE_BADGE_COPY,
   LAB_COPY,
   type BodyPresentation,
   type BodyPresentationStatus,
@@ -50,11 +49,6 @@ type LabFeature = (typeof FEATURES)[number]
 type Viewing = 'auto' | 'completed' | 'failed'
 
 const ACTIVE_OPERATION_STATES = new Set(['accepted', 'running', 'retrying'])
-
-// 角标只认服务端投影的 source_kind（红线：不按 provider、不按 URL 推断）。
-function viewerBadge(presentation: BodyPresentation): string {
-  return presentation.source_kind === 'demo_example' ? IMAGE_BADGE_COPY.demo : IMAGE_BADGE_COPY.aiPreview
-}
 
 function isActiveStatus(value?: string): boolean {
   return value === 'queued' || value === 'processing'
@@ -359,7 +353,6 @@ export default function Lab() {
               key={status.completed.id}
               presentation={status.completed}
               bodyMedia={body}
-              badgeText={viewerBadge(status.completed)}
             />
           </View>
           <View className="lab__card-copy lab__card-copy--onstage">
