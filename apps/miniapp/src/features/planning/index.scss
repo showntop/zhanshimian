@@ -578,7 +578,8 @@
     gap: 16rpx;
     margin-top: -38vh;
     min-height: 38vh;
-    padding: 140rpx var(--page-gutter) calc(20rpx + env(safe-area-inset-bottom));
+    // 底部 padding 给吸底 CTA 玻璃条（pd__cta-bar）让位，板尾内容不被盖
+    padding: 140rpx var(--page-gutter) calc(160rpx + env(safe-area-inset-bottom));
     background: linear-gradient(
       180deg,
       rgba(244, 245, 242, 0) 0%,
@@ -728,10 +729,17 @@
     align-items: center;
     gap: 10rpx;
     padding-top: 4rpx;
+  }
 
-    .primary-button {
-      align-self: stretch;
-    }
+  // 吸底 CTA 玻璃条：与方案 tab 的选择坞同一语言（dock-glass 提供
+  // 毛玻璃底、顶部发丝线、投影），首屏即可选，不用滚到底
+  &__cta-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    padding: 16rpx var(--page-gutter) calc(12rpx + env(safe-area-inset-bottom));
   }
 
   &__feedback-entry {

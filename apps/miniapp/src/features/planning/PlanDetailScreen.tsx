@@ -238,12 +238,8 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
           ) : null}
         </View>
 
+        {/* 板尾：反馈入口 + 绑定说明留在文档流；CTA 吸底（见 pd__cta-bar） */}
         <View className="pd__foot">
-          <PrimaryButton
-            text={PLANS_COPY.cta}
-            loading={selecting}
-            onClick={() => void selectThis()}
-          />
           {/* 反馈绑定用户真正看到的那张 publication；没发布就没有入口 */}
           <GenerationFeedback
             publicationId={variant.render.publication_id}
@@ -251,6 +247,16 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
           />
           <Text className="pd__bound-note">{PLANNING_COPY.boundNote}</Text>
         </View>
+      </View>
+
+      {/* 吸底 CTA 玻璃条：与方案 tab 选择坞同一语言——首屏沉浸的同时主行动常驻，
+          不用滚到底才能「选这套」；板尾 padding 已为它让位 */}
+      <View className="pd__cta-bar dock-glass">
+        <PrimaryButton
+          text={PLANS_COPY.cta}
+          loading={selecting}
+          onClick={() => void selectThis()}
+        />
       </View>
     </>
   )
