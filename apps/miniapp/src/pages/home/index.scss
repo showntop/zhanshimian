@@ -231,15 +231,15 @@
     flex: 1;
     min-width: 0;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: flex-start;
-    gap: 6rpx;
-    padding: 14rpx 12rpx;
+    gap: 8rpx;
+    padding: 14rpx 10rpx;
     border-radius: var(--radius-md);
     background: rgba(238, 240, 236, 0.10);
 
-    // 数字 chip 独占一行，标题占满卡宽——同行挤压曾把
-    // 「3 套可执行方案」断成「方/案」两行
+    // 序号 chip 与标题同行（标题已收 4~6 字，同行不再断行；
+    // 之前断行是「3 套可执行方案」太长逼出来的，不是设计意图）
     &-index {
       display: flex;
       align-items: center;
