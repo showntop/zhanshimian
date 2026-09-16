@@ -302,7 +302,7 @@ export const HOME_COPY = {
   reportReady: '形象档案已就绪',
   viewReport: '查看报告与建议 ›',
   startArchive: '开始形象档案',
-  startAnalysis: '开始三图建档',
+  startAnalysis: '开始形象分析',
   // 分析进行中的主按钮：状态 + 动作，与纯链接 viewProgress 区分开
   analyzingAction: '正在分析，查看进度',
   archiveTitle: '三张照片，建立只属于你的形象档案',
