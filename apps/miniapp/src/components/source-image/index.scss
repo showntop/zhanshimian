@@ -1,6 +1,8 @@
 // 与旧 example-image 同名同名类，页面里已有的 .example-badge / .example-soft 覆盖继续生效
 // （styleIsolation: apply-shared：页面样式能影响组件内节点）。
-// 区别是这里给出角标与弱化的**基础样式**——旧组件没定义，全靠各页面各自补一份。
+// .example-badge 的基础样式不在这里定义——全局单源在 @zsm/design 的 _base.scss
+// （app.wxss 经 apply-shared 穿透到组件内）。这里只保留组件自己的弱化档：
+// 若两边各写一份角标基础样式，改一处漏一处（9.16 磨砂 chip 改版踩过这个坑）。
 .source-image {
   position: relative;
   overflow: hidden;
@@ -56,20 +58,6 @@
     color: var(--ink);
     text-decoration: underline;
   }
-}
-
-// 角标：内置图与 Demo 必挂；生成图与用户原图也带自己的说法。
-.example-badge {
-  position: absolute;
-  right: 12rpx;
-  bottom: 12rpx;
-  z-index: 2;
-  padding: 5rpx 14rpx;
-  border-radius: 999rpx;
-  background: rgba(30, 35, 29, 0.62);
-  color: #fff;
-  font-size: 20rpx;
-  line-height: 1.5;
 }
 
 // 弱化：示例图 / 内置参考图不能看起来像用户本人的效果。

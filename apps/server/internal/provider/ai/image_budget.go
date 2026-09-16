@@ -6,6 +6,8 @@ import (
 	"image/jpeg"
 	_ "image/png"
 	"net/http"
+
+	"golang.org/x/image/draw"
 )
 
 const (
@@ -94,13 +96,9 @@ func constrainImage(data []byte, mimeType string, budget imageBudget) ([]byte, s
 		}
 	}
 	dst := image.NewRGBA(image.Rect(0, 0, outW, outH))
-	for y := 0; y < outH; y++ {
-		srcY := bounds.Min.Y + y*height/outH
-		for x := 0; x < outW; x++ {
-			srcX := bounds.Min.X + x*width/outW
-			dst.Set(x, y, src.At(srcX, srcY))
-		}
-	}
+	// 高质量缩放：此前是逐像素跳取的最近邻，头发/织物等高频细节被打出
+	// 毛刺，模型从脏输入学出更脏的输出；CatmullRom 是清晰档的标准核
+	draw.CatmullRom.Scale(dst, dst.Bounds(), src, bounds, draw.Over, nil)
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, dst, &jpeg.Options{Quality: budget.jpegQuality}); err != nil {
 		return data, mimeType

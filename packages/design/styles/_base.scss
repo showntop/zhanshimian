@@ -286,16 +286,19 @@ button::after {
 
 // ---------- 示例标识（数据真实性契约的 UI 落点） ----------
 // 任何非用户本人的内置/AI 示例图必须叠加；父容器需 position: relative。
+// 标识必须显式（红线 2 + AI 生成内容标识办法），但样式收敛为磨砂半透明
+// 小 chip——实心深底 pill 像膏药，更小更透才融得进照片。
 .example-badge {
   position: absolute;
   right: 12rpx;
   bottom: 12rpx;
   z-index: 2;
-  padding: 5rpx 14rpx;
+  padding: 3rpx 12rpx;
   border-radius: 999rpx;
-  background: var(--badge);
-  color: #ffffff;
-  font-size: 20rpx;
+  background: rgba(30, 35, 29, 0.36);
+  backdrop-filter: blur(12rpx);
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 18rpx;
   line-height: 1.5;
 }
 
