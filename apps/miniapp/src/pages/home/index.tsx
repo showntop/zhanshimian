@@ -52,9 +52,11 @@ const TOOL_PATHS: Record<(typeof HOME_COPY.tools)[number]['key'], string> = {
   purchase: '/packages/tools/pages/purchase/index',
 }
 
-// 工具卡图标（按需）：发型主卡补识别锚点，安静卡保持纯文字
-const TOOL_ICONS: Partial<Record<(typeof HOME_COPY.tools)[number]['key'], string>> = {
-  hair: '/assets/icons/sparkles.png',
+// 工具卡图标：与场合图标同一套定制几何线稿（深苔绿圆头粗线）
+const TOOL_ICONS: Record<(typeof HOME_COPY.tools)[number]['key'], string> = {
+  hair: '/assets/icons/tool-hair.png',
+  outfit: '/assets/icons/tool-outfit.png',
+  purchase: '/assets/icons/tool-purchase.png',
 }
 
 const SCENE_ICONS: Record<SceneCopy['id'], string> = {
@@ -402,7 +404,7 @@ export default function Home() {
                 return (
                   <View
                     key={tool.key}
-                    className={`home__tool pressable ${tool.key === 'hair' ? 'home__tool--lead' : ''}`}
+                    className={`home__tool home__tool--${tool.key} pressable ${tool.key === 'hair' ? 'home__tool--lead' : ''}`}
                     onClick={() => void Taro.navigateTo({ url: TOOL_PATHS[tool.key] })}
                   >
                     <View className="home__tool-copy">

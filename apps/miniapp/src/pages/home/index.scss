@@ -394,7 +394,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  // ---------- 工具（1 张照片主卡 + 2 张安静功能卡） ----------
+  // ---------- 工具（1 张发型主卡 + 2 张安静卡；三色区分 + 场景风线稿图标） ----------
   &__tools {
     display: flex;
     flex-wrap: wrap;
@@ -412,6 +412,15 @@
     border-radius: var(--radius-lg);
     overflow: hidden;
     background: var(--moss-soft);
+
+    // 三色区分（与场景格同一低饱和色系）：全部 moss-soft 看起来死板
+    &--outfit {
+      background: #e8e4e6;
+    }
+
+    &--purchase {
+      background: #ede7db;
+    }
 
     &-copy {
       display: flex;
@@ -433,14 +442,14 @@
       flex-shrink: 0;
     }
 
-    // 主卡降一档：moss-soft 底 + 右侧照片，深绿只留报告 hero
+    // 主卡降一档：灰绿底 + 右侧照片，深绿只留报告 hero
     // （每页至多一个深色视觉锚点；两块 moss-deep 连排会互相抢焦点）
     &--lead {
       flex: 1 1 100%;
       min-height: 210rpx;
       justify-content: flex-end;
       padding: 32rpx 46% 30rpx 28rpx;
-      background: var(--moss-soft);
+      background: #d9e2d1;
       isolation: isolate;
 
       &::after {
@@ -450,10 +459,10 @@
         content: '';
         background: linear-gradient(
           90deg,
-          rgba(237, 241, 234, 1) 0%,
-          rgba(237, 241, 234, 0.98) 42%,
-          rgba(237, 241, 234, 0.58) 66%,
-          rgba(237, 241, 234, 0.08) 100%
+          rgba(217, 226, 209, 1) 0%,
+          rgba(217, 226, 209, 0.98) 42%,
+          rgba(217, 226, 209, 0.58) 66%,
+          rgba(217, 226, 209, 0.08) 100%
         );
         pointer-events: none;
       }
