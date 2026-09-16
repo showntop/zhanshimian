@@ -220,3 +220,19 @@ test('full-body anchor box keeps its geometric center', () => {
     { anchorX: 0.495, anchorY: 0.615 },
   )
 })
+
+// report.v2 起锚点是分析模型直接给的语义关键点，原样采用，不做几何加工
+test('report.v2 anchor is the model-provided keypoint, used verbatim', () => {
+  assert.deepEqual(
+    findingAnchorPoint({ anchor: { x: 0.24, y: 0.28, w: 0.51, h: 0.32 } }, 'report.v2'),
+    { anchorX: 0.24, anchorY: 0.28 },
+  )
+})
+
+// report.v1 的区域矩形仍走上下半身语义边（旧报告兼容路径）
+test('report.v1 anchor box falls back to the semantic edge heuristic', () => {
+  assert.deepEqual(
+    findingAnchorPoint({ anchor: { x: 0.31, y: 0.58, w: 0.36, h: 0.38 } }, 'report.v1'),
+    { anchorX: 0.49, anchorY: 0.96 },
+  )
+})

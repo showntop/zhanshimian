@@ -50,6 +50,8 @@ type AnalysisRun struct {
 	FinishedAt                                     *time.Time
 }
 
+// EvidenceAnchor 中 X,Y 是语义关键点（report.v2 起由分析模型直接给出，
+// 如领口正中/裤脚/发顶；更早的报告里是区域矩形的左上角），W,H 是特征覆盖范围。
 type EvidenceAnchor struct{ X, Y, W, H float64 }
 
 type ReportFinding struct {

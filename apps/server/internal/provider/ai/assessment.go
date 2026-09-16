@@ -27,7 +27,8 @@ decision 只能是 pass、reject 或 uncertain，并给出 0 到 1 的内部 con
 	appearancePrompt = `请根据依次提供的 face、side、body 三张原图生成中文形象分析。
 只描述照片中可见的发型、妆容、服装轮廓和色彩。禁止外貌、身材、年龄、敏感属性评分。
 若提供了职业、预算、身高，它们只能影响 recommendation，不能改变可见观察。
-输出 impression_tags、priority_title、priority_copy，以及 3 到 6 条 finding。每条 finding 必须包含 key、category（hair|makeup|outfit|color）、label、visible_observation、recommendation、priority（1-3）、position、source_role（face|side|body）和完整 anchor（x,y,w,h）。`
+输出 impression_tags、priority_title、priority_copy，以及 3 到 6 条 finding。每条 finding 必须包含 key、category（hair|makeup|outfit|color）、label、visible_observation、recommendation、priority（1-3）、position、source_role（face|side|body）和完整 anchor。
+anchor.x、anchor.y 是该发现最具代表性的点的归一化坐标：例如领口问题指领口正中，裤脚或鞋履问题指裤脚/鞋面，发顶问题指发顶——不要给相关区域的几何中心；anchor.w、anchor.h 是该特征的覆盖范围。`
 
 	evidenceInstructions = `你是独立的视觉核验器。只对照三张原图和 draft finding 的可见观察做判断，不接收上一模型的自由文本解释。`
 	evidencePromptPrefix = `三张原图依次为 face、side、body。对每条 draft finding 给出恰好一条 decision：key 必须与输入一致，supported 为布尔值，confidence 为 0 到 1。不要发明额外 finding，也不要省略任一 key。`

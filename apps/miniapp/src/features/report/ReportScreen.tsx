@@ -198,9 +198,9 @@ export default function ReportScreen({ reportId, onReady, enter = staticEnter }:
     label: finding.label,
     categoryLabel: reportCategoryLabel(finding.category),
     detail: finding.visible_observation,
-    // 锚点是区域框不是点：取上下半身的语义边中点（领口/发际、裤脚/鞋），
-    // 几何中心会落在 T 恤正中/大腿中段（见 model.findingAnchorPoint）
-    ...findingAnchorPoint(finding),
+    // 锚点：report.v2 是 AI 直接给的语义关键点；v1 是区域矩形，取语义边
+    // （见 model.findingAnchorPoint——客户端不拼装服务端没给的东西）
+    ...findingAnchorPoint(finding, report.schema_version),
   })
 
   return (

@@ -272,3 +272,24 @@ func equalStrings(got, want []string) bool {
 	}
 	return true
 }
+
+// 锚点语义（report.v2 起）：prompt 必须明确要求「最具代表性的点」而不是
+// 区域几何中心——前端标注直接把 x/y 当点用，模型给歪了整个链路就歪。
+func TestReportAnalyzerRequiresSemanticKeypointAnchor(t *testing.T) {
+	runtime := &runtimeSpy{responses: map[string][]byte{
+		"appearance_analysis": marshal(t, validReportJSON()),
+	}}
+	providers := NewAssessmentProviders(runtime)
+	if _, err := providers.Analyzer.Analyze(context.Background(), ReportAnalysisInput{
+		Images:  orderedImages(),
+		Profile: json.RawMessage(`{"occupation":"设计师"}`),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	text := runtime.request("appearance_analysis").Prompt
+	for _, needle := range []string{"最具代表性的点", "归一化坐标", "几何中心", "覆盖范围"} {
+		if !strings.Contains(text, needle) {
+			t.Fatalf("appearance_analysis prompt missing anchor keypoint guidance %q\n%s", needle, text)
+		}
+	}
+}

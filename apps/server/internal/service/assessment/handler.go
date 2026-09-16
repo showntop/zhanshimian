@@ -13,7 +13,7 @@ import (
 const (
 	TaskTypeAssessment  = domain.TaskType("assessment")
 	PayloadVersion      = 1
-	ReportSchemaVersion = "report.v1"
+	ReportSchemaVersion = "report.v2"
 )
 
 type HandlerRepository interface {

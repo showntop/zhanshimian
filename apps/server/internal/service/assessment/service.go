@@ -16,7 +16,7 @@ import (
 
 const (
 	PhotoSetSchemaVersion = "photo-set.v1"
-	AnalyzerSchemaVersion = "analyzer.v1"
+	AnalyzerSchemaVersion = "analyzer.v2"
 	QualityPolicyVersion  = "quality.v1"
 )
 
