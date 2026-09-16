@@ -407,6 +407,15 @@ export default function Home() {
                     className={`home__tool home__tool--${tool.key} pressable ${tool.key === 'hair' ? 'home__tool--lead' : ''}`}
                     onClick={() => void Taro.navigateTo({ url: TOOL_PATHS[tool.key] })}
                   >
+                    {tool.key === 'hair' ? (
+                      <Image
+                        className="home__tool-watermark"
+                        src={TOOL_ICONS.hair}
+                        mode="aspectFit"
+                        lazyLoad={false}
+                        fadeIn={false}
+                      />
+                    ) : null}
                     <View className="home__tool-copy">
                       <View className="home__tool-name-row">
                         {toolIcon ? (
@@ -424,12 +433,12 @@ export default function Home() {
                     </View>
                     {tool.key === 'hair' ? (
                       hairLatestMedia ? (
-                        <SourceImage className="home__tool-visual" media={hairLatestMedia} mode="aspectFit" />
+                        <SourceImage className="home__tool-visual" media={hairLatestMedia} anchor="top" />
                       ) : (
                         <SourceImage
                           className="home__tool-visual"
                           reference={{ slug: 'natural', variant: 'hair' }}
-                          mode="aspectFit"
+                          anchor="top"
                         />
                       )
                     ) : null}
