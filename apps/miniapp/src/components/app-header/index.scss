@@ -123,7 +123,9 @@
 .app-header-spacer {
   width: 100%;
   flex-shrink: 0;
-  /* 导航与页面内容之间的呼吸间距：全部页面共用此占位，一处生效。
-     此前 spacer 高度正好等于导航高度，内容紧贴导航底边没有留白。 */
-  margin-bottom: var(--space-xxl);
+  /* 导航与页面内容之间的呼吸间距：全站统一 24rpx，只在这里生效——
+     各页内容根节点不要再叠 padding-top（叠了就是双重间距）。
+     历史教训：这里曾是 48rpx，而各页仍按「spacer 无 margin」留了自己的
+     顶距，全站间距被 double 到 56~76rpx 且页页不同。 */
+  margin-bottom: var(--space-md);
 }

@@ -63,14 +63,15 @@ const GENERAL_BRIEF = { focus: 'balanced', preparation: 'closet', impression: 'n
 
 // hero 高度跟随照片比例（旧线思路保留）：三套方案图同一管线产出、宽高比一致，
 // 切换不跳动，因此让照片自己定高度——满宽 + 完整，无侧边区。
-// 上限 = 视口剩余（防极端竖图），下限 320px。这是基于 windowHeight 的 px 计算，
-// 是 rpx 规约的显式例外（与旧线相同）。
+// 上限 = 内容视口高（防极端竖图把首屏撑死），下限 320px；tab 行不占 hero 预算——
+// 页面可滚动，hero 只管自己不超过一屏，把空间让给照片。
+// 这是基于 windowHeight 的 px 计算，是 rpx 规约的显式例外（与旧线相同）。
 const NAV = getNavMetrics()
-const HEADER_GAP_PX = 24
-const TABS_PX = 40
+// spacer 的 margin-bottom（24rpx）换算成 px：hero 上限要扣除导航下的这段净距
+const HEADER_GAP_PX = 12
 const MAX_HERO_PX = Math.max(
   320,
-  Math.round(NAV.windowHeight - NAV.navHeight - HEADER_GAP_PX - TABS_PX),
+  Math.round(NAV.windowHeight - NAV.navHeight - HEADER_GAP_PX),
 )
 
 interface PlansScreenProps {
@@ -720,10 +721,11 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         sceneEmptyCard
       ) : (
         <>
-        {/* 拖动对比 hero：照片满宽完整展示（高度跟随照片比例），
-            无侧边区无裁切。key 随方案切换重挂载 → 交叉淡入。
-            渲染未就绪时不摆空 hero：状态条进细节卡，文字永远可读。 */}
-        {activeVariant && activeRender?.kind === 'ready' ? (
+        {/* 拖动对比 hero：照片满宽完整展示（高度跟随照片比例），无侧边区无裁切。
+            相框常驻（旧线结构）：渲染就绪出对比图，未就绪把状态（含重试）摆在框内——
+            页面骨架不随渲染结果塌缩，后面的信息卡永远不会上叠场景 tab。
+            key 随方案切换重挂载 → 交叉淡入。 */}
+        {activeVariant && activeRender ? (
           <View className="plans__hero">
             <View
               className="plans__hero-frame"
@@ -735,42 +737,65 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
                 writeStorage(STORAGE_KEYS.compareHint, '1')
               }}
             >
-              <CompareSlider
-                single={!canCompare}
-                current={<SourceImage className="plans__hero-img" media={leftMedia} mode="widthFix" />}
-                plan={
-                  <SourceImage
-                    className="plans__hero-img"
-                    media={activeRender.media}
-                    mode="widthFix"
-                    onLoad={(e) => {
-                      const w = Number(e.detail.width)
-                      const h = Number(e.detail.height)
-                      if (!w || !h) return
-                      setPhotoDims((prev) =>
-                        prev[activeVariant.id]?.w === w && prev[activeVariant.id]?.h === h
-                          ? prev
-                          : { ...prev, [activeVariant.id]: { w, h } },
-                      )
-                    }}
+              {activeRender.kind === 'ready' ? (
+                <>
+                  <CompareSlider
+                    single={!canCompare}
+                    current={<SourceImage className="plans__hero-img" media={leftMedia} mode="widthFix" />}
+                    plan={
+                      <SourceImage
+                        className="plans__hero-img"
+                        media={activeRender.media}
+                        mode="widthFix"
+                        onLoad={(e) => {
+                          const w = Number(e.detail.width)
+                          const h = Number(e.detail.height)
+                          if (!w || !h) return
+                          setPhotoDims((prev) =>
+                            prev[activeVariant.id]?.w === w && prev[activeVariant.id]?.h === h
+                              ? prev
+                              : { ...prev, [activeVariant.id]: { w, h } },
+                          )
+                        }}
+                      />
+                    }
+                    currentLabel={PLANNING_COPY.currentLabel}
+                    planLabel={PLANNING_COPY.planLabel}
                   />
-                }
-                currentLabel={PLANNING_COPY.currentLabel}
-                planLabel={PLANNING_COPY.planLabel}
-              />
-              {compareHint && canCompare ? (
-                <Text className="plans__hint">{PLANNING_COPY.compareHint}</Text>
-              ) : null}
+                  {compareHint && canCompare ? (
+                    <Text className="plans__hint">{PLANNING_COPY.compareHint}</Text>
+                  ) : null}
+                </>
+              ) : (
+                <View className="plans__hero-state">
+                  <RenderState view={activeRender} onRetry={() => void retryVariant(activeVariant)} />
+                </View>
+              )}
               <View className="plans__hero-fade" />
             </View>
           </View>
         ) : null}
 
-        {/* 细节卡：负边距压 hero 底边（骑在渐变上，首屏即露头）。
-            descriptor + 收益/差异 chips（从坞上移，与 why 归为一区）+ 渲染状态 */}
-        {activeVariant && activeRender ? (
+        {/* 细节卡（第 2 屏起）：descriptor + 折叠 why，正常文档流跟随 hero。
+            负边距上叠 hero 的改法在没有 hero（渲染未就绪）时会把卡片拉上去
+            盖住场景 tab——回旧线，不再负边距，状态也不再进这张卡。 */}
+        {activeVariant ? (
           <View className="plans__info fade-up delay-1">
             <Text className="plans__summary">{activeVariant.descriptor}</Text>
+            {activeVariant.rationale ? (
+              <View className="plans__why-wrap" onClick={() => setWhyOpen(!whyOpen)}>
+                <Text className={`plans__why ${whyOpen ? 'plans__why--open' : ''}`}>{activeVariant.rationale}</Text>
+                <Text className="plans__why-toggle">{whyOpen ? PLANNING_COPY.whyClose : PLANNING_COPY.whyLabel}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* 悬浮选择坞（旧线结构）：收益词顶行 + 三选一（方案名 + 差异 chips）
+            + CTA + 来源说明。浮在照片底部上方不占文档流——照片有多高就展示多高，
+            选择要素常驻第一屏。 */}
+        {activeVariant && activeRender ? (
+          <View className="plans__dock dock-glass fade-up delay-2">
             {activeVariant.outcome_tags.length > 0 ? (
               <View className="plans__outcome">
                 {activeVariant.outcome_tags.slice(0, 3).map((tag) => (
@@ -778,28 +803,6 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
                 ))}
               </View>
             ) : null}
-            {activeVariant.rationale ? (
-              <View className="plans__why-wrap" onClick={() => setWhyOpen(!whyOpen)}>
-                <Text className={`plans__why ${whyOpen ? 'plans__why--open' : ''}`}>{activeVariant.rationale}</Text>
-                <Text className="plans__why-toggle">{whyOpen ? PLANNING_COPY.whyClose : PLANNING_COPY.whyLabel}</Text>
-              </View>
-            ) : null}
-            {activeVariant.difference_tags.length > 0 ? (
-              <View className="plans__diffs">
-                {activeVariant.difference_tags.slice(0, 3).map((tag) => (
-                  <Text key={tag} className="plans__diff">{tag}</Text>
-                ))}
-              </View>
-            ) : null}
-            {activeRender.kind !== 'ready' ? (
-              <RenderState view={activeRender} onRetry={() => void retryVariant(activeVariant)} />
-            ) : null}
-          </View>
-        ) : null}
-
-        {/* 悬浮选择坞：三选一 + 方案名 + CTA 三层（收益/差异 chips 已上移信息卡） */}
-        {activeVariant && activeRender ? (
-          <View className="plans__dock dock-glass fade-up delay-2">
             <View className="plans__chooser">
               <View className="plans__choices">
                 {variants.map((item) => {
@@ -812,21 +815,33 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
                     >
                       <View className="plans__choice-thumb">
                         {itemRender.kind === 'ready' ? (
-                          <SourceImage className="plans__choice-img" media={itemRender.media} mode="aspectFill" />
+                          <SourceImage className="plans__choice-img" media={itemRender.media} mode="aspectFit" />
                         ) : RENDER_IN_FLIGHT.has(itemRender.kind) ? (
                           <View className="spinner plans__choice-spin" />
-                        ) : null}
+                        ) : (
+                          <Text className="plans__choice-state">
+                            {itemRender.kind === 'unavailable'
+                              ? PLANNING_COPY.renderThumbUnavailable
+                              : PLANNING_COPY.renderThumbFailed}
+                          </Text>
+                        )}
                         {item.recommended ? (
                           <Text className="plans__choice-badge">{PLANNING_COPY.recommended}</Text>
                         ) : null}
                       </View>
-                      <Text className="plans__choice-name">{item.name}</Text>
                     </View>
                   )
                 })}
               </View>
               <View className="plans__chooser-info">
                 <Text className="plans__name">{activeVariant.name}</Text>
+                {activeVariant.difference_tags.length > 0 ? (
+                  <View className="plans__diffs">
+                    {activeVariant.difference_tags.slice(0, 3).map((tag) => (
+                      <Text key={tag} className="plans__diff">{tag}</Text>
+                    ))}
+                  </View>
+                ) : null}
               </View>
             </View>
             <PrimaryButton text={PLANNING_COPY.viewDetail} onClick={() => openDetail(activeVariant)} />

@@ -617,6 +617,9 @@ export const PLANNING_COPY = {
   renderRetry: '重试这一套',
   renderFailedNote: '文字方案不受影响，可以先照着准备',
   renderUnavailableNote: '文字方案不受影响；服务恢复后这里会自动可以重试',
+  // 坞内缩略图的无图占位（重试在 hero 相框的状态区，小图里只如实标状态）
+  renderThumbFailed: '未生成',
+  renderThumbUnavailable: '暂不可用',
   // 列表为空 / 加载失败
   generalEmptyTitle: '还没有形象方案',
   generalEmptyBody: '基于你的形象报告生成三套可执行的方案。',

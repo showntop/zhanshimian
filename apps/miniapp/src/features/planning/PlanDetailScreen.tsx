@@ -1,13 +1,13 @@
 // 方案详情：旧线（recovery/ui-0911）全屏沉浸视觉在新数据模型上的恢复——
-// 照片铺满整屏、导航透明、底部奶油渐变内容板（可滑）叠在画面上。
+// 照片 fixed 铺满整屏、导航透明、奶油渐变内容板在文档流，上滑盖过照片看全量步骤。
 // 架构不让步的部分：
 // 1. 对比左图严格来自方案集绑定的那一份报告，右图只用这一套自己的 render.media；
 //    绑定不了就空态，绝不拿"手头最近一份报告"的照片凑对比；
 // 2. 渲染没就绪时给渲染状态条，绝不拿旧图顶上——"上次那张"不是这次的证据；
-// 3. 步骤是全量列表（旧线只摆当前分类第一条），收进底部板内滑动。
+// 3. 步骤是全量列表（旧线只摆当前分类第一条），在板的文档流里随页面上滑展开。
 import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
-import { ScrollView, Text, View } from '@tarojs/components'
+import { Text, View } from '@tarojs/components'
 import { ERROR_COPY, CHECKLIST_COPY, PLANNING_COPY, PLANS_COPY, PLAN_DETAIL_COPY, SOURCE_IMAGE_COPY, planSlotLabel } from '@zsm/core'
 import type { PlanSet, PlanStep, Report } from '@zsm/core'
 import { qualityApi } from '../../app/api/quality'
@@ -152,28 +152,32 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
   }
 
   return (
-    <View className="pd" style={{ ['--pd-nav' as string]: `${NAV.navHeight}px` }}>
-      {/* 满屏 hero：ready 时拖动对比，未 ready 单图（左）+ 板上状态条 */}
-      <View className="pd__hero">
-        <View className="pd__hero-frame">
-          {bindingError || !leftMedia ? (
-            <View className="pd__hero-empty">
-              <Text className="pd__hero-empty-text">{SOURCE_IMAGE_COPY.userPhotoEmpty}</Text>
-            </View>
-          ) : render.kind === 'ready' ? (
-            <CompareSlider
-              current={<SourceImage className="pd__hero-img" media={leftMedia} anchor="top" frameAspect={PLAN_FRAME_ASPECT} />}
-              plan={<SourceImage className="pd__hero-img" media={render.media} anchor="top" frameAspect={PLAN_FRAME_ASPECT} />}
-              currentLabel={PLANNING_COPY.currentLabel}
-              planLabel={PLANNING_COPY.planLabel}
-            />
-          ) : (
-            <SourceImage className="pd__hero-img" media={leftMedia} anchor="top" frameAspect={PLAN_FRAME_ASPECT} />
-          )}
+    <>
+      {/* 满屏 hero（fixed 铺满整屏）：ready 时拖动对比，未 ready 单图（左）+ 板上状态条 */}
+      <View className="pd" style={{ ['--pd-nav' as string]: `${NAV.navHeight}px` }}>
+        <View className="pd__hero">
+          <View className="pd__hero-frame">
+            {bindingError || !leftMedia ? (
+              <View className="pd__hero-empty">
+                <Text className="pd__hero-empty-text">{SOURCE_IMAGE_COPY.userPhotoEmpty}</Text>
+              </View>
+            ) : render.kind === 'ready' ? (
+              <CompareSlider
+                current={<SourceImage className="pd__hero-img" media={leftMedia} anchor="top" frameAspect={PLAN_FRAME_ASPECT} />}
+                plan={<SourceImage className="pd__hero-img" media={render.media} anchor="top" frameAspect={PLAN_FRAME_ASPECT} />}
+                currentLabel={PLANNING_COPY.currentLabel}
+                planLabel={PLANNING_COPY.planLabel}
+              />
+            ) : (
+              <SourceImage className="pd__hero-img" media={leftMedia} anchor="top" frameAspect={PLAN_FRAME_ASPECT} />
+            )}
+          </View>
         </View>
       </View>
 
-      {/* 底部奶油渐变内容板：渲染状态 + 方案名 + 分类 tab + 步骤（可滑）+ CTA */}
+      {/* 奶油渐变内容板（文档流）：渲染状态 + 方案名 + 分类 tab + 全量步骤 + CTA。
+          margin-top 让出首屏照片区，上滑整板盖过照片——hint 承诺的交互。
+          不嵌 ScrollView：微信 ScrollView 在只有 max-height 的父级里塌成 0 高。 */}
       <View className="pd__board">
         {render.kind !== 'ready' ? (
           <View className="pd__render-state">
@@ -200,7 +204,7 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
           ) : null}
         </View>
 
-        <ScrollView className="pd__steps" scrollY enhanced showScrollbar={false}>
+        <View className="pd__steps">
           {variant.descriptor ? <Text className="pd__desc">{variant.descriptor}</Text> : null}
           {variant.rationale ? <Text className="pd__why">{variant.rationale}</Text> : null}
           {steps.map((step) => (
@@ -227,7 +231,7 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
           {steps.length === 0 ? (
             <Text className="pd__empty-step">{PLAN_DETAIL_COPY.emptyStep}</Text>
           ) : null}
-        </ScrollView>
+        </View>
 
         <View className="pd__foot">
           <PrimaryButton
@@ -243,6 +247,6 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
           <Text className="pd__bound-note">{PLANNING_COPY.boundNote}</Text>
         </View>
       </View>
-    </View>
+    </>
   )
 }

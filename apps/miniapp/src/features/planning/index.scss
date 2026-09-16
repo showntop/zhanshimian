@@ -6,7 +6,6 @@
   display: flex;
   flex-direction: column;
   gap: 24rpx;
-  padding-top: 20rpx;
 
   &__wait {
     display: flex;
@@ -41,9 +40,8 @@
   display: flex;
   flex-direction: column;
   gap: 20rpx;
-  padding-top: 20rpx;
-  // 悬浮选择坞（收益词 + 三选一 + CTA + 安全区）让位
-  padding-bottom: 460rpx;
+  // 悬浮选择坞（收益词 + 三选一 + CTA + 重新设计链接 + 安全区）让位
+  padding-bottom: 500rpx;
 
   &__tabs {
     display: flex;
@@ -151,10 +149,28 @@
       left: 0;
       right: 0;
       bottom: 0;
-      // 底部 40% 渐变遮罩：满屏图与上拉的信息卡柔和衔接，不再生硬相撞
-      height: 300rpx;
+      // 底部渐变（旧线 120rpx）：满屏图与页面底色柔和衔接；
+      // 信息卡不再上叠 hero，不需要更高的遮罩
+      height: 120rpx;
       background: linear-gradient(180deg, rgba(244, 245, 242, 0) 0%, var(--bg) 100%);
       pointer-events: none;
+    }
+
+    // 渲染未就绪的相框内状态（生成中 spinner / 失败重试）：
+    // 去状态块自身的底色，居中浮在相框的苔绿浅底上
+    &-state {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40rpx;
+
+      .render-state {
+        align-items: center;
+        background: transparent;
+        text-align: center;
+      }
     }
 
     // SourceImage 填满对比层（cmp 内层不再认旧 .example-image 类）；
@@ -178,9 +194,9 @@
     }
   }
 
-  // 收益词胶囊（信息卡内左对齐）：直接回答「选这套能获得什么」
+  // 收益词胶囊（悬浮坞内顶行，居中）：直接回答「选这套能获得什么」
   &__outcome {
-    align-self: flex-start;
+    align-self: center;
     display: flex;
     align-items: center;
     gap: 10rpx;
@@ -204,16 +220,16 @@
     }
   }
 
-  // 细节卡：负边距上拉压 hero 底边（骑在底部渐变上），首屏即露出
-  // descriptor 开头，形成「下面还有内容」的引导。选择坞在 fixed 底部，
-  // 不在文档流，不会再出现卡片叠卡片
+  // 细节卡（第 2 屏起）：正常文档流跟随 hero。
+  // 负边距上叠是「信息卡压 hero 底边」改版的做法——渲染未就绪没有 hero 时，
+  // 卡片会被拉上去叠住场景 tab（9.16 事故），回旧线不再负边距
   &__info {
     position: relative;
     z-index: 2;
     display: flex;
     flex-direction: column;
     gap: 12rpx;
-    margin: -96rpx 20rpx 0;
+    margin: 0 20rpx;
     padding: 28rpx 30rpx;
     border-radius: var(--radius-lg);
     background: var(--surface-strong);
@@ -325,10 +341,9 @@
   }
 
   &__choice {
-    width: 144rpx;
+    width: 104rpx;
     display: flex;
     flex-direction: column;
-    gap: 5rpx;
     opacity: 0.55;
     transition: opacity 0.25s ease, transform 0.25s ease;
 
@@ -340,17 +355,12 @@
         border-color: var(--moss);
         box-shadow: 0 4rpx 12rpx rgba(88, 115, 68, 0.25);
       }
-
-      .plans__choice-name {
-        color: var(--ink);
-        font-weight: 700;
-      }
     }
 
     &-thumb {
       position: relative;
-      width: 144rpx;
-      height: 192rpx;
+      width: 104rpx;
+      height: 140rpx;
       border-radius: 12rpx;
       overflow: hidden;
       background: var(--moss-soft);
@@ -386,6 +396,14 @@
       flex: none;
     }
 
+    // 失败/暂不可用占位：缩略图不留白洞（重试在 hero 相框的状态区）
+    &-state {
+      font-size: 18rpx;
+      line-height: 1.4;
+      color: var(--ink-3);
+      text-align: center;
+    }
+
     &-badge {
       position: absolute;
       top: 5rpx;
@@ -398,19 +416,11 @@
       font-size: 16rpx;
       font-weight: 650;
     }
-
-    &-name {
-      font-size: 20rpx;
-      color: var(--ink-2);
-      text-align: center;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
   }
 
   // 悬浮选择坞：收益词 + 三选一 + CTA 收进毛玻璃坞，浮在照片底部
   // 上方不占文档流——照片有多高就展示多高，选择要素常驻第一屏。
+  // 坞做薄（去掉缩略图名字行、收紧间距），把高度让给照片。
   // tab 页视口已在原生 tabBar 之上；再加 safe-area 会和 tabBar 叠出一段空。
   &__dock {
     position: fixed;
@@ -420,8 +430,8 @@
     z-index: 20;
     display: flex;
     flex-direction: column;
-    gap: 14rpx;
-    padding: 18rpx var(--page-gutter) 12rpx;
+    gap: 12rpx;
+    padding: 14rpx var(--page-gutter) 10rpx;
     background: var(--dock);
 
     // 坞内选择面板卡去边框阴影，与毛玻璃底融合
@@ -524,9 +534,9 @@
         border-radius: 0;
       }
 
-      // 生成图角标钉在导航下方右侧
+      // 生成图角标在导航下方右侧、对比标签下一行——同钉一排会重合（9.16 事故）
       .pd__hero-img .example-badge {
-        top: calc(var(--pd-nav) + 12rpx);
+        top: calc(var(--pd-nav) + 64rpx);
         right: 24rpx;
         bottom: auto;
       }
@@ -546,18 +556,17 @@
     }
   }
 
-  // 底部内容板：140rpx 透明渐起步，照片从这里融进奶油底；
-  // 板内三段——头（方案名+tab）、步骤 ScrollView（自适应可滑）、脚（CTA 常驻）
+  // 底部内容板：140rpx 透明渐起步，照片从这里融进奶油底。
+  // 板在文档流（margin-top 让出首屏照片区）：上滑整板盖过照片，全量步骤
+  // 随页面滚动展开——不嵌板内 ScrollView：微信 ScrollView 在只有 max-height
+  // 的父级里拿不到确定高度，会塌成 0（步骤不可见、上滑/切分类全没反应）。
   &__board {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    position: relative;
     z-index: 4;
     display: flex;
     flex-direction: column;
     gap: 16rpx;
-    max-height: 76%;
+    margin-top: 62vh;
     padding: 140rpx var(--page-gutter) calc(20rpx + env(safe-area-inset-bottom));
     background: linear-gradient(
       180deg,
@@ -610,12 +619,8 @@
     }
   }
 
-  // 步骤区：板内唯一滚动容器，吃满头部与脚部之间的剩余高度
-  // （height:0 + flex 是微信 ScrollView 在弹性列里拿确定高度的既成写法，同 adv__list）
+  // 步骤区：全量列表在板的文档流里，随页面上滑展开
   &__steps {
-    flex: 1 1 auto;
-    min-height: 0;
-    height: 0;
     display: flex;
     flex-direction: column;
     gap: 14rpx;
@@ -736,7 +741,6 @@
   display: flex;
   flex-direction: column;
   gap: 28rpx;
-  padding-top: 28rpx;
 
   &--loading {
     align-items: center;

@@ -6,14 +6,14 @@
 .home {
   display: flex;
   flex-direction: column;
-  // AppHeader 占位到导航底边；问候自身还有 20rpx 顶距，净距约 28rpx（与旧线一致）。
-  padding-top: 8rpx;
 
   &__greeting {
     display: flex;
     flex-direction: column;
     gap: 10rpx;
-    padding: 20rpx 8rpx 28rpx;
+    // 导航下净距 = spacer 24rpx + 此处 4rpx ≈ 旧线 28rpx；
+    // 各页顶距统一收在 spacer，页面根节点不再自叠
+    padding: 4rpx 8rpx 28rpx;
 
     &-top {
       display: flex;
