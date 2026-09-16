@@ -420,12 +420,27 @@
       min-width: 0;
     }
 
+    &-name-row {
+      display: flex;
+      align-items: center;
+      gap: 10rpx;
+      min-width: 0;
+    }
+
+    &-icon {
+      width: 34rpx;
+      height: 34rpx;
+      flex-shrink: 0;
+    }
+
+    // 主卡降一档：moss-soft 底 + 右侧照片，深绿只留报告 hero
+    // （每页至多一个深色视觉锚点；两块 moss-deep 连排会互相抢焦点）
     &--lead {
       flex: 1 1 100%;
       min-height: 210rpx;
       justify-content: flex-end;
       padding: 32rpx 46% 30rpx 28rpx;
-      background: var(--moss-deep);
+      background: var(--moss-soft);
       isolation: isolate;
 
       &::after {
@@ -435,10 +450,10 @@
         content: '';
         background: linear-gradient(
           90deg,
-          rgba(57, 73, 46, 1) 0%,
-          rgba(57, 73, 46, 0.98) 42%,
-          rgba(57, 73, 46, 0.58) 66%,
-          rgba(57, 73, 46, 0.08) 100%
+          rgba(237, 241, 234, 1) 0%,
+          rgba(237, 241, 234, 0.98) 42%,
+          rgba(237, 241, 234, 0.58) 66%,
+          rgba(237, 241, 234, 0.08) 100%
         );
         pointer-events: none;
       }
@@ -449,12 +464,13 @@
       }
 
       .home__tool-name {
-        font-size: 36rpx;
-        color: var(--cream);
+        font-size: 34rpx;
+        font-weight: 700;
+        color: var(--ink);
       }
 
       .home__tool-desc {
-        color: var(--cream-muted);
+        color: var(--ink-2);
       }
 
       .example-badge {

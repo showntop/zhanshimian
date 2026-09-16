@@ -52,6 +52,11 @@ const TOOL_PATHS: Record<(typeof HOME_COPY.tools)[number]['key'], string> = {
   purchase: '/packages/tools/pages/purchase/index',
 }
 
+// 工具卡图标（按需）：发型主卡补识别锚点，安静卡保持纯文字
+const TOOL_ICONS: Partial<Record<(typeof HOME_COPY.tools)[number]['key'], string>> = {
+  hair: '/assets/icons/sparkles.png',
+}
+
 const SCENE_ICONS: Record<SceneCopy['id'], string> = {
   interview: '/assets/icons/scene-interview.png',
   wedding: '/assets/icons/scene-wedding.png',
@@ -393,6 +398,7 @@ export default function Home() {
                         ? PURCHASE_COPY.lastResult
                         : ''
                 const badge = liveBadge || tool.badge
+                const toolIcon = TOOL_ICONS[tool.key]
                 return (
                   <View
                     key={tool.key}
@@ -400,7 +406,18 @@ export default function Home() {
                     onClick={() => void Taro.navigateTo({ url: TOOL_PATHS[tool.key] })}
                   >
                     <View className="home__tool-copy">
-                      <Text className="home__tool-name">{tool.label}</Text>
+                      <View className="home__tool-name-row">
+                        {toolIcon ? (
+                          <Image
+                            className="home__tool-icon"
+                            src={toolIcon}
+                            mode="aspectFit"
+                            lazyLoad={false}
+                            fadeIn={false}
+                          />
+                        ) : null}
+                        <Text className="home__tool-name">{tool.label}</Text>
+                      </View>
                       <Text className="home__tool-desc">{tool.desc}</Text>
                     </View>
                     {tool.key === 'hair' ? (
