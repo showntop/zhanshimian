@@ -1,5 +1,5 @@
 // 方案详情：旧线（recovery/ui-0911）全屏沉浸视觉在新数据模型上的恢复——
-// 照片 fixed 铺满整屏、导航透明、奶油渐变内容板在文档流，上滑盖过照片看全量步骤。
+// 照片 fixed 钉在上半屏、导航透明、奶油渐变内容板在文档流，上滑盖过照片看全量步骤。
 // 架构不让步的部分：
 // 1. 对比左图严格来自方案集绑定的那一份报告，右图只用这一套自己的 render.media；
 //    绑定不了就空态，绝不拿"手头最近一份报告"的照片凑对比；
@@ -31,9 +31,10 @@ const CATEGORIES = [
   { key: 'outfit', label: '穿搭' },
 ] as const
 
-// 满屏相框的宽高比：SourceImage 顶对齐自动铺满据此在裁底/裁侧之间选择
+// 满屏相框的宽高比：SourceImage 顶对齐自动铺满据此在裁底/裁侧之间选择。
+// 相框高 = 视口 62vh（.pd 只钉上半屏），不是整屏——裁切比例必须跟着相框走
 const NAV = getNavMetrics()
-const PLAN_FRAME_ASPECT = NAV.windowWidth / NAV.windowHeight
+const PLAN_FRAME_ASPECT = NAV.windowWidth / (NAV.windowHeight * 0.62)
 
 interface PlanDetailScreenProps {
   planSetId: string
@@ -153,7 +154,8 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
 
   return (
     <>
-      {/* 满屏 hero（fixed 铺满整屏）：ready 时拖动对比，未 ready 单图（左）+ 板上状态条 */}
+      {/* hero（fixed 钉在上半屏，不再满屏——满屏会在滚动惯性/橡皮筋时从板底漏出）：
+          ready 时拖动对比，未 ready 单图（左）+ 板上状态条 */}
       <View className="pd" style={{ ['--pd-nav' as string]: `${NAV.navHeight}px` }}>
         <View className="pd__hero">
           <View className="pd__hero-frame">

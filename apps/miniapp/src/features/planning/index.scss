@@ -496,8 +496,14 @@
 
 .pd {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 1;
+  // hero 只钉上半屏（与内容板 margin-top:62vh 对齐）：
+  // 满屏 fixed 会在滚动惯性/橡皮筋时永远钉在视口上——板子被带上去，
+  // 下面就露出另一截照片。钉上半屏后，板底之外只可能是页面底色
+  height: 62vh;
 
   &__hero {
     position: absolute;
