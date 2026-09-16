@@ -173,6 +173,48 @@
       }
     }
 
+    // 未就绪单图（原本照片）的来源标签：与详情页对比标签一套深色 pill
+    &-current-label {
+      position: absolute;
+      top: 16rpx;
+      left: 16rpx;
+      z-index: 5;
+      padding: 4rpx 14rpx;
+      border-radius: 999rpx;
+      background: rgba(30, 35, 29, 0.55);
+      color: #ffffff;
+      font-size: 20rpx;
+    }
+
+    // 渲染未就绪的状态 pill：压在原本照片底部居中，单行
+    &-state-pill {
+      position: absolute;
+      left: 50%;
+      bottom: 48rpx;
+      z-index: 5;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10rpx;
+      max-width: 86%;
+      padding: 10rpx 24rpx;
+      border-radius: 999rpx;
+      background: var(--scrim);
+      white-space: nowrap;
+    }
+
+    &-state-spin {
+      width: 22rpx;
+      height: 22rpx;
+    }
+
+    &-state-text {
+      font-size: 22rpx;
+      color: #ffffff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     // SourceImage 填满对比层（cmp 内层不再认旧 .example-image 类）；
     // 满宽照片（widthFix）：内层图高度自然、顶部锚定，
     // 超高时超出部分从底部裁掉（头部完整）

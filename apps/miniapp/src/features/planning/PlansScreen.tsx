@@ -73,6 +73,8 @@ const MAX_HERO_PX = Math.max(
   320,
   Math.round(NAV.windowHeight - NAV.navHeight - HEADER_GAP_PX),
 )
+// 渲染未就绪且原本照片也缺失时，状态块只给紧凑高度——不摆一整框空状态
+const EMPTY_STATE_HERO_PX = 240
 
 interface PlansScreenProps {
   planSetId?: string
@@ -722,14 +724,14 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       ) : (
         <>
         {/* 拖动对比 hero：照片满宽完整展示（高度跟随照片比例），无侧边区无裁切。
-            相框常驻（旧线结构）：渲染就绪出对比图，未就绪把状态（含重试）摆在框内——
-            页面骨架不随渲染结果塌缩，后面的信息卡永远不会上叠场景 tab。
-            key 随方案切换重挂载 → 交叉淡入。 */}
+            相框常驻（旧线结构）：就绪出对比图；未就绪展示原本照片单图 + 状态 pill
+            （都没有才退紧凑状态块）——页面骨架不随渲染结果塌缩，
+            后面的信息卡永远不会上叠场景 tab。key 随方案切换重挂载 → 交叉淡入。 */}
         {activeVariant && activeRender ? (
           <View className="plans__hero">
             <View
               className="plans__hero-frame"
-              style={{ height: `${heroPx}px` }}
+              style={{ height: `${activeRender.kind === 'ready' || leftMedia ? heroPx : EMPTY_STATE_HERO_PX}px` }}
               key={activeVariant.id}
               onClick={() => {
                 if (!compareHint) return
@@ -765,6 +767,39 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
                   {compareHint && canCompare ? (
                     <Text className="plans__hint">{PLANNING_COPY.compareHint}</Text>
                   ) : null}
+                </>
+              ) : leftMedia ? (
+                <>
+                  {/* 渲染未就绪但原本照片在架：单图展示当前形象（标「原本」）+
+                      底部状态 pill（生成中转圈 / 失败点按重试 / 暂不可用），
+                      与详情页同一处理——不摆一整框空状态把文字方案挤出首屏 */}
+                  <SourceImage className="plans__hero-img" media={leftMedia} mode="widthFix" />
+                  <Text className="plans__hero-current-label">{PLANNING_COPY.currentLabel}</Text>
+                  <View
+                    className="plans__hero-state-pill"
+                    onClick={
+                      activeRender.kind === 'failed' && activeRender.retryable
+                        ? () => void retryVariant(activeVariant)
+                        : undefined
+                    }
+                  >
+                    {RENDER_IN_FLIGHT.has(activeRender.kind) || retryingId === activeVariant.id ? (
+                      <View className="spinner spinner--on-deep plans__hero-state-spin" />
+                    ) : null}
+                    <Text className="plans__hero-state-text">
+                      {activeRender.kind === 'queued'
+                        ? PLANNING_COPY.renderQueued
+                        : activeRender.kind === 'generating'
+                          ? PLANNING_COPY.renderGenerating
+                          : activeRender.kind === 'checking'
+                            ? PLANNING_COPY.renderChecking
+                            : activeRender.kind === 'unavailable'
+                              ? PLANNING_COPY.renderUnavailable
+                              : activeRender.retryable
+                                ? `${PLANNING_COPY.renderFailed} · ${PLANNING_COPY.renderRetry}`
+                                : PLANNING_COPY.renderFailed}
+                    </Text>
+                  </View>
                 </>
               ) : (
                 <View className="plans__hero-state">
