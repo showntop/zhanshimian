@@ -151,7 +151,8 @@
       left: 0;
       right: 0;
       bottom: 0;
-      height: 120rpx;
+      // 底部 40% 渐变遮罩：满屏图与上拉的信息卡柔和衔接，不再生硬相撞
+      height: 300rpx;
       background: linear-gradient(180deg, rgba(244, 245, 242, 0) 0%, var(--bg) 100%);
       pointer-events: none;
     }
@@ -177,9 +178,9 @@
     }
   }
 
-  // 收益词胶囊（悬浮坞内顶行，居中）：直接回答「选这套能获得什么」
+  // 收益词胶囊（信息卡内左对齐）：直接回答「选这套能获得什么」
   &__outcome {
-    align-self: center;
+    align-self: flex-start;
     display: flex;
     align-items: center;
     gap: 10rpx;
@@ -203,15 +204,16 @@
     }
   }
 
-  // 细节卡：正常文档流跟随 hero。
-  // 旧线一度用负边距上叠 hero 底边，那会把卡片拉上去叠住选择面板卡
+  // 细节卡：负边距上拉压 hero 底边（骑在底部渐变上），首屏即露出
+  // descriptor 开头，形成「下面还有内容」的引导。选择坞在 fixed 底部，
+  // 不在文档流，不会再出现卡片叠卡片
   &__info {
     position: relative;
     z-index: 2;
     display: flex;
     flex-direction: column;
     gap: 12rpx;
-    margin: 0 20rpx;
+    margin: -96rpx 20rpx 0;
     padding: 28rpx 30rpx;
     border-radius: var(--radius-lg);
     background: var(--surface-strong);
@@ -323,7 +325,7 @@
   }
 
   &__choice {
-    width: 104rpx;
+    width: 144rpx;
     display: flex;
     flex-direction: column;
     gap: 5rpx;
@@ -347,8 +349,8 @@
 
     &-thumb {
       position: relative;
-      width: 104rpx;
-      height: 140rpx;
+      width: 144rpx;
+      height: 192rpx;
       border-radius: 12rpx;
       overflow: hidden;
       background: var(--moss-soft);
@@ -358,6 +360,21 @@
       display: flex;
       align-items: center;
       justify-content: center;
+
+      // 「风格参考」角标：图内底部通栏小条，单行不换行（小图上不再溢出）
+      .example-badge {
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        padding: 3rpx 0 4rpx;
+        border-radius: 0;
+        background: rgba(30, 35, 29, 0.55);
+        font-size: 15rpx;
+        line-height: 1.3;
+        text-align: center;
+        white-space: nowrap;
+      }
     }
 
     &-img {

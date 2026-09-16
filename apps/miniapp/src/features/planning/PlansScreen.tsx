@@ -766,14 +766,29 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
           </View>
         ) : null}
 
-        {/* 细节卡：descriptor + 折叠的 why + 渲染状态（文字永远在） */}
+        {/* 细节卡：负边距压 hero 底边（骑在渐变上，首屏即露头）。
+            descriptor + 收益/差异 chips（从坞上移，与 why 归为一区）+ 渲染状态 */}
         {activeVariant && activeRender ? (
           <View className="plans__info fade-up delay-1">
             <Text className="plans__summary">{activeVariant.descriptor}</Text>
+            {activeVariant.outcome_tags.length > 0 ? (
+              <View className="plans__outcome">
+                {activeVariant.outcome_tags.slice(0, 3).map((tag) => (
+                  <Text key={tag} className="plans__outcome-tag">{tag}</Text>
+                ))}
+              </View>
+            ) : null}
             {activeVariant.rationale ? (
               <View className="plans__why-wrap" onClick={() => setWhyOpen(!whyOpen)}>
                 <Text className={`plans__why ${whyOpen ? 'plans__why--open' : ''}`}>{activeVariant.rationale}</Text>
                 <Text className="plans__why-toggle">{whyOpen ? PLANNING_COPY.whyClose : PLANNING_COPY.whyLabel}</Text>
+              </View>
+            ) : null}
+            {activeVariant.difference_tags.length > 0 ? (
+              <View className="plans__diffs">
+                {activeVariant.difference_tags.slice(0, 3).map((tag) => (
+                  <Text key={tag} className="plans__diff">{tag}</Text>
+                ))}
               </View>
             ) : null}
             {activeRender.kind !== 'ready' ? (
@@ -782,17 +797,9 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
           </View>
         ) : null}
 
-        {/* 悬浮选择坞：收益词 + 三选一 + CTA 收进毛玻璃坞，浮在照片底部
-            上方不占文档流——照片有多高就展示多高，选择要素常驻第一屏 */}
+        {/* 悬浮选择坞：三选一 + 方案名 + CTA 三层（收益/差异 chips 已上移信息卡） */}
         {activeVariant && activeRender ? (
           <View className="plans__dock dock-glass fade-up delay-2">
-            {activeVariant.outcome_tags.length > 0 ? (
-              <View className="plans__outcome">
-                {activeVariant.outcome_tags.slice(0, 3).map((tag) => (
-                  <Text key={tag} className="plans__outcome-tag">{tag}</Text>
-                ))}
-              </View>
-            ) : null}
             <View className="plans__chooser">
               <View className="plans__choices">
                 {variants.map((item) => {
@@ -805,7 +812,7 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
                     >
                       <View className="plans__choice-thumb">
                         {itemRender.kind === 'ready' ? (
-                          <SourceImage className="plans__choice-img" media={itemRender.media} mode="aspectFit" />
+                          <SourceImage className="plans__choice-img" media={itemRender.media} mode="aspectFill" />
                         ) : RENDER_IN_FLIGHT.has(itemRender.kind) ? (
                           <View className="spinner plans__choice-spin" />
                         ) : null}
@@ -820,13 +827,6 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
               </View>
               <View className="plans__chooser-info">
                 <Text className="plans__name">{activeVariant.name}</Text>
-                {activeVariant.difference_tags.length > 0 ? (
-                  <View className="plans__diffs">
-                    {activeVariant.difference_tags.slice(0, 3).map((tag) => (
-                      <Text key={tag} className="plans__diff">{tag}</Text>
-                    ))}
-                  </View>
-                ) : null}
               </View>
             </View>
             <PrimaryButton text={PLANNING_COPY.viewDetail} onClick={() => openDetail(activeVariant)} />
