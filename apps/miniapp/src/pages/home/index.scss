@@ -183,39 +183,26 @@
     height: 100%;
     border-radius: 0;
 
+    // 单卡角标隐藏：组级一个「风格参考」即可（见 __preview-badge），
+    // 三张分挂跟着旋转角度东倒西歪、半张被裁
     .example-badge {
-      top: 7rpx;
-      right: 7rpx;
-      bottom: auto;
-      left: auto;
-      padding: 2rpx 6rpx;
-      font-size: 12rpx;
-      line-height: 1.2;
+      display: none;
     }
   }
 
-  &__preview-focus {
+  // 堆叠组的组级角标：钉在组右上角，不跟卡片旋转
+  &__preview-badge {
     position: absolute;
-    left: 50%;
-    top: 34%;
-    z-index: 2;
-    width: 54rpx;
-    height: 54rpx;
-    border: 2rpx solid rgba(238, 240, 236, 0.88);
+    top: -8rpx;
+    right: -8rpx;
+    z-index: 5;
+    padding: 3rpx 12rpx;
     border-radius: 999rpx;
-    transform: translate(-50%, -50%);
-    box-shadow: 0 0 0 8rpx rgba(88, 115, 68, 0.22);
-
-    &-dot {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 10rpx;
-      height: 10rpx;
-      border-radius: 999rpx;
-      background: var(--cream);
-      transform: translate(-50%, -50%);
-    }
+    background: rgba(30, 35, 29, 0.55);
+    backdrop-filter: blur(12rpx);
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 16rpx;
+    line-height: 1.5;
   }
 
   &__preview-caption {
@@ -239,13 +226,15 @@
     flex: 1;
     min-width: 0;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     align-items: flex-start;
-    gap: 8rpx;
-    padding: 14rpx 10rpx;
+    gap: 6rpx;
+    padding: 14rpx 12rpx;
     border-radius: var(--radius-md);
     background: rgba(238, 240, 236, 0.10);
 
+    // 数字 chip 独占一行，标题占满卡宽——同行挤压曾把
+    // 「3 套可执行方案」断成「方/案」两行
     &-index {
       display: flex;
       align-items: center;
