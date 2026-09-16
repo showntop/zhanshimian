@@ -433,8 +433,14 @@ export default function Home() {
                     </View>
                     {tool.key === 'hair' ? (
                       hairLatestMedia ? (
-                        <SourceImage className="home__tool-visual" media={hairLatestMedia} anchor="top" />
+                        <SourceImage
+                          className="home__tool-visual home__tool-visual--focal"
+                          media={hairLatestMedia}
+                          anchor="top"
+                        />
                       ) : (
+                        // 内置参考图是预裁好的头肩构图（0 位移），
+                        // 与生成图的焦点裁切分开处理
                         <SourceImage
                           className="home__tool-visual"
                           reference={{ slug: 'natural', variant: 'hair' }}
