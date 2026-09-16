@@ -121,10 +121,10 @@ export const ERROR_COPY = {
 
 // ---------- 空态文案骨架（必须带下一步动作） ----------
 export const EMPTY_COPY = {
-  report: { title: '还没有形象报告', body: '拍三张照片，几分钟拿到你的第一份形象分析。', action: '去建档' },
+  report: { title: '还没有形象报告', body: '拍三张照片，几分钟拿到你的第一份形象分析。', action: '去形象分析' },
   plans: { title: '这个场合还没有方案', body: '选定一份形象报告后，即可生成对应场合的穿搭方案。', action: '去选报告' },
-  plansNeedArchive: { title: '还没有方案', body: '先完成三图建档，或在场景页生成场合方案。', action: '去建档' },
-  plansAnalyzing: { title: '正在分析你的照片', body: '分析完成后就可以生成方案，现在不用重新建档。', action: '查看分析进度' },
+  plansNeedArchive: { title: '还没有方案', body: '生成方案前，需要先完成形象分析。', action: '去形象分析' },
+  plansAnalyzing: { title: '正在分析你的照片', body: '分析完成后就可以生成方案，现在不用重新拍摄。', action: '查看分析进度' },
   checklist: { title: '清单已就绪', body: '按步骤准备，完成一项勾一项。', action: '查看方案' },
   today: { title: '今天还没有方案', body: '看看今天适合怎么穿，一分钟生成。', action: '生成今日方案' },
   wardrobe: { title: '衣橱还是空的', body: '拍两张单品照，让方案用上你已有的衣服。', action: '添加单品' },
@@ -308,7 +308,7 @@ export const HOME_COPY = {
   archiveTitle: '三张照片，建立只属于你的形象档案',
   archiveBody: '正脸、45° 侧脸、正面全身。不用化妆，也不需要刻意摆姿势。',
   photoPrivacy: '照片与建议只对你可见，可随时删除',
-  processTitle: '建档后会得到什么',
+  processTitle: '分析后会得到什么',
   process: [
     { title: '当前形象标签', desc: '看清现在的整体印象' },
     // 不写死数字：findings 真实数量是 3~6 条（schema minItems~maxFindings），
@@ -417,7 +417,7 @@ export const ME_COPY = {
   // hero 身份行：没有报告时不编造标签，只说这是什么
   archiveIdentity: '你的形象档案',
   viewReportLink: '查看最近报告 ›',
-  startArchiveLink: '开始建档 ›',
+  startArchiveLink: '开始形象分析 ›',
   // 任务中心（简化版）：公开 OperationRef 只有 kind/status，没有进度百分比。
   // 键集合与契约 kind 枚举一致；execution_feedback 是后台一次性写入，页面不列出。
   tasksTitle: '进行中的任务',
@@ -436,7 +436,7 @@ export const ME_COPY = {
   archiveTitle: '形象档案',
   latestReport: '最近的分析报告',
   viewAction: '查看',
-  noArchive: '未建档',
+  noArchive: '未分析',
   myPlans: '我的方案',
   updateArchive: '更新形象档案',
   updateArchiveHint: '重拍三张',
@@ -471,7 +471,7 @@ export const REPORT_COPY = {
   noReportTitle: '还没有形象报告',
   noReportBody: '拍三张照片，几分钟拿到你的第一份形象分析。',
   noReportAction: '重新拍摄',
-  goArchive: '去建档',
+  goArchive: '去形象分析',
   // 证据缺失时的空位说明：报告宁可留缺口，也不拿别的照片顶上
   evidenceEmpty: '这张来源照片暂不可用',
   evidenceEmptyHint: '锚点是在这张照片上量出来的，换一张就不作数',
@@ -673,11 +673,11 @@ export const SCENE_BRIEF_COPY = {
   lede: '补充几个选择，约 30 秒。不会重复索要照片和身体数据。',
   generateAction: '生成方案',
   needArchiveTitle: '还没有形象报告',
-  needArchiveBody: '先完成三图建档，才能生成场合方案。',
-  needArchiveAction: '去建档',
+  needArchiveBody: '生成场合方案前，需要先完成形象分析。',
+  needArchiveAction: '去形象分析',
   // 无档案但分析在途：引导看进度，不能引导发起第二次建档（旧线 scene 页行为）
   analyzingTitle: '正在分析你的照片',
-  analyzingBody: '分析完成后就能生成场合方案，不用重新建档。',
+  analyzingBody: '分析完成后就能生成场合方案，不用重新拍摄。',
   analyzingAction: '查看分析进度',
   loadFailed: '页面没有加载成功，请重试',
   submitFailed: '方案没有生成成功，请重试',
