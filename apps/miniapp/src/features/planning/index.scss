@@ -494,16 +494,16 @@
   background: var(--bg);
 }
 
+// 满屏沉浸的关键：hero 用 sticky 而不是 fixed——sticky 在文档流里，
+// 橡皮筋/滚动惯性时整页一起动，板底之外只可能是页面底色；
+// fixed 永远钉在视口上，板子被带上去就从板底漏出另一截照片（1.0.5 的教训）。
+// 滚动全程 hero 钉在视口顶（sticky 行程 = 板高 - 38vh = 可滚区间），
+// 内容板从 hero 底部 38vh 处叠上来——满屏照片 + 视差 + 不漏底，三者兼得。
 .pd {
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: 0;
-  right: 0;
   z-index: 1;
-  // hero 只钉上半屏（与内容板 margin-top:62vh 对齐）：
-  // 满屏 fixed 会在滚动惯性/橡皮筋时永远钉在视口上——板子被带上去，
-  // 下面就露出另一截照片。钉上半屏后，板底之外只可能是页面底色
-  height: 62vh;
+  height: 100vh;
 
   &__hero {
     position: absolute;
@@ -521,16 +521,18 @@
         background: var(--ink);
       }
 
-      // 对比标签移到导航下方，不压底部内容板
+      // 对比标签在导航下方、不压底部内容板；
+      // 深色半透小 pill（与「风格参考」角标一套语言）：
+      // 亮背景照片上白字 text-shadow 根本看不清
       .cmp__label {
         top: calc(var(--pd-nav) + 12rpx);
         bottom: auto;
-        padding: 0;
-        border-radius: 0;
-        background: transparent;
+        padding: 4rpx 14rpx;
+        border-radius: 999rpx;
+        background: rgba(30, 35, 29, 0.55);
         color: #ffffff;
         font-size: 20rpx;
-        text-shadow: 0 2rpx 10rpx rgba(24, 28, 22, 0.45);
+        text-shadow: none;
       }
 
       // SourceImage 填满对比层，去自身圆角（外层统一裁切）
@@ -563,18 +565,18 @@
   }
 
   // 底部内容板：140rpx 透明渐起步，照片从这里融进奶油底。
-  // 板在文档流（margin-top 让出首屏照片区）：上滑整板盖过照片，全量步骤
-  // 随页面滚动展开——不嵌板内 ScrollView：微信 ScrollView 在只有 max-height
-  // 的父级里拿不到确定高度，会塌成 0（步骤不可见、上滑/切分类全没反应）。
-  // min-height 与 margin-top 凑满一屏：数据少、板身短时板底也必须到达屏底，
-  // 否则 fixed 满屏的 hero 会从板底漏出来（滚到一半看见另一截照片）
+  // 负边距上叠 hero 底部 38vh（hero 满屏在文档流，见 .pd 的 sticky 注释）：
+  // 首屏满屏照片，上滑整板盖过照片，全量步骤随页面滚动展开——不嵌板内
+  // ScrollView：微信 ScrollView 在只有 max-height 的父级里拿不到确定高度，
+  // 会塌成 0（步骤不可见、上滑/切分类全没反应）。
+  // min-height 与上叠量凑满一屏：数据少、板身短时板底也必须到达屏底
   &__board {
     position: relative;
     z-index: 4;
     display: flex;
     flex-direction: column;
     gap: 16rpx;
-    margin-top: 62vh;
+    margin-top: -38vh;
     min-height: 38vh;
     padding: 140rpx var(--page-gutter) calc(20rpx + env(safe-area-inset-bottom));
     background: linear-gradient(

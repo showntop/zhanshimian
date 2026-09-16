@@ -1,5 +1,6 @@
 // 方案详情：旧线（recovery/ui-0911）全屏沉浸视觉在新数据模型上的恢复——
-// 照片 fixed 钉在上半屏、导航透明、奶油渐变内容板在文档流，上滑盖过照片看全量步骤。
+// 照片 sticky 满屏钉在视口顶、导航透明、奶油渐变内容板负边距上叠，
+// 上滑带视差盖过照片看全量步骤；sticky 在文档流里，橡皮筋时整页一起动，底部永不漏照片。
 // 架构不让步的部分：
 // 1. 对比左图严格来自方案集绑定的那一份报告，右图只用这一套自己的 render.media；
 //    绑定不了就空态，绝不拿"手头最近一份报告"的照片凑对比；
@@ -32,9 +33,9 @@ const CATEGORIES = [
 ] as const
 
 // 满屏相框的宽高比：SourceImage 顶对齐自动铺满据此在裁底/裁侧之间选择。
-// 相框高 = 视口 62vh（.pd 只钉上半屏），不是整屏——裁切比例必须跟着相框走
+// hero 满屏（sticky，见 index.scss .pd 注释），相框就是整屏
 const NAV = getNavMetrics()
-const PLAN_FRAME_ASPECT = NAV.windowWidth / (NAV.windowHeight * 0.62)
+const PLAN_FRAME_ASPECT = NAV.windowWidth / NAV.windowHeight
 
 interface PlanDetailScreenProps {
   planSetId: string
@@ -154,8 +155,8 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
 
   return (
     <>
-      {/* hero（fixed 钉在上半屏，不再满屏——满屏会在滚动惯性/橡皮筋时从板底漏出）：
-          ready 时拖动对比，未 ready 单图（左）+ 板上状态条 */}
+      {/* hero（sticky 满屏钉在视口顶；文档流内，橡皮筋/惯性时随页一起动，
+          不会像 fixed 那样从板底漏出）：ready 时拖动对比，未 ready 单图（左）+ 板上状态条 */}
       <View className="pd" style={{ ['--pd-nav' as string]: `${NAV.navHeight}px` }}>
         <View className="pd__hero">
           <View className="pd__hero-frame">
@@ -177,8 +178,8 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
         </View>
       </View>
 
-      {/* 奶油渐变内容板（文档流）：渲染状态 + 方案名 + 分类 tab + 全量步骤 + CTA。
-          margin-top 让出首屏照片区，上滑整板盖过照片——hint 承诺的交互。
+      {/* 奶油渐变内容板（文档流，负边距上叠 hero 底部 38vh）：
+          渲染状态 + 方案名 + 分类 tab + 全量步骤 + CTA。上滑整板带视差盖过照片。
           不嵌 ScrollView：微信 ScrollView 在只有 max-height 的父级里塌成 0 高。 */}
       <View className="pd__board">
         {render.kind !== 'ready' ? (
@@ -186,6 +187,10 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
             <RenderState view={render} />
           </View>
         ) : null}
+
+        {/* hint 在板的引导边（渐变融色区）：首屏照片底部的引子，邀请上滑。
+            落点在 padding-top 140rpx 之后——渐变已半实，不压照片主体 */}
+        <Text className="pd__hint">{PLAN_DETAIL_COPY.boardHint}</Text>
 
         <View className="pd__head">
           <Text className="pd__series">{planSlotLabel(variant.name, variant.slot)}</Text>
@@ -203,9 +208,6 @@ export default function PlanDetailScreen({ planSetId, variantId }: PlanDetailScr
             </View>
           ) : null}
         </View>
-
-        {/* hint 放实色区（板头之后）：压在板顶渐变的半透明区会浮在照片脸上 */}
-        <Text className="pd__hint">{PLAN_DETAIL_COPY.boardHint}</Text>
 
         <View className="pd__steps">
           {variant.descriptor ? <Text className="pd__desc">{variant.descriptor}</Text> : null}
