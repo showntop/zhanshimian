@@ -94,6 +94,16 @@ export {
   type DisplayImage
 } from './media/display.ts'
 export {
+  CUSTOM_DIRECTION_ID,
+  HAIR_DIRECTIONS,
+  HAIR_GENDERS,
+  hairDirectionViews,
+  type HairDirection,
+  type HairDirectionView,
+  type HairGender,
+  type HairGenderTag
+} from './hair/directions.ts'
+export {
   MAX_OPERATION_FETCH_FAILURES,
   OPERATION_POLL_INTERVAL_MS,
   areOperationsSettled,

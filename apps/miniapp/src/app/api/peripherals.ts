@@ -56,6 +56,8 @@ export const peripherals = {
   createHairPreview: (input: {
     media_id?: string
     style_id: string
+    /** 方向名或自定义描述（≤40 字）：目录未收录时它就是生成提示词与展示名 */
+    direction?: string
     report_id?: string
     scene?: string
   }): Promise<HairPreviewAccepted> =>

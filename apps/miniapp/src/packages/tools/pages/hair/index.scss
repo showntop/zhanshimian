@@ -1,5 +1,10 @@
 // 发型设计：四步线性流程的样式。hero 一屏一事；方向卡横滑大卡；
 // 结果态 verdict + 历史条 + 沉底 CTA。主按钮区与购买判断同构。
+//
+// 一屏收束：输入态（S0 确认照片 / S1 选方向 / S2 生成中）页面高 = 一屏，
+// hero 只吃「一屏 − 导语 − 方向卡 − 主按钮」的剩余高度——照片按宽铺满、顶对齐，
+// 超出的下半截从底部裁掉（与 HeroPhoto 的 widthFix 直出一致，不裁脸），
+// 竖版正脸照不再把导语和主按钮顶出首屏（见 .hair--form）。
 .hair {
   display: flex;
   flex-direction: column;
@@ -254,6 +259,25 @@
     }
   }
 
+  // ---------- S1 性别分段：方向目录按性别分组（女士/男士），右侧对齐不占一行高度 ----------
+  &__gender {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16rpx;
+
+    &-label {
+      font-size: 24rpx;
+      font-weight: 600;
+      color: var(--ink-2);
+    }
+
+    &-pills {
+      display: flex;
+      gap: 16rpx;
+    }
+  }
+
   // ---------- S1 方向卡：横滑缩排卡，差异前置（缩排保一屏） ----------
   &__cards {
     width: 100%;
@@ -283,6 +307,39 @@
     &-img {
       width: 100%;
       height: 168rpx;
+    }
+
+    // 没有参考图的方向（男士）与自定义：同高的浅色块，横滑轨道的节奏不塌
+    &-blank {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 168rpx;
+      background: var(--moss-soft);
+
+      &-icon {
+        width: 56rpx;
+        height: 56rpx;
+        opacity: 0.6;
+      }
+
+      &-plus {
+        font-size: 40rpx;
+        line-height: 1;
+        color: var(--moss);
+      }
+    }
+
+    // 自定义卡：虚线与「目录里的一款」区分开，未选中时也是一条可点的入口
+    &--custom {
+      border-style: dashed;
+      border-color: var(--line);
+      background: transparent;
+    }
+
+    &--custom.hair__card--active {
+      border-color: var(--moss);
     }
 
     &-body {
@@ -425,5 +482,91 @@
       font-size: 24rpx;
       color: var(--moss);
     }
+  }
+
+  // ---------- 自定义方向：输入层（描述直接当方向名与提示词） ----------
+  &__custom-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+  }
+
+  &__custom-label {
+    font-size: 26rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  &__custom-input {
+    width: 100%;
+    min-height: 176rpx;
+    padding: 20rpx;
+    border-radius: var(--radius-md);
+    border: 1rpx solid var(--line);
+    background: var(--surface-strong);
+    font-size: 28rpx;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+
+  &__custom-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16rpx;
+  }
+
+  &__custom-helper {
+    flex: 1;
+    font-size: 22rpx;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+
+  &__custom-count {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__custom-empty {
+    font-size: 22rpx;
+    text-align: center;
+    color: var(--ink-3);
+  }
+}
+
+// ---------- 输入态一屏收束（S0/S1/S2）：hero 吃剩余高度，其余元素全留首屏 ----------
+// 相框不再是「图多高就多高」（竖版正脸照能拉到 1300rpx+，把导语、方向卡、主按钮
+// 全顶出屏幕）；改成页面高 = 一屏，hero 拿剩下的高度，照片顶对齐、超出部分裁底。
+// 结果是「一屏 = 照片 + 导语 + 方向卡 + 主按钮」，不用滚屏就能做决定。
+.hair--form {
+  // .page 的底部内边距（safe-area + 48rpx）之外正好是一屏
+  height: calc(100vh - env(safe-area-inset-bottom) - 48rpx);
+  // 矮屏 / 放大字号的保底：宁可页面滚动，也不把 hero 压成一条
+  min-height: 1040rpx;
+
+  .hair__hero {
+    // 唯一可伸缩项：余量全给照片，430rpx 是下限（不塌成横条）
+    flex: 1 1 auto;
+  }
+
+  // frame 绝对铺满 hero 盒：高度交给 flex 算，不再由照片高度决定
+  .hair__hero-frame {
+    position: absolute;
+    inset: 0;
+  }
+
+  // 直出的照片改吃满相框（仍是 widthFix + 顶对齐：按宽铺满、超出裁底，不裁脸）
+  .hair__photo {
+    height: 100%;
+  }
+
+  // 导语 / 性别分段 / 方向卡 / 失败块 / 主按钮按内容排布，不参与压缩（余量只给 hero）
+  .hair__hint,
+  .hair__gender,
+  .hair__cards,
+  .hair__failed,
+  .hair__foot {
+    flex: none;
   }
 }

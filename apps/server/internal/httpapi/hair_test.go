@@ -13,17 +13,23 @@ import (
 	"github.com/zhanshimian/server/internal/service/hair"
 )
 
-// fakeHairService 记录调用形状（过滤器、次数），返回固定预览。
+// fakeHairService 记录调用形状（过滤器、方向、次数），返回固定预览。
 type fakeHairService struct {
 	mu          sync.Mutex
 	createCalls int
 	lastFilter  hair.ListFilter
+	lastInput   hair.CreatePreviewInput
 }
 
 func (f *fakeHairService) CreatePreview(_ context.Context, userID string, input hair.CreatePreviewInput) (hair.Preview, domain.OperationRef, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.createCalls++
+	f.lastInput = input
+	// 与生产 service 同规则：自定义方向必须带描述
+	if input.StyleID == hair.CustomDirectionID && input.Direction == "" {
+		return hair.Preview{}, domain.OperationRef{}, hair.ErrDirectionInvalid
+	}
 	preview := hair.Preview{
 		ID: "11111111-1111-1111-1111-111111111111", StyleID: input.StyleID, State: hair.StateQueued,
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
@@ -87,6 +93,24 @@ func TestCreateHairPreviewRequiresIdempotencyKey(t *testing.T) {
 	if fake.createCalls != 1 {
 		t.Fatalf("create calls = %d, want 1 (idempotent replay)", fake.createCalls)
 	}
+}
+
+// 方向描述要原样进服务层（展示名 + 生成提示词），自定义方向缺描述按 400 拒绝。
+func TestCreateHairPreviewPassesDirection(t *testing.T) {
+	fake, api := newHairHTTP(t)
+
+	res := api.Do(http.MethodPost, "/v1/hair-previews",
+		`{"media_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","style_id":"custom","direction":"两侧推短，顶部留一点长度"}`,
+		map[string]string{"Idempotency-Key": "hair-direction"})
+	assertStatus(t, res, 202)
+	if fake.lastInput.Direction != "两侧推短，顶部留一点长度" || fake.lastInput.StyleID != "custom" {
+		t.Fatalf("direction 未透传: %#v", fake.lastInput)
+	}
+
+	res = api.Do(http.MethodPost, "/v1/hair-previews",
+		`{"media_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","style_id":"custom"}`,
+		map[string]string{"Idempotency-Key": "hair-direction-empty"})
+	assertError(t, res, 400, "validation_error", false)
 }
 
 func TestListHairPreviewsQueryFilters(t *testing.T) {

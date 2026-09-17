@@ -31,10 +31,11 @@ func (a *API) createHairPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
-		MediaID  string `json:"media_id"`
-		StyleID  string `json:"style_id"`
-		ReportID string `json:"report_id"`
-		Scene    string `json:"scene"` // 契约选填；当前不影响生成，收下即忽略
+		MediaID   string `json:"media_id"`
+		StyleID   string `json:"style_id"`
+		Direction string `json:"direction"` // 方向名/自定义描述（≤40 字）
+		ReportID  string `json:"report_id"`
+		Scene     string `json:"scene"` // 契约选填；当前不影响生成，收下即忽略
 	}
 	if err := decodeJSON(r, &input); err != nil {
 		writeError(w, r, http.StatusBadRequest, "validation_error", err.Error())
@@ -42,9 +43,14 @@ func (a *API) createHairPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	preview, operation, err := a.hair.CreatePreview(r.Context(), currentUser(r).ID, hair.CreatePreviewInput{
 		ReportID: input.ReportID, MediaAssetID: input.MediaID, StyleID: input.StyleID,
+		Direction: input.Direction,
 	})
 	if errors.Is(err, hair.ErrFaceMissing) {
 		writeError(w, r, http.StatusBadRequest, "validation_error", "发型预览需要一张正脸照")
+		return
+	}
+	if errors.Is(err, hair.ErrDirectionInvalid) {
+		writeError(w, r, http.StatusBadRequest, "validation_error", "方向描述不超过 40 个字；自定义方向需要一句话描述")
 		return
 	}
 	if err != nil {

@@ -1289,6 +1289,11 @@ export interface components {
             note?: string;
             reason?: string;
             tags?: string[];
+            /**
+             * @description 该方向面向的性别；unisex 在两侧都出现（选填，缺省按 unisex）
+             * @enum {string}
+             */
+            gender?: "women" | "men" | "unisex";
         };
         HairPreview: {
             /** Format: uuid */
@@ -2971,8 +2976,10 @@ export interface operations {
                 "application/json": {
                     /** @description 正脸照媒体 ID（选填；与 report_id 至少其一。缺省时回退 report 关联档案正脸） */
                     media_id?: string;
-                    /** @description 发型 ID（来自 GET /v1/hairstyles） */
+                    /** @description 发型 ID（来自 GET /v1/hairstyles）；自定义方向固定传 custom */
                     style_id: string;
+                    /** @description 方向名或用户自定义描述（选填，≤40 字）；目录未收录该 style_id 时作为生成提示词与展示名，style_id=custom 时必填 */
+                    direction?: string;
                     /** @description 关联报告（选填；media_id 缺省时作为正脸照来源） */
                     report_id?: string;
                     /** @description 场景（选填） */

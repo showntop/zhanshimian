@@ -8,6 +8,8 @@ export const STORAGE_KEYS = {
   uiSchemaVersion: 'zsm_ui_schema_version',
   compareHint: 'zsm_compare_hint',  city: 'zsm_city',
   openCreditSheet: 'zsm_open_credit_sheet',
+  // 发型方向的性别分段（女士/男士）：只是「上次看的那一侧」，不改变任何业务事实
+  hairGender: 'zsm_hair_gender',
 } as const
 
 /** UI 偏好 key：schema 版本变化时只清这些，不迁移任何业务值。 */
@@ -15,6 +17,7 @@ const UI_PREFERENCE_KEYS = [
   'compareHint',
   'city',
   'openCreditSheet',
+  'hairGender',
 ] as const satisfies readonly (keyof typeof STORAGE_KEYS)[]
 
 /** 与 UI 偏好结构绑定的版本号；改动偏好语义时手动 +1。 */

@@ -3,10 +3,22 @@
 // S3 效果图（长按看原图）。生成历史在结果页底部横滑回放，「换个方向」不再丢结果。
 // 预览是异步受理（202 + 公开 Operation）；恢复先问服务端 /v1/hair-previews/active，
 // 端点异常退回列表；没有进行中则回放最近一次成果（list 新到旧）。
-import { useCallback, useEffect, useRef, useState } from 'react'
+//
+// S1 方向：先按性别分段（女士/男士），再在横滑卡里选方向，末尾一张「自定义」卡
+// 让用户自己写一句话。方向名随创建请求的 direction 上送——它就是生成提示词，
+// 所以「选了哪个方向」和「生成出来的样子」是同一件事（目录未收录时尤其如此）。
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
-import { Image, ScrollView, Text, View } from '@tarojs/components'
-import { HAIR_COPY, LOCAL_LOOK_SLUGS, type DisplayMedia, type HairPreview, type HairStyle } from '@zsm/core'
+import { Image, ScrollView, Text, Textarea, View } from '@tarojs/components'
+import {
+  CUSTOM_DIRECTION_ID,
+  HAIR_COPY,
+  hairDirectionViews,
+  type DisplayMedia,
+  type HairGender,
+  type HairPreview,
+  type HairStyle
+} from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { peripherals } from '../../../../app/api/peripherals'
 import { qualityApi } from '../../../../app/api/quality'
@@ -16,8 +28,11 @@ import { normalizeUploadableImage, readLocalImage } from '../../../../features/c
 import { resourceCache, resourceKey } from '../../../../app/cache/resource-cache'
 import { useOperationPolling } from '../../../../app/operations/use-operation-polling'
 import { handleBillingError } from '../../../../services/billing'
+import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
 import AppHeader from '../../../../components/app-header'
 import { useDisplayablePath } from '../../../../hooks/use-displayable-path'
+import BottomSheet from '../../../../components/bottom-sheet'
+import Pill from '../../../../components/pill'
 import PrimaryButton from '../../../../components/primary-button'
 import SourceImage from '../../../../components/source-image'
 import './index.scss'
@@ -25,16 +40,19 @@ import './index.scss'
 const IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
 // 空态的正脸拍照示范（包内资产，JPEG）
 const FACE_GUIDE_IMAGE = '/assets/capture/face.jpg'
-// 服务端目录缺席时的兜底三款；desc 是选中前的差异依据（缩略图看不清发型差别）
-const STYLES = [
-  { id: 'sharp', name: '锁骨层次发', tag: '中长 · 层次', desc: '修饰脸型线条，利落不挑人' },
-  { id: 'warm', name: '空气微卷', tag: '微卷 · 蓬松', desc: '蓬松显发量，柔和日常感' },
-  { id: 'natural', name: '自然偏分', tag: '偏分 · 利落', desc: '干净利落，省心百搭' },
-] as const
+// 无参考图方向用的线性图标（男士方向没有包内模特图，不借女模特的图冒充）
+const HAIR_ICON = '/assets/icons/tool-hair.png'
+// 自定义描述字数上限（服务端同一上限 40 字）
+const CUSTOM_MAX = 40
+const GENDERS: readonly { id: HairGender; label: string }[] = [
+  { id: 'women', label: HAIR_COPY.genderWomen },
+  { id: 'men', label: HAIR_COPY.genderMen }
+]
 
 // hero 照片统一「直出」：单层真图，永远按宽铺满、顶对齐、底部越界裁切——
-// 不给 frameAspect（不出现「按高铺满裁两侧」），横构图照片出矮横幅、竖构图出
-// 长竖幅，任何入图都不裁脸。框高完全随图（容器 height:auto）。
+// 不给 frameAspect（不出现「按高铺满裁两侧」），任何入图都不裁脸。
+// 框高：结果态随图（容器 height:auto）；输入态由一屏剩余高度决定（.hair--form），
+// 竖版正脸照超出相框的下半截裁掉，导语/方向卡/主按钮因此留在首屏。
 function HeroPhoto(props: { media?: DisplayMedia | null; localPath?: string }) {
   const { media, localPath } = props
   // 工具新渲染层按 CORS 拦截 http://tmp/：本地路径渲染前换出（真机原样）
@@ -53,6 +71,14 @@ function HeroPhoto(props: { media?: DisplayMedia | null; localPath?: string }) {
 export default function Hair() {
   const [styles, setStyles] = useState<HairStyle[]>([])
   const [styleId, setStyleId] = useState<string>('sharp')
+  // 方向按性别分组：选过一次就记住（本地只是 UI 偏好，业务事实仍在服务端）
+  const [gender, setGender] = useState<HairGender>(() =>
+    readStorage(STORAGE_KEYS.hairGender) === 'men' ? 'men' : 'women'
+  )
+  // 自定义方向：文本已生效，draft 是弹层里的草稿（点了生成才落到 customText）
+  const [customText, setCustomText] = useState('')
+  const [customDraft, setCustomDraft] = useState('')
+  const [customOpen, setCustomOpen] = useState(false)
   const [preview, setPreview] = useState<HairPreview | null>(null)
   // 生成历史（新到旧）：结果页底部横滑回放，「换个方向」的结果都留在这里
   const [history, setHistory] = useState<HairPreview[]>([])
@@ -75,12 +101,45 @@ export default function Hair() {
     setHistory((prev) => [item, ...prev.filter((p) => p.id !== item.id)])
   }
 
+  // 这一侧的方向列表：服务端目录优先，缺项由包内目录补齐（当前 baseline 没有
+  // 目录表，所以实际上就是包内目录 + 性别过滤）
+  const directions = useMemo(() => hairDirectionViews(gender, styles), [gender, styles])
+  const customActive = styleId === CUSTOM_DIRECTION_ID
+  const activeDirection = directions.find((item) => item.id === styleId)
+
+  // 选中项必须落在当前这一侧：切性别、服务端目录换 id 都在这里校正（不留隐形选中）
+  useEffect(() => {
+    if (styleId === CUSTOM_DIRECTION_ID) return
+    if (directions.some((item) => item.id === styleId)) return
+    const first = directions[0]
+    if (first) setStyleId(first.id)
+  }, [directions, styleId])
+
+  // 自定义方向与性别无关：切性别时它保持选中，其余情况切到新一侧的第一个方向
+  const switchGender = (next: HairGender) => {
+    if (next === gender) return
+    setGender(next)
+    writeStorage(STORAGE_KEYS.hairGender, next)
+  }
+
+  const openCustom = () => {
+    setCustomDraft(customText)
+    setCustomOpen(true)
+  }
+
+  // 恢复/回放历史时把方向一起带回来：自定义方向从 style_name 还原（服务端存的就是
+  // 那句描述），目录方向按 id 选中（不落在当前一侧时由上面的校正 effect 兜底）
+  const adoptDirection = (item: HairPreview) => {
+    if (!item.style_id) return
+    if (item.style_id === CUSTOM_DIRECTION_ID && item.style_name) setCustomText(item.style_name)
+    setStyleId(item.style_id)
+  }
+
   const loadOptions = useCallback(async () => {
     setLoading(true)
     try {
       const items = await peripherals.listHairstyles()
       setStyles(items)
-      if (items[0]) setStyleId(items[0].id)
     } catch {
       setStyles([])
     } finally {
@@ -91,7 +150,7 @@ export default function Hair() {
   const loadPreview = useCallback(async (id: string) => {
     const item = await peripherals.getHairPreview(id)
     setPreview(item)
-    if (item.style_id) setStyleId(item.style_id)
+    adoptDirection(item)
     touchHistory(item)
     return item
   }, [])
@@ -104,7 +163,7 @@ export default function Hair() {
       // 用户已经选了新照片：旧任务（含进行中）一概不接管页面
       if (freshIntentRef.current) return
       setPreview(item)
-      if (item.style_id) setStyleId(item.style_id)
+      adoptDirection(item)
     }
     let list: HairPreview[] | null = null
     try {
@@ -194,8 +253,19 @@ export default function Hair() {
     })
   }
 
-  const generate = async (demo = false) => {
+  /**
+   * direction 是方向事实：目录收录的风格用它上屏（目录名）与服务端对照，
+   * 目录没收录（自定义方向、目录表缺失）时它就是唯一的生成依据——
+   * 服务端把它直接拼进提示词（见 service/hair previewPrompt）。
+   */
+  const generate = async (demo = false, directionOverride?: string) => {
     if (busy) return
+    const direction = (directionOverride ?? (customActive ? customText : activeDirection?.name ?? '')).trim()
+    if (customActive && !direction) {
+      // 自定义方向没有描述：退回输入层，而不是发一个空方向
+      openCustom()
+      return
+    }
     setBusy(true)
     try {
       let mediaId: string | undefined
@@ -218,6 +288,7 @@ export default function Hair() {
         media_id: mediaId,
         report_id: fallbackReportId,
         style_id: styleId,
+        direction,
       })
       resourceCache.write(resourceKey('operation', accepted.operation.id), accepted.operation)
       setPreview(accepted.data)
@@ -228,6 +299,17 @@ export default function Hair() {
     } finally {
       setBusy(false)
     }
+  }
+
+  // 自定义描述的提交：先落成当前方向，再拿它去生成（setState 是异步的，
+  // 所以文本显式传给 generate，不靠下一次渲染）
+  const submitCustom = () => {
+    const text = customDraft.trim()
+    if (!text || busy) return
+    setCustomText(text)
+    setStyleId(CUSTOM_DIRECTION_ID)
+    setCustomOpen(false)
+    void generate(false, text)
   }
 
   const save = async () => {
@@ -245,11 +327,13 @@ export default function Hair() {
   // 历史卡切换：结果都留着，点哪张回放哪张
   const adoptFromHistory = (item: HairPreview) => {
     setPreview(item)
-    if (item.style_id) setStyleId(item.style_id)
+    adoptDirection(item)
     if (item.state === 'ready' && !item.media) void loadPreview(item.id)
   }
 
-  const styleName = preview?.style_name || STYLES.find((s) => s.id === styleId)?.name || ''
+  // 当前方向的展示名：结果态以服务端为准（历史回放也是它），未生成时用选中的方向
+  const directionName = customActive ? customText : activeDirection?.name ?? ''
+  const styleName = preview?.style_name || directionName
   const hasResult = preview?.state === 'ready' && Boolean(preview?.media)
   const generating = running
   const failed = preview?.state === 'failed' || preview?.state === 'unavailable'
@@ -259,16 +343,23 @@ export default function Hair() {
   const failedOperation = operations.find((operation) => operation.status === 'failed')
   const failureText = failedOperation?.public_message || HAIR_COPY.generateFailed
   const readyHistory = history.filter((item) => item.state === 'ready' && item.media)
-  const styleOptions: HairStyle[] = styles.length > 0
-    ? styles
-    : STYLES.map((s) => ({ id: s.id, name: s.name, media: undefined, reason: s.desc } as unknown as HairStyle))
-  const activeDesc =
-    styleOptions.find((o) => o.id === styleId)?.reason || HAIR_COPY.desc
+  const activeDesc = (customActive ? customText : activeDirection?.desc) || HAIR_COPY.desc
+  // 卡面只有一行 tag 的宽度：自定义描述在卡上截断，完整文本在结果判词/输入层里
+  const customCardLabel = customActive && customText
+    ? (customText.length > 8 ? `${customText.slice(0, 8)}…` : customText)
+    : HAIR_COPY.customCardHint
+  const primaryText = generating
+    ? HAIR_COPY.generating
+    : needsPhoto
+      ? HAIR_COPY.uploadTitle
+      : customActive
+        ? (customText ? HAIR_COPY.customCta : HAIR_COPY.customName)
+        : `生成「${directionName}」预览`
 
   return (
     <View className={pageClass}>
       <AppHeader title="发型设计" back onPhoto />
-      <View className={`hair${hasResult ? ' hair--done' : ''}`}>
+      <View className={`hair${hasResult ? ' hair--done' : ' hair--form'}`}>
         {/* S3 结果态相框拉高成竖幅：竖版生成图近乎满框，不再挤成中间一条 */}
         <View
           className={`hair__hero photo-hero photo-hero--bleed${hasResult ? ' hair__hero--done' : ''} ${enter()}`}
@@ -411,35 +502,64 @@ export default function Hair() {
               <Text className="hair__hint-desc">{activeDesc}</Text>
             </View>
 
-            {/* S1 方向卡：图 + 名 + 差异标签 + 一句适合谁，选中前的差异全部前置 */}
+            {/* S1 性别分段：方向目录按性别分组，先选这一侧再看方向 */}
+            <View className={`hair__gender ${enter(2)}`}>
+              <Text className="hair__gender-label">{HAIR_COPY.genderLabel}</Text>
+              <View className="hair__gender-pills">
+                {GENDERS.map((item) => (
+                  <Pill
+                    key={item.id}
+                    label={item.label}
+                    active={gender === item.id}
+                    onClick={() => !busy && switchGender(item.id)}
+                  />
+                ))}
+              </View>
+            </View>
+
+            {/* S1 方向卡：图 + 名 + 差异标签 + 一句适合谁，选中前的差异全部前置；
+                末尾一张「自定义」卡：没有合适的方向时用自己的话描述 */}
             <ScrollView scroll-x enhanced showScrollbar={false} className={`hair__cards ${enter(2)}`}>
               <View className="hair__cards-rail">
-                {styleOptions.map((opt) => {
-                  const tag = STYLES.find((s) => s.id === opt.id)?.tag
-                  const desc = opt.reason || STYLES.find((s) => s.id === opt.id)?.desc
-                  return (
-                    <View
-                      key={opt.id}
-                      className={`hair__card${styleId === opt.id ? ' hair__card--active' : ''} pressable`}
-                      onClick={() => setStyleId(opt.id)}
-                    >
-                      {opt.media ? (
-                        <SourceImage className="hair__card-img" media={opt.media} anchor="top" />
-                      ) : (
-                        <SourceImage
-                          className="hair__card-img"
-                          reference={{ slug: (LOCAL_LOOK_SLUGS as readonly string[]).includes(opt.id) ? opt.id : 'sharp', variant: 'hair' }}
-                          anchor="top"
-                        />
-                      )}
-                      <View className="hair__card-body">
-                        <Text className="hair__card-name">{opt.name}</Text>
-                        {tag ? <Text className="hair__card-tag">{tag}</Text> : null}
-                        {desc ? <Text className="hair__card-desc">{desc}</Text> : null}
+                {directions.map((opt) => (
+                  <View
+                    key={opt.id}
+                    className={`hair__card${styleId === opt.id ? ' hair__card--active' : ''} pressable`}
+                    onClick={() => setStyleId(opt.id)}
+                  >
+                    {opt.media ? (
+                      <SourceImage className="hair__card-img" media={opt.media} anchor="top" />
+                    ) : opt.slug ? (
+                      <SourceImage
+                        className="hair__card-img"
+                        reference={{ slug: opt.slug, variant: 'hair' }}
+                        anchor="top"
+                      />
+                    ) : (
+                      // 没有参考图的方向出文本卡：不借别人性别的模特图
+                      <View className="hair__card-blank">
+                        <Image className="hair__card-blank-icon" src={HAIR_ICON} mode="aspectFit" />
                       </View>
+                    )}
+                    <View className="hair__card-body">
+                      <Text className="hair__card-name">{opt.name}</Text>
+                      {opt.tag ? <Text className="hair__card-tag">{opt.tag}</Text> : null}
+                      {opt.desc ? <Text className="hair__card-desc">{opt.desc}</Text> : null}
                     </View>
-                  )
-                })}
+                  </View>
+                ))}
+                <View
+                  className={`hair__card hair__card--custom${customActive ? ' hair__card--active' : ''} pressable`}
+                  onClick={() => !busy && openCustom()}
+                >
+                  <View className="hair__card-blank">
+                    <Text className="hair__card-blank-plus">＋</Text>
+                  </View>
+                  <View className="hair__card-body">
+                    <Text className="hair__card-name">{HAIR_COPY.customName}</Text>
+                    <Text className="hair__card-tag">{customCardLabel}</Text>
+                  </View>
+                </View>
               </View>
             </ScrollView>
 
@@ -455,9 +575,13 @@ export default function Hair() {
 
             <View className={`hair__foot hair__foot--inline ${enter(3)}`}>
               <PrimaryButton
-                text={generating ? HAIR_COPY.generating : needsPhoto ? HAIR_COPY.uploadTitle : `生成「${styleName}」预览`}
+                text={primaryText}
                 loading={busy || generating}
-                onClick={() => void generate(false)}
+                onClick={() => {
+                  // 自定义方向还没写描述时，按钮的下一步是「写描述」而不是发请求
+                  if (customActive && !customText) openCustom()
+                  else void generate(false)
+                }}
               />
               {needsPhoto ? (
                 <View className="hair__foot-row">
@@ -470,6 +594,37 @@ export default function Hair() {
           </>
         )}
       </View>
+
+      {/* 自定义方向的输入层：文字描述直接当方向名与提示词（≤40 字，服务端同限） */}
+      <BottomSheet
+        open={customOpen}
+        title={HAIR_COPY.customTitle}
+        onClose={() => setCustomOpen(false)}
+      >
+        <View className="hair__custom-sheet">
+          <Text className="hair__custom-label">{HAIR_COPY.customLabel}</Text>
+          <Textarea
+            className="hair__custom-input"
+            value={customDraft}
+            maxlength={CUSTOM_MAX}
+            placeholder={HAIR_COPY.customPlaceholder}
+            onInput={(event) => setCustomDraft(event.detail.value)}
+          />
+          <View className="hair__custom-meta">
+            <Text className="hair__custom-helper">{HAIR_COPY.customHelper}</Text>
+            <Text className="hair__custom-count">
+              {customDraft.length >= CUSTOM_MAX ? HAIR_COPY.customTooLong : `${customDraft.length}/${CUSTOM_MAX}`}
+            </Text>
+          </View>
+          <PrimaryButton
+            text={HAIR_COPY.customCta}
+            disabled={!customDraft.trim() || busy}
+            loading={busy}
+            onClick={submitCustom}
+          />
+          {!customDraft.trim() ? <Text className="hair__custom-empty">{HAIR_COPY.customEmpty}</Text> : null}
+        </View>
+      </BottomSheet>
     </View>
   )
 }

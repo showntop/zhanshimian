@@ -2,7 +2,11 @@ package hair
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/zhanshimian/server/internal/domain"
 )
@@ -44,6 +48,45 @@ type CreatePreviewInput struct {
 	ReportID     string
 	MediaAssetID string
 	StyleID      string
+	// Direction 是方向名或用户自定义描述（契约 direction，≤DirectionMaxRunes 字）。
+	// 目录收录该风格时以目录名为准；未收录（当前 baseline 没有 hairstyles 表）时
+	// 它同时是展示名与生成提示词。
+	Direction string
+}
+
+// DirectionMaxRunes 是方向描述的字数上限，与契约 maxLength 同一取值。
+const DirectionMaxRunes = 40
+
+// CustomDirectionID 是自定义方向的 style_id（不在目录里，方向名由用户写）。
+const CustomDirectionID = "custom"
+
+// ErrDirectionInvalid 表示方向描述不可用：超长，或自定义方向没写描述。
+var ErrDirectionInvalid = errors.New("hair direction invalid")
+
+// NormalizeDirection 归一化方向描述后返回：去首尾空白、折叠换行与连续空格、
+// 去掉零宽字符，并限长 DirectionMaxRunes 字。空串合法（表示这次没写方向）。
+//
+// 这段文本会进生成提示词（见 previewPrompt）：提示词是单行结构，换行与「」会破坏
+// 它，所以在这里一次清干净，而不是靠调用方自觉。
+func NormalizeDirection(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", nil
+	}
+	cleaned := strings.Map(func(r rune) rune {
+		switch {
+		case r == '\n' || r == '\r' || r == '\t' || r == '「' || r == '」':
+			return ' '
+		case unicode.IsControl(r) || r == '\u200b' || r == '\ufeff':
+			return -1
+		}
+		return r
+	}, trimmed)
+	cleaned = strings.Join(strings.Fields(cleaned), " ")
+	if utf8.RuneCountInString(cleaned) > DirectionMaxRunes {
+		return "", ErrDirectionInvalid
+	}
+	return cleaned, nil
 }
 
 // ListFilter 是 GET /v1/hair-previews 的契约过滤：无参返回全部历史，
@@ -99,14 +142,30 @@ func New(reader Reader, writer Writer, runner RunCreator, hairstyler Hairstyler,
 // 响应里 media 永远为 null：图像生成落库前不可见。
 // 正脸来源：客户端显式上传的 media_id 优先（demo 照片按 demo_example 投影），
 // 否则回退报告建档 face；两者都没有时报 ErrFaceMissing。
+// 方向：目录收录的 style_id 用目录名（服务端权威）；未收录时用 direction——
+// 自定义方向（style_id=custom）则必须带 direction，否则 ErrDirectionInvalid。
 func (s *Service) CreatePreview(ctx context.Context, userID string, input CreatePreviewInput) (Preview, domain.OperationRef, error) {
+	direction, err := NormalizeDirection(input.Direction)
+	if err != nil {
+		return Preview{}, domain.OperationRef{}, err
+	}
+	styleID := input.StyleID
+	styleName := s.styleName(ctx, userID, styleID)
+	if styleName == "" {
+		if styleID == CustomDirectionID && direction == "" {
+			return Preview{}, domain.OperationRef{}, ErrDirectionInvalid
+		}
+		// 目录未收录（当前 baseline 没有 hairstyles 表）：客户端下发的方向名/自定义
+		// 描述就是这次生成的唯一方向事实，展示名与提示词同源。
+		styleName = direction
+	}
 	source, sourceAssetID, sourceObjectKey, err := s.resolveFace(ctx, userID, input)
 	if err != nil {
 		return Preview{}, domain.OperationRef{}, err
 	}
 	preview, operation, err := s.runner.CreateHairPreviewRun(ctx, userID, CreateRunParams{
-		StyleID:       input.StyleID,
-		StyleName:     s.styleName(ctx, userID, input.StyleID),
+		StyleID:       styleID,
+		StyleName:     styleName,
 		SourceAssetID: sourceAssetID,
 		MaxAttempts:   TaskMaxAttempts,
 	})

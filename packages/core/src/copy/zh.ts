@@ -560,7 +560,21 @@ export const HAIR_COPY = {
   changePhoto: '换一张照片',
   retry: '再试一次',
   generateFailed: '生成没有完成，请重试',
-  generateStart: '生成没有开始，请重试'
+  generateStart: '生成没有开始，请重试',
+  // 性别分段：方向按性别分组，男女各有各的目录（unisex 两侧都出现）
+  genderLabel: '按性别看方向',
+  genderWomen: '女士',
+  genderMen: '男士',
+  // 自定义方向：用户自己写一句话当方向（≤40 字，服务端同样校验）
+  customName: '自定义',
+  customCardHint: '用一句话描述',
+  customTitle: '说说你想要的样子',
+  customLabel: '你想要的发型',
+  customPlaceholder: '比如：两侧推短，顶部留一点长度',
+  customHelper: '越具体越好；只改发型，脸和衣服不会变',
+  customCta: '用这个描述生成',
+  customEmpty: '先写一句你想要的样子',
+  customTooLong: '描述最多 40 个字'
 } as const
 
 export const ADVISOR_COPY = {
