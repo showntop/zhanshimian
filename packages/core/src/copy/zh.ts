@@ -467,6 +467,7 @@ export const REPORT_COPY = {
   findingsTitle: '可提升点',
   emptyFindings: '这次没有必须调整的项目，可以按方案逐步尝试。',
   viewPlans: '查看我的 3 套方案',
+  generatePlans: '生成我的 3 套方案',
   viewPlansNote: '方案基于你的照片与现实条件生成',
   noReportTitle: '还没有形象报告',
   noReportBody: '拍三张照片，几分钟拿到你的第一份形象分析。',

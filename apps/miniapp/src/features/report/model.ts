@@ -8,11 +8,14 @@ import type {
   CreatePlanSetRequest,
   DisplayMedia,
   Operation,
+  PlanSet,
   Report,
   ReportFinding,
 } from '@zsm/core'
 // 带 .ts 后缀的值导入：这个文件被 node --test 直接加载（测试跑的是真实现，不是替身），
 // 而 Node 的 ESM 解析不做后缀补全。类型导入是纯类型、编译期就没了，按包内习惯省略后缀。
+import { createIdempotencyKey } from '../../app/keys.ts'
+import { planSetView } from '../planning/model.ts'
 import { operationView } from '../../app/operations/operation-view.ts'
 import type { PlanSetHandoff } from '../../app/plan-set-handoff'
 import type { PlanSetStart } from '../../app/api/quality'
@@ -139,6 +142,31 @@ export function reportPlanSetRequest(reportId: string): CreatePlanSetRequest {
  */
 export function reportPlanSetIdempotencyKey(reportId: string): string {
   return `plan-set:${reportId}`
+}
+
+/**
+ * 报告页方案 CTA 的状态：按钮说「查看」还是「生成」，取决于这份报告的
+ * general 方案集有没有可看的目标——报告刚出来时什么都没有，
+ * 说「查看」却触发生成是在骗点击。判定复用方案集视图规则（planning/rendering/
+ * ready/ready_partial 都算可看，failed 扣掉带已发布文字的假失败）。
+ */
+export type ReportPlansCtaState = 'view' | 'generate' | 'retry'
+
+export function reportPlansCtaState(
+  planSets: ReadonlyArray<Pick<PlanSet, 'state' | 'variants'>>,
+): ReportPlansCtaState {
+  if (planSets.some((planSet) => planSetView(planSet).kind !== 'failed')) return 'view'
+  return planSets.length > 0 ? 'retry' : 'generate'
+}
+
+/**
+ * CTA 状态 → 幂等键。view / generate 用固定键（复用与首次受理各归其位）；
+ * retry 不能用旧键——固定键在服务端会被原样重放同一份失败（24h 内），
+ * 「重新生成」必须换新键，与方案页 retry marker 是同一条规则。
+ */
+export function reportPlansIdempotencyKey(reportId: string, cta: ReportPlansCtaState): string {
+  const base = reportPlanSetIdempotencyKey(reportId)
+  return cta === 'retry' ? createIdempotencyKey(base) : base
 }
 
 /**

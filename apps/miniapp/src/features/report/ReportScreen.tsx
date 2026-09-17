@@ -38,9 +38,11 @@ import {
   reportFindingsOnRole,
   reportPhotoForFinding,
   reportPlanSetHandoff,
-  reportPlanSetIdempotencyKey,
+  reportPlansCtaState,
+  reportPlansIdempotencyKey,
   reportPlanSetRequest,
   reportSourcePhoto,
+  type ReportPlansCtaState,
   type ReportRole,
 } from './model'
 import './index.scss'
@@ -88,6 +90,10 @@ export default function ReportScreen({ reportId, onReady, enter = staticEnter }:
   const [activeFindingId, setActiveFindingId] = useState<string | null>(null)
   const [photoDims, setPhotoDims] = useState<Partial<Record<ReportRole, { w: number; h: number }>>>({})
   const [planning, setPlanning] = useState(false)
+  // CTA 说「查看」还是「生成」：取决于这份报告的 general 方案集有没有可看的目标。
+  // 默认 generate——报告刚出来的常态就是什么都没有，对账只是确认；
+  // 有方案的老用户会在这里被 listPlanSets 翻成 view。
+  const [plansCta, setPlansCta] = useState<ReportPlansCtaState>('generate')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -96,7 +102,14 @@ export default function ReportScreen({ reportId, onReady, enter = staticEnter }:
       const result = reportId
         ? await qualityApi.getReport(reportId)
         : await qualityApi.getCurrentReport()
-      if (result) resourceCache.write(resourceKey('report', result.id), result)
+      if (result) {
+        resourceCache.write(resourceKey('report', result.id), result)
+        // CTA 状态对账（失败不拆页，回到「生成」语义——宁可少承诺不冒充可看）
+        void qualityApi
+          .listPlanSets(result.id, 'general')
+          .then((sets) => setPlansCta(reportPlansCtaState(sets)))
+          .catch(() => setPlansCta('generate'))
+      }
       setReport(result)
       setActiveRole(defaultReportRole(result))
       setActiveFindingId(null)
@@ -133,14 +146,15 @@ export default function ReportScreen({ reportId, onReady, enter = staticEnter }:
     if (reportPhotoForFinding(report, finding) !== null) setActiveRole(finding.source_photo.role)
   }
 
-  /** 「查看方案」：受理 → 交接条 → 方案 tab。幂等键绑报告 id，重复点击复用同一份方案集。 */
+  /** 「查看 / 生成方案」：受理 → 交接条 → 方案 tab。幂等键跟 CTA 状态走——
+   *  复用与首次受理用固定键，全失败后的重新生成换新键（旧键只会重放同一份失败）。 */
   const viewPlans = async () => {
     if (!report || planning) return
     setPlanning(true)
     try {
       const start = await qualityApi.createPlanSet(
         reportPlanSetRequest(report.id),
-        reportPlanSetIdempotencyKey(report.id),
+        reportPlansIdempotencyKey(report.id, plansCta),
       )
       writePlanSetHandoff(reportPlanSetHandoff(start))
       await Taro.switchTab({ url: PLANS_ROUTE })
@@ -376,7 +390,7 @@ export default function ReportScreen({ reportId, onReady, enter = staticEnter }:
       {/* ---------- 下一步 ---------- */}
       <View className={`report-screen__cta ${enter(2)}`}>
         <PrimaryButton
-          text={REPORT_COPY.viewPlans}
+          text={plansCta === 'view' ? REPORT_COPY.viewPlans : REPORT_COPY.generatePlans}
           loading={planning}
           onClick={() => void viewPlans()}
         />

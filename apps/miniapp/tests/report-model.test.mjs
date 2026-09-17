@@ -9,6 +9,9 @@ import {
   reportFindingsOnRole,
   reportPhotoForFinding,
   reportPlanSetHandoff,
+  reportPlanSetIdempotencyKey,
+  reportPlansCtaState,
+  reportPlansIdempotencyKey,
   reportPlanSetRequest,
   reportRouteAfterOperation,
   reportSourcePhoto,
@@ -94,8 +97,7 @@ test('only a finished report operation yields a report route', () => {
 })
 
 test('view plans asks for one general plan set bound to this report', () => {
-  assert.deepEqual(reportPlanSetRequest('r1'), {
-    report_id: 'r1',
+  assert.deepEqual(reportPlanSetRequest('r1'), {    report_id: 'r1',
     scene: 'general',
     brief: { focus: 'balanced', preparation: 'closet', impression: 'natural' },
   })
@@ -117,6 +119,37 @@ test('plan set handoff carries both ids, and only the id when it was reused', ()
     reportPlanSetHandoff({ accepted: false, planSet: { id: 'ps-1' } }),
     { planSetId: 'ps-1', operationId: null },
   )
+})
+
+test('report plans CTA promises 查看 only when the report has something to view', () => {
+  // 报告刚出来、一份方案集都没有：按钮必须是「生成」——说「查看」却触发生成
+  // 是在骗点击（用户投诉的原案）
+  assert.equal(reportPlansCtaState([]), 'generate')
+  // 规划在途 / 已就绪：有可看的目标 → 查看
+  assert.equal(reportPlansCtaState([{ state: 'planning', variants: [] }]), 'view')
+  assert.equal(reportPlansCtaState([{ state: 'ready', variants: [{ steps: [{}] }] }]), 'view')
+  // 渲染中 / 失败但文字已发布（ready_partial）：内容可看 → 查看
+  assert.equal(reportPlansCtaState([{ state: 'rendering', variants: [{ steps: [{}] }] }]), 'view')
+  assert.equal(reportPlansCtaState([{ state: 'failed', variants: [{ steps: [{}] }] }]), 'view')
+  // 生成过但全真失败（无文字）：没有可看的东西，回到「生成」语义
+  assert.equal(reportPlansCtaState([{ state: 'failed', variants: [] }]), 'retry')
+  assert.equal(
+    reportPlansCtaState([
+      { state: 'failed', variants: [] },
+      { state: 'failed', variants: [{ steps: [] }] },
+    ]),
+    'retry',
+  )
+})
+
+test('retry mints a fresh idempotency key; first attempt and reuse keep the fixed one', () => {
+  // 固定键在服务端会原样重放同一份失败（24h 内）：重试必须换新键——
+  // 与方案页 retry marker 是同一条规则
+  assert.equal(reportPlansIdempotencyKey('r1', 'generate'), reportPlanSetIdempotencyKey('r1'))
+  assert.equal(reportPlansIdempotencyKey('r1', 'view'), reportPlanSetIdempotencyKey('r1'))
+  const retryKey = reportPlansIdempotencyKey('r1', 'retry')
+  assert.notEqual(retryKey, reportPlanSetIdempotencyKey('r1'))
+  assert.ok(retryKey.startsWith(`${reportPlanSetIdempotencyKey('r1')}:`))
 })
 
 test('findings render in server position order, never re-sorted by the client', () => {
