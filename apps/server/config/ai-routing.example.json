@@ -269,9 +269,8 @@
     },
     "hair_edit": {
       "policy": "quality_first",
-      "primary": "siliconflow/kwai-kolors-kolors",
+      "primary": "aliyun/qwen-image-3.0-hair",
       "fallbacks": [
-        "aliyun/qwen-image-3.0-hair",
         "aliyun/qwen-image-edit-plus-hair"
       ],
       "max_cost_cny": 0.6
