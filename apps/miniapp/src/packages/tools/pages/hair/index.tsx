@@ -17,7 +17,8 @@ import {
   type DisplayMedia,
   type HairGender,
   type HairPreview,
-  type HairStyle
+  type HairStyle,
+  type LookSlug
 } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { peripherals } from '../../../../app/api/peripherals'
@@ -48,6 +49,21 @@ const GENDERS: readonly { id: HairGender; label: string }[] = [
   { id: 'women', label: HAIR_COPY.genderWomen },
   { id: 'men', label: HAIR_COPY.genderMen }
 ]
+
+/** 卡面只有一行 tag 的宽度：自定义描述在卡上截断，完整文本留给判词与输入层 */
+const truncateLabel = (text: string): string => (text.length > 8 ? `${text.slice(0, 8)}…` : text)
+
+/** 结果页横滑槽位：目录方向与「目录外的历史」共用一种形状（有 preview = 已生成过） */
+interface ResultSlot {
+  key: string
+  styleId: string
+  name: string
+  tag?: string
+  desc?: string
+  slug?: LookSlug
+  media?: DisplayMedia | null
+  preview?: HairPreview
+}
 
 // hero 照片统一「直出」：单层真图，永远按宽铺满、顶对齐、底部越界裁切——
 // 不给 frameAspect（不出现「按高铺满裁两侧」），任何入图都不裁脸。
@@ -258,10 +274,13 @@ export default function Hair() {
    * 目录没收录（自定义方向、目录表缺失）时它就是唯一的生成依据——
    * 服务端把它直接拼进提示词（见 service/hair previewPrompt）。
    */
-  const generate = async (demo = false, directionOverride?: string) => {
+  const generate = async (demo = false, directionOverride?: string, styleIdOverride?: string) => {
     if (busy) return
-    const direction = (directionOverride ?? (customActive ? customText : activeDirection?.name ?? '')).trim()
-    if (customActive && !direction) {
+    // 卡片点选会连带生成，此时 setStyleId 还没落地：方向 id 显式传进来，不用下一次渲染的状态
+    const targetStyleId = styleIdOverride ?? styleId
+    const isCustom = targetStyleId === CUSTOM_DIRECTION_ID
+    const direction = (directionOverride ?? (isCustom ? customText : activeDirection?.name ?? '')).trim()
+    if (isCustom && !direction) {
       // 自定义方向没有描述：退回输入层，而不是发一个空方向
       openCustom()
       return
@@ -287,7 +306,7 @@ export default function Hair() {
       const accepted = await peripherals.createHairPreview({
         media_id: mediaId,
         report_id: fallbackReportId,
-        style_id: styleId,
+        style_id: targetStyleId,
         direction,
       })
       resourceCache.write(resourceKey('operation', accepted.operation.id), accepted.operation)
@@ -309,7 +328,8 @@ export default function Hair() {
     setCustomText(text)
     setStyleId(CUSTOM_DIRECTION_ID)
     setCustomOpen(false)
-    void generate(false, text)
+    // 自定义方向的 style_id 显式传：状态要下一次渲染才生效，不能等它
+    void generate(false, text, CUSTOM_DIRECTION_ID)
   }
 
   const save = async () => {
@@ -343,11 +363,60 @@ export default function Hair() {
   const failedOperation = operations.find((operation) => operation.status === 'failed')
   const failureText = failedOperation?.public_message || HAIR_COPY.generateFailed
   const readyHistory = history.filter((item) => item.state === 'ready' && item.media)
+
+  // 结果页下半屏的横滑槽位：当前性别的全部方向 + 目录外的历史（换过性别、方向已下架）。
+  // 有结果的方向带生成图（点它回放，不再花一次生成），没试过的带参考图（点它直接生成）——
+  // 4:3 横图只占屏高三分之一，下半屏靠这条轨和固定 CTA 撑住。
+  const resultSlots: ResultSlot[] = useMemo(() => {
+    const slots: ResultSlot[] = directions.map((view) => {
+      const done = readyHistory.find((item) => item.style_id === view.id)
+      return {
+        key: view.id,
+        styleId: view.id,
+        // 自定义方向：卡面写用户那句话的截断版，而不是「自定义」三个字
+        name: view.id === CUSTOM_DIRECTION_ID && done?.style_name ? truncateLabel(done.style_name) : view.name,
+        tag: view.tag,
+        desc: view.desc,
+        slug: view.slug,
+        media: view.media,
+        preview: done,
+      }
+    })
+    for (const item of readyHistory) {
+      if (directions.some((view) => view.id === item.style_id)) continue
+      slots.push({
+        key: item.id,
+        styleId: item.style_id || item.id,
+        name: item.style_name || HAIR_COPY.customName,
+        preview: item,
+      })
+    }
+    return slots
+  }, [directions, readyHistory])
+
+  // 点已试过的方向＝回放（零成本）；点没试过的＝换这个方向重新生成；
+  // 自定义没有现成描述，点了打开输入层（写完「用这个描述生成」）
+  const openSlot = (slot: ResultSlot) => {
+    if (busy || generating) return
+    if (slot.preview) {
+      adoptFromHistory(slot.preview)
+      return
+    }
+    setStyleId(slot.styleId)
+    if (slot.styleId === CUSTOM_DIRECTION_ID) {
+      openCustom()
+      return
+    }
+    void generate(false, slot.name, slot.styleId)
+  }
+
   const activeDesc = (customActive ? customText : activeDirection?.desc) || HAIR_COPY.desc
-  // 卡面只有一行 tag 的宽度：自定义描述在卡上截断，完整文本在结果判词/输入层里
-  const customCardLabel = customActive && customText
-    ? (customText.length > 8 ? `${customText.slice(0, 8)}…` : customText)
-    : HAIR_COPY.customCardHint
+  // 判词说的是「这张结果」：说明与差异标签从结果自己的方向取——
+  // 结果页上选中态可能已经变了，不能用当前选中项的文案冒充
+  const activeSlot = resultSlots.find((slot) => slot.styleId === preview?.style_id)
+  const verdictTag = hasResult ? activeSlot?.tag : undefined
+  const verdictDesc = hasResult ? activeSlot?.desc || HAIR_COPY.desc : activeDesc
+  const customCardLabel = customActive && customText ? truncateLabel(customText) : HAIR_COPY.customCardHint
   const primaryText = generating
     ? HAIR_COPY.generating
     : needsPhoto
@@ -455,38 +524,56 @@ export default function Hair() {
 
         {hasResult ? (
           <>
-            <View className={`hair__verdict ${enter(1)}`}>
-              <Text className="hair__verdict-title serif">{styleName}</Text>
-              <Text className="hair__verdict-desc">{activeDesc}</Text>
-              {/* 生成边界说明：只改发型，其余保持原样（与提示词同一条约束） */}
-              <Text className="hair__verdict-note">{HAIR_COPY.resultNote}</Text>
+            <View className={`hair__verdict card ${enter(1)}`}>
+              <View className="hair__verdict-head">
+                <Text className="hair__verdict-title serif">{styleName}</Text>
+                {verdictTag ? <Text className="hair__verdict-tag">{verdictTag}</Text> : null}
+              </View>
+              <Text className="hair__verdict-desc">{verdictDesc}</Text>
+              <View className="hair__verdict-foot">
+                <Text className="hair__verdict-note">{HAIR_COPY.resultNote}</Text>
+              </View>
             </View>
 
-            {readyHistory.length > 0 ? (
-              // 历史条常显（只有一张时它就是当前结果）：结果页下半屏由它和 CTA 撑住，
-              // 4:3 横图占不满一屏，没有它中间会空一大块
-              <View className={`hair__history ${enter(2)}`}>
-                <Text className="hair__history-label">
-                  {readyHistory.length > 1 ? HAIR_COPY.historyLabel : HAIR_COPY.currentLabel}
-                </Text>
-                <ScrollView scroll-x enhanced showScrollbar={false} className="hair__history-scroll">
-                  <View className="hair__history-rail">
-                    {readyHistory.map((item) => (
-                      <View
-                        key={item.id}
-                        className={`hair__history-card${item.id === preview!.id ? ' hair__history-card--active' : ''} pressable`}
-                        onClick={() => adoptFromHistory(item)}
-                      >
-                        <SourceImage className="hair__history-img" media={item.media} anchor="top" />
-                        <Text className="hair__history-name">{item.style_name}</Text>
+            {/* 换个方向看看：全部方向横铺（已生成的用生成图当缩略图，点回放；
+                没试过的用参考图/文本卡，点直接换方向生成）——「换个方向再试」
+                不再是一句死文案，下半屏也有了真实内容 */}
+            <View className={`hair__turn ${enter(2)}`}>
+              <Text className="hair__turn-label">{HAIR_COPY.directionLabel}</Text>
+              <ScrollView scroll-x enhanced showScrollbar={false} className="hair__cards">
+                <View className="hair__cards-rail">
+                  {resultSlots.map((slot) => (
+                    <View
+                      key={slot.key}
+                      className={`hair__card${slot.styleId === preview!.style_id ? ' hair__card--active' : ''} pressable`}
+                      onClick={() => openSlot(slot)}
+                    >
+                      {slot.preview?.media ? (
+                        <SourceImage className="hair__card-img" media={slot.preview.media} anchor="top" />
+                      ) : slot.media ? (
+                        <SourceImage className="hair__card-img" media={slot.media} anchor="top" />
+                      ) : slot.slug ? (
+                        <SourceImage
+                          className="hair__card-img"
+                          reference={{ slug: slot.slug, variant: 'hair' }}
+                          anchor="top"
+                        />
+                      ) : (
+                        <View className="hair__card-blank">
+                          <Image className="hair__card-blank-icon" src={HAIR_ICON} mode="aspectFit" />
+                        </View>
+                      )}
+                      <View className="hair__card-body">
+                        <Text className="hair__card-name">{slot.name}</Text>
+                        {slot.tag ? <Text className="hair__card-tag">{slot.tag}</Text> : null}
                       </View>
-                    ))}
-                  </View>
-                </ScrollView>
-              </View>
-            ) : null}
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
 
-            {/* CTA 固定底部（竖幅相框会把它挤下屏）：不带 enter——
+            {/* CTA 固定底部（拇指位的主操作，页面滚动时它不动）：不带 enter——
                 fade-up 的 transform 在动画期间会视觉偏移固定栏，穿搭页同此处理 */}
             <View className="hair__foot hair__foot--cta">
               <PrimaryButton
@@ -495,8 +582,9 @@ export default function Hair() {
                 onClick={() => void save()}
               />
               <View className="hair__foot-row">
+                {/* 换方向已经由上面的横滑承担：这条链接只负责「换张照片」这条路 */}
                 <Text className="hair__foot-alt pressable" onClick={() => setPreview(null)}>
-                  {HAIR_COPY.tryAnother}
+                  {HAIR_COPY.retakePhoto}
                 </Text>
               </View>
             </View>

@@ -239,28 +239,51 @@
     }
   }
 
+  // ---------- S3 结果判词卡：方向名 + 差异标签 + 说明 + 边界说明 ----------
+  // 白卡（.card）把「三行飘在底色上的字」收拢成一个有分量的信息块，
+  // 也把「这张结果是什么/为什么/边界在哪」装进同一个容器里。
   &__verdict {
-    display: flex;
-    flex-direction: column;
-    gap: 10rpx;
+    padding: 32rpx 32rpx 24rpx;
+
+    &-head {
+      display: flex;
+      align-items: center;
+      gap: 16rpx;
+    }
 
     // 方向名用 .serif：结果页的仪式感落点，一屏只此一处（红线）
     &-title {
-      font-size: 44rpx;
+      flex: 1;
+      font-size: 46rpx;
       font-weight: 700;
       line-height: 1.26;
       color: var(--ink);
     }
 
+    &-tag {
+      padding: 6rpx 18rpx;
+      border-radius: 999rpx;
+      background: var(--moss-soft);
+      font-size: 20rpx;
+      color: var(--moss);
+      white-space: nowrap;
+    }
+
     &-desc {
-      font-size: 25rpx;
+      margin-top: 12rpx;
+      font-size: 26rpx;
       line-height: 1.6;
       color: var(--ink-2);
     }
 
-    // 结果页边界说明：比判词低一档，读得到但不抢判词
+    // 边界说明：脚注位（发丝线隔开），读得到但不抢判词
+    &-foot {
+      margin-top: 20rpx;
+      padding-top: 18rpx;
+      border-top: 1rpx solid var(--line);
+    }
+
     &-note {
-      margin-top: 4rpx;
       font-size: 22rpx;
       line-height: 1.55;
       color: var(--ink-3);
@@ -376,57 +399,29 @@
     }
   }
 
-  // ---------- 结果页底部历史条 ----------
-  &__history {
+  // ---------- 结果页下半屏：换个方向看看 ----------
+  // 复用 S1 的方向卡（同一形状），卡面换成「已生成的结果图」；整块沉到固定 CTA
+  // 上方——判词紧跟照片，余量落在判词与横滑之间，4:3 横图只占一屏三分之一，
+  // 不压住底部整屏会散成「一条图 + 一片空」。卡比 S1 大一号：下半屏要有分量。
+  &__turn {
     display: flex;
     flex-direction: column;
     gap: 16rpx;
-    // 沉到固定 CTA 上方（判词紧跟照片，余量落在判词与历史条之间）：
-    // 4:3 横图只占一屏三分之一，不压住底部的话整屏会散成「一条图 + 一片空」
     margin-top: auto;
 
     &-label {
-      font-size: 22rpx;
-      color: var(--ink-3);
-    }
-
-    &-scroll {
-      width: 100%;
-      white-space: nowrap;
-    }
-
-    &-rail {
-      display: inline-flex;
-      gap: 16rpx;
-      padding-right: var(--page-gutter);
-      width: max-content;
-    }
-
-    &-card {
-      // 4:3 头肩横框：与发型预览的显示规范（服务端归一化裁切、内置示例）一致，
-      // 生成图 widthFix 后恰好铺满，零裁切
-      width: 200rpx;
-      border-radius: var(--radius-md);
-      overflow: hidden;
-      border: 2rpx solid transparent;
-
-      &--active {
-        border-color: var(--moss);
-      }
-    }
-
-    &-img {
-      width: 100%;
-      height: 150rpx;
-    }
-
-    &-name {
-      display: block;
-      padding: 12rpx 0 4rpx;
-      font-size: 20rpx;
-      text-align: center;
+      font-size: 24rpx;
+      font-weight: 600;
       color: var(--ink-2);
-      white-space: normal;
+    }
+
+    .hair__card {
+      width: 260rpx;
+    }
+
+    .hair__card-img,
+    .hair__card-blank {
+      height: 200rpx;
     }
   }
 

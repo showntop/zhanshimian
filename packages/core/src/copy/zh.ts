@@ -555,12 +555,12 @@ export const HAIR_COPY = {
   holdOriginal: '长按看原图',
   save: '保存这个效果',
   saved: '已存到我的',
-  tryAnother: '换个方向再试',
+  // 换方向由结果页横滑承担；这条链接只负责换照片
+  retakePhoto: '换张照片再试',
   // 结果页边界说明：只改发型，其余保持原样（与提示词的约束同一件事）
   resultNote: '只改了发型；五官、妆容、服装和背景保持原样',
-  historyLabel: '试过的方向',
-  // 只有一张结果时不说「试过的方向」——那就是当前这一张
-  currentLabel: '当前方向',
+  // 结果页下半屏的横滑：全部方向铺开，点了就换（试过的回放、没试过的直接生成）
+  directionLabel: '换个方向看看',
   changePhoto: '换一张照片',
   retry: '再试一次',
   generateFailed: '生成没有完成，请重试',
