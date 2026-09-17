@@ -130,6 +130,7 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		"dashscope_wan":            true,
 		"dashscope_wanx_imageedit": true,
 		"ark_image":                true,
+		"siliconflow_image_edit":   true,
 		"demo_orbit":               true,
 	}
 	structuredCapabilities := map[string]bool{
@@ -203,7 +204,7 @@ func validateAIRouting(routing AIRoutingConfig) error {
 			if structuredCapabilities[capability] && protocol != "openai_responses" && protocol != "openai_chat_completions" {
 				return fmt.Errorf("AI route %q uses image protocol %q", capability, protocol)
 			}
-			if imageCapabilities[capability] && protocol != "openai_image_edit" && protocol != "dashscope_wan" && protocol != "dashscope_wanx_imageedit" && protocol != "ark_image" {
+			if imageCapabilities[capability] && protocol != "openai_image_edit" && protocol != "dashscope_wan" && protocol != "dashscope_wanx_imageedit" && protocol != "ark_image" && protocol != "siliconflow_image_edit" {
 				return fmt.Errorf("AI route %q uses structured protocol %q", capability, protocol)
 			}
 			if videoCapabilities[capability] && protocol != "demo_orbit" {

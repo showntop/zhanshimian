@@ -179,6 +179,24 @@
       ],
       "data_retention": "zero"
     },
+    "siliconflow/kwai-kolors-kolors": {
+      "vendor": "siliconflow",
+      "protocol": "siliconflow_image_edit",
+      "model": "Kwai-Kolors/Kolors",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "api_key_env": "SILICONFLOW_API_KEY",
+      "parameters": {
+        "image_size": "1024x768"
+      },
+      "timeout_seconds": 180,
+      "output_image_cost": 0,
+      "max_input_images": 1,
+      "supports_multiple_reference_images": false,
+      "output_mime_types": [
+        "image/jpeg",
+        "image/png"
+      ]
+    },
     "demo/body-orbit": {
       "vendor": "demo",
       "protocol": "demo_orbit",
@@ -235,8 +253,9 @@
     },
     "hair_edit": {
       "policy": "quality_first",
-      "primary": "aliyun/qwen-image-3.0-hair",
+      "primary": "siliconflow/kwai-kolors-kolors",
       "fallbacks": [
+        "aliyun/qwen-image-3.0-hair",
         "aliyun/qwen-image-edit-plus-hair"
       ],
       "max_cost_cny": 0.6

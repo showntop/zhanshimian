@@ -100,6 +100,64 @@ func TestAIRuntimeDashScopeImageEditPersistsDownloadedBytes(t *testing.T) {
 	}
 }
 
+// 硅基流动：JSON 单端点，参考图放 image（data URL）、生成参数用 image_size、
+// 结果容器是 images[0].url。
+func TestAIRuntimeSiliconFlowImageEditSendsReferenceImage(t *testing.T) {
+	t.Setenv("AI_TEST_SF_KEY", "sf-key")
+	png := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00}
+	var body map[string]any
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/images/generations":
+			if r.Header.Get("Authorization") != "Bearer sf-key" {
+				t.Fatal("missing bearer token")
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"images": []map[string]string{{"url": server.URL + "/result.png"}}})
+		case "/result.png":
+			_, _ = w.Write(png)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	runtime, err := NewAIRuntime(
+		[]AIModel{{
+			ID: "kolors", Vendor: "siliconflow", Protocol: "siliconflow_image_edit",
+			Model: "Kwai-Kolors/Kolors", BaseURL: server.URL + "/v1", APIKeyEnv: "AI_TEST_SF_KEY",
+			Timeout: time.Second, Parameters: map[string]any{"image_size": "1024x768"},
+		}},
+		[]AIRoute{{Capability: CapabilityHairEdit, Primary: "kolors"}},
+		server.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := runtime.EditImage(context.Background(), CapabilityHairEdit, ImageEditRequest{
+		Prompt: "换发型", Images: []AnalysisImage{{MIMEType: "image/jpeg", Data: []byte("source")}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(result.Data) != string(png) || result.MIMEType != "image/png" {
+		t.Fatalf("unexpected image result: %#v", result)
+	}
+	if result.Meta.ProviderVersion() != "siliconflow:siliconflow_image_edit:Kwai-Kolors/Kolors" {
+		t.Fatalf("unexpected provider version: %s", result.Meta.ProviderVersion())
+	}
+	if body["model"] != "Kwai-Kolors/Kolors" || body["prompt"] != "换发型" {
+		t.Fatalf("unexpected request body: %#v", body)
+	}
+	if image, _ := body["image"].(string); !strings.HasPrefix(image, "data:image/jpeg;base64,") {
+		t.Fatalf("reference image must be inlined as a data URL: %#v", body["image"])
+	}
+	if body["image_size"] != "1024x768" {
+		t.Fatalf("model parameters were not forwarded: %#v", body)
+	}
+}
+
 func TestAIRuntimeWanxImageEditSubmitsAndPollsTask(t *testing.T) {
 	t.Setenv("AI_TEST_WANX_KEY", "wanx-key")
 	png := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00}

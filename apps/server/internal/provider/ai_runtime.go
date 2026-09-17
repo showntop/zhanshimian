@@ -437,6 +437,8 @@ func (r *AIRuntime) EditImageOnModel(ctx context.Context, modelID, capability st
 			return r.dashScopeWanxImageEdit(callCtx, capability, model, input)
 		case "ark_image":
 			return r.arkImageEdit(callCtx, capability, model, input)
+		case "siliconflow_image_edit":
+			return r.siliconFlowImageEdit(callCtx, capability, model, input)
 		default:
 			return ImageEditResult{}, fmt.Errorf("incompatible image protocol %s", model.Protocol)
 		}
@@ -474,6 +476,8 @@ func (r *AIRuntime) EditImage(ctx context.Context, capability string, input Imag
 				return r.dashScopeWanxImageEdit(callCtx, capability, model, input)
 			case "ark_image":
 				return r.arkImageEdit(callCtx, capability, model, input)
+			case "siliconflow_image_edit":
+				return r.siliconFlowImageEdit(callCtx, capability, model, input)
 			default:
 				return ImageEditResult{}, fmt.Errorf("incompatible image protocol %s", model.Protocol)
 			}
@@ -845,6 +849,53 @@ func (r *AIRuntime) arkImageEdit(ctx context.Context, capability string, model A
 	}
 	meta := invocationMeta(ctx, capability, model, started)
 	meta.RequestID, meta.InputImages, meta.OutputImages = response.ID, len(input.Images), 1
+	meta.EstimatedCostCNY = float64(meta.InputImages)*model.InputImageCost + model.OutputImageCost
+	return ImageEditResult{Data: data, MIMEType: mimeType, Meta: meta}, nil
+}
+
+// siliconFlowImageEdit 走硅基流动的 /images/generations：与 ark 同为「JSON 单端点 +
+// 参考图内联」，差异有三处——参考图放 image 字段（data URL，单张）、生成参数是
+// image_size（不是 size）、默认结果是 images[0].url。
+//
+// 响应容器两种形状都收：官方 API 参考写 images[].url，社区文档另记 OpenAI 风格的
+// data[].url。多判一个分支（不是兜底容错），是为了换同厂商的编辑模型时只改配置、
+// 不动协议层。
+func (r *AIRuntime) siliconFlowImageEdit(ctx context.Context, capability string, model AIModel, input ImageEditRequest) (ImageEditResult, error) {
+	if len(input.Images) == 0 {
+		return ImageEditResult{}, errors.New("image edit requires at least one source image")
+	}
+	body := map[string]any{
+		"model":  model.Model,
+		"prompt": input.Prompt,
+		"image":  dataURL(input.Images[0].MIMEType, input.Images[0].Data),
+	}
+	mergeModelParameters(body, model.Parameters, map[string]bool{"model": true, "prompt": true, "image": true})
+	var response struct {
+		Images []struct {
+			URL string `json:"url"`
+		} `json:"images"`
+		Data []struct {
+			URL     string `json:"url"`
+			B64JSON string `json:"b64_json"`
+		} `json:"data"`
+	}
+	started := time.Now()
+	if err := r.doJSON(ctx, model, http.MethodPost, strings.TrimSuffix(model.BaseURL, "/")+"/images/generations", body, &response, 4<<20); err != nil {
+		return ImageEditResult{}, err
+	}
+	var encoded, imageURL string
+	switch {
+	case len(response.Images) > 0:
+		imageURL = response.Images[0].URL
+	case len(response.Data) > 0:
+		encoded, imageURL = response.Data[0].B64JSON, response.Data[0].URL
+	}
+	data, mimeType, err := r.resolveImage(ctx, model, encoded, imageURL)
+	if err != nil {
+		return ImageEditResult{}, err
+	}
+	meta := invocationMeta(ctx, capability, model, started)
+	meta.InputImages, meta.OutputImages = len(input.Images), 1
 	meta.EstimatedCostCNY = float64(meta.InputImages)*model.InputImageCost + model.OutputImageCost
 	return ImageEditResult{Data: data, MIMEType: mimeType, Meta: meta}, nil
 }
