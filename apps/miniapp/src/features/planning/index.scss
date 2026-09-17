@@ -1,36 +1,165 @@
 // 方案集三屏（方案 tab / 方案详情 / 场合 Brief）。
 // 页面外壳（.page 内边距、AppHeader）归 pages/*，这里只管内容。
 // ---------- 方案 tab ----------
-// planning 整屏等待（受理后到第一套文字发布前）
+// planning 整屏等待（受理后到方案发布前）的外壳；内容在 .plan-progress
 .planning-screen {
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
+}
 
-  &__wait {
+// 规划进度视图：照片锚 + 三步指示 + 服务端真实进度。
+// 拱形相框沿用分析进度页的视觉语言（暖绿渐变），微光呼吸用盒影脉冲——
+// 安静地"活着"，不转圈不闪屏；快照未到时进度条留空、步骤全灰。
+.plan-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22rpx;
+  padding: 80rpx 32rpx 120rpx;
+
+  &__arch {
+    position: relative;
+    width: 600rpx;
+    height: 620rpx;
+    border-radius: 300rpx 300rpx 40rpx 40rpx;
+    background: linear-gradient(180deg, var(--moss-soft) 0%, var(--cream) 58%, var(--moss-soft) 100%);
+    border: 1rpx solid var(--line);
+    overflow: hidden;
+    animation: plan-progress-breathe 2.8s ease-in-out infinite;
+  }
+
+  &__photo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  &__placeholder {
+    position: absolute;
+    inset: 0;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 18rpx;
-    padding: 120rpx 32rpx;
-    text-align: center;
+    justify-content: center;
   }
 
-  &__spin {
-    width: 56rpx;
-    height: 56rpx;
+  &__placeholder-text {
+    font-size: 24rpx;
+    color: var(--ink-2);
   }
 
-  &__wait-title {
+  &__stage {
+    margin-top: 10rpx;
     font-size: 34rpx;
     font-weight: 700;
     color: var(--ink);
+    text-align: center;
   }
 
-  &__wait-body {
-    font-size: 26rpx;
-    line-height: 1.7;
+  &__retrying {
+    margin-top: -10rpx;
+    font-size: 24rpx;
+    color: var(--moss);
+  }
+
+  &__steps {
+    display: flex;
+    align-items: flex-start;
+    gap: 48rpx;
+    margin-top: 6rpx;
+  }
+
+  &__step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10rpx;
+
+    &-label {
+      font-size: 22rpx;
+      color: var(--ink-2);
+    }
+  }
+
+  &__dot {
+    width: 14rpx;
+    height: 14rpx;
+    border-radius: 50%;
+    background: var(--line);
+  }
+
+  &__step--done {
+    .plan-progress__dot {
+      background: var(--moss);
+    }
+
+    .plan-progress__step-label {
+      color: var(--ink);
+    }
+  }
+
+  &__step--active {
+    .plan-progress__dot {
+      background: var(--moss);
+      animation: plan-progress-dot 1.6s ease-in-out infinite;
+    }
+
+    .plan-progress__step-label {
+      color: var(--ink);
+      font-weight: 600;
+    }
+  }
+
+  &__bar {
+    width: 520rpx;
+    height: 12rpx;
+    border-radius: 999rpx;
+    background: var(--moss-soft);
+    border: 1rpx solid var(--line);
+    overflow: hidden;
+  }
+
+  &__bar-fill {
+    height: 100%;
+    border-radius: 999rpx;
+    background: var(--moss);
+    transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  &__percent {
+    margin-top: -12rpx;
+    font-size: 24rpx;
     color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__eta {
+    font-size: 24rpx;
+    color: var(--ink-2);
+  }
+}
+
+@keyframes plan-progress-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(88, 115, 68, 0.16);
+  }
+
+  50% {
+    box-shadow: 0 0 0 26rpx rgba(88, 115, 68, 0);
+  }
+}
+
+@keyframes plan-progress-dot {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.5);
   }
 }
 

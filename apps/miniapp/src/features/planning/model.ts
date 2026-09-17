@@ -6,6 +6,7 @@
 // 既不把服务端还在提供的内容藏起来，也从不用旧缓存替它补一份。
 import {
   PLAN_DETAIL_COPY,
+  planStageText,
   SCENE_BRIEF_COPY,
   type HomeBootstrap,
   type SceneBriefScene,
@@ -13,6 +14,7 @@ import {
 import type {
   CreatePlanSetRequest,
   DisplayMedia,
+  Operation,
   PlanSet,
   PlanStep,
   PlanVariant,
@@ -20,6 +22,7 @@ import type {
 } from '@zsm/core'
 // 带 .ts 后缀：这个模块被 node --test 直接加载，Node 的 ESM 解析不做后缀补全。
 import { createIdempotencyKey } from '../../app/keys.ts'
+import { operationView } from '../../app/operations/operation-view.ts'
 
 // 幂等键生成器已上移到 app/keys（建档重发、渲染重试、执行事件共用同一条规则）；
 // 这里保留再导出，老引用不需要知道它搬了家。
@@ -192,6 +195,45 @@ export function analyzingAssessmentOperationId(operations: readonly OperationRef
     operations.find((operation) => operation.kind === 'assessment' && ASSESSMENT_IN_FLIGHT.has(operation.status))
       ?.id ?? ''
   )
+}
+
+/** 规划进度视图的快照：全部来自服务端轮询事实，客户端不补间、不虚构中间态。 */
+export interface PlanProgressSnapshot {
+  /** 服务端 progress_bps 钳成的 0-100 */
+  percent: number
+  /** 三步指示的当前步：0 读报告 / 1 定制造型 / 2 收尾 */
+  stepIndex: number
+  /** 服务端 public_message 优先，其次阶段码文案表，最后兜底 */
+  stageLine: string
+  retrying: boolean
+}
+
+/** 阶段码 → 步位。服务端的进度阈值（6500 bps 进入检查）是未知码定步的唯一依据。 */
+const PLAN_STAGE_STEP: Record<string, number> = {
+  'plan.reading_report': 0,
+  'plan.checking': 1,
+}
+
+/**
+ * 轮询快照 → 规划进度视图。只认在途的受理（调用方按候选 id 过滤）；
+ * 没有在途快照返回 null——视图自己退到安静态，绝不编一个 0% 出来。
+ */
+export function planProgressView(operations: readonly Operation[]): PlanProgressSnapshot | null {
+  for (const operation of operations) {
+    const view = operationView(operation)
+    if (view.kind !== 'working') continue
+    const stepIndex =
+      view.progress >= 100
+        ? 2
+        : PLAN_STAGE_STEP[view.stageCode] ?? (view.progress >= 65 ? 1 : 0)
+    return {
+      percent: view.progress,
+      stepIndex,
+      stageLine: view.message || planStageText(view.stageCode),
+      retrying: view.retrying,
+    }
+  }
+  return null
 }
 
 /**

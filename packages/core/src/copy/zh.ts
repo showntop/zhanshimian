@@ -467,7 +467,7 @@ export const REPORT_COPY = {
   findingsTitle: '可提升点',
   emptyFindings: '这次没有必须调整的项目，可以按方案逐步尝试。',
   viewPlans: '查看我的 3 套方案',
-  generatePlans: '生成我的 3 套方案',
+  generatePlans: '三套造型，为你量身定制',
   viewPlansNote: '方案基于你的照片与现实条件生成',
   noReportTitle: '还没有形象报告',
   noReportBody: '拍三张照片，几分钟拿到你的第一份形象分析。',
@@ -634,9 +634,12 @@ export const PLANNING_COPY = {
   viewDetail: '查看方案',
   boundNote: '基于你当前的报告与照片',
   // 方案集五态的页面文案
-  planningTitle: '正在规划你的三套方案',
-  planningBody: '从你的报告出发，通常需要一两分钟。可以先去逛逛。',
   wander: '先去逛逛，不用守在这里 ›',
+  // 规划进度视图：三步指示与快照缺失时的安静态文案
+  progressSteps: ['读你的报告', '定制三套造型', '写好每一步'],
+  progressEta: '通常需要 1-2 分钟',
+  progressRetrying: '服务端正在重试这一步',
+  progressFallback: '正在为你定制三套造型',
   // 单套渲染的六态（与契约 RenderStatusView.state 一一对应）
   renderQueued: '排队等待生成',
   renderGenerating: '正在生成形象图',
@@ -652,11 +655,11 @@ export const PLANNING_COPY = {
   renderThumbUnavailable: '暂不可用',
   // 列表为空 / 加载失败
   generalEmptyTitle: '还没有形象方案',
-  generalEmptyBody: '基于你的形象报告生成三套可执行的方案。',
-  sceneEmptyBody: '回答几个选择（约 30 秒），复用档案不重复要照片。',
-  generateGeneral: '生成形象方案',
-  generateScenePrefix: '生成',
-  generateSceneSuffix: '方案',
+  generalEmptyBody: '顾问读完了你的报告，三套造型照着就能穿。',
+  sceneEmptyBody: '回答几个小问题（约 30 秒），按你的档案定制三套。',
+  generateGeneral: '三套造型，为你量身定制',
+  generateScenePrefix: '穿什么？为你定制',
+  generateSceneSuffix: '三套',
   loadFailed: '方案没有加载成功，请重试',
   generateFailed: '方案暂时没有生成，请稍后重试',
   retryFailedTitle: '这一组方案没有生成成功',
@@ -683,6 +686,21 @@ export const PLANNING_COPY = {
   tabInFlightSuffix: '· 制作中',
   inFlightBanner: '有方案正在制作中，完成后会自动更新'
 } as const
+
+/** 服务端阶段码 → 中文。键必须与 apps/server 的 planning ports 完全一致：
+ * 这里列不出某个码时宁可退回兜底文案，也不猜它大概在哪一步。 */
+export const PLAN_STAGE_COPY: Record<string, string> = {
+  'plan.reading_report': '正在阅读你的形象报告',
+  'plan.checking': '正在检查三套造型'
+}
+
+/** 阶段码 → 规划进度文案；服务端没给或给了不认识的码时用兜底文案。 */
+export function planStageText(stageCode: string | undefined): string {
+  if (stageCode && stageCode in PLAN_STAGE_COPY) {
+    return PLAN_STAGE_COPY[stageCode] as string
+  }
+  return PLANNING_COPY.progressFallback
+}
 
 /** 方案名 + 序号：「第 2 套 · 暖意」。序号来自 slot，不靠列表位置。 */
 export function planSlotLabel(name: string, slot: number): string {

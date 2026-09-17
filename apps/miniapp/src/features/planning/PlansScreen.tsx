@@ -32,6 +32,7 @@ import { getNavMetrics } from '../../components/app-header'
 import CompareSlider from '../../components/compare-slider'
 import EmptyState from '../../components/empty-state'
 import ErrorState from '../../components/error-state'
+import PlanProgressView from './PlanProgressView'
 import PrimaryButton from '../../components/primary-button'
 import RenderState from '../../components/render-state'
 import Skeleton from '../../components/skeleton'
@@ -43,6 +44,7 @@ import {
   briefFingerprint,
   createIdempotencyKey,
   inFlightPlanSetOperationIds,
+  planProgressView,
   planSetRetryMarkerKey,
   planSetSceneKey,
   planSetView,
@@ -332,7 +334,10 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     }
   }
 
-  const { refresh: refreshOperations } = useOperationPolling({
+  const {
+    operations,
+    refresh: refreshOperations,
+  } = useOperationPolling({
     operationIds: watchedIds,
     enabled: watchedIds.length > 0,
     onSettled: (operations) => {
@@ -665,14 +670,19 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
 
   // ---------- planning：整屏等待，不虚构方案卡 ----------
   if (view?.kind === 'planning') {
+    // 只把方案集受理相关的快照交给进度视图；单套渲染的在途不进这里
+    const candidateIds = new Set([acceptOperationId, ...activePlanSetOps])
+    const snapshot = planProgressView(operations.filter((operation) => candidateIds.has(operation.id)))
+    // 照片锚：优先绑定校验过的对比左图；等待期方案集未发布拿不到绑定，
+    // 退当前报告的身体照（纯展示锚，不参与任何对比/证据语义）
+    const progressMedia = leftMedia ?? report?.source_media?.body?.media ?? null
     return (
       <View className="planning-screen">
-        <View className="planning-screen__wait fade-up">
-          <View className="spinner planning-screen__spin" />
-          <Text className="planning-screen__wait-title">{PLANNING_COPY.planningTitle}</Text>
-          <Text className="planning-screen__wait-body">{PLANNING_COPY.planningBody}</Text>
-          <TextLink text={PLANNING_COPY.wander} onClick={() => void Taro.switchTab({ url: HOME_ROUTE })} />
-        </View>
+        <PlanProgressView
+          media={progressMedia}
+          snapshot={snapshot}
+          onWander={() => void Taro.switchTab({ url: HOME_ROUTE })}
+        />
       </View>
     )
   }

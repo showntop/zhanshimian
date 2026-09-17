@@ -8,6 +8,7 @@ import {
   briefFingerprint,
   createIdempotencyKey,
   inFlightPlanSetOperationIds,
+  planProgressView,
   planSetView,
   sceneBriefPrefill,
   sceneBriefRequest,
@@ -219,6 +220,49 @@ test('in-flight plan-set accepts are the only operations worth watching', () => 
   ]
   assert.deepEqual(inFlightPlanSetOperationIds(ops), ['op-1', 'op-2', 'op-3'])
   assert.deepEqual(inFlightPlanSetOperationIds([]), [])
+})
+
+test('plan progress view reads only the working accept and maps server stages honestly', () => {
+  // 在途快照 → bps 钳成百分比，阶段码定步位，服务端文案优先
+  const reading = {
+    id: 'op-a',
+    status: 'running',
+    progress_bps: 1500,
+    stage_code: 'plan.reading_report',
+    public_message: '正在阅读你的形象报告',
+  }
+  assert.deepEqual(planProgressView([reading]), {
+    percent: 15,
+    stepIndex: 0,
+    stageLine: '正在阅读你的形象报告',
+    retrying: false,
+  })
+
+  // 检查阶段；服务端没给文案时查客户端文案表，不认识的码退兜底
+  const checking = { id: 'op-b', status: 'running', progress_bps: 6500, stage_code: 'plan.checking', public_message: '' }
+  assert.equal(planProgressView([checking]).percent, 65)
+  assert.equal(planProgressView([checking]).stepIndex, 1)
+  assert.equal(planProgressView([checking]).stageLine, '正在检查三套造型')
+  const unknown = { id: 'op-c', status: 'running', progress_bps: 3000, stage_code: 'plan.something_new', public_message: '' }
+  assert.equal(planProgressView([unknown]).stepIndex, 0)
+  assert.equal(planProgressView([unknown]).stageLine, '正在为你定制三套造型')
+
+  // 服务端自己的阈值（6500）是未知阶段定步的唯一依据，不虚构中间态
+  const lateUnknown = { id: 'op-d', status: 'running', progress_bps: 7000, stage_code: 'plan.something_new', public_message: '' }
+  assert.equal(planProgressView([lateUnknown]).stepIndex, 1)
+
+  // 到 100 进收尾步；服务端在重试要如实说
+  const finishing = { id: 'op-e', status: 'running', progress_bps: 10000, stage_code: 'plan.checking', public_message: '' }
+  assert.equal(planProgressView([finishing]).stepIndex, 2)
+  const retrying = { id: 'op-f', status: 'retrying', progress_bps: 6500, stage_code: 'plan.checking', public_message: '' }
+  assert.equal(planProgressView([retrying]).retrying, true)
+
+  // 没有在途快照就不编进度：null，视图自己退到安静态
+  assert.equal(planProgressView([]), null)
+  assert.equal(
+    planProgressView([{ id: 'op-g', status: 'succeeded', progress_bps: 10000, stage_code: 'plan.ready', public_message: '' }]),
+    null,
+  )
 })
 
 test('analyzingAssessmentOperationId finds the in-flight analysis the plans empty state links to', () => {
