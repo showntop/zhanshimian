@@ -243,13 +243,14 @@
   }
 
   // ---------- S1 方向卡：横滑大卡，差异前置 ----------
+  // ---------- S1 方向卡：缩排保一屏（hero + 提示 + 卡 + 沉底 CTA 不出首屏） ----------
   &__cards {
     width: 100%;
     white-space: nowrap;
 
     &-rail {
       display: inline-flex;
-      gap: 20rpx;
+      gap: 16rpx;
       // 末张卡右边距
       padding-right: var(--page-gutter);
       width: max-content;
@@ -257,7 +258,8 @@
   }
 
   &__card {
-    width: 300rpx;
+    // 224×168 = 4:3：缩排保一屏（与首页卡同一显示规范的缩小版）
+    width: 224rpx;
     border-radius: var(--radius-md);
     background: var(--surface, #fff);
     overflow: hidden;
@@ -269,33 +271,31 @@
 
     &-img {
       width: 100%;
-      // 4:3 头肩横框：示范图（700×525）widthFix 后恰好铺满，
-      // 不再需要 scale(2.3) 放大裁切的 hack
-      height: 225rpx;
+      height: 168rpx;
     }
 
     &-body {
       display: flex;
       flex-direction: column;
-      gap: 6rpx;
-      padding: 20rpx 24rpx 24rpx;
+      gap: 4rpx;
+      padding: 14rpx 18rpx 16rpx;
       white-space: normal;
     }
 
     &-name {
-      font-size: 28rpx;
+      font-size: 24rpx;
       font-weight: 700;
       color: var(--ink);
     }
 
     &-tag {
-      font-size: 20rpx;
+      font-size: 18rpx;
       color: var(--moss);
     }
 
     &-desc {
-      font-size: 22rpx;
-      line-height: 1.5;
+      font-size: 18rpx;
+      line-height: 1.4;
       color: var(--ink-3);
     }
   }

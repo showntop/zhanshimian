@@ -432,8 +432,9 @@
     // （每页至多一个深色视觉锚点；两块 moss-deep 连排会互相抢焦点）
     &--lead {
       flex: 1 1 100%;
-      // 视觉区是 4:3 头肩横框（见 &-visual），卡高让出框体 + 上下边距
-      min-height: 238rpx;
+      // 定高不变高：视觉区比例（384×238rpx）是裁切方向的裁决依据，
+      // 卡高随内容漂移的话枢纽就失准（见 index.tsx frameAspect 注释）
+      height: 238rpx;
       justify-content: flex-end;
       padding: 32rpx 46% 30rpx 28rpx;
       background: #d9e2d1;

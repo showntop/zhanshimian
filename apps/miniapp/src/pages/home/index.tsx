@@ -430,23 +430,23 @@ export default function Home() {
                     </View>
                     {tool.key === 'hair' ? (
                       // 全出血直出：4:3 头肩图顶对齐铺满右区，无任何滤镜效果。
-                      // 裁切方向枢纽取 1.4（区域实际比例约 1.5，4:3/竖图/方图都
-                      // 走「按宽铺满、顶对齐裁底」，只裁背景不切头）；真横图走
-                      // 「按高铺满裁两侧」。左缘由卡面渐变与羽化溶接。
+                      // 裁切方向枢纽 = 视觉区真实比例（384×238rpx，rpx 域常数）：
+                      // 图比例 ≤ 1.614 走「按宽铺满、顶对齐裁底」，> 1.614 的真横图
+                      // 走「按高铺满裁两侧」——任何比例都必然铺满，无露底缝隙。
                       <View className="home__tool-visual">
                         {hairLatestMedia ? (
                           <SourceImage
                             className="home__tool-visual-photo"
                             media={hairLatestMedia}
                             anchor="top"
-                            frameAspect={1.4}
+                            frameAspect={384 / 238}
                           />
                         ) : (
                           <SourceImage
                             className="home__tool-visual-photo"
                             reference={{ slug: 'natural', variant: 'hair' }}
                             anchor="top"
-                            frameAspect={1.4}
+                            frameAspect={384 / 238}
                           />
                         )}
                       </View>
