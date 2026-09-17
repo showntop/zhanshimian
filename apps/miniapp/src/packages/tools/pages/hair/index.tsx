@@ -13,6 +13,7 @@ import { Image, ScrollView, Text, Textarea, View } from '@tarojs/components'
 import {
   CUSTOM_DIRECTION_ID,
   HAIR_COPY,
+  HAIR_DIRECTIONS,
   hairDirectionViews,
   type DisplayMedia,
   type HairGender,
@@ -368,29 +369,39 @@ export default function Hair() {
   // 有结果的方向带生成图（点它回放，不再花一次生成），没试过的带参考图（点它直接生成）——
   // 4:3 横图只占屏高三分之一，下半屏靠这条轨和固定 CTA 撑住。
   const resultSlots: ResultSlot[] = useMemo(() => {
-    const slots: ResultSlot[] = directions.map((view) => {
-      const done = readyHistory.find((item) => item.style_id === view.id)
-      return {
-        key: view.id,
-        styleId: view.id,
-        // 自定义方向：卡面写用户那句话的截断版，而不是「自定义」三个字
-        name: view.id === CUSTOM_DIRECTION_ID && done?.style_name ? truncateLabel(done.style_name) : view.name,
-        tag: view.tag,
-        desc: view.desc,
-        slug: view.slug,
-        media: view.media,
-        preview: done,
-      }
-    })
+    const slots: ResultSlot[] = directions.map((view) => ({
+      key: view.id,
+      styleId: view.id,
+      name: view.name,
+      tag: view.tag,
+      desc: view.desc,
+      slug: view.slug,
+      media: view.media,
+      preview: readyHistory.find((item) => item.style_id === view.id),
+    }))
     for (const item of readyHistory) {
       if (directions.some((view) => view.id === item.style_id)) continue
+      // 目录外的历史：方向来自另一性别（换过性别）或自定义。目录里认得到的按目录补齐
+      // 标签与说明——判词不能退回通用导语；认不到的（自定义）用用户那句话当卡面名。
+      const known = HAIR_DIRECTIONS.find((view) => view.id === item.style_id)
       slots.push({
         key: item.id,
         styleId: item.style_id || item.id,
-        name: item.style_name || HAIR_COPY.customName,
+        name: known?.name ?? truncateLabel(item.style_name || HAIR_COPY.customName),
+        tag: known?.tag,
+        desc: known?.desc,
+        slug: known?.slug,
         preview: item,
       })
     }
+    // 自定义也是一条方向：结果态横滑同样给入口（没生成过就是那张 ＋ 卡）
+    const customPreview = readyHistory.find((item) => item.style_id === CUSTOM_DIRECTION_ID)
+    slots.push({
+      key: CUSTOM_DIRECTION_ID,
+      styleId: CUSTOM_DIRECTION_ID,
+      name: customPreview?.style_name ? truncateLabel(customPreview.style_name) : HAIR_COPY.customName,
+      preview: customPreview,
+    })
     return slots
   }, [directions, readyHistory])
 
@@ -558,6 +569,10 @@ export default function Hair() {
                           reference={{ slug: slot.slug, variant: 'hair' }}
                           anchor="top"
                         />
+                      ) : slot.styleId === CUSTOM_DIRECTION_ID ? (
+                        <View className="hair__card-blank">
+                          <Text className="hair__card-blank-plus">＋</Text>
+                        </View>
                       ) : (
                         <View className="hair__card-blank">
                           <Image className="hair__card-blank-icon" src={HAIR_ICON} mode="aspectFit" />

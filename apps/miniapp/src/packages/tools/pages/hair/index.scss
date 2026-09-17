@@ -42,8 +42,14 @@
     }
   }
 
-  // 结果态：给固定 CTA 栏留位
+  // 结果态：同样收成一屏。这里必须是「定高」而不是 min-height——auto margin 只吃定高
+  // 容器里的余量，min-height 撑出来的高度不会分给 auto margin，「换个方向看看」就沉不
+  // 下去，底部永远空出一条带（真机观感就是「整页偏上、下方太空」）。
   &--done {
+    height: calc(100vh - env(safe-area-inset-bottom) - 48rpx);
+    // 内容 ≈ 照片 + 判词卡 + 横滑 + CTA 预留：矮屏宁可页面滚动，也不压扁内容
+    min-height: 1380rpx;
+    // 给固定 CTA 栏留位
     padding-bottom: 260rpx;
   }
 
