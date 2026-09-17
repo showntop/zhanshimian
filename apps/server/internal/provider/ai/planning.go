@@ -67,7 +67,13 @@ grounding 输出契约（逐字遵守，下游会逐条确定性校验）：
 4. style_rule 的 source_id 只能逐字来自 style_rule_ids 列表，不得发明新 ID。
 5. report.priority_finding_id 指向的 finding 至少被一条 report_finding grounding 引用。
 6. profile_snapshot 为空对象时不得使用 profile_preference；没有 profile_preference grounding 的 outfit 步骤，其文案不得出现材质词（真丝、桑蚕丝、羊绒、纯棉、皮革、醋酸面料）。
-7. 任何用户可见文案不得出现价格（¥、元、块钱）与“颜值、身材分、缺陷严重、医学诊断、年龄判定、族裔”。`
+7. 任何用户可见文案不得出现价格（¥、元、块钱）与“颜值、身材分、缺陷严重、医学诊断、年龄判定、族裔”。
+
+步骤输出契约（逐字遵守，下游会逐条确定性校验）：
+1. 每个变体恰好三步：hair、makeup、outfit 各恰好一步，不得重复或缺席类别。
+2. hair/makeup 步骤的 details 只用 target（非空）与 intensity（只能是 low 或 medium），另可用 avoid（至多 8 项）；silhouette、palette、layers、formality 必须为空字符串或空数组。
+3. outfit 只用 silhouette（非空）、palette（1-8 色）、formality（至多 40 字）、layers 与 avoid（各至多 8 项）；target 与 intensity 必须为空字符串——那是 hair/makeup 的字段。
+4. action 只能是 keep 或 adjust。`
 
 func (g *PlanSetGenerator) Generate(ctx context.Context, input planning.GenerationInput) (planning.GeneratedPlanSet, error) {
 	result, err := g.runtime.Structured(ctx, StructuredRequest{

@@ -299,6 +299,35 @@ func TestPlanSetPromptSpellsOutExactGroundingIDForms(t *testing.T) {
 	}
 }
 
+// 步骤结构契约只写在 schema blob 和校验器错误消息里，json_object 模式的小模型
+// 读不懂 oneOf/const——线上 qwen3.8-flash 两次采样先后产出 hair+outfit+outfit
+// 与 outfit 携带 target/intensity，两轮重试全烧完直接永久失败。确定性契约必须
+// 和 grounding 契约一样在 instructions 里逐字写明。
+func TestPlanSetPromptSpellsOutStepStructureContract(t *testing.T) {
+	runtime := &fakeStructuredRuntime{result: validGeneratedPlanSetJSON()}
+	_, err := NewPlanSetGenerator(runtime).Generate(context.Background(), planning.GenerationInput{
+		Report:         validPlanningReport(),
+		Brief:          validDailyBrief(),
+		ContentAttempt: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"每个变体恰好三步",
+		"各恰好一步",
+		"只能是 low 或 medium",
+		"silhouette、palette、layers、formality 必须为空字符串或空数组",
+		"outfit 只用 silhouette",
+		"target 与 intensity 必须为空字符串",
+		"action 只能是 keep 或 adjust",
+	} {
+		if !strings.Contains(runtime.request.Instructions, want) {
+			t.Fatalf("instructions must state the step structure contract (%q missing):\n%s", want, runtime.request.Instructions)
+		}
+	}
+}
+
 // 发给厂商的 response_format schema 只能包含校验形状;文件里的 JSON Schema
 // 元字段($schema/$id/title)会被模型当成输出字段回显——线上 qwen3.7-flash
 // 在 plan_grounding_verification 回包顶层塞了 "$id",撞 DisallowUnknownFields
