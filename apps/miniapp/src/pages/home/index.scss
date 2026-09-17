@@ -485,40 +485,55 @@
 
     &-visual {
       position: absolute;
-      top: 20rpx;
-      right: 20rpx;
+      top: 0;
+      right: 0;
+      bottom: 0;
       z-index: -2;
-      // 发型预览域统一 4:3 头肩横框：与服务端归一化裁切（hairNormalizer 4:3
-      // 顶对齐）、内置示例（700×525 肩颈以上）同一条规范——4:3 的图恰好铺满，
-      // 卡片也回到横向矮卡的天然形状；历史遗留的竖图由框内 blur 衬底兜底。
-      width: 264rpx;
-      height: 198rpx;
-      border-radius: var(--radius-md);
+      width: 56%;
       overflow: hidden;
 
-      // 失焦衬底铺满：照片两侧的空区是同图失焦放大版，不是死色块
+      // 绿色薄纱：示例图的影棚灰底与卡面暖绿之间的一层统一色罩——
+      // 左缘重（溶进卡面）、往右近乎透明（人脸保持干净）
+      &::after {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        content: '';
+        background: linear-gradient(
+          90deg,
+          rgba(217, 226, 209, 0.75) 0%,
+          rgba(217, 226, 209, 0.15) 34%,
+          rgba(217, 226, 209, 0.06) 100%
+        );
+        pointer-events: none;
+      }
+
+      // 失焦衬底铺满整个右区：4:3 图按高铺满后两侧的窄缝是同图失焦，
+      // 不是死色块；提一点亮度让影棚灰底向卡面亮度靠拢
       &-blur {
         position: absolute;
         inset: 0;
+        width: 100%;
+        height: 100%;
         background-color: transparent;
         border-radius: 0;
-        filter: blur(16rpx) saturate(1.1);
-        transform: scale(1.15);
+        filter: blur(28rpx) saturate(1.05) brightness(1.04);
+        transform: scale(1.2);
 
         .example-badge {
           display: none;
         }
       }
 
-      // 完整入镜：任何构图（脸高脸低）都看到全脸全发；
-      // 左右羽化把照片竖边溶进衬底
+      // 完整入镜：4:3 头肩图按高铺满（4:3 与区内高度天然吻合），
+      // 左右羽化把竖边溶进失焦衬底——图没有自己的「边」，不与卡面对撞
       &-fit {
         position: absolute;
         inset: 0;
         background-color: transparent;
         border-radius: 0;
-        -webkit-mask-image: linear-gradient(90deg, transparent, #000 32rpx, #000 calc(100% - 32rpx), transparent);
-        mask-image: linear-gradient(90deg, transparent, #000 32rpx, #000 calc(100% - 32rpx), transparent);
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 40rpx, #000 calc(100% - 40rpx), transparent);
+        mask-image: linear-gradient(90deg, transparent, #000 40rpx, #000 calc(100% - 40rpx), transparent);
       }
     }
 
