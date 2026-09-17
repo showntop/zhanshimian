@@ -492,48 +492,16 @@
       width: 56%;
       overflow: hidden;
 
-      // 绿色薄纱：示例图的影棚灰底与卡面暖绿之间的一层统一色罩——
-      // 左缘重（溶进卡面）、往右近乎透明（人脸保持干净）
-      &::after {
-        position: absolute;
-        inset: 0;
-        z-index: 2;
-        content: '';
-        background: linear-gradient(
-          90deg,
-          rgba(217, 226, 209, 0.75) 0%,
-          rgba(217, 226, 209, 0.15) 34%,
-          rgba(217, 226, 209, 0.06) 100%
-        );
-        pointer-events: none;
-      }
-
-      // 失焦衬底铺满整个右区：4:3 图按高铺满后两侧的窄缝是同图失焦，
-      // 不是死色块；提一点亮度让影棚灰底向卡面亮度靠拢
-      &-blur {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        background-color: transparent;
-        border-radius: 0;
-        filter: blur(28rpx) saturate(1.05) brightness(1.04);
-        transform: scale(1.2);
-
-        .example-badge {
-          display: none;
-        }
-      }
-
-      // 完整入镜：4:3 头肩图按高铺满（4:3 与区内高度天然吻合），
-      // 左右羽化把竖边溶进失焦衬底——图没有自己的「边」，不与卡面对撞
-      &-fit {
+      // 全出血直出：单层真图（anchor=top 按宽铺满、顶对齐、底部越界裁切），
+      // 无模糊无色罩——4:3 头肩规范保证裁掉的只是背景。左缘 40rpx 羽化 +
+      // 卡面渐变把图溶进卡面；右/上/下贴卡片边缘，随卡片圆角裁切。
+      &-photo {
         position: absolute;
         inset: 0;
         background-color: transparent;
         border-radius: 0;
-        -webkit-mask-image: linear-gradient(90deg, transparent, #000 40rpx, #000 calc(100% - 40rpx), transparent);
-        mask-image: linear-gradient(90deg, transparent, #000 40rpx, #000 calc(100% - 40rpx), transparent);
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 40rpx, #000 100%);
+        mask-image: linear-gradient(90deg, transparent, #000 40rpx, #000 100%);
       }
     }
 

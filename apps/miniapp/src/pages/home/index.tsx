@@ -429,27 +429,25 @@ export default function Home() {
                       <Text className="home__tool-desc">{tool.desc}</Text>
                     </View>
                     {tool.key === 'hair' ? (
-                      // 失焦衬底 + 完整入镜：任何构图的生成图都看到全脸，
-                      // 不再按「脸在 15%~50%」的经验位移赌裁切窗口
+                      // 全出血直出：4:3 头肩图顶对齐铺满右区，无任何滤镜效果。
+                      // 裁切方向枢纽取 1.4（区域实际比例约 1.5，4:3/竖图/方图都
+                      // 走「按宽铺满、顶对齐裁底」，只裁背景不切头）；真横图走
+                      // 「按高铺满裁两侧」。左缘由卡面渐变与羽化溶接。
                       <View className="home__tool-visual">
                         {hairLatestMedia ? (
-                          <>
-                            <SourceImage className="home__tool-visual-blur" media={hairLatestMedia} mode="aspectFill" />
-                            <SourceImage className="home__tool-visual-fit" media={hairLatestMedia} mode="aspectFit" />
-                          </>
+                          <SourceImage
+                            className="home__tool-visual-photo"
+                            media={hairLatestMedia}
+                            anchor="top"
+                            frameAspect={1.4}
+                          />
                         ) : (
-                          <>
-                            <SourceImage
-                              className="home__tool-visual-blur"
-                              reference={{ slug: 'natural', variant: 'hair' }}
-                              mode="aspectFill"
-                            />
-                            <SourceImage
-                              className="home__tool-visual-fit"
-                              reference={{ slug: 'natural', variant: 'hair' }}
-                              mode="aspectFit"
-                            />
-                          </>
+                          <SourceImage
+                            className="home__tool-visual-photo"
+                            reference={{ slug: 'natural', variant: 'hair' }}
+                            anchor="top"
+                            frameAspect={1.4}
+                          />
                         )}
                       </View>
                     ) : null}
