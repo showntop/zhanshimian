@@ -18,8 +18,7 @@ import {
   type DisplayMedia,
   type HairGender,
   type HairPreview,
-  type HairStyle,
-  type LookSlug
+  type HairStyle
 } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { peripherals } from '../../../../app/api/peripherals'
@@ -42,7 +41,7 @@ import './index.scss'
 const IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
 // 空态的正脸拍照示范（包内资产，JPEG）
 const FACE_GUIDE_IMAGE = '/assets/capture/face.jpg'
-// 无参考图方向用的线性图标（男士方向没有包内模特图，不借女模特的图冒充）
+// 没有生成图的方向卡用这个线性图标占位（内置示例模特已从主流程退役，不再借模特图）
 const HAIR_ICON = '/assets/icons/tool-hair.png'
 // 自定义描述字数上限（服务端同一上限 40 字）
 const CUSTOM_MAX = 40
@@ -61,7 +60,6 @@ interface ResultSlot {
   name: string
   tag?: string
   desc?: string
-  slug?: LookSlug
   media?: DisplayMedia | null
   preview?: HairPreview
 }
@@ -375,7 +373,6 @@ export default function Hair() {
       name: view.name,
       tag: view.tag,
       desc: view.desc,
-      slug: view.slug,
       media: view.media,
       preview: readyHistory.find((item) => item.style_id === view.id),
     }))
@@ -390,7 +387,6 @@ export default function Hair() {
         name: known?.name ?? truncateLabel(item.style_name || HAIR_COPY.customName),
         tag: known?.tag,
         desc: known?.desc,
-        slug: known?.slug,
         preview: item,
       })
     }
@@ -438,7 +434,9 @@ export default function Hair() {
 
   return (
     <View className={pageClass}>
-      <AppHeader title="发型设计" back onPhoto />
+      {/* 结果态不再让照片垫到视口顶：导航占位（透明栏 + 深色标题），照片整体下移到
+          导航之下——4:3 横图贴顶会被状态栏切掉头部；输入态保持出血导航（顶部压 scrim） */}
+      <AppHeader title="发型设计" back onPhoto={!hasResult} transparent={hasResult} />
       <View className={`hair${hasResult ? ' hair--done' : ' hair--form'}`}>
         {/* S3 结果态相框拉高成竖幅：竖版生成图近乎满框，不再挤成中间一条 */}
         <View
@@ -546,9 +544,9 @@ export default function Hair() {
               </View>
             </View>
 
-            {/* 换个方向看看：全部方向横铺（已生成的用生成图当缩略图，点回放；
-                没试过的用参考图/文本卡，点直接换方向生成）——「换个方向再试」
-                不再是一句死文案，下半屏也有了真实内容 */}
+            {/* 换个方向看看：卡面语义只有两类——有生成图＝试过的（点回放），没图的
+                只是可选项（点它直接生成该方向）。不再把内置示例模特图混进来，
+                也不会让人对着别人的脸猜「这是我的结果还是示例」 */}
             <View className={`hair__turn ${enter(2)}`}>
               <Text className="hair__turn-label">{HAIR_COPY.directionLabel}</Text>
               <ScrollView scroll-x enhanced showScrollbar={false} className="hair__cards">
@@ -563,12 +561,6 @@ export default function Hair() {
                         <SourceImage className="hair__card-img" media={slot.preview.media} anchor="top" />
                       ) : slot.media ? (
                         <SourceImage className="hair__card-img" media={slot.media} anchor="top" />
-                      ) : slot.slug ? (
-                        <SourceImage
-                          className="hair__card-img"
-                          reference={{ slug: slot.slug, variant: 'hair' }}
-                          anchor="top"
-                        />
                       ) : slot.styleId === CUSTOM_DIRECTION_ID ? (
                         <View className="hair__card-blank">
                           <Text className="hair__card-blank-plus">＋</Text>
@@ -638,14 +630,9 @@ export default function Hair() {
                   >
                     {opt.media ? (
                       <SourceImage className="hair__card-img" media={opt.media} anchor="top" />
-                    ) : opt.slug ? (
-                      <SourceImage
-                        className="hair__card-img"
-                        reference={{ slug: opt.slug, variant: 'hair' }}
-                        anchor="top"
-                      />
                     ) : (
-                      // 没有参考图的方向出文本卡：不借别人性别的模特图
+                      // 内置示例模特已从主流程退役（红线修订）：没有服务端图的方向只出
+                      // 文字卡，不再拿内置模特图当「风格参考」混在卡面里
                       <View className="hair__card-blank">
                         <Image className="hair__card-blank-icon" src={HAIR_ICON} mode="aspectFit" />
                       </View>

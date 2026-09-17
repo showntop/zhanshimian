@@ -42,15 +42,19 @@
     }
   }
 
-  // 结果态：同样收成一屏。这里必须是「定高」而不是 min-height——auto margin 只吃定高
-  // 容器里的余量，min-height 撑出来的高度不会分给 auto margin，「换个方向看看」就沉不
-  // 下去，底部永远空出一条带（真机观感就是「整页偏上、下方太空」）。
+  // 结果态：顶部有占位导航（照片下移到导航之下），可用高度 = 视口 − 导航占位(≈200rpx)
+  // − 导航呼吸距(24rpx) − 页面底部内边距(safe-area + 48rpx)。不写定高：定了高容易把
+  // 内容顶到固定 CTA 底下；这里只给 min-height，余量交给两个 auto margin 平分。
   &--done {
-    height: calc(100vh - env(safe-area-inset-bottom) - 48rpx);
-    // 内容 ≈ 照片 + 判词卡 + 横滑 + CTA 预留：矮屏宁可页面滚动，也不压扁内容
-    min-height: 1380rpx;
+    min-height: calc(100vh - 224rpx - env(safe-area-inset-bottom));
     // 给固定 CTA 栏留位
     padding-bottom: 260rpx;
+  }
+
+  // 结果态：余量由两个 auto margin 平分——照片往下让一半、横滑往上让一半，
+  // 空白不再整块堆在底部（内容溢出时 auto margin 自动归零，不会把内容顶出可视区）
+  &--done .hair__hero {
+    margin-top: auto;
   }
 
   // ---------- hero 照片：直出（单层真图，anchor=top 顶对齐、底部越界裁切） ----------
