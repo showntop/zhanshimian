@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/draw"
 	"image/jpeg"
 	"image/png"
 	"net/http"
@@ -29,6 +30,11 @@ type DecoderConfig struct {
 	MaxInputBytes int64
 	MaxPixels     int64
 	JPEGQuality   int
+	// CropAspectWidth/Height 非 0 时，输出统一裁成该宽高比：
+	// 发型预览域的显示规范（3:4）。方案渲染不设——跟随 body 原图，
+	// 对比滑块左右必须同比例。
+	CropAspectWidth  int
+	CropAspectHeight int
 }
 
 // Decoder normalizes provider JPEG/PNG/WebP bytes into clean JPEG.
@@ -43,6 +49,14 @@ func NewJPEGNormalizer() *Decoder {
 		MaxPixels:     40_000_000,
 		JPEGQuality:   92,
 	}}
+}
+
+// NewJPEGNormalizerWithAspect 在生产归一化参数之上追加输出比例裁切。
+func NewJPEGNormalizerWithAspect(aspectWidth, aspectHeight int) *Decoder {
+	decoder := NewJPEGNormalizer()
+	decoder.config.CropAspectWidth = aspectWidth
+	decoder.config.CropAspectHeight = aspectHeight
+	return decoder
 }
 
 // Normalization failure codes surfaced through RejectionError.
@@ -108,6 +122,9 @@ func (d *Decoder) Normalize(data []byte, declaredMIME string) (NormalizedJPEG, e
 		}
 		return NormalizedJPEG{}, rejection(codeImageDecodeFailed, err)
 	}
+	if d.config.CropAspectWidth > 0 && d.config.CropAspectHeight > 0 {
+		decoded = cropToAspect(decoded, d.config.CropAspectWidth, d.config.CropAspectHeight)
+	}
 	bounds := decoded.Bounds()
 	if bounds.Dx() < 1 || bounds.Dy() < 1 {
 		return NormalizedJPEG{}, rejection(codeImageDecodeFailed, errors.New("empty decoded bounds"))
@@ -143,6 +160,43 @@ func decodeImage(detected string, data []byte) (image.Image, error) {
 		return xwebp.Decode(bytes.NewReader(data))
 	}
 	return nil, fmt.Errorf("unsupported format %s", detected)
+}
+
+// cropToAspect 把图裁到给定宽高比：比目标更宽的图（横图/方图）左右居中
+// 裁宽；更瘦的竖长图顶对齐裁底——人像脸在上半部，切底不切头。
+func cropToAspect(img image.Image, aspectWidth, aspectHeight int) image.Image {
+	bounds := img.Bounds()
+	width, height := bounds.Dx(), bounds.Dy()
+	if width <= 0 || height <= 0 || aspectWidth <= 0 || aspectHeight <= 0 {
+		return img
+	}
+	targetWidth, targetHeight := width, height
+	switch {
+	case width*aspectHeight > height*aspectWidth:
+		targetWidth = height * aspectWidth / aspectHeight
+	case width*aspectHeight < height*aspectWidth:
+		targetHeight = width * aspectHeight / aspectWidth
+	default:
+		return img
+	}
+	if targetWidth == width && targetHeight == height {
+		return img
+	}
+	rect := image.Rect(
+		bounds.Min.X+(width-targetWidth)/2,
+		bounds.Min.Y,
+		bounds.Min.X+(width-targetWidth)/2+targetWidth,
+		bounds.Min.Y+targetHeight,
+	)
+	type subImager interface {
+		SubImage(image.Rectangle) image.Image
+	}
+	if sub, ok := img.(subImager); ok {
+		return sub.SubImage(rect)
+	}
+	cropped := image.NewRGBA(image.Rect(0, 0, targetWidth, targetHeight))
+	draw.Draw(cropped, cropped.Bounds(), img, rect.Min, draw.Src)
+	return cropped
 }
 
 // isAnimatedWebP checks the extended WebP header animation bit without a

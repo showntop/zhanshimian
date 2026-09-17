@@ -116,7 +116,7 @@ func wireHairHandler(store *postgres.Store, objects storage.ObjectStorage, ai AI
 		generator = hairEditGenerator{runtime: ai.Runtime}
 	}
 	return hair.NewHandler(store, objects, hairSourceLoader{objects: objects}, operationProgress{store: store},
-		generator, hairNormalizer{decoder: rendering.NewJPEGNormalizer()})
+		generator, hairNormalizer{decoder: rendering.NewJPEGNormalizerWithAspect(3, 4)})
 }
 
 // hairSourceLoader 读 hair 源图并按编辑预算约束（与渲染参考图同一做法：

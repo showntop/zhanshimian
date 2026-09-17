@@ -240,11 +240,14 @@ func (h *Handler) loadSource(ctx context.Context, work PreviewWork) (SourceImage
 }
 
 // previewPrompt 只描述发型变化与保持项：不打分、不评判五官/身材（红线 1）。
+// 输出比例显式要 3:4 竖构图——发型卡/历史/风格卡全是竖框；模型不听话也有
+// 归一化层的 3:4 裁切兜底（hairNormalizer），两层说的是同一条显示规范。
 func previewPrompt(work PreviewWork) string {
+	const aspectLine = "输出一张 3:4 竖构图照片，人物头顶留少量空间。"
 	if work.StyleName != "" {
-		return fmt.Sprintf("把照片中人物的发型换成「%s」，只改变发型；人物的面部特征、表情、妆容、服装与背景保持完全不变，效果自然真实。", work.StyleName)
+		return fmt.Sprintf("把照片中人物的发型换成「%s」，只改变发型；人物的面部特征、表情、妆容、服装与背景保持完全不变，效果自然真实。%s", work.StyleName, aspectLine)
 	}
-	return "为照片中的人物换一个自然好看的新发型，只改变发型；人物的面部特征、表情、妆容、服装与背景保持完全不变，效果自然真实。"
+	return "为照片中的人物换一个自然好看的新发型，只改变发型；人物的面部特征、表情、妆容、服装与背景保持完全不变，效果自然真实。" + aspectLine
 }
 
 func domainFail(class domain.ErrorClass, code string) domain.TaskResult {
