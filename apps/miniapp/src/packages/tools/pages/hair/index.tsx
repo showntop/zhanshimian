@@ -401,20 +401,17 @@ export default function Hair() {
     return slots
   }, [directions, readyHistory])
 
-  // 点已试过的方向＝回放（零成本）；点没试过的＝换这个方向重新生成；
-  // 自定义没有现成描述，点了打开输入层（写完「用这个描述生成」）
+  // 点卡片只做「选中」：已经生成过的顺带把它调出来看（零成本、即时），
+  // 没生成过的只改选中态——主按钮随之变成「生成这个效果」，点了才发请求（不偷跑额度）。
+  // 自定义方向没有描述可生成，点了直接开输入层。
   const openSlot = (slot: ResultSlot) => {
     if (busy || generating) return
+    setStyleId(slot.styleId)
     if (slot.preview) {
       adoptFromHistory(slot.preview)
       return
     }
-    setStyleId(slot.styleId)
-    if (slot.styleId === CUSTOM_DIRECTION_ID) {
-      openCustom()
-      return
-    }
-    void generate(false, slot.name, slot.styleId)
+    if (slot.styleId === CUSTOM_DIRECTION_ID) openCustom()
   }
 
   const activeDesc = (customActive ? customText : activeDirection?.desc) || HAIR_COPY.desc
@@ -423,6 +420,13 @@ export default function Hair() {
   const activeSlot = resultSlots.find((slot) => slot.styleId === preview?.style_id)
   const verdictTag = hasResult ? activeSlot?.tag : undefined
   const verdictDesc = hasResult ? activeSlot?.desc || HAIR_COPY.desc : activeDesc
+  // 主按钮说实话：选中的方向还没生成过 → 「生成这个效果」（点了才发请求，不偷跑额度）；
+  // 选中的就是正在展示的那张结果 → 「保存这个效果」
+  const selectedSlot = resultSlots.find((slot) => slot.styleId === styleId)
+  const pendingDirection = hasResult && selectedSlot && !selectedSlot.preview ? selectedSlot : undefined
+  const resultCtaText = pendingDirection
+    ? `生成「${pendingDirection.name}」效果`
+    : (preview?.saved ? HAIR_COPY.saved : HAIR_COPY.save)
   const customCardLabel = customActive && customText ? truncateLabel(customText) : HAIR_COPY.customCardHint
   const primaryText = generating
     ? HAIR_COPY.generating
@@ -544,9 +548,9 @@ export default function Hair() {
               </View>
             </View>
 
-            {/* 换个方向看看：卡面语义只有两类——有生成图＝试过的（点回放），没图的
-                只是可选项（点它直接生成该方向）。不再把内置示例模特图混进来，
-                也不会让人对着别人的脸猜「这是我的结果还是示例」 */}
+            {/* 换个方向看看：卡面语义只有两类——有生成图＝试过的（点它把它调出来看），
+                没图的只是可选项（点它＝选中，主按钮随之变成「生成这个效果」）。
+                高亮跟着「选中」走，不跟「正在展示」走。 */}
             <View className={`hair__turn ${enter(2)}`}>
               <Text className="hair__turn-label">{HAIR_COPY.directionLabel}</Text>
               <ScrollView scroll-x enhanced showScrollbar={false} className="hair__cards">
@@ -554,7 +558,7 @@ export default function Hair() {
                   {resultSlots.map((slot) => (
                     <View
                       key={slot.key}
-                      className={`hair__card${slot.styleId === preview!.style_id ? ' hair__card--active' : ''} pressable`}
+                      className={`hair__card${slot.styleId === styleId ? ' hair__card--active' : ''} pressable`}
                       onClick={() => openSlot(slot)}
                     >
                       {slot.preview?.media ? (
@@ -584,9 +588,12 @@ export default function Hair() {
                 fade-up 的 transform 在动画期间会视觉偏移固定栏，穿搭页同此处理 */}
             <View className="hair__foot hair__foot--cta">
               <PrimaryButton
-                text={preview!.saved ? HAIR_COPY.saved : HAIR_COPY.save}
-                disabled={preview!.saved}
-                onClick={() => void save()}
+                text={resultCtaText}
+                disabled={!pendingDirection && preview!.saved}
+                onClick={() => {
+                  if (pendingDirection) void generate(false, pendingDirection.name, pendingDirection.styleId)
+                  else void save()
+                }}
               />
               <View className="hair__foot-row">
                 {/* 换方向已经由上面的横滑承担：这条链接只负责「换张照片」这条路 */}
