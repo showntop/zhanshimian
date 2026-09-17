@@ -458,11 +458,17 @@ export default function Hair() {
             <View className={`hair__verdict ${enter(1)}`}>
               <Text className="hair__verdict-title serif">{styleName}</Text>
               <Text className="hair__verdict-desc">{activeDesc}</Text>
+              {/* 生成边界说明：只改发型，其余保持原样（与提示词同一条约束） */}
+              <Text className="hair__verdict-note">{HAIR_COPY.resultNote}</Text>
             </View>
 
-            {readyHistory.length > 1 ? (
+            {readyHistory.length > 0 ? (
+              // 历史条常显（只有一张时它就是当前结果）：结果页下半屏由它和 CTA 撑住，
+              // 4:3 横图占不满一屏，没有它中间会空一大块
               <View className={`hair__history ${enter(2)}`}>
-                <Text className="hair__history-label">{HAIR_COPY.historyLabel}</Text>
+                <Text className="hair__history-label">
+                  {readyHistory.length > 1 ? HAIR_COPY.historyLabel : HAIR_COPY.currentLabel}
+                </Text>
                 <ScrollView scroll-x enhanced showScrollbar={false} className="hair__history-scroll">
                   <View className="hair__history-rail">
                     {readyHistory.map((item) => (

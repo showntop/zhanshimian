@@ -556,7 +556,11 @@ export const HAIR_COPY = {
   save: '保存这个效果',
   saved: '已存到我的',
   tryAnother: '换个方向再试',
+  // 结果页边界说明：只改发型，其余保持原样（与提示词的约束同一件事）
+  resultNote: '只改了发型；五官、妆容、服装和背景保持原样',
   historyLabel: '试过的方向',
+  // 只有一张结果时不说「试过的方向」——那就是当前这一张
+  currentLabel: '当前方向',
   changePhoto: '换一张照片',
   retry: '再试一次',
   generateFailed: '生成没有完成，请重试',

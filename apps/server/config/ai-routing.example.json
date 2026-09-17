@@ -138,6 +138,25 @@
       ],
       "data_retention": "zero"
     },
+    "aliyun/qwen-image-edit-plus-hair": {
+      "vendor": "aliyun",
+      "protocol": "dashscope_wan",
+      "model": "qwen-image-edit-plus",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      "api_key_env": "ALIYUN_API_KEY",
+      "parameters": {
+        "size": "1536*1152"
+      },
+      "timeout_seconds": 180,
+      "output_image_cost": 0.3,
+      "max_input_images": 2,
+      "supports_multiple_reference_images": true,
+      "identity_preservation": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
+    },
     "aliyun/qwen-image-3.0": {
       "vendor": "aliyun",
       "protocol": "dashscope_wan",
@@ -146,6 +165,25 @@
       "api_key_env": "ALIYUN_API_KEY",
       "parameters": {
         "size": "1024*1536"
+      },
+      "timeout_seconds": 180,
+      "output_image_cost": 0.3,
+      "max_input_images": 2,
+      "supports_multiple_reference_images": true,
+      "identity_preservation": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
+    },
+    "aliyun/qwen-image-3.0-hair": {
+      "vendor": "aliyun",
+      "protocol": "dashscope_wan",
+      "model": "qwen-image-3.0",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      "api_key_env": "ALIYUN_API_KEY",
+      "parameters": {
+        "size": "1536*1152"
       },
       "timeout_seconds": 180,
       "output_image_cost": 0.3,
@@ -213,9 +251,9 @@
     },
     "hair_edit": {
       "policy": "quality_first",
-      "primary": "aliyun/qwen-image-3.0",
+      "primary": "aliyun/qwen-image-3.0-hair",
       "fallbacks": [
-        "aliyun/qwen-image-edit-plus"
+        "aliyun/qwen-image-edit-plus-hair"
       ],
       "max_cost_cny": 0.6
     },

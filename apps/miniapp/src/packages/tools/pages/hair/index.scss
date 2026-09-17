@@ -257,6 +257,14 @@
       line-height: 1.6;
       color: var(--ink-2);
     }
+
+    // 结果页边界说明：比判词低一档，读得到但不抢判词
+    &-note {
+      margin-top: 4rpx;
+      font-size: 22rpx;
+      line-height: 1.55;
+      color: var(--ink-3);
+    }
   }
 
   // ---------- S1 性别分段：方向目录按性别分组（女士/男士），右侧对齐不占一行高度 ----------
@@ -373,6 +381,9 @@
     display: flex;
     flex-direction: column;
     gap: 16rpx;
+    // 沉到固定 CTA 上方（判词紧跟照片，余量落在判词与历史条之间）：
+    // 4:3 横图只占一屏三分之一，不压住底部的话整屏会散成「一条图 + 一片空」
+    margin-top: auto;
 
     &-label {
       font-size: 22rpx;
