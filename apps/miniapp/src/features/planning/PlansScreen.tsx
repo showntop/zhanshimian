@@ -484,6 +484,15 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     } catch (error) {
       // 402/429 等计费错误先走购买引导（弹层→标记→profile 购买层），其余才落通用提示
       if (handleBillingError(error)) return
+      // report id 失效（服务端重置/报告被替换）：陈旧 state 必须丢掉重新对账，
+      // 不然空态/失败卡上的按钮会一直拿着死 id 撞 404
+      if (error instanceof PublicApiError && error.statusCode === 404) {
+        setReport(null)
+        setPlanSet(null)
+        setPlanSetId('')
+        void bootstrap()
+        return
+      }
       const message = error instanceof PublicApiError && error.message ? error.message : PLANNING_COPY.generateFailed
       Taro.showToast({ title: message, icon: 'none' })
     }

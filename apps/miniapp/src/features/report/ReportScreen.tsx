@@ -10,7 +10,7 @@
 //
 // 视觉沿用 09-11 旧线：全出血 Swiper hero + 骑缝胶片条 + 上叠内容板 + 固定底部 CTA。
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Taro from '@tarojs/taro'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { Swiper, SwiperItem, Text, View } from '@tarojs/components'
 import {
   CAPTURE_COPY,
@@ -95,8 +95,11 @@ export default function ReportScreen({ reportId, onReady, enter = staticEnter }:
   // 有方案的老用户会在这里被 listPlanSets 翻成 view。
   const [plansCta, setPlansCta] = useState<ReportPlansCtaState>('generate')
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const reportRef = useRef<ReportType | null>(null)
+  reportRef.current = report
+
+  const load = useCallback(async (background = false) => {
+    if (!background) setLoading(true)
     setFailed(false)
     try {
       const result = reportId
@@ -113,16 +116,31 @@ export default function ReportScreen({ reportId, onReady, enter = staticEnter }:
       setReport(result)
       setActiveRole(defaultReportRole(result))
       setActiveFindingId(null)
-    } catch {
-      setFailed(true)
+    } catch (error) {
+      // 后台对账的分寸：网络抖动不拆已渲染的页；但 404 意味着这份报告
+      // 在服务端已经不存在（重置/被替换）——CTA 已是死的，必须落错误态
+      if (!background || !reportRef.current || (error instanceof PublicApiError && error.statusCode === 404)) {
+        setFailed(true)
+      }
     } finally {
-      setLoading(false)
+      if (!background) setLoading(false)
     }
   }, [reportId])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  // 回访对账：报告页常驻页面栈，挂载后服务端的报告可能被重分析替换或清掉——
+  // 拿着已失效的 report id 点「量身定制」只会拿到 404（与 home / 方案页同一规则）
+  const firstShowRef = useRef(true)
+  useDidShow(() => {
+    if (firstShowRef.current) {
+      firstShowRef.current = false
+      return
+    }
+    void load(true)
+  })
 
   // ready 时序：内容（或失败/空态）首次到达才点亮。外壳恒 ready 会让
   // page--settled 提前钉住，数据晚到时 fade-up 被 animation:none 压掉，
