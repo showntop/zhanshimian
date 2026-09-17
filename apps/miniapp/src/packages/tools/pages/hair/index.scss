@@ -344,7 +344,9 @@
     }
 
     &-card {
-      width: 160rpx;
+      // 3:4 竖框：与发型预览的显示规范（服务端归一化裁切、内置示例）一致，
+      // 3:4 的图 widthFix 后恰好铺满，不再裁底
+      width: 150rpx;
       border-radius: var(--radius-md);
       overflow: hidden;
       border: 2rpx solid transparent;

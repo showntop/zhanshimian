@@ -432,7 +432,8 @@
     // （每页至多一个深色视觉锚点；两块 moss-deep 连排会互相抢焦点）
     &--lead {
       flex: 1 1 100%;
-      min-height: 210rpx;
+      // 视觉区是 3:4 竖框（见 &-visual），卡高让出框体 + 上下边距
+      min-height: 304rpx;
       justify-content: flex-end;
       padding: 32rpx 46% 30rpx 28rpx;
       background: #d9e2d1;
@@ -484,12 +485,16 @@
 
     &-visual {
       position: absolute;
-      top: 0;
-      right: 0;
+      top: 20rpx;
+      right: 20rpx;
       z-index: -2;
-      width: 54%;
-      height: 100%;
-      border-radius: 0;
+      // 发型预览域统一 3:4 竖框：与服务端归一化裁切（hairNormalizer 3:4）、
+      // 内置示例（525×700）同一条规范——3:4 的图恰好铺满，不再「竖图在横向盒里
+      // 缩成中央小岛」；历史遗留的非 3:4 图由框内 blur 衬底兜底。
+      width: 198rpx;
+      height: 264rpx;
+      border-radius: var(--radius-md);
+      overflow: hidden;
 
       // 失焦衬底铺满：照片两侧的空区是同图失焦放大版，不是死色块
       &-blur {
