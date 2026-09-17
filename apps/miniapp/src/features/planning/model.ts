@@ -180,6 +180,20 @@ export function inFlightPlanSetOperationIds(operations: readonly OperationRef[])
     .map((operation) => operation.id)
 }
 
+/** 分析在途状态（与 bootstrap active_operations 语义一致；终态不算——失败允许重拍，完成该去报告）。 */
+const ASSESSMENT_IN_FLIGHT = new Set(['accepted', 'running', 'retrying'])
+
+/**
+ * bootstrap active_operations 里在途的形象分析受理 id。
+ * 方案页空态据此区分「正在分析」（查看进度）与「未建档」（去拍摄）。
+ */
+export function analyzingAssessmentOperationId(operations: readonly OperationRef[]): string {
+  return (
+    operations.find((operation) => operation.kind === 'assessment' && ASSESSMENT_IN_FLIGHT.has(operation.status))
+      ?.id ?? ''
+  )
+}
+
 /**
  * 已发布方案集的 brief → Brief 页预填答案（「重新设计」入口）。
  * 逐字段对照文案表校验，表外的 key/值一律丢弃——契约演进丢枚举时宁可少填不填错；

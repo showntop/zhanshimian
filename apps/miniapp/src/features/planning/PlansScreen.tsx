@@ -38,6 +38,7 @@ import Skeleton from '../../components/skeleton'
 import SourceImage from '../../components/source-image'
 import TextLink from '../../components/text-link'
 import {
+  analyzingAssessmentOperationId,
   boundBodyMedia,
   briefFingerprint,
   createIdempotencyKey,
@@ -176,9 +177,10 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     return boot
   }, [])
 
-  /** Tab 入口：先问当前报告，再列 general 的方案集；报告都没有时区分"在分析"与"未建档"。 */
-  const bootstrap = useCallback(async () => {
-    setBootstrapped(false)
+  /** Tab 入口：先问当前报告，再列 general 的方案集；报告都没有时区分"在分析"与"未建档"。
+   *  background=true 是回 tab 的后台对账：已渲染内容（含空态）保留到响应到达，不闪骨架。 */
+  const bootstrap = useCallback(async (background = false) => {
+    if (!background) setBootstrapped(false)
     try {
       const [current, boot] = await Promise.all([
         qualityApi.getCurrentReport(),
@@ -186,10 +188,7 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       ])
       setActivePlanSetOps(inFlightPlanSetOperationIds(boot?.active_operations ?? []))
       if (!current) {
-        const assessment = (boot?.active_operations ?? []).find(
-          (op) => op.kind === 'assessment' && (op.status === 'accepted' || op.status === 'running' || op.status === 'retrying'),
-        )
-        setAnalyzingOperationId(assessment?.id ?? '')
+        setAnalyzingOperationId(analyzingAssessmentOperationId(boot?.active_operations ?? []))
         setReport(null)
         setBootstrapped(true)
         return
@@ -235,9 +234,21 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   // tab 页常驻：useState 初始化只在首次挂载消费交接条，
   // 「方案页 → Brief 页 → 提交 → switchTab 回来」的受理会无声丢失。
   // 每次 onShow 都取一次；取走即清，首次挂载已取过时这里是空操作。
+  const firstShowRef = useRef(true)
   useDidShow(() => {
     const next = takePlanSetHandoff()
     if (next) applyHandoff(next)
+    // 首次 onShow 跳过对账：挂载效应刚跑过 bootstrap（与 home 同一规则）
+    if (firstShowRef.current) {
+      firstShowRef.current = false
+      return
+    }
+    // 空态回访对账：tab 常驻、bootstrap 只跑一次——挂载后才发起的形象分析
+    //（拍摄页提交 → 进度页 → 切回方案 tab）拿不到，空态会停在「去形象分析」
+    // 把正在分析的用户引去重拍；离开期间分析完成的也一样查不到新报告。
+    // home 每次 onShow 都对账，这里对空态（无报告无方案集）做同一件事。
+    if (next || reportRef.current || planSetIdRef.current) return
+    void bootstrap(true)
   })
 
   // 只自动跑一次：切场景把 planSetId 清回 '' 时不得再次 bootstrap 把场景顶回去；

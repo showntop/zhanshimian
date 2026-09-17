@@ -3,6 +3,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  analyzingAssessmentOperationId,
   boundBodyMedia,
   briefFingerprint,
   createIdempotencyKey,
@@ -218,6 +219,22 @@ test('in-flight plan-set accepts are the only operations worth watching', () => 
   ]
   assert.deepEqual(inFlightPlanSetOperationIds(ops), ['op-1', 'op-2', 'op-3'])
   assert.deepEqual(inFlightPlanSetOperationIds([]), [])
+})
+
+test('analyzingAssessmentOperationId finds the in-flight analysis the plans empty state links to', () => {
+  const ops = [
+    { id: 'op-1', kind: 'plan_set', status: 'running' },
+    { id: 'op-2', kind: 'assessment', status: 'accepted' },
+    { id: 'op-3', kind: 'assessment', status: 'running' },
+    { id: 'op-4', kind: 'assessment', status: 'failed' },
+    { id: 'op-5', kind: 'assessment', status: 'succeeded' },
+    { id: 'op-6', kind: 'render', status: 'running' },
+  ]
+  // 有且只有一个在途分析：空态按钮指向进度页而不是重拍
+  assert.equal(analyzingAssessmentOperationId(ops), 'op-2')
+  assert.equal(analyzingAssessmentOperationId([]), '')
+  // 终态（失败/完成）不算在途：失败允许重拍，完成该去报告
+  assert.equal(analyzingAssessmentOperationId(ops.slice(3)), '')
 })
 
 test('a published brief prefills the scene brief page, table-checked field by field', () => {
