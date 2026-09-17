@@ -32,9 +32,10 @@ const STYLES = [
   { id: 'natural', name: '自然偏分', tag: '偏分 · 利落', desc: '干净利落，省心百搭' },
 ] as const
 
-// hero 照片统一「直出」：单层真图，永远按宽铺满、顶对齐、底部越界裁切——
-// 不给 frameAspect（不出现「按高铺满裁两侧」），横构图照片出矮横幅、竖构图出
-// 长竖幅，任何入图都不裁脸。框高完全随图（容器 height:auto）。
+// hero 照片统一「直出」：单层真图，永远按宽铺满、顶对齐——不给 frameAspect
+//（不出现「按高铺满裁两侧」），横构图照片出矮横幅、竖构图出长竖幅，任何
+// 入图都不裁脸。容器 max-height 700rpx 轻钳位：竖版正脸照裁掉的是胸部以下，
+// 脸始终完整（S0 是「确认将用哪张脸」），同时保住 S1 的一屏布局。
 function HeroPhoto(props: { media?: DisplayMedia | null; localPath?: string }) {
   const { media, localPath } = props
   // 工具新渲染层按 CORS 拦截 http://tmp/：本地路径渲染前换出（真机原样）

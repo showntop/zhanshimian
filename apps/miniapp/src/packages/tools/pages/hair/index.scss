@@ -45,18 +45,22 @@
   // ---------- hero 照片：直出（单层真图，anchor=top 顶对齐、底部越界裁切） ----------
   // 高度由 HeroPhoto onLoad 按真实宽高算出、内联在 &__hero 上；这里只负责铺满。
   // ---------- hero 照片：直出（单层真图，widthFix 按宽铺满、顶对齐不裁侧） ----------
-  // 高度随图；容器在文档流里，frame 包住它，覆盖层（角标/生成中）绝对定位其上
+  // 高度随图；max-height 700rpx 轻钳位——竖版正脸照裁掉的是胸部以下，
+  // 脸始终完整（S0 确认用哪张脸），同时保住 S1 的一屏布局
   &__photo {
     position: relative;
     z-index: 1;
     width: 100%;
     height: auto;
+    max-height: 700rpx;
+    overflow: hidden;
     background-color: transparent;
     border-radius: 0;
 
     &-img {
       width: 100%;
       height: auto;
+      max-height: 700rpx;
       background-color: transparent;
       border-radius: 0;
     }
