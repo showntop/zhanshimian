@@ -617,6 +617,15 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '422':
+          description: 照片门禁拒识（error.code=photo_rejected，message 为可公开原因；不落库，客户端引导换一张）
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorEnvelope"
         '500':
           "$ref": "#/components/responses/InternalError"
   "/v1/diagnostics/latest":

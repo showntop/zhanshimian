@@ -2,6 +2,7 @@ package diagnostic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -60,6 +61,36 @@ type DiagnosticOutput struct {
 	Tags          []string
 	Findings      []domain.DiagnosisFinding
 	Options       []domain.DiagnosisOption
+
+	// Rejected/ReasonCode 是照片内容门禁：模型先判照片是否可诊断，拒识时
+	// ReasonCode 是 photoRejectedMessages 的键，其余字段为空，绝不硬产结论
+	// （数据真实性红线：对建筑线稿输出「黑色圆领T恤」就是这么来的）。
+	Rejected   bool
+	ReasonCode string
+}
+
+// ErrPhotoRejected 照片门禁拒识：不落库、不产结论，客户端按
+// code=photo_rejected 给「换一张」的体面空态（红线 3/4）。
+var ErrPhotoRejected = errors.New("photo_rejected")
+
+// photoRejectedMessages 拒识原因的用户可读本（outfit 与 purchase 共用一份）。
+var photoRejectedMessages = map[string]string{
+	"no_person":             "照片里看不到人物，换一张你的全身照",
+	"no_product":            "照片里看不清要判断的物品，换一张试试",
+	"illustration":          "这张照片像是插画或效果图，换一张真实拍摄的照片",
+	"screenshot":            "这张照片像是屏幕截图，换一张真实拍摄的照片",
+	"multiple_people":       "照片里有多个人，换一张只有你本人的全身照",
+	"body_not_head_to_calf": "穿搭诊断需要从头到小腿的全身照，站远一步再拍",
+	"too_blurry":            "照片太模糊，换一张清晰一点的",
+	"too_dark":              "照片太暗，到光线好一点的地方再拍",
+}
+
+// PhotoRejectedMessage 拒识原因的公开文案；空或未知 code 回落到通用说法。
+func PhotoRejectedMessage(code string) string {
+	if msg, ok := photoRejectedMessages[code]; ok {
+		return msg
+	}
+	return "这张照片不适合诊断，换一张试试"
 }
 
 // Advisor 是诊断的 AI 能力接口：由消费方定义，provider/ai 提供实现。
@@ -141,6 +172,10 @@ func (s *Service) Run(ctx context.Context, userID string, input RunInput) (Diagn
 	})
 	if err != nil {
 		return Diagnosis{}, err
+	}
+	// 照片门禁拒识：不落库，把用户可读的原因透给客户端换一张（红线 4：错误态给下一步动作）。
+	if output.Rejected {
+		return Diagnosis{}, fmt.Errorf("%w: %s", ErrPhotoRejected, PhotoRejectedMessage(output.ReasonCode))
 	}
 	return s.writer.InsertDiagnostic(ctx, userID, Diagnosis{
 		Kind: input.Kind, Scene: input.Scene,

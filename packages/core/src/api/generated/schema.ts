@@ -2787,6 +2787,16 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            /** @description 照片门禁拒识（error.code=photo_rejected，message 为可公开原因；不落库，客户端引导换一张） */
+            422: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

@@ -25,7 +25,10 @@ func NewDiagnostic(runtime StructuredRuntime) *StructuredDiagnostic {
 
 var _ diagnostic.Advisor = (*StructuredDiagnostic)(nil)
 
-const diagnosticInstructions = "你是审慎、尊重用户的穿搭与购买顾问。基于形象报告、用户档案和照片给出一句话判断、一条最高优先级建议和若干观察点；只描述看得到的事实，建议具体可执行。不用缺陷、严重度等评判词；不评价颜值和身体；不编造用户没有的单品；语气保持尊重（positive=适合保留，improve=可提升，optional=可参考，caution=注意）。"
+const diagnosticInstructions = "你是审慎、尊重用户的穿搭与购买顾问。基于形象报告、用户档案和照片给出一句话判断、一条最高优先级建议和若干观察点；只描述看得到的事实，建议具体可执行。不用缺陷、严重度等评判词；不评价颜值和身体；不编造用户没有的单品；语气保持尊重（positive=适合保留，improve=可提升，optional=可参考，caution=注意）。" +
+	"先做照片门禁：照片里看不到可诊断的主体时 decision=reject 并给出 reason_code，其余字段一律输出空字符串或空数组，绝不硬答；照片可诊断时 decision=pass，reason_code 输出空字符串。" +
+	"穿搭诊断的主体是单一真人的全身或大半身穿搭：看不到人、插画、截图、多人主导、只到腰部以上、过糊、过暗一律拒识；可诊断时观察点只落在服装、鞋包与配色（category 用 outfit 或 color），不评发型妆容。" +
+	"购买判断的主体是清晰可见的物品本身：看不清物品、插画、截图、过糊、过暗一律拒识；可诊断时观察点只落在物品与搭配方向（category 用 item、outfit 或 color）。"
 
 func (d *StructuredDiagnostic) Diagnose(ctx context.Context, request diagnostic.DiagnosticRequest) (diagnostic.DiagnosticOutput, error) {
 	capability := CapabilityOutfitDiagnosis
@@ -65,6 +68,8 @@ func (d *StructuredDiagnostic) Diagnose(ctx context.Context, request diagnostic.
 }
 
 type diagnosticPayload struct {
+	Decision      string                 `json:"decision"`
+	ReasonCode    string                 `json:"reason_code"`
 	Conclusion    string                 `json:"conclusion"`
 	PriorityTitle string                 `json:"priority_title"`
 	PriorityCopy  string                 `json:"priority_copy"`
@@ -101,15 +106,34 @@ func (p diagnosticPayload) toOutput() diagnostic.DiagnosticOutput {
 	return diagnostic.DiagnosticOutput{
 		Conclusion: p.Conclusion, PriorityTitle: p.PriorityTitle, PriorityCopy: p.PriorityCopy,
 		Tags: p.Tags, Findings: findings, Options: options,
+		Rejected: p.Decision == "reject", ReasonCode: p.ReasonCode,
 	}
 }
 
 var diagnosticTones = map[string]bool{"positive": true, "improve": true, "optional": true, "caution": true}
 
+var diagnosticRejectReasons = map[string]bool{
+	"no_person": true, "no_product": true, "illustration": true, "screenshot": true,
+	"multiple_people": true, "body_not_head_to_calf": true, "too_blurry": true, "too_dark": true,
+}
+
 func validateDiagnosticPayload(data []byte) error {
 	var payload diagnosticPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return err
+	}
+	if payload.Decision != "pass" && payload.Decision != "reject" {
+		return errors.New("diagnostic provider output has invalid decision")
+	}
+	// 拒识分支：reason_code 必须合法，内容字段本就为空，不做内容校验
+	if payload.Decision == "reject" {
+		if !diagnosticRejectReasons[payload.ReasonCode] {
+			return errors.New("diagnostic provider output has invalid reject reason")
+		}
+		return nil
+	}
+	if payload.ReasonCode != "" {
+		return errors.New("diagnostic provider output has unexpected reason_code")
 	}
 	if !aiSafeText(payload.Conclusion) || !aiSafeText(payload.PriorityTitle) || !aiSafeText(payload.PriorityCopy) {
 		return errors.New("diagnostic provider output is incomplete or unsafe")
@@ -129,17 +153,20 @@ func validateDiagnosticPayload(data []byte) error {
 
 func diagnosticSchema() map[string]any {
 	return map[string]any{"type": "object", "additionalProperties": false,
-		"required": []string{"conclusion", "priority_title", "priority_copy", "tags", "findings", "options"},
+		"required": []string{"decision", "reason_code", "conclusion", "priority_title", "priority_copy", "tags", "findings", "options"},
 		"properties": map[string]any{
-			"conclusion":     map[string]any{"type": "string", "minLength": 1, "maxLength": 120},
-			"priority_title": map[string]any{"type": "string", "minLength": 1, "maxLength": 40},
-			"priority_copy":  map[string]any{"type": "string", "minLength": 1, "maxLength": 160},
+			"decision":    map[string]any{"type": "string", "enum": []string{"pass", "reject"}},
+			"reason_code": map[string]any{"type": "string", "enum": []string{"", "no_person", "no_product", "illustration", "screenshot", "multiple_people", "body_not_head_to_calf", "too_blurry", "too_dark"}},
+			// 内容字段允许空串：门禁拒识（decision=reject）时它们本就为空
+			"conclusion":     map[string]any{"type": "string", "maxLength": 120},
+			"priority_title": map[string]any{"type": "string", "maxLength": 40},
+			"priority_copy":  map[string]any{"type": "string", "maxLength": 160},
 			"tags":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "maxItems": 6},
 			"findings": map[string]any{"type": "array", "maxItems": 6, "items": map[string]any{
 				"type": "object", "additionalProperties": false, "required": []string{"label", "category", "tone"},
 				"properties": map[string]any{
 					"label":    map[string]any{"type": "string", "minLength": 1, "maxLength": 40},
-					"category": map[string]any{"type": "string"},
+					"category": map[string]any{"type": "string", "enum": []string{"outfit", "color", "item"}},
 					"tone":     map[string]any{"type": "string", "enum": []string{"positive", "improve", "optional", "caution"}},
 					"anchor_x": map[string]any{"type": "number", "minimum": 0, "maximum": 1},
 					"anchor_y": map[string]any{"type": "number", "minimum": 0, "maximum": 1},

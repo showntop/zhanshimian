@@ -9,6 +9,7 @@ import (
 
 func validDiagnosticJSON() []byte {
 	return []byte(`{` +
+		`"decision":"pass","reason_code":"",` +
 		`"conclusion":"整体干净利落，适合日常",` +
 		`"priority_title":"收紧下摆比例",` +
 		`"priority_copy":"把上衣前摆轻塞进腰头，露出腰线",` +
@@ -16,6 +17,32 @@ func validDiagnosticJSON() []byte {
 		`"findings":[{"label":"配色协调","category":"color","tone":"positive","anchor_x":0.5,"anchor_y":0.4}],` +
 		`"options":[{"name":"米色针织衫","note":"柔和过渡","reason":"与现有衣橱色系连续","tags":["日常"]}]` +
 		`}`)
+}
+
+// 照片门禁：没有人/插画/截图等主体缺失的照片必须拒识并给出合法 reason_code，
+// 内容字段为空也要通过校验——绝不硬产结论（数据真实性红线）。
+func TestDiagnosticRejectBranch(t *testing.T) {
+	rejectJSON := []byte(`{"decision":"reject","reason_code":"illustration",` +
+		`"conclusion":"","priority_title":"","priority_copy":"","tags":[],"findings":[],"options":[]}`)
+	runtime := &fakeStructuredRuntime{result: rejectJSON}
+	advisor := NewDiagnostic(runtime)
+	output, err := advisor.Diagnose(context.Background(), diagnostic.DiagnosticRequest{Kind: "outfit"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !output.Rejected || output.ReasonCode != "illustration" {
+		t.Fatalf("reject output = %+v", output)
+	}
+
+	// pass 时偷带 reason_code、或 reject 时 reason_code 非法，一律打回
+	if err := validateDiagnosticPayload([]byte(`{"decision":"pass","reason_code":"no_person",` +
+		`"conclusion":"a","priority_title":"b","priority_copy":"c","tags":[],"findings":[],"options":[]}`)); err == nil {
+		t.Fatal("pass with reason_code should fail validation")
+	}
+	if err := validateDiagnosticPayload([]byte(`{"decision":"reject","reason_code":"made_up",` +
+		`"conclusion":"","priority_title":"","priority_copy":"","tags":[],"findings":[],"options":[]}`)); err == nil {
+		t.Fatal("reject with unknown reason_code should fail validation")
+	}
 }
 
 // 诊断输出 schema 要求 anchor_x/y：源照片必须作为视觉模型图片输入随请求

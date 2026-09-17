@@ -34,11 +34,15 @@ func (f fakeReader) ReadDiagnosticMedia(context.Context, string, string) (domain
 type fakeAdvisor struct {
 	called  bool
 	request DiagnosticRequest
+	output  DiagnosticOutput
 }
 
 func (f *fakeAdvisor) Diagnose(_ context.Context, request DiagnosticRequest) (DiagnosticOutput, error) {
 	f.called = true
 	f.request = request
+	if f.output.Conclusion != "" || f.output.Rejected {
+		return f.output, nil
+	}
 	return DiagnosticOutput{Conclusion: "可行"}, nil
 }
 
@@ -104,6 +108,23 @@ func TestRunPersistsSourceMediaAsset(t *testing.T) {
 	}
 	if writer.inserted.MediaAssetID != "asset-1" {
 		t.Fatalf("source media asset dropped: %q", writer.inserted.MediaAssetID)
+	}
+}
+
+// 照片门禁拒识：不产结论、不落库，错误必须带 ErrPhotoRejected 与用户可读
+// 原因——客户端靠它给「换一张」空态，而不是把幻觉结果上屏。
+func TestRunPhotoRejectedNeverPersisted(t *testing.T) {
+	reader, writer, advisor, loader := newRunFixture()
+	advisor.output = DiagnosticOutput{Rejected: true, ReasonCode: "illustration"}
+	svc := New(reader, writer, advisor, loader)
+	_, err := svc.Run(context.Background(), "user-1", RunInput{
+		Kind: "outfit", Scene: "daily", MediaAssetID: "asset-1",
+	})
+	if !errors.Is(err, ErrPhotoRejected) {
+		t.Fatalf("err = %v, want ErrPhotoRejected", err)
+	}
+	if writer.inserted.ID != "" || writer.inserted.Conclusion != "" {
+		t.Fatalf("rejected diagnosis persisted: %+v", writer.inserted)
 	}
 }
 

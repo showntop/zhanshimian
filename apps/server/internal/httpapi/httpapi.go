@@ -17,6 +17,7 @@ import (
 	"github.com/zhanshimian/server/internal/service/advisor"
 	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/body"
+	"github.com/zhanshimian/server/internal/service/diagnostic"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
 	"github.com/zhanshimian/server/internal/service/wardrobe"
@@ -230,6 +231,9 @@ func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), wardrobe.ErrValidation.Error()+": "))
 	case errors.Is(err, billing.ErrPaymentUnavailable):
 		writeError(w, r, http.StatusServiceUnavailable, "payment_unavailable", "购买暂未开通")
+	case errors.Is(err, diagnostic.ErrPhotoRejected):
+		// 照片门禁拒识：422 + 用户可读原因，客户端据此给「换一张」空态
+		writeError(w, r, http.StatusUnprocessableEntity, "photo_rejected", strings.TrimPrefix(err.Error(), diagnostic.ErrPhotoRejected.Error()+": "))
 	case errors.Is(err, account.ErrValidation):
 		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), account.ErrValidation.Error()+": "))
 	case errors.Is(err, media.ErrValidation):
