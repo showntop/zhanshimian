@@ -32,26 +32,37 @@ const STYLES = [
   { id: 'natural', name: '自然偏分', tag: '偏分 · 利落', desc: '干净利落，省心百搭' },
 ] as const
 
-// hero 照片统一「完整入镜」：失焦衬底铺底 + aspectFit 锐图四边羽化溶进去。
-// 之前 widthFix 顶对齐裁底，竖版正脸照在宽扁相框里下巴直接被切掉——
-// S0 是「确认将用哪张脸」，看不到全脸就无从确认；S3 长发型的发尾同样不能被裁。
-// 角标在 stage 外自绘（stage 内的自动角标会被羽化遮罩切到，SCSS 里统一隐藏）。
-function HeroPhoto(props: { media?: DisplayMedia | null; localPath?: string }) {
-  const { media, localPath } = props
+// hero 照片统一「直出」：单层真图 anchor=top 按宽铺满、顶对齐、底部越界裁切，
+// 无模糊无羽化。框随图走——onLoad 拿真实宽高，hero 高度 = 内容宽 × 高宽比，
+// 钳在 [515, 900]rpx：4:3 头肩生成图落在下限附近，竖版正脸照到上限不再切下巴
+//（S0 是「确认将用哪张脸」，看不到全脸就无从确认；S3 长发型的发尾同样不能被裁）。
+function HeroPhoto(props: {
+  media?: DisplayMedia | null
+  localPath?: string
+  onHeightChange?: (rpx: number) => void
+}) {
+  const { media, localPath, onHeightChange } = props
   // 工具新渲染层按 CORS 拦截 http://tmp/：本地路径渲染前换出（真机原样）
   const localDisplay = useDisplayablePath(localPath ?? '')
+  const handleLoad = (event: { detail: { width: number | string; height: number | string } }) => {
+    const width = Number(event.detail.width)
+    const height = Number(event.detail.height)
+    if (!onHeightChange || width <= 0 || height <= 0) return
+    const raw = (686 * height) / width // 686rpx：页面内容区宽（750 − 两侧页边距）
+    onHeightChange(Math.round(Math.min(900, Math.max(515, raw))))
+  }
   return (
     <View className="hair__photo">
       {media ? (
-        <>
-          <SourceImage className="hair__photo-blur" media={media} mode="aspectFill" />
-          <SourceImage className="hair__photo-fit" media={media} mode="aspectFit" />
-        </>
+        <SourceImage
+          className="hair__photo-img"
+          media={media}
+          anchor="top"
+          frameAspect={4 / 3}
+          onLoad={handleLoad}
+        />
       ) : localPath ? (
-        <>
-          <Image className="hair__photo-blur" src={localDisplay} mode="aspectFill" />
-          <Image className="hair__photo-fit" src={localDisplay} mode="aspectFit" />
-        </>
+        <Image className="hair__photo-img" src={localDisplay} mode="widthFix" onLoad={handleLoad} />
       ) : null}
     </View>
   )
@@ -72,6 +83,8 @@ export default function Hair() {
   const [reportFace, setReportFace] = useState<DisplayMedia | null>(null)
   // S3 长按看原图
   const [holdOriginal, setHoldOriginal] = useState(false)
+  // 框随图走：hero 高度由 HeroPhoto onLoad 按真实宽高算出（钳位见 HeroPhoto）
+  const [heroHeight, setHeroHeight] = useState<number | null>(null)
   // S2 生成阶段文案（按时间推进，不是真实进度——真实进度看 Operation）
   const [genStage, setGenStage] = useState(0)
   // 用户已亲手选了照片 = 新意图：异步 resume 落地时不得把旧结果 adopt 回来劫持页面
@@ -277,7 +290,10 @@ export default function Hair() {
       <AppHeader title="发型设计" back />
       <View className={`hair${hasResult ? ' hair--done' : ''}`}>
         {/* S3 结果态相框拉高成竖幅：竖版生成图近乎满框，不再挤成中间一条 */}
-        <View className={`hair__hero photo-hero photo-hero--bleed${hasResult ? ' hair__hero--done' : ''} ${enter()}`}>
+        <View
+          className={`hair__hero photo-hero photo-hero--bleed${hasResult ? ' hair__hero--done' : ''} ${enter()}`}
+          style={heroHeight ? { height: `${heroHeight}rpx` } : undefined}
+        >
           <View className="hair__hero-frame">
             {hasResult ? (
               // S3 结果：长按看原图——对比是直觉动作，不是模式切换
@@ -287,7 +303,7 @@ export default function Hair() {
                 onTouchEnd={() => setHoldOriginal(false)}
                 onTouchCancel={() => setHoldOriginal(false)}
               >
-                <HeroPhoto media={preview!.media} />
+                <HeroPhoto media={preview!.media} onHeightChange={setHeroHeight} />
                 {preview!.source_media ? (
                   <View className={`hair__compare-original${holdOriginal ? ' hair__compare-original--on' : ''}`}>
                     <HeroPhoto media={preview!.source_media} />
@@ -305,7 +321,7 @@ export default function Hair() {
             ) : preview?.source_media ? (
               // S2 生成中：源图 + 沉浸等待（阶段文案 + 可离开明示），不是原地盖 mask
               <>
-                <HeroPhoto media={preview.source_media} />
+                <HeroPhoto media={preview.source_media} onHeightChange={setHeroHeight} />
                 <View className="hair__badge">
                   <Text>原本</Text>
                 </View>
@@ -325,7 +341,7 @@ export default function Hair() {
             ) : pendingPath ? (
               // S0 刚选的正脸照立刻上 hero（本地临时路径，不走 SourceImage 投影）
               <>
-                <HeroPhoto localPath={pendingPath} />
+                <HeroPhoto localPath={pendingPath} onHeightChange={setHeroHeight} />
                 <View className="hair__badge">
                   <Text>原本</Text>
                 </View>
@@ -333,7 +349,7 @@ export default function Hair() {
             ) : reportFace ? (
               // S0 档案正脸：生成默认用这张，进来先看到自己的脸
               <>
-                <HeroPhoto media={reportFace} />
+                <HeroPhoto media={reportFace} onHeightChange={setHeroHeight} />
                 <View className="hair__badge">
                   <Text>原本</Text>
                 </View>

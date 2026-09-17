@@ -7,12 +7,14 @@
   min-height: calc(100vh - 200rpx);
 
   // ---------- hero ----------
+  // 高度是图未加载时的回落值：HeroPhoto onLoad 后按真实宽高内联覆盖
+  //（钳位 [515, 900]，直出语言见 HeroPhoto）
   &__hero {
     height: 640rpx;
     border-radius: 0;
     border: 0;
 
-    // S3 结果态：相框拉高成竖幅，竖版生成图近乎满框（两侧羽化溶边保留）
+    // S3 结果态回落值
     &--done {
       height: 900rpx;
     }
@@ -29,43 +31,22 @@
     padding-bottom: 260rpx;
   }
 
-  // ---------- hero 照片：失焦衬底 + 完整入镜锐图（与穿搭/购买结果态同构） ----------
-  // 任何宽高比都看到整张脸：aspectFit 锐图四边羽化，溶进同图失焦放大的衬底
+  // ---------- hero 照片：直出（单层真图，anchor=top 顶对齐、底部越界裁切） ----------
+  // 高度由 HeroPhoto onLoad 按真实宽高算出、内联在 &__hero 上；这里只负责铺满。
   &__photo {
     position: absolute;
     inset: 0;
-    // 横向羽化（竖图两侧的锐图硬边溶进衬底）
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 48rpx, #000 calc(100% - 48rpx), transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 48rpx, #000 calc(100% - 48rpx), transparent);
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    background-color: transparent;
+    border-radius: 0;
 
-    // stage 内的自动角标会被羽化切到，角标统一在 stage 外自绘
-    .example-badge {
-      display: none;
-    }
-
-    &-blur {
-      position: absolute;
-      inset: 0;
-      z-index: 0;
+    &-img {
       width: 100%;
       height: 100%;
       background-color: transparent;
       border-radius: 0;
-      filter: blur(28rpx) saturate(1.2);
-      transform: scale(1.2);
-    }
-
-    &-fit {
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-      width: 100%;
-      height: 100%;
-      background-color: transparent;
-      border-radius: 0;
-      // 纵向羽化
-      -webkit-mask-image: linear-gradient(180deg, transparent, #000 64rpx, #000 calc(100% - 64rpx), transparent);
-      mask-image: linear-gradient(180deg, transparent, #000 64rpx, #000 calc(100% - 64rpx), transparent);
     }
   }
 
