@@ -432,13 +432,31 @@
     // （每页至多一个深色视觉锚点；两块 moss-deep 连排会互相抢焦点）
     &--lead {
       flex: 1 1 100%;
-      // 定高不变高：4:3 照片面板（317×238rpx）的几何确定性前提
+      // 定高不变高：视觉区比例（384×238rpx）是裁切方向的裁决依据，
+      // 卡高随内容漂移的话枢纽就失准（见 index.tsx frameAspect 注释）
       height: 238rpx;
       justify-content: flex-end;
-      // 右侧给面板让位：面板 317 + 呼吸 28
-      padding: 32rpx 345rpx 30rpx 28rpx;
+      padding: 32rpx 46% 30rpx 28rpx;
       background: #d9e2d1;
       isolation: isolate;
+
+      &::after {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        content: '';
+        // 左实右虚的融合带：左侧保住文案可读，右侧照片完整入镜后
+        // 脸落在视觉区中央（约 73% 卡宽），停顿点左移把清晰区让给它
+        background: linear-gradient(
+          90deg,
+          rgba(217, 226, 209, 1) 0%,
+          rgba(217, 226, 209, 0.96) 38%,
+          rgba(217, 226, 209, 0.55) 56%,
+          rgba(217, 226, 209, 0.14) 74%,
+          rgba(217, 226, 209, 0) 90%
+        );
+        pointer-events: none;
+      }
 
       .home__tool-copy {
         position: relative;
@@ -466,24 +484,25 @@
       }
     }
 
-    // 发型卡的固定 4:3 照片面板：与卡右缘齐平、占满卡高，外角随卡圆角。
-    // 面板 317rpx = 卡高 238 × 4/3：4:3 的图零裁切落入、四周零缝隙；
-    // 卡高是定值（几何确定性的前提），非 4:3 的旧图 anchor-top 只裁底部。
-    // 有清晰边界的照片不需要 mask/色罩去「溶」——影棚底色是照片自己的画布。
     &-visual {
       position: absolute;
       top: 0;
       right: 0;
       bottom: 0;
       z-index: -2;
-      width: 317rpx;
+      width: 56%;
       overflow: hidden;
-      border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
 
+      // 全出血直出：单层真图（anchor=top 按宽铺满、顶对齐、底部越界裁切），
+      // 无模糊无色罩——4:3 头肩规范保证裁掉的只是背景。左缘 40rpx 羽化 +
+      // 卡面渐变把图溶进卡面；右/上/下贴卡片边缘，随卡片圆角裁切。
       &-photo {
-        width: 100%;
-        height: 100%;
+        position: absolute;
+        inset: 0;
+        background-color: transparent;
         border-radius: 0;
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 40rpx, #000 100%);
+        mask-image: linear-gradient(90deg, transparent, #000 40rpx, #000 100%);
       }
     }
 

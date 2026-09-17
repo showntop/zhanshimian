@@ -244,7 +244,7 @@ func (h *Handler) loadSource(ctx context.Context, work PreviewWork) (SourceImage
 // 落在唯一变化的区域；模型仍输出竖构图时，归一化层的 4:3 顶对齐裁切兜底
 // （保留头部切掉以下，最坏情况也正好是头肩特写），两层同一条显示规范。
 func previewPrompt(work PreviewWork) string {
-	const aspectLine = "输出一张 4:3 横构图照片，只呈现人物肩颈以上，头肩充满画面（两侧仅留少量背景），头顶留白不超过画面高度的十分之一。"
+	const aspectLine = "输出一张 4:3 横构图照片，只呈现人物肩颈以上（头部完整、可见肩部），头顶留少量空间。"
 	if work.StyleName != "" {
 		return fmt.Sprintf("把照片中人物的发型换成「%s」，只改变发型；人物的面部特征、表情、妆容、服装与背景保持完全不变，效果自然真实。%s", work.StyleName, aspectLine)
 	}
