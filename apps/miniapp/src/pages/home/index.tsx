@@ -429,24 +429,24 @@ export default function Home() {
                       <Text className="home__tool-desc">{tool.desc}</Text>
                     </View>
                     {tool.key === 'hair' ? (
-                      // 全出血直出：4:3 头肩图顶对齐铺满右区，无任何滤镜效果。
-                      // 裁切方向枢纽 = 视觉区真实比例（384×238rpx，rpx 域常数）：
-                      // 图比例 ≤ 1.614 走「按宽铺满、顶对齐裁底」，> 1.614 的真横图
-                      // 走「按高铺满裁两侧」——任何比例都必然铺满，无露底缝隙。
+                      // 固定 4:3 照片面板：右缘与卡齐平、占满卡高，外角随卡圆角。
+                      // 示例与生成图（服务端 4:3 规范）零裁切精确落入；旧竖图
+                      // anchor-top 只裁底部、脸安全。有清晰边界的照片不需要
+                      // mask/色罩去「溶」——影棚底色是照片自己的画布。
                       <View className="home__tool-visual">
                         {hairLatestMedia ? (
                           <SourceImage
                             className="home__tool-visual-photo"
                             media={hairLatestMedia}
                             anchor="top"
-                            frameAspect={384 / 238}
+                            frameAspect={4 / 3}
                           />
                         ) : (
                           <SourceImage
                             className="home__tool-visual-photo"
                             reference={{ slug: 'natural', variant: 'hair' }}
                             anchor="top"
-                            frameAspect={384 / 238}
+                            frameAspect={4 / 3}
                           />
                         )}
                       </View>

@@ -7,22 +7,19 @@
   min-height: calc(100vh - 200rpx);
 
   // ---------- hero ----------
-  // 直出 + 框随图走：高度完全由图决定（widthFix），不裁侧不裁头；
-  // onPhoto 透明导航下照片垫到视口顶，顶部压 scrim 保证返回/标题可读
+  // 完整入镜的「照片台」：frame 满宽出血（moss 台面），照片以自身比例
+  // contain 居中（画布 686×615rpx，见 HeroPhoto）——任何构图都不裁切，
+  // 顶部压 scrim 保证浮在照片上的导航可读
   &__hero {
     height: auto;
-    min-height: 430rpx;
     border-radius: 0;
     border: 0;
-
-    &--done {
-      height: auto;
-    }
 
     &-frame {
       position: relative;
       width: 100%;
       height: auto;
+      background: var(--moss-soft);
     }
 
     &-scrim {
@@ -44,26 +41,25 @@
 
   // ---------- hero 照片：直出（单层真图，anchor=top 顶对齐、底部越界裁切） ----------
   // 高度由 HeroPhoto onLoad 按真实宽高算出、内联在 &__hero 上；这里只负责铺满。
-  // ---------- hero 照片：直出（单层真图，widthFix 按宽铺满、顶对齐不裁侧） ----------
-  // 高度随图；max-height 700rpx 轻钳位——竖版正脸照裁掉的是胸部以下，
-  // 脸始终完整（S0 确认用哪张脸），同时保住 S1 的一屏布局
+  // ---------- hero 照片：完整入镜的相纸 ----------
+  // 尺寸由 HeroPhoto onLoad 按真实宽高 contain 算出后内联（回退 686×515）；
+  // 居中圆角相纸，永不裁切——竖图出竖幅、横图出横幅、特写也不裁成只剩头
   &__photo {
     position: relative;
     z-index: 1;
     width: 100%;
-    height: auto;
-    max-height: 700rpx;
+    height: 515rpx;
+    margin: 0 auto;
+    border-radius: 24rpx;
     overflow: hidden;
     background-color: transparent;
-    border-radius: 0;
+  }
 
-    &-img {
-      width: 100%;
-      height: auto;
-      max-height: 700rpx;
-      background-color: transparent;
-      border-radius: 0;
-    }
+  &__photo-img {
+    width: 100%;
+    height: 100%;
+    background-color: transparent;
+    border-radius: 0;
   }
 
   &__badge {
@@ -193,10 +189,15 @@
     width: 100%;
     height: auto;
 
+    // 浮层用暗底 + contain 居中：源图（任意比例）完整可见，不比结果图高
     &-original {
       position: absolute;
       inset: 0;
       z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #191c19;
       opacity: 0;
       transition: opacity 0.18s ease;
 

@@ -32,20 +32,42 @@ const STYLES = [
   { id: 'natural', name: '自然偏分', tag: '偏分 · 利落', desc: '干净利落，省心百搭' },
 ] as const
 
-// hero 照片统一「直出」：单层真图，永远按宽铺满、顶对齐——不给 frameAspect
-//（不出现「按高铺满裁两侧」），横构图照片出矮横幅、竖构图出长竖幅，任何
-// 入图都不裁脸。容器 max-height 700rpx 轻钳位：竖版正脸照裁掉的是胸部以下，
-// 脸始终完整（S0 是「确认将用哪张脸」），同时保住 S1 的一屏布局。
-function HeroPhoto(props: { media?: DisplayMedia | null; localPath?: string }) {
-  const { media, localPath } = props
+// hero 照片「完整入镜」：onLoad 拿真实宽高，contain 适配进 686×615rpx 画布
+//（宽图封宽、高图封高），照片按自己的比例居中呈现，圆角相纸样式——
+// 任何构图都不裁切：横图出横幅、竖图出竖幅、大头贴特写也不会被裁成只剩头。
+// 画布封顶 615rpx：S0 确认照片 / S1 选方向 + CTA 始终一屏放下。
+const HERO_CANVAS_W = 686
+const HERO_CANVAS_H = 615
+
+function HeroPhoto(props: {
+  media?: DisplayMedia | null
+  localPath?: string
+  /** contain 画布（对比浮层用结果图的画布，避免比结果图更高） */
+  maxW?: number
+  maxH?: number
+}) {
+  const { media, localPath, maxW = HERO_CANVAS_W, maxH = HERO_CANVAS_H } = props
   // 工具新渲染层按 CORS 拦截 http://tmp/：本地路径渲染前换出（真机原样）
   const localDisplay = useDisplayablePath(localPath ?? '')
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null)
+  const handleLoad = (event: { detail: { width: number | string; height: number | string } }) => {
+    const w = Number(event.detail.width)
+    const h = Number(event.detail.height)
+    if (w <= 0 || h <= 0) return
+    const ratio = w / h
+    // contain（rpx 域，与机型无关）：宽图封宽、高图封高
+    setBox(
+      ratio >= maxW / maxH
+        ? { w: maxW, h: Math.round(maxW / ratio) }
+        : { h: maxH, w: Math.round(maxH * ratio) },
+    )
+  }
   return (
-    <View className="hair__photo">
+    <View className="hair__photo" style={box ? { width: `${box.w}rpx`, height: `${box.h}rpx` } : undefined}>
       {media ? (
-        <SourceImage className="hair__photo-img" media={media} anchor="top" mode="widthFix" />
+        <SourceImage className="hair__photo-img" media={media} mode="aspectFit" onLoad={handleLoad} />
       ) : localPath ? (
-        <Image className="hair__photo-img" src={localDisplay} mode="widthFix" />
+        <Image className="hair__photo-img" src={localDisplay} mode="aspectFit" onLoad={handleLoad} />
       ) : null}
     </View>
   )
@@ -287,7 +309,9 @@ export default function Hair() {
                 <HeroPhoto media={preview!.media} />
                 {preview!.source_media ? (
                   <View className={`hair__compare-original${holdOriginal ? ' hair__compare-original--on' : ''}`}>
-                    <HeroPhoto media={preview!.source_media} />
+                    {/* 对比浮层用结果图的画布（686×515）：源图 contain 居中，
+                        绝不会比结果图更高而溢出 */}
+                    <HeroPhoto media={preview!.source_media} maxW={686} maxH={515} />
                     <View className="hair__badge">
                       <Text>原本</Text>
                     </View>
