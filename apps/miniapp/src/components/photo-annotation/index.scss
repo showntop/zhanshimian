@@ -30,6 +30,16 @@
   transform: translate(-50%, -50%);
   z-index: 4;
   box-shadow: var(--shadow-annotation);
+
+  // 呼吸脉冲：锚点是「活的标注」，不是死贴纸
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -3rpx;
+    border-radius: 999rpx;
+    border: 3rpx solid var(--moss);
+    animation: anno-pulse 2.4s ease-out infinite;
+  }
 }
 
 .anno__tag {
@@ -130,6 +140,21 @@
   }
 }
 
+@keyframes anno-pulse {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
 @keyframes anno-drawer-in {
   from {
     opacity: 0;
@@ -143,7 +168,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .anno,
-  .anno__drawer {
+  .anno__drawer,
+  .anno__dot::after {
     animation: none;
   }
 }

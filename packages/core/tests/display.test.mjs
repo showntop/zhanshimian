@@ -63,3 +63,19 @@ test('generated, bundled and demo assets must be jpeg', () => {
     ),
   )
 })
+
+test('devtools local files render; any other http url stays rejected', () => {
+  const local = { source_kind: 'user_original', display_label: '原本' }
+  assert.ok(projectDisplayMedia(media({ ...local, url: 'http://tmp/ab12cd.jpg' })))
+  assert.ok(projectDisplayMedia(media({ ...local, url: 'http://usr/store/ab12cd' })))
+  assert.equal(projectDisplayMedia(media({ ...local, url: 'http://cdn.example/x.jpg' })), null)
+})
+
+test('inline image data urls render with a short react key', () => {
+  const inlined = projectDisplayMedia(
+    media({ source_kind: 'user_original', display_label: '原本', url: 'data:image/jpeg;base64,AAAA' }),
+  )
+  assert.equal(inlined?.src, 'data:image/jpeg;base64,AAAA')
+  // data URL 本体几百 KB，不进 React key
+  assert.equal(inlined?.key, 'asset-1:data')
+})

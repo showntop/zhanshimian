@@ -69,3 +69,8 @@ export function noContentOrThrow<T>(result: ApiResult<T, PublicErrorBody>): void
   if (isEmptySuccessStatus(result.response.status)) return
   bodyOrThrow(result)
 }
+
+/** 公开错误码判定（如 photo_rejected）：非 PublicApiError 一律 false。 */
+export function isPublicErrorCode(error: unknown, code: string): boolean {
+  return error instanceof PublicApiError && error.code === code
+}

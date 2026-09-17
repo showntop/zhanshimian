@@ -7,9 +7,10 @@ import { usePageShell } from '../../../../hooks/use-page-visibility'
 import { peripherals } from '../../../../app/api/peripherals'
 import { mediaUpload } from '../../../../app/api/client'
 import { uploadMedia } from '../../../../app/api/media-upload'
-import { readLocalImage } from '../../../../features/capture/local-file'
+import { normalizeUploadableImage, readLocalImage } from '../../../../features/capture/local-file'
 import AppHeader from '../../../../components/app-header'
 import SourceImage from '../../../../components/source-image'
+import { useDisplayablePath } from '../../../../hooks/use-displayable-path'
 import PrimaryButton from '../../../../components/primary-button'
 import BottomSheet from '../../../../components/bottom-sheet'
 import Pill from '../../../../components/pill'
@@ -36,6 +37,8 @@ export default function Wardrobe() {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ name: '', category: 'top', color: '' })
   const [formPhoto, setFormPhoto] = useState('')
+  // 工具新渲染层按 CORS 拦截 http://tmp/：渲染用换出值，上传仍用原路径
+  const formPhotoDisplay = useDisplayablePath(formPhoto)
   const { pageClass, enter } = usePageShell(!loading || items.length > 0, '', 'wardrobe')
 
   const load = useCallback(async () => {
@@ -57,7 +60,8 @@ export default function Wardrobe() {
       mediaType: ['image'],
       success: (res) => {
         const file = res.tempFiles[0]
-        if (file) setFormPhoto(file.tempFilePath)
+        // HEIC 等非 JPEG/PNG 会被服务端按字节拒：选完先归一成 JPEG
+        if (file) void normalizeUploadableImage(file.tempFilePath).then(setFormPhoto)
       },
     })
   }
@@ -230,7 +234,7 @@ export default function Wardrobe() {
         <View className="wd__form">
           <View className="wd__form-photo pressable" onClick={chooseFormPhoto}>
             {formPhoto ? (
-              <Image className="wd__form-photo-img" src={formPhoto} mode="aspectFill" />
+              <Image className="wd__form-photo-img" src={formPhotoDisplay} mode="aspectFill" />
             ) : (
               <Text className="wd__form-photo-hint">＋ 单品照片（可选）</Text>
             )}

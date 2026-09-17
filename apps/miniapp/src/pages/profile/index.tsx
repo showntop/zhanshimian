@@ -27,7 +27,7 @@ import { peripherals } from '../../app/api/peripherals'
 import { mediaUpload } from '../../app/api/client'
 import { uploadMedia } from '../../app/api/media-upload'
 import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
-import { readLocalImage } from '../../features/capture/local-file'
+import { normalizeUploadableImage, readLocalImage } from '../../features/capture/local-file'
 import { reportSourcePhoto } from '../../features/report/model'
 import { clearAllLocalState, readStorage, removeStorage, STORAGE_KEYS } from '../../services/storage'
 import { usePageShell } from '../../hooks/use-page-visibility'
@@ -204,8 +204,9 @@ export default function Profile() {
         setAvatarBusy(true)
         void (async () => {
           try {
-            // 上传三步事务：upload-intents → 直传 → complete，与建档页同一套
-            const image = await readLocalImage(file.tempFilePath)
+            // 上传三步事务：upload-intents → 直传 → complete，与建档页同一套。
+            // HEIC 等非 JPEG/PNG 先归一成 JPEG，服务端按字节嗅探会拒原生高效格式
+            const image = await readLocalImage(await normalizeUploadableImage(file.tempFilePath))
             const asset = await uploadMedia(mediaUpload, image, 'face')
             const next = await peripherals.updateMe({ avatar_media_id: asset.id })
             setAccount(next)

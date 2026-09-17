@@ -1,29 +1,79 @@
+// 发型设计：四步线性流程的样式。hero 一屏一事；方向卡横滑大卡；
+// 结果态 verdict + 历史条 + 沉底 CTA。主按钮区与购买判断同构。
 .hair {
   display: flex;
   flex-direction: column;
-  gap: 28rpx;
+  gap: 24rpx;
+  min-height: calc(100vh - 200rpx);
 
+  // ---------- hero ----------
   &__hero {
+    height: 640rpx;
+    border-radius: 0;
+    border: 0;
+
+    // S3 结果态：相框拉高成竖幅，竖版生成图近乎满框（两侧羽化溶边保留）
+    &--done {
+      height: 900rpx;
+    }
+
     &-frame {
       position: relative;
-      height: 720rpx;
-    }
-
-    &-img {
-      width: 100%;
-      height: 100%;
-    }
-
-    &-img.example-image {
       width: 100%;
       height: 100%;
     }
   }
 
+  // 结果态：给固定 CTA 栏留位
+  &--done {
+    padding-bottom: 260rpx;
+  }
+
+  // ---------- hero 照片：失焦衬底 + 完整入镜锐图（与穿搭/购买结果态同构） ----------
+  // 任何宽高比都看到整张脸：aspectFit 锐图四边羽化，溶进同图失焦放大的衬底
+  &__photo {
+    position: absolute;
+    inset: 0;
+    // 横向羽化（竖图两侧的锐图硬边溶进衬底）
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 48rpx, #000 calc(100% - 48rpx), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 48rpx, #000 calc(100% - 48rpx), transparent);
+
+    // stage 内的自动角标会被羽化切到，角标统一在 stage 外自绘
+    .example-badge {
+      display: none;
+    }
+
+    &-blur {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      background-color: transparent;
+      border-radius: 0;
+      filter: blur(28rpx) saturate(1.2);
+      transform: scale(1.2);
+    }
+
+    &-fit {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      background-color: transparent;
+      border-radius: 0;
+      // 纵向羽化
+      -webkit-mask-image: linear-gradient(180deg, transparent, #000 64rpx, #000 calc(100% - 64rpx), transparent);
+      mask-image: linear-gradient(180deg, transparent, #000 64rpx, #000 calc(100% - 64rpx), transparent);
+    }
+  }
+
   &__badge {
     position: absolute;
-    bottom: 20rpx;
-    right: 20rpx;
+    top: 20rpx;
+    left: 20rpx;
+    z-index: 4;
     padding: 8rpx 20rpx;
     border-radius: 999rpx;
     background: var(--badge);
@@ -31,46 +81,148 @@
     font-size: 18rpx;
   }
 
-  &__toggle {
+  // ---------- S0 输入透明化：将用的照片 + 换一张 ----------
+  &__use-photo {
     position: absolute;
-    top: 20rpx;
     left: 20rpx;
+    bottom: 20rpx;
+    z-index: 4;
+    padding: 10rpx 22rpx;
+    border-radius: 999rpx;
+    background: var(--glass);
+    font-size: 22rpx;
+    font-weight: 600;
+    color: var(--ink);
   }
 
-  // 生成中不盖死照片：只留扫描光带（.scan-sweep）滑过可见的正脸照，
-  // 状态收进一张磨砂小卡（--glass 本来是面板色，整面铺会变成空白挡板）。
-  &__mask {
+  &__hero-actions {
+    position: absolute;
+    top: 20rpx;
+    right: 20rpx;
+    z-index: 4;
+  }
+
+  &__hero-alt {
+    display: block;
+    padding: 12rpx 24rpx;
+    border-radius: 999rpx;
+    background: var(--glass);
+    font-size: 22rpx;
+    color: var(--ink);
+  }
+
+  // ---------- S0 空态：拍照示范引导（镜像穿搭诊断的上传条） ----------
+  &__upload {
+    position: relative;
+    height: 100%;
+
+    &-bar {
+      position: absolute;
+      left: 24rpx;
+      right: 24rpx;
+      bottom: 24rpx;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10rpx;
+      height: 88rpx;
+      border-radius: 999rpx;
+      background: var(--glass);
+      box-shadow: var(--shadow-card);
+
+      &-plus {
+        font-size: 32rpx;
+        line-height: 1;
+        color: var(--moss);
+      }
+
+      &-text {
+        font-size: 26rpx;
+        font-weight: 600;
+        color: var(--ink);
+      }
+    }
+  }
+
+  // ---------- S2 生成中：源图 + 沉浸等待 ----------
+  &__gen {
     position: absolute;
     inset: 0;
+    z-index: 3;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-end;
-    padding-bottom: 32rpx;
-    pointer-events: none;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 48rpx;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.28));
 
     &-card {
       display: flex;
       align-items: center;
-      gap: 16rpx;
-      padding: 16rpx 32rpx;
-      border-radius: 999rpx;
+      gap: 20rpx;
+      padding: 24rpx 32rpx;
+      border-radius: var(--radius-md);
       background: var(--glass);
-      backdrop-filter: blur(24rpx);
+      box-shadow: var(--shadow-card);
     }
 
     &-spin {
-      width: 32rpx;
-      height: 32rpx;
+      width: 44rpx;
+      height: 44rpx;
       border-width: 4rpx;
     }
 
-    &-text {
-      font-size: 24rpx;
+    &-texts {
+      display: flex;
+      flex-direction: column;
+      gap: 6rpx;
+    }
+
+    &-stage {
+      font-size: 26rpx;
+      font-weight: 600;
       color: var(--ink);
+    }
+
+    &-note {
+      font-size: 22rpx;
+      color: var(--ink-3);
     }
   }
 
+  // ---------- S3 结果：长按看原图 ----------
+  &__compare {
+    position: relative;
+    width: 100%;
+    height: 100%;
+
+    &-original {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      opacity: 0;
+      transition: opacity 0.18s ease;
+
+      &--on {
+        opacity: 1;
+      }
+    }
+  }
+
+  &__hold-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 28rpx;
+    z-index: 4;
+    transform: translateX(-50%);
+    padding: 10rpx 24rpx;
+    border-radius: 999rpx;
+    background: var(--glass);
+    font-size: 22rpx;
+    color: var(--ink);
+  }
+
+  // ---------- 图下导语 / 结果判词 ----------
   &__hint {
     display: flex;
     flex-direction: column;
@@ -85,25 +237,49 @@
     &-desc {
       font-size: 24rpx;
       line-height: 1.65;
+      color: var(--ink-3);
+    }
+  }
+
+  &__verdict {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+
+    // 方向名用 .serif：结果页的仪式感落点，一屏只此一处（红线）
+    &-title {
+      font-size: 44rpx;
+      font-weight: 700;
+      line-height: 1.26;
+      color: var(--ink);
+    }
+
+    &-desc {
+      font-size: 25rpx;
+      line-height: 1.6;
       color: var(--ink-2);
     }
   }
 
-  &__styles {
-    display: flex;
-    white-space: nowrap;
+  // ---------- S1 方向卡：横滑大卡，差异前置 ----------
+  &__cards {
     width: 100%;
+    white-space: nowrap;
+
+    &-rail {
+      display: inline-flex;
+      gap: 20rpx;
+      // 末张卡右边距
+      padding-right: var(--page-gutter);
+      width: max-content;
+    }
   }
 
-  &__style {
-    display: inline-flex;
-    flex-direction: column;
-    gap: 8rpx;
-    width: 176rpx;
-    margin-right: 16rpx;
-    padding: 12rpx;
-    border-radius: var(--radius-sm);
-    background: var(--surface);
+  &__card {
+    width: 300rpx;
+    border-radius: var(--radius-md);
+    background: var(--surface, #fff);
+    overflow: hidden;
     border: 2rpx solid transparent;
 
     &--active {
@@ -111,65 +287,145 @@
     }
 
     &-img {
-      width: 152rpx;
-      height: 190rpx;
-      border-radius: var(--radius-sm);
+      width: 100%;
+      height: 320rpx;
+      // 发型参考图的人脸在上半部：放大裁出头顶至肩的发型区
+      transform: scale(2.3);
+      transform-origin: 50% 0;
     }
 
-    &-img.example-image {
-      width: 152rpx;
-      height: 190rpx;
+    &-body {
+      display: flex;
+      flex-direction: column;
+      gap: 6rpx;
+      padding: 20rpx 24rpx 24rpx;
+      white-space: normal;
     }
 
     &-name {
-      font-size: 22rpx;
+      font-size: 28rpx;
+      font-weight: 700;
       color: var(--ink);
-      text-align: center;
+    }
+
+    &-tag {
+      font-size: 20rpx;
+      color: var(--moss);
+    }
+
+    &-desc {
+      font-size: 22rpx;
+      line-height: 1.5;
+      color: var(--ink-3);
     }
   }
 
+  // ---------- 结果页底部历史条 ----------
+  &__history {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+
+    &-label {
+      font-size: 22rpx;
+      color: var(--ink-3);
+    }
+
+    &-scroll {
+      width: 100%;
+      white-space: nowrap;
+    }
+
+    &-rail {
+      display: inline-flex;
+      gap: 16rpx;
+      padding-right: var(--page-gutter);
+      width: max-content;
+    }
+
+    &-card {
+      width: 160rpx;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 2rpx solid transparent;
+
+      &--active {
+        border-color: var(--moss);
+      }
+    }
+
+    &-img {
+      width: 100%;
+      height: 200rpx;
+    }
+
+    &-name {
+      display: block;
+      padding: 12rpx 0 4rpx;
+      font-size: 20rpx;
+      text-align: center;
+      color: var(--ink-2);
+      white-space: normal;
+    }
+  }
+
+  // ---------- 失败态：原因 + 双动作 ----------
   &__failed {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
     padding: 24rpx 28rpx;
     border-radius: var(--radius-md);
     background: var(--moss-soft);
 
     &-text {
       font-size: 24rpx;
-      color: var(--warn);
+      line-height: 1.6;
+      color: var(--ink);
+    }
+
+    &-row {
+      display: flex;
+      gap: 32rpx;
+    }
+
+    &-action {
+      padding: 8rpx 0;
+      font-size: 24rpx;
+      font-weight: 600;
+      color: var(--moss);
     }
   }
 
+  // ---------- 底部操作 ----------
   &__foot {
     display: flex;
     flex-direction: column;
-    gap: 20rpx;
-    margin-top: 8rpx;
+    gap: 12rpx;
+    margin-top: auto;
+
+    // S3 固定 CTA 栏：竖幅相框拉高后按钮沉在拇指位，内容从栏底渐显滚过
+    &--cta {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 20;
+      margin-top: 0;
+      padding: 32rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 8rpx);
+      background: linear-gradient(180deg, rgba(244, 245, 242, 0), var(--bg) 72rpx);
+    }
 
     &-row {
       display: flex;
       justify-content: center;
-      gap: 40rpx;
+      gap: 48rpx;
     }
 
     &-alt {
+      padding: 20rpx 8rpx;
       font-size: 24rpx;
       color: var(--moss);
-      text-decoration: underline;
     }
   }
-}
-
-.hair__toggle {
-  position: absolute; top: 20rpx; left: 20rpx;
-  display: inline-flex; padding: 6rpx;
-  border-radius: 999rpx; background: var(--glass);
-  backdrop-filter: blur(24rpx); border: 1rpx solid var(--line);
-}
-.hair__toggle-seg {
-  display: flex; align-items: center; justify-content: center;
-  min-width: 100rpx; height: 52rpx; border-radius: 999rpx;
-  font-size: 22rpx; color: var(--ink-2); transition: all 0.2s ease;
-}
-.hair__toggle-seg--active {
-  background: var(--surface-strong); color: var(--ink); font-weight: 600;
 }

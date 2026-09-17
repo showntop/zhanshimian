@@ -26,7 +26,8 @@ import { submitAssessment, assessmentSubmitErrorText } from '../assessment/start
 import { handleBillingError } from '../../services/billing'
 import PrimaryButton from '../../components/primary-button'
 import SourceImage from '../../components/source-image'
-import { mimeTypeOf, readLocalImage } from './local-file'
+import { mimeTypeOf, normalizeUploadableImage, readLocalImage, stabilizeLocalPath } from './local-file'
+import { useDisplayablePath } from '../../hooks/use-displayable-path'
 import {
   CAPTURE_ROLES,
   assessmentIdempotencyKey,
@@ -64,17 +65,21 @@ const LOCAL_PREVIEW_EXPIRES_AT = '9999-12-31T00:00:00Z'
  * 槽位当前该渲染的图。
  *
  * 关键事实：上传成功后服务端只回 asset id——MediaAsset 没有 URL，契约里也没有媒体读取接口。
- * 所以本地临时文件是整条建档流程里唯一能渲染的图源。这里显式声明 `source_kind: 'user_original'`
+ * 所以本地文件是整条建档流程里唯一能渲染的图源。这里显式声明 `source_kind: 'user_original'`
  * （角标「原本」、不弱化）：这是**声明**，不是从路径/后缀/来源猜出来的，用户刚拍的照片本来就是用户原图。
  *
- * 已知边界：微信开发者工具的 chooseMedia 返回 `http://tmp/...`，投影只认 https/wxfile/file，
- * 于是开发者工具里槽位落到空态（真机是 `wxfile://`，正常显示）。这里不放宽协议白名单去迁就它——
- * 那条白名单是挡"服务端塞个 http 图进来"的，放宽的代价远大于开发者工具看不见预览。
+ * localPath 在 ingest 入口已被 stabilizeLocalPath 沉淀到本地持久目录（真机
+ * wxfile://；开发者工具 http://usr，工具的本地文件模拟，投影白名单含这两个
+ * 本地主机名——见 media/display.ts 的 isDevtoolsLocalFile）。白名单不对一般
+ * http:// 开口：它是挡「服务端塞个 http 图进来」的。
+ *
+ * displayPath：工具 lib 3.17.1 起渲染层把 http://tmp/、http://usr/ 按 CORS
+ * 拦截，投影进 url 的是换出后的可渲染值（data URL），不是本地路径本体。
  */
-function slotMedia(role: CaptureRole, slot: CaptureSlot): DisplayMedia | null {
+function slotMedia(role: CaptureRole, slot: CaptureSlot, displayPath: string): DisplayMedia | null {
   if (slot.media) return slot.media
   if (!slot.localPath) return null
-  return localPreview(role, slot.localPath, `local-${role}`)
+  return localPreview(role, displayPath || slot.localPath, `local-${role}`)
 }
 
 /** 本地临时文件的用户原图投影：还没拿到 asset id 时用本地键占位（只参与 React key）。 */
@@ -93,6 +98,13 @@ export default function CaptureScreen() {
   const [slots, setSlots] = useState<CaptureSlots>(createSlots)
   const [focusRole, setFocusRole] = useState<CaptureRole>('face')
   const [busy, setBusy] = useState(false)
+  // 工具新渲染层按 CORS 拦截 http://tmp/、http://usr/：每个槽位的本地路径
+  // 各换出一份可渲染值（真机原样返回）。state 里存的仍是原路径。
+  const faceDisplay = useDisplayablePath(slots.face.localPath)
+  const sideDisplay = useDisplayablePath(slots.side.localPath)
+  const bodyDisplay = useDisplayablePath(slots.body.localPath)
+  const displayPath = (role: CaptureRole): string =>
+    role === 'face' ? faceDisplay : role === 'side' ? sideDisplay : bodyDisplay
 
   const photos = photosByRole(slots)
   const done = CAPTURE_ROLES.filter((role) => slots[role].phase === 'ready').length
@@ -113,10 +125,13 @@ export default function CaptureScreen() {
   const ingest = async (role: CaptureRole, filePath: string): Promise<boolean> => {
     patch(role, { phase: 'hashing', localPath: filePath, media: null, errorText: '' })
     try {
-      const file = await readLocalImage(filePath)
-      patch(role, { phase: 'uploading' })
+      // 先沉淀成 wxfile://：开发者工具的 http://tmp 临时路径过不了投影协议白名单，
+      // 且临时文件被微信清理后「重传这一份」会永远失败
+      const stablePath = await stabilizeLocalPath(filePath)
+      const file = await readLocalImage(stablePath)
+      patch(role, { phase: 'uploading', localPath: stablePath })
       const asset = await uploadMedia(mediaUpload, file, role)
-      patch(role, { phase: 'ready', media: localPreview(role, filePath, asset.id), errorText: '' })
+      patch(role, { phase: 'ready', media: localPreview(role, stablePath, asset.id), errorText: '' })
       return true
     } catch (error) {
       // 真机排障依赖 vConsole：保留原始错误（域名 600002 / 签名 403 / sha256 不支持在此区分）。
@@ -148,7 +163,8 @@ export default function CaptureScreen() {
       ...(source === 'camera' && role !== 'body' ? { camera: 'front' as const } : {}),
       success: (res) => {
         const file = res.tempFiles[0]
-        if (file) void ingest(role, file.tempFilePath)
+        // HEIC 等非 JPEG/PNG 会被服务端按字节拒：先归一成 JPEG 再 ingest
+        if (file) void normalizeUploadableImage(file.tempFilePath).then((path) => ingest(role, path))
         else patch(role, { phase: revertTo })
       },
       fail: (error) => {
@@ -208,7 +224,7 @@ export default function CaptureScreen() {
   }
 
   const previewLarge = (role: CaptureRole) => {
-    const media = slotMedia(role, slots[role])
+    const media = slotMedia(role, slots[role], displayPath(role))
     if (media) Taro.previewImage({ current: media.url, urls: [media.url] })
   }
 
@@ -236,7 +252,10 @@ export default function CaptureScreen() {
         void Promise.all(
           roles.map((role, index) => {
             const file = res.tempFiles[index]
-            return file ? ingest(role, file.tempFilePath) : Promise.resolve(false)
+            // 同上：非 JPEG/PNG 先归一成 JPEG（批量选图逐张转换）
+            return file
+              ? normalizeUploadableImage(file.tempFilePath).then((path) => ingest(role, path))
+              : Promise.resolve(false)
           }),
         ).then((outcomes) => {
           if (outcomes.some((ok) => !ok)) {
@@ -310,7 +329,7 @@ export default function CaptureScreen() {
         {CAPTURE_ROLES.map((role, index) => {
           const slot = slots[role]
           const copy = CAPTURE_COPY.shots[role]
-          const media = slotMedia(role, slot)
+          const media = slotMedia(role, slot, displayPath(role))
           const masked = slot.phase === 'hashing' || slot.phase === 'uploading'
           return (
             <View

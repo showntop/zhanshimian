@@ -123,8 +123,11 @@ client.use({
 })
 
 /**
- * 幂等键由业务语义决定：同一个文件（sha256）或同一个 intent 重试时复用同一把键，
+ * 幂等键由业务语义决定：同一用途的同一个文件（purpose + sha256）重试时复用同一把键，
  * 服务端因此重放而不是重复建资产。不要在这里引入时间戳或随机数。
+ * 注意种子必须含 purpose：同一张照片可以分别进建档（face/side/body）和
+ * 穿搭/购买（body/wardrobe），不带 purpose 时同一 sha256 换用途会撞
+ * 同一把键、payload 不同 → 409 idempotency_conflict。
  */
 function idempotencyKey(kind: string, seed: string): string {
   return `${kind}:${seed}`
@@ -146,7 +149,7 @@ export const mediaUpload: MediaUploadPort = {
     client
       .POST('/v1/media/upload-intents', {
         body: input,
-        params: { header: { 'Idempotency-Key': idempotencyKey('upload-intent', input.sha256) } },
+        params: { header: { 'Idempotency-Key': idempotencyKey('upload-intent', `${input.purpose}:${input.sha256}`) } },
       })
       .then(dataOrThrow),
 

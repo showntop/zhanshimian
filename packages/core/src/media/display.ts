@@ -39,6 +39,21 @@ function badgeFor(sourceKind: DisplayMedia['source_kind']): DisplayBadge {
   }
 }
 
+// http://tmp/ 与 http://usr/ 不是网络来源：微信开发者工具用这两个主机名模拟本地
+// 文件系统（临时目录 / USER_DATA_PATH，对应真机的 wxfile://tmp / wxfile://usr），
+// 开发者工具的 <image> 能正常渲染它们。真机不会出现这两个主机名——服务端就算
+// 下发这种字符串也只是一张裂图，变不成别人的照片，所以放行不开任何口子；
+// 其余 http:// 一律按「渲染不了」拒掉。
+// data:image/ 同理是自包含的内联图（工具新渲染层拦截 http://tmp/ 后的换出形态，
+// 见 miniapp local-file.ts 的 displayableImagePath），不是网络来源，放行。
+function isDevtoolsLocalFile(url: string): boolean {
+  return url.startsWith('http://tmp/') || url.startsWith('http://usr/')
+}
+
+function isInlineImageData(url: string): boolean {
+  return url.startsWith('data:image/')
+}
+
 export function projectDisplayMedia(
   media: DisplayMedia | null | undefined,
   now = Date.now(),
@@ -48,7 +63,9 @@ export function projectDisplayMedia(
   if (
     !url.startsWith('https://') &&
     !url.startsWith('wxfile://') &&
-    !url.startsWith('file://')
+    !url.startsWith('file://') &&
+    !isInlineImageData(url) &&
+    !isDevtoolsLocalFile(url)
   ) {
     return null
   }
@@ -64,7 +81,9 @@ export function projectDisplayMedia(
   }
 
   return {
-    key: `${media.asset_id}:${url}`,
+    // React 列表 key。data URL 自身就是几百 KB 的字符串，不进 key——
+    // 它没有独立身份，asset_id 就是身份（同一槽位换图必然换 asset_id 或重挂）
+    key: isInlineImageData(url) ? `${media.asset_id}:data` : `${media.asset_id}:${url}`,
     src: url,
     badge: badgeFor(media.source_kind),
     soften:

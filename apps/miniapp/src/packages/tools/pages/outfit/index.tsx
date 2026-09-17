@@ -10,8 +10,9 @@ import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility
 import { peripherals } from '../../../../app/api/peripherals'
 import { qualityApi } from '../../../../app/api/quality'
 import { mediaUpload } from '../../../../app/api/client'
+import { isPublicErrorCode } from '../../../../app/api/result'
 import { uploadMedia } from '../../../../app/api/media-upload'
-import { readLocalImage } from '../../../../features/capture/local-file'
+import { normalizeUploadableImage, readLocalImage } from '../../../../features/capture/local-file'
 import { handleBillingError } from '../../../../services/billing'
 import { billingErrorMessage } from '../../../../services/billing-error'
 import {
@@ -21,7 +22,8 @@ import {
 } from '../../../../services/outfit-session'
 import { readStorage, writeStorage } from '../../../../services/storage'
 import { splitAdviceTitle } from '../../../../services/advice-title'
-import AppHeader from '../../../../components/app-header'
+import AppHeader, { getNavMetrics } from '../../../../components/app-header'
+import { useDisplayablePath } from '../../../../hooks/use-displayable-path'
 import PrimaryButton from '../../../../components/primary-button'
 import SourceImage from '../../../../components/source-image'
 import PhotoAnnotationLayer from '../../../../components/photo-annotation'
@@ -33,8 +35,17 @@ import './index.scss'
 const OUTFIT_GUIDE_IMAGE = '/assets/capture/outfit-guide.jpg'
 
 // hero 相框比例（rpx，与 index.scss 一致）：锚点按 aspectFit 可视区重映射。
+// 结果态相框更大（满宽出血 + 820rpx 高），坐标框必须跟着状态走，否则锚点偏移。
 const HERO_W = 686
 const HERO_H = 640
+const HERO_DONE_W = 750
+const HERO_DONE_H = 820
+// 结果态照片与导航栏之间的呼吸缝：aspectFit 高度受限时头顶必然贴 stage 顶，
+// stage 顶 = 导航底 + 这道缝，头才不会顶着导航栏（stage 内照片区 = 820-56=764rpx）
+const HERO_DONE_GAP = 56
+// 结果态 hero 底部的停靠带：竖版全身照高度受限，脚底必然贴 stage 底——
+// stage 底边抬高 120rpx，板子上叠（88rpx）与底部融化只盖停靠带，不盖脚
+const HERO_DONE_DOCK = 120
 
 const CONTEXTS = [
   { key: 'daily', label: '日常' },
@@ -54,6 +65,8 @@ export default function Outfit() {
   const [error, setError] = useState('')
   // 日限（429/402）体面错误态：明日再来 + 查看上次结果，不进计费购买链
   const [limit, setLimit] = useState<{ title: string; body: string } | null>(null)
+  // 照片门禁拒识（422 photo_rejected）：照片保留在 hero，原因上屏，动作是「换一张」
+  const [rejectedMsg, setRejectedMsg] = useState('')
   // 所选照片真实宽高（onLoad 采集）：aspectFit 可视区锚点换算
   const [photoDims, setPhotoDims] = useState<{ w: number; h: number } | null>(null)
 
@@ -76,6 +89,12 @@ export default function Outfit() {
         title: serverMsg || BILLING_COPY.rateLimited,
         body: serverMsg && serverMsg !== BILLING_COPY.rateLimited ? BILLING_COPY.rateLimited : '',
       })
+      setError('')
+      return
+    }
+    if (isPublicErrorCode(e, 'photo_rejected')) {
+      // 拒识不是「失败重试」：同一张照片再诊一次结果一样，动作必须是换照片
+      setRejectedMsg((e as Error)?.message || '这张照片不适合诊断，换一张试试')
       setError('')
       return
     }
@@ -107,6 +126,7 @@ export default function Outfit() {
             if (event.busy) {
               setError('')
               setLimit(null)
+              setRejectedMsg('')
             }
             return
           }
@@ -138,23 +158,26 @@ export default function Outfit() {
       sizeType: ['compressed'],
       success: (res) => {
         const file = res.tempFiles[0]
-        if (file) {
-          setPhotoPath(file.tempFilePath)
+        if (!file) return
+        // HEIC 等非 JPEG/PNG 会被服务端按字节拒：选完先归一成 JPEG 再进状态与草稿
+        void normalizeUploadableImage(file.tempFilePath).then((path) => {
+          setPhotoPath(path)
           setPhotoMedia(null)
           setResult(null)
           setPhotoDims(null)
           setError('')
           setLimit(null)
+          setRejectedMsg('')
           freshStartRef.current = true
           // 草稿同步换成新照片：进行中的旧请求落定时就不会再盖回来
           outfitSession.writeDraft({
             pending: false,
             scene,
-            photoPath: file.tempFilePath,
+            photoPath: path,
             mediaId: '',
             result: null,
           })
-        }
+        })
       },
     })
   }
@@ -165,6 +188,7 @@ export default function Outfit() {
     setBusy(true)
     setError('')
     setLimit(null)
+    setRejectedMsg('')
     // 提到 try 外：catch 要用它判断「草稿是否已换照片」
     let mediaId = ''
     try {
@@ -223,6 +247,7 @@ export default function Outfit() {
       applySession(latest)
       setLimit(null)
       setError('')
+      setRejectedMsg('')
     } catch {
       /* 拉不到历史：保持日限错误态 */
     }
@@ -234,41 +259,96 @@ export default function Outfit() {
     setResult(null)
     setError('')
     setLimit(null)
+    setRejectedMsg('')
   }
 
   const shownMedia: DisplayMedia | null = photoMedia ?? result?.source_media ?? null
+  // 工具新渲染层按 CORS 拦截 http://tmp/、http://usr/：渲染用换出值，
+  // 状态与草稿里存原路径（上传、跨页恢复都靠它）
+  const photoDisplayPath = useDisplayablePath(photoPath)
+  // 结果态 hero 出血到屏幕顶：导航区 + 一道呼吸缝只铺模糊衬底，前景照片与
+  // 锚点层整体下移——否则头部顶进状态栏/灵动岛，或贴着导航栏下沿，都不协调。
+  // hero 总高不变（导航高 + 820rpx），stage 下移的 56rpx 从照片区扣（764rpx）。
+  const nav = getNavMetrics()
+  const rpxPx = nav.windowWidth / 750
+  const doneHeroStyle = result
+    ? { height: `${nav.navHeight + (HERO_DONE_H + HERO_DONE_DOCK) * rpxPx}px` }
+    : undefined
+  const doneStageStyle = result
+    ? {
+        top: `${nav.navHeight + HERO_DONE_GAP * rpxPx}px`,
+        bottom: `${HERO_DONE_DOCK * rpxPx}px`,
+      }
+    : undefined
+  // 锐图四边羽化：照片可见矩形（aspectFit letterbox）用 photoDims 实测，
+  // mask 渐变精确压在照片四条边上，溶进底下的对焦模糊层——横图竖图、
+  // 任何屏宽都没有矩形硬边。photoDims 未就绪前用 SCSS 里的兜底渐变。
+  const FEATHER = 44
+  const stageWpx = nav.windowWidth
+  const stageHpx = (result ? HERO_DONE_H - HERO_DONE_GAP : HERO_H) * rpxPx
+  let photoMaskVars: Record<string, string> | undefined
+  if (photoDims && photoDims.w > 0 && photoDims.h > 0) {
+    const sc = Math.min(stageWpx / photoDims.w, stageHpx / photoDims.h)
+    const vw = photoDims.w * sc
+    const vh = photoDims.h * sc
+    const offL = (stageWpx - vw) / 2
+    const offT = (stageHpx - vh) / 2
+    photoMaskVars = {
+      '--mv0': `${offT}px`,
+      '--mv1': `${offT + FEATHER}px`,
+      '--mv2': `${Math.max(offT + vh - FEATHER, offT + FEATHER)}px`,
+      '--mv3': `${offT + vh}px`,
+      '--mh0': `${offL}px`,
+      '--mh1': `${offL + FEATHER}px`,
+      '--mh2': `${Math.max(offL + vw - FEATHER, offL + FEATHER)}px`,
+      '--mh3': `${offL + vw}px`,
+    }
+  }
+  const photoStageStyle = { ...doneStageStyle, ...photoMaskVars } as React.CSSProperties
   const adviceTitle = result?.priority_title || result?.conclusion || OUTFIT_COPY.title
   const { lead: adviceLead, action: adviceAction } = splitAdviceTitle(adviceTitle)
   const adviceBody = result
     ? result.priority_copy || (result.priority_title ? result.conclusion : '')
     : ''
-  const keepFindings = (result?.findings ?? []).filter((item) => item.tone === 'positive')
-  const liftFindings = (result?.findings ?? []).filter((item) => item.tone !== 'positive')
+  // 服务端 schema 收紧前的存量结论可能带发型/妆容观察：穿搭页只上穿搭域
+  // （锚点层也从这里取，被滤掉的观察不能留着锚点飘在照片上）
+  const OFF_DOMAIN_CATEGORIES = new Set(['hair', 'makeup'])
+  const domainFindings = (result?.findings ?? []).filter((item) => !OFF_DOMAIN_CATEGORIES.has(item.category))
+  const keepFindings = domainFindings.filter((item) => item.tone === 'positive')
+  const liftFindings = domainFindings.filter((item) => item.tone !== 'positive')
 
   return (
     <View className={pageClass}>
-      <AppHeader title="穿搭诊断" back />
+      <AppHeader title="穿搭诊断" back onPhoto={Boolean(result)} />
       <View className={`od${result ? ' od--done' : ''}`}>
-        <View className={`od__hero photo-hero photo-hero--bleed ${enter()}`}>
+        <View className={`od__hero photo-hero photo-hero--bleed ${enter()}`} style={doneHeroStyle}>
           {shownMedia ? (
             <>
               <SourceImage className="od__photo-backdrop" media={shownMedia} mode="aspectFill" />
-              <SourceImage
-                className="od__hero-img od__hero-img--fit"
-                media={shownMedia}
-                mode="aspectFit"
-                onLoad={(e) => setPhotoDims({ w: Number(e.detail.width), h: Number(e.detail.height) })}
-              />
+              <View className="od__stage od__stage--photo" style={photoStageStyle}>
+                {/* 对焦模糊层：同一张照片、同一 aspectFit 几何，虚化放大垫在锐图底下——
+                    锐图边缘落在「同一画面的失焦版」上，横图/竖图都没有硬边和分割线 */}
+                <SourceImage className="od__stage-blur" media={shownMedia} mode="aspectFit" />
+                <SourceImage
+                  className="od__hero-img od__hero-img--fit"
+                  media={shownMedia}
+                  mode="aspectFit"
+                  onLoad={(e) => setPhotoDims({ w: Number(e.detail.width), h: Number(e.detail.height) })}
+                />
+              </View>
             </>
           ) : photoPath ? (
             <>
-              <Image className="od__photo-backdrop" src={photoPath} mode="aspectFill" />
-              <Image
-                className="od__hero-img od__hero-img--fit"
-                src={photoPath}
-                mode="aspectFit"
-                onLoad={(e) => setPhotoDims({ w: Number(e.detail.width), h: Number(e.detail.height) })}
-              />
+              <Image className="od__photo-backdrop" src={photoDisplayPath} mode="aspectFill" />
+              <View className="od__stage od__stage--photo" style={photoStageStyle}>
+                <Image className="od__stage-blur" src={photoDisplayPath} mode="aspectFit" />
+                <Image
+                  className="od__hero-img od__hero-img--fit"
+                  src={photoDisplayPath}
+                  mode="aspectFit"
+                  onLoad={(e) => setPhotoDims({ w: Number(e.detail.width), h: Number(e.detail.height) })}
+                />
+              </View>
             </>
           ) : (
             <View className="od__upload pressable" onClick={choosePhoto}>
@@ -281,7 +361,8 @@ export default function Outfit() {
             </View>
           )}
           {shownMedia || photoPath ? (
-            <View className="od__hero-actions">
+            // 结果态导航透明不占位：chip 让到导航栏下方（真机测量 px，同 AppHeader 做法）
+            <View className="od__hero-actions" style={result ? { top: `${getNavMetrics().navHeight + 8}px` } : undefined}>
               <Text className="od__hero-alt pressable" onClick={choosePhoto}>{OUTFIT_COPY.reselect}</Text>
             </View>
           ) : null}
@@ -291,64 +372,74 @@ export default function Outfit() {
               <Text className="od__mask-text">{OUTFIT_COPY.busyHint}</Text>
             </View>
           ) : null}
-          {!busy && result?.findings ? (
-            <PhotoAnnotationLayer
-              items={result.findings
-                .filter((finding) => finding.anchor_x != null && finding.anchor_y != null)
-                .slice(0, 1)
-                .map((finding) => ({
-                  id: `${finding.category}-${finding.label}`,
-                  label: finding.label,
-                  detail: finding.label,
-                  anchorX: finding.anchor_x ?? 0.5,
-                  anchorY: finding.anchor_y ?? 0.5,
-                }))}
-              activeId=""
-              frameW={HERO_W}
-              frameH={HERO_H}
-              photoDims={photoDims ?? undefined}
-              onTap={() => {}}
-              showDrawer={false}
-            />
+          {!busy && domainFindings.length > 0 ? (
+            <View className="od__stage od__stage--anno" style={doneStageStyle}>
+              <PhotoAnnotationLayer
+                items={domainFindings
+                  .filter((finding) => finding.anchor_x != null && finding.anchor_y != null)
+                  .map((finding) => ({
+                    id: `${finding.category}-${finding.label}`,
+                    label: finding.label,
+                    detail: finding.label,
+                    anchorX: finding.anchor_x ?? 0.5,
+                    anchorY: finding.anchor_y ?? 0.5,
+                  }))}
+                activeId=""
+                frameW={result ? HERO_DONE_W : HERO_W}
+                frameH={result ? HERO_DONE_H - HERO_DONE_GAP : HERO_H}
+                photoDims={photoDims ?? undefined}
+                onTap={() => {}}
+                showDrawer={false}
+              />
+            </View>
           ) : null}
         </View>
+        {/* hero 在结果态是 fixed 钉住的，文档流里放同高占位——
+            卡片从钉住的照片上滚过（「hero 不滚，只滚卡片」） */}
+        {result ? <View style={doneHeroStyle} /> : null}
 
         {result ? (
-          <View className={`od__sheet ${enter(1)}`}>
-            <View className="od__advice">
-              {adviceLead ? <Text className="od__advice-lead">{adviceLead}</Text> : null}
-              <Text className="od__advice-title">{adviceAction}</Text>
-              {adviceBody ? <Text className="od__advice-body">{adviceBody}</Text> : null}
+          <>
+            <View className={`od__sheet ${enter(1)}`}>
+              <View className="od__advice">
+                <Text className="od__advice-scene">按「{CONTEXTS.find((c) => c.key === scene)?.label ?? scene}」场景诊断</Text>
+                {adviceLead ? <Text className="od__advice-lead">{adviceLead}</Text> : null}
+                <Text className="od__advice-title serif">{adviceAction}</Text>
+                {adviceBody ? <Text className="od__advice-body">{adviceBody}</Text> : null}
+              </View>
+
+              {keepFindings.length > 0 ? (
+                <View className="od__keep">
+                  <Text className="od__keep-label">{OUTFIT_COPY.findingsKeep}</Text>
+                  <Text className="od__keep-text">{keepFindings.map((item) => item.label).join('、')}</Text>
+                </View>
+              ) : null}
+
+              {liftFindings.length > 0 ? (
+                <View className="od__lifts">
+                  <Text className="od__lifts-label">{OUTFIT_COPY.findingsLift}</Text>
+                  {liftFindings.map((finding) => (
+                    <View key={`${finding.category}-${finding.label}`} className="od__lift">
+                      <Text className="od__lift-dot">·</Text>
+                      <Text className="od__lift-text">{finding.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              {error ? <ErrorState message={error} onRetry={() => void analyze(false)} /> : null}
             </View>
 
-            {keepFindings.length > 0 ? (
-              <View className="od__keep">
-                <Text className="od__keep-label">{OUTFIT_COPY.findingsKeep}</Text>
-                <Text className="od__keep-text">{keepFindings.map((item) => item.label).join('、')}</Text>
-              </View>
-            ) : null}
-
-            {liftFindings.length > 0 ? (
-              <View className="od__lifts">
-                <Text className="od__lifts-label">{OUTFIT_COPY.findingsLift}</Text>
-                {liftFindings.map((finding) => (
-                  <Text key={`${finding.category}-${finding.label}`} className="od__lift">
-                    {finding.label}
-                  </Text>
-                ))}
-              </View>
-            ) : null}
-
-            {error ? <ErrorState message={error} onRetry={() => void analyze(false)} /> : null}
-
-            <View className="od__result-actions">
+            {/* CTA 固定底部：必须是 sheet 的平级节点——sheet 的 fade-up 动画带
+                transform，fixed 放它里面会被困成相对 sheet 定位 */}
+            <View className="od__cta">
               <PrimaryButton text={OUTFIT_COPY.toPlans} onClick={toPlans} />
               <View className="od__result-row">
                 <Text className="od__result-alt pressable" onClick={() => void saveResult()}>{OUTFIT_COPY.save}</Text>
                 <Text className="od__result-alt pressable" onClick={retryFresh}>{OUTFIT_COPY.again}</Text>
               </View>
             </View>
-          </View>
+          </>
         ) : limit ? (
           <>
             <View className={`od__hint ${enter(1)}`}>
@@ -376,17 +467,21 @@ export default function Outfit() {
                 ))}
               </View>
             </View>
-            {error ? <ErrorState message={error} onRetry={() => void analyze(false)} /> : null}
+            {rejectedMsg ? (
+              <View className={`od__rejected ${enter(2)}`}>
+                <Text className="od__rejected-text">{rejectedMsg}</Text>
+              </View>
+            ) : error ? <ErrorState message={error} onRetry={() => void analyze(false)} /> : null}
           </>
         )}
 
         {!result && !limit ? (
           <View className={`od__foot ${enter(3)}`}>
             <PrimaryButton
-              text={busy ? OUTFIT_COPY.busy : OUTFIT_COPY.start}
+              text={rejectedMsg ? '重新选择照片' : busy ? OUTFIT_COPY.busy : OUTFIT_COPY.start}
               loading={busy}
-              disabled={!photoPath && !photoMedia}
-              onClick={() => void analyze(false)}
+              disabled={!rejectedMsg && !photoPath && !photoMedia}
+              onClick={() => (rejectedMsg ? choosePhoto() : void analyze(false))}
             />
             <View className="od__foot-row">
               <Text className="od__foot-alt pressable" onClick={() => void analyze(true)}>{OUTFIT_COPY.demo}</Text>

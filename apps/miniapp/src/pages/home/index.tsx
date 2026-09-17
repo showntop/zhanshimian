@@ -429,21 +429,29 @@ export default function Home() {
                       <Text className="home__tool-desc">{tool.desc}</Text>
                     </View>
                     {tool.key === 'hair' ? (
-                      hairLatestMedia ? (
-                        <SourceImage
-                          className="home__tool-visual home__tool-visual--focal"
-                          media={hairLatestMedia}
-                          anchor="top"
-                        />
-                      ) : (
-                        // 内置参考图是预裁好的头肩构图（0 位移），
-                        // 与生成图的焦点裁切分开处理
-                        <SourceImage
-                          className="home__tool-visual"
-                          reference={{ slug: 'natural', variant: 'hair' }}
-                          anchor="top"
-                        />
-                      )
+                      // 失焦衬底 + 完整入镜：任何构图的生成图都看到全脸，
+                      // 不再按「脸在 15%~50%」的经验位移赌裁切窗口
+                      <View className="home__tool-visual">
+                        {hairLatestMedia ? (
+                          <>
+                            <SourceImage className="home__tool-visual-blur" media={hairLatestMedia} mode="aspectFill" />
+                            <SourceImage className="home__tool-visual-fit" media={hairLatestMedia} mode="aspectFit" />
+                          </>
+                        ) : (
+                          <>
+                            <SourceImage
+                              className="home__tool-visual-blur"
+                              reference={{ slug: 'natural', variant: 'hair' }}
+                              mode="aspectFill"
+                            />
+                            <SourceImage
+                              className="home__tool-visual-fit"
+                              reference={{ slug: 'natural', variant: 'hair' }}
+                              mode="aspectFit"
+                            />
+                          </>
+                        )}
+                      </View>
                     ) : null}
                     {badge ? (
                       <Text

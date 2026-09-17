@@ -19,6 +19,26 @@
     &-img--fit {
       position: relative;
       z-index: 1;
+      // 组件默认底色/圆角在 hero 里会变成灰板和圆角接缝：
+      // letterbox 区必须透明，露出底下的对焦模糊层
+      background-color: transparent;
+      border-radius: 0;
+      // 垂直向羽化：断点 --mv* 由页面按 photoDims 实测写入（继承自 stage），
+      // 照片顶/底边溶进失焦层，头顶上方与卡片上方都没有分割线
+      -webkit-mask-image: linear-gradient(
+        180deg,
+        transparent var(--mv0, 0),
+        #000 var(--mv1, 64rpx),
+        #000 var(--mv2, calc(100% - 64rpx)),
+        transparent var(--mv3, 100%)
+      );
+      mask-image: linear-gradient(
+        180deg,
+        transparent var(--mv0, 0),
+        #000 var(--mv1, 64rpx),
+        #000 var(--mv2, calc(100% - 64rpx)),
+        transparent var(--mv3, 100%)
+      );
     }
 
     // widthFix 原生铺满：相框高度跟随照片（hero 容器 inline height:auto）
@@ -39,15 +59,74 @@
     }
 
     &-alt {
-      padding: 12rpx 24rpx;
+      // 「重选照片」是低频动作：安静的玻璃 chip，别抢结果内容的焦点
+      padding: 8rpx 20rpx;
       border-radius: 999rpx;
       background: var(--glass);
-      font-size: 22rpx;
-      color: var(--ink);
+      font-size: 20rpx;
+      color: var(--ink-2);
+    }
+  }
+
+  // 前景照片/锚点层的定位盒：默认铺满 hero；结果态由页面 inline top
+  // 下移一个实测导航高（照片避开状态栏/灵动岛，衬底留在导航区出血）
+  &__stage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    // 照片盒：横向羽化（垂直向在锐图自己的 --mv* 上）。渐变断点由页面按
+    // photoDims 实测写入 CSS 变量，精确压在照片可见矩形的左右边上；
+    // 未就绪时兜底 48rpx。老基础库不支持 mask 时降级为硬边（有模糊层兜底）
+    &--photo {
+      -webkit-mask-image: linear-gradient(
+        90deg,
+        transparent var(--mh0, 0),
+        #000 var(--mh1, 48rpx),
+        #000 var(--mh2, calc(100% - 48rpx)),
+        transparent var(--mh3, 100%)
+      );
+      mask-image: linear-gradient(
+        90deg,
+        transparent var(--mh0, 0),
+        #000 var(--mh1, 48rpx),
+        #000 var(--mh2, calc(100% - 48rpx)),
+        transparent var(--mh3, 100%)
+      );
+    }
+
+    // 锚点层的盒：整层不挡触摸（重选 chip / 滑动），只有标签胶囊可点
+    &--anno {
+      pointer-events: none;
+    }
+  }
+
+  // 对焦模糊层：与锐图同盒同几何（aspectFit），虚化 + 放大 1.2——
+  // 锐图的硬边落在同一画面的失焦版上（景深效果），模糊层自己的边缘
+  // 因 blur 的 alpha 羽化自然软化，与 hero 级衬底糊对糊相接，无线可寻
+  &__stage-blur {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    background-color: transparent;
+    border-radius: 0;
+    filter: blur(28rpx) saturate(1.2);
+    transform: scale(1.2);
+
+    .example-badge {
+      display: none;
     }
   }
 
   // 本人照片的模糊衬底（铺满宽度，色自图出）
+  // 饱和度拉高、亮度略压：衬底是「氛围」，灰白洗出来就成了两块死灰板
   &__photo-backdrop {
     position: absolute;
     top: 0;
@@ -56,7 +135,7 @@
     bottom: 0;
     width: 100%;
     height: 100%;
-    filter: blur(36rpx) saturate(1.12) brightness(1.05);
+    filter: blur(36rpx) saturate(1.45) brightness(0.94);
     transform: scale(1.25);
   }
 
@@ -158,15 +237,52 @@
     }
   }
 
-  // ---------- 结果态：照片满宽，内容板上叠（对齐形象报告的铰链） ----------
+  // ---------- 结果态：照片满屏出血（透明导航），内容板上叠 ----------
   &--done {
     gap: 0;
+    // 给固定 CTA 栏留位：栏高 ≈ 按钮 96 + 文字行 64 + 上下留白
+    padding-bottom: 260rpx;
 
     .od__hero {
-      margin: 0 calc(-1 * var(--page-gutter));
-      height: 720rpx;
+      // 钉住不滚：卡片（z3）从它上面滚过；文档流占位由页面同高 spacer 补上。
+      // fixed 后 bleed 负边距无意义且会推歪盒子，归零（left/right 已是满宽）
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1;
+      margin: 0;
+      // 实际高度由页面 inline 设为「实测导航高 + (820+120)rpx」：导航区出血只铺
+      // 衬底，前景照片/锚点 stage 上下各让 56/120rpx（此 940rpx 仅作首帧兜底）
+      height: 940rpx;
       border-radius: 0;
       border: none;
+
+      // 顶部 scrim：压住照片保证透明导航的白标题/返回可读
+      &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 260rpx;
+        z-index: 2;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0));
+        pointer-events: none;
+      }
+
+      // 底部融化：照片渐变进内容板的底色，衔接不是一刀切
+      &::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 200rpx;
+        z-index: 2;
+        background: linear-gradient(180deg, rgba(244, 245, 242, 0), var(--bg));
+        pointer-events: none;
+      }
     }
 
     .od__hero-actions {
@@ -190,9 +306,9 @@
     z-index: 3;
     display: flex;
     flex-direction: column;
-    gap: 40rpx;
+    gap: 28rpx;
     margin: -88rpx calc(-1 * var(--page-gutter)) 0;
-    padding: 48rpx var(--page-gutter) 8rpx;
+    padding: 40rpx var(--page-gutter) 8rpx;
     background: var(--bg);
     box-shadow: var(--shadow-sheet);
   }
@@ -200,23 +316,30 @@
   &__advice {
     display: flex;
     flex-direction: column;
-    gap: 16rpx;
+    gap: 12rpx;
+
+    // 「按哪个场景诊断的」必须上屏：场景是输入条件，结果态不能丢
+    &-scene {
+      font-size: 20rpx;
+      color: var(--ink-3);
+    }
 
     &-lead {
       font-size: 22rpx;
       color: var(--ink-3);
     }
 
+    // 判词标题用 .serif：顾问便条的语气，一屏只此一处（红线）
     &-title {
-      font-size: 48rpx;
+      font-size: 44rpx;
       font-weight: 700;
-      line-height: 1.28;
+      line-height: 1.26;
       color: var(--ink);
     }
 
     &-body {
-      font-size: 26rpx;
-      line-height: 1.75;
+      font-size: 25rpx;
+      line-height: 1.6;
       color: var(--ink-2);
     }
   }
@@ -229,11 +352,12 @@
     &-label {
       flex: none;
       font-size: 22rpx;
+      font-weight: 600;
       color: var(--moss);
     }
 
     &-text {
-      font-size: 26rpx;
+      font-size: 24rpx;
       line-height: 1.5;
       color: var(--ink-2);
     }
@@ -242,7 +366,7 @@
   &__lifts {
     display: flex;
     flex-direction: column;
-    gap: 20rpx;
+    gap: 12rpx;
 
     &-label {
       font-size: 22rpx;
@@ -250,11 +374,37 @@
     }
   }
 
+  // 「还可以改」是支撑观察，不是并列的行动项：安静列表，别用粗体大标题
+  // 跟「最值得改的一处」抢焦点（页面承诺就是一处，列表抢戏就成了缺陷堆砌）
   &__lift {
-    font-size: 32rpx;
-    font-weight: 600;
-    line-height: 1.45;
-    color: var(--ink);
+    display: flex;
+    gap: 12rpx;
+    align-items: baseline;
+
+    &-dot {
+      flex: none;
+      font-weight: 700;
+      color: var(--moss);
+    }
+
+    &-text {
+      font-size: 24rpx;
+      line-height: 1.5;
+      color: var(--ink-2);
+    }
+  }
+
+  // 照片门禁拒态：原因居中上屏，动作交给主按钮「重新选择照片」
+  &__rejected {
+    padding: 24rpx 28rpx;
+    border-radius: var(--radius-md);
+    background: var(--moss-soft);
+
+    &-text {
+      font-size: 24rpx;
+      line-height: 1.6;
+      color: var(--ink);
+    }
   }
 
   // ---------- 锚点标注 ----------
@@ -342,11 +492,18 @@
     }
   }
 
-  &__result-actions {
+  // ---------- 固定 CTA 栏：内容从栏底渐显滚过，主按钮永远在拇指位 ----------
+  &__cta {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
     display: flex;
     flex-direction: column;
-    gap: 8rpx;
-    padding-top: 8rpx;
+    gap: 4rpx;
+    padding: 32rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 8rpx);
+    background: linear-gradient(180deg, rgba(244, 245, 242, 0), var(--bg) 72rpx);
   }
 
   &__result-row {
@@ -356,7 +513,7 @@
   }
 
   &__result-alt {
-    padding: 20rpx 8rpx;
+    padding: 16rpx 8rpx;
     font-size: 24rpx;
     color: var(--moss);
   }

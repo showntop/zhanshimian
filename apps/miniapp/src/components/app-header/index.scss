@@ -21,6 +21,19 @@
     border-bottom-color: transparent;
   }
 
+  // 照片全屏出血：栏体消失，只剩白标题与返回 chip 浮在照片上
+  // （页面须在 hero 顶部压 scrim 保证可读，见穿搭诊断结果态）
+  &--on-photo {
+    background: transparent;
+    backdrop-filter: none;
+    border-bottom-color: transparent;
+
+    .app-header__title-text {
+      color: #ffffff;
+      text-shadow: 0 2rpx 16rpx rgba(0, 0, 0, 0.5);
+    }
+  }
+
   &__bar {
     position: relative;
     z-index: 1;

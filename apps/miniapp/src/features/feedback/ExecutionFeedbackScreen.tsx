@@ -20,7 +20,7 @@ import { qualityApi } from '../../app/api/quality'
 import { mediaUpload } from '../../app/api/client'
 import { PublicApiError } from '../../app/api/result'
 import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
-import { readLocalImage } from '../capture/local-file'
+import { normalizeUploadableImage, readLocalImage } from '../capture/local-file'
 import { uploadMedia } from '../../app/api/media-upload'
 import { createIdempotencyKey } from '../../app/keys'
 import EmptyState from '../../components/empty-state'
@@ -28,6 +28,7 @@ import ErrorState from '../../components/error-state'
 import Pill from '../../components/pill'
 import PrimaryButton from '../../components/primary-button'
 import { canSubmitExecutionFeedback } from '../execution/model'
+import { useDisplayablePath } from '../../hooks/use-displayable-path'
 import { executionFeedbackBody } from './model'
 import './index.scss'
 
@@ -47,6 +48,8 @@ export default function ExecutionFeedbackScreen({ executionId }: ExecutionFeedba
   // 实拍：上传成功才有 asset id；本地路径只用于预览
   const [mediaAssetId, setMediaAssetId] = useState<string | null>(null)
   const [localPreview, setLocalPreview] = useState('')
+  // 工具新渲染层按 CORS 拦截 http://tmp/：预览用换出值，上传仍用原路径
+  const localPreviewDisplay = useDisplayablePath(localPreview)
   const [photoState, setPhotoState] = useState<'idle' | 'uploading' | 'failed'>('idle')
   const [busy, setBusy] = useState(false)
 
@@ -86,11 +89,13 @@ export default function ExecutionFeedbackScreen({ executionId }: ExecutionFeedba
       success: (res) => {
         const file = res.tempFiles[0]
         if (!file) return
-        setLocalPreview(file.tempFilePath)
         setPhotoState('uploading')
         void (async () => {
           try {
-            const image = await readLocalImage(file.tempFilePath)
+            // HEIC 等非 JPEG/PNG 先归一成 JPEG：预览与上传用同一条转换后的路径
+            const path = await normalizeUploadableImage(file.tempFilePath)
+            setLocalPreview(path)
+            const image = await readLocalImage(path)
             const asset = await uploadMedia(mediaUpload, image, 'feedback')
             setMediaAssetId(asset.id)
             setPhotoState('idle')
@@ -187,7 +192,7 @@ export default function ExecutionFeedbackScreen({ executionId }: ExecutionFeedba
         <Text className="feedback-screen__label">{FEEDBACK_SCREEN_COPY.photoTitle}</Text>
         {localPreview ? (
           <View className="feedback-screen__photo-wrap">
-            <Image className="feedback-screen__photo" src={localPreview} mode="aspectFill" />
+            <Image className="feedback-screen__photo" src={localPreviewDisplay} mode="aspectFill" />
             {photoState === 'uploading' ? (
               <View className="feedback-screen__photo-mask">
                 <View className="spinner spinner--on-deep" />

@@ -14,6 +14,9 @@ interface AppHeaderProps {
   title?: string
   back?: boolean
   transparent?: boolean
+  /** 照片全屏出血：栏体真正透明、不占位（无 spacer），标题转白——
+   *  内容从屏幕顶开始，由页面自己保证顶部有照片/scrim 压住。 */
+  onPhoto?: boolean
   onBack?: () => void
   right?: React.ReactNode
 }
@@ -50,7 +53,7 @@ export function getNavMetrics() {
   return measureNav()
 }
 
-export default function AppHeader({ title, back, transparent, onBack, right }: AppHeaderProps) {
+export default function AppHeader({ title, back, transparent, onPhoto, onBack, right }: AppHeaderProps) {
   const [nav, setNav] = useState(measureNav)
 
   useEffect(() => {
@@ -72,7 +75,7 @@ export default function AppHeader({ title, back, transparent, onBack, right }: A
   return (
     <View className="app-header-wrap">
       <View
-        className={`app-header ${transparent ? 'app-header--transparent' : ''}`}
+        className={`app-header ${transparent ? 'app-header--transparent' : ''} ${onPhoto ? 'app-header--on-photo' : ''}`}
         style={{
           paddingTop: `${nav.statusBar}px`,
           height: `${nav.navHeight}px`,
@@ -106,7 +109,7 @@ export default function AppHeader({ title, back, transparent, onBack, right }: A
           <View className="app-header__right">{right}</View>
         </View>
       </View>
-      <View className="app-header-spacer" style={{ height: `${nav.navHeight}px` }} />
+      {onPhoto ? null : <View className="app-header-spacer" style={{ height: `${nav.navHeight}px` }} />}
     </View>
   )
 }

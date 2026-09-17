@@ -88,6 +88,18 @@ export function isNewerDiagnosis(latest: Diagnosis, current: Diagnosis): boolean
   return new Date(latest.created_at).getTime() > new Date(current.created_at).getTime()
 }
 
+/**
+ * 同一条结论的签名 URL 会过期：草稿落了盘，隔天复访 URL 已失效，照片投影
+ * 不出（hero 只剩「照片暂不可用」空态）。latest 里是刚签的新 URL，同 id 也
+ * 值得再收养一次。只看 URL 生命期：没有 source_media 或没有过期字段就不折腾。
+ */
+export function needsMediaRefresh(current: Diagnosis): boolean {
+  const media = current.source_media
+  if (!media?.url) return false
+  const expiresAt = Date.parse(media.url_expires_at ?? '')
+  return Number.isFinite(expiresAt) && expiresAt <= Date.now()
+}
+
 export function createOutfitSession(store: OutfitSessionStore, storageKey = 'zsm_outfit_session') {
   let memory: OutfitDraft | null = null
   let inflight: Promise<Diagnosis> | null = null
@@ -238,7 +250,12 @@ export function createOutfitSession(store: OutfitSessionStore, storageKey = 'zsm
     if (!latest) return
     if (freshStart()) return
     const current = read()?.result
-    if (current && !isNewerDiagnosis(latest, current)) return
+    if (current) {
+      // 同 id 只在签名 URL 过期时再收养一次（换刚签的新 URL）；否则同条/
+      // 更旧都保持草稿原样。不同 id 只认更新的（防旧盖新）。
+      const staleMedia = latest.id === current.id && needsMediaRefresh(current)
+      if (!staleMedia && !isNewerDiagnosis(latest, current)) return
+    }
     markDone(latest)
     emit({ type: 'result', item: latest })
   }

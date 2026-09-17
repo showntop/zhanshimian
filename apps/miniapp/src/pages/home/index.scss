@@ -443,15 +443,15 @@
         inset: 0;
         z-index: -1;
         content: '';
-        // 融合带放宽到 40%→90% 的缓坡：左右接缝基本看不见
+        // 左实右虚的融合带：左侧保住文案可读，右侧照片完整入镜后
+        // 脸落在视觉区中央（约 73% 卡宽），停顿点左移把清晰区让给它
         background: linear-gradient(
           90deg,
           rgba(217, 226, 209, 1) 0%,
-          rgba(217, 226, 209, 0.98) 40%,
-          rgba(217, 226, 209, 0.7) 56%,
-          rgba(217, 226, 209, 0.32) 72%,
-          rgba(217, 226, 209, 0.06) 90%,
-          rgba(217, 226, 209, 0) 100%
+          rgba(217, 226, 209, 0.96) 38%,
+          rgba(217, 226, 209, 0.55) 56%,
+          rgba(217, 226, 209, 0.14) 74%,
+          rgba(217, 226, 209, 0) 90%
         );
         pointer-events: none;
       }
@@ -490,22 +490,31 @@
       width: 54%;
       height: 100%;
       border-radius: 0;
-      background-position: center top;
 
-      // 参考图不放大铺边（组件的 .example-soft 已统一为轻模糊档，
-      // 这里 cover 铺满，无需裁边）
-      .example-soft {
-        width: 100%;
-        height: 100%;
-        margin: 0;
+      // 失焦衬底铺满：照片两侧的空区是同图失焦放大版，不是死色块
+      &-blur {
+        position: absolute;
+        inset: 0;
+        background-color: transparent;
+        border-radius: 0;
+        filter: blur(16rpx) saturate(1.1);
+        transform: scale(1.15);
+
+        .example-badge {
+          display: none;
+        }
       }
-    }
 
-    // 焦点裁切只给生成图（竖版人像、脸约在 15%~50%）：
-    // 矮横框按宽铺满后可视窗口落在 16%~54%，发顶到下巴都完整。
-    // 内置参考图是预裁好的头肩构图，不走这个位移
-    &--focal .source-image__img {
-      transform: translateY(-16%);
+      // 完整入镜：任何构图（脸高脸低）都看到全脸全发；
+      // 左右羽化把照片竖边溶进衬底
+      &-fit {
+        position: absolute;
+        inset: 0;
+        background-color: transparent;
+        border-radius: 0;
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 32rpx, #000 calc(100% - 32rpx), transparent);
+        mask-image: linear-gradient(90deg, transparent, #000 32rpx, #000 calc(100% - 32rpx), transparent);
+      }
     }
 
     &-badge {

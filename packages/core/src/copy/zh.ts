@@ -516,7 +516,7 @@ export const OUTFIT_COPY = {
   findingsLift: '还可以改',
   save: '保存这条建议',
   saved: '已保存',
-  toPlans: '去看三套方案'
+  toPlans: '去看搭配方案'
 } as const
 
 export const PURCHASE_COPY = {
@@ -536,6 +536,30 @@ export const PURCHASE_COPY = {
   findingsLift: '还要注意',
   save: '保存这条判断',
   saved: '已保存'
+} as const
+
+// ---------- 工具页：发型设计 ----------
+// 四步线性流程：确认照片 → 选方向 → 生成中 → 结果·对比（历史在结果页底部回放）
+export const HAIR_COPY = {
+  title: '先看效果，再决定剪不剪',
+  desc: '选一个方向，基于你的正脸照生成上身效果',
+  guideBadge: '拍照示范',
+  uploadTitle: '选一张正脸照',
+  useThisPhoto: '将用这张照片生成',
+  reselect: '换一张',
+  demo: '先看看示例效果',
+  generating: '正在生成…',
+  genStages: ['分析脸型轮廓…', '正在试戴发型…', '最后调整发丝…'],
+  genNote: '需要 20 秒左右，可以离开，好了会帮你留着',
+  holdOriginal: '长按看原图',
+  save: '保存这个效果',
+  saved: '已存到我的',
+  tryAnother: '换个方向再试',
+  historyLabel: '试过的方向',
+  changePhoto: '换一张照片',
+  retry: '再试一次',
+  generateFailed: '生成没有完成，请重试',
+  generateStart: '生成没有开始，请重试'
 } as const
 
 export const ADVISOR_COPY = {
