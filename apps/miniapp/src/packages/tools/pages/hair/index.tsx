@@ -66,8 +66,7 @@ interface ResultSlot {
 
 // hero 照片统一「直出」：单层真图，永远按宽铺满、顶对齐、底部越界裁切——
 // 不给 frameAspect（不出现「按高铺满裁两侧」），任何入图都不裁脸。
-// 框高：结果态随图（容器 height:auto）；输入态由一屏剩余高度决定（.hair--form），
-// 竖版正脸照超出相框的下半截裁掉，导语/方向卡/主按钮因此留在首屏。
+// 框高两页一致（.hair__hero 写死 4:3 的 562rpx），照片超出相框的下半截裁掉。
 function HeroPhoto(props: { media?: DisplayMedia | null; localPath?: string }) {
   const { media, localPath } = props
   // 工具新渲染层按 CORS 拦截 http://tmp/：本地路径渲染前换出（真机原样）
@@ -438,16 +437,15 @@ export default function Hair() {
 
   return (
     <View className={pageClass}>
-      {/* 结果态不再让照片垫到视口顶：导航占位（透明栏 + 深色标题），照片整体下移到
-          导航之下——4:3 横图贴顶会被状态栏切掉头部；输入态保持出血导航（顶部压 scrim） */}
-      <AppHeader title="发型设计" back onPhoto={!hasResult} transparent={hasResult} />
-      <View className={`hair${hasResult ? ' hair--done' : ' hair--form'}`}>
-        {/* S3 结果态相框拉高成竖幅：竖版生成图近乎满框，不再挤成中间一条 */}
-        <View
-          className={`hair__hero photo-hero photo-hero--bleed${hasResult ? ' hair__hero--done' : ''} ${enter()}`}
-        >
+      {/* 两页共用一套骨架：占位导航（透明栏 + 深色标题）+ 同高相框 + 同段信息区 +
+          同尺寸方向卡 + 固定底部 CTA。以前两页各写各的（照片一个贴顶一个不贴、
+          卡一个 224 一个 260），落差全落在视觉上 */}
+      <AppHeader title="发型设计" back transparent />
+      <View className="hair">
+        {/* 相框两页一致：750×562rpx＝4:3，照片按宽铺满、顶对齐、超出裁底——
+            生成图（服务端 4:3）几乎零裁切，正脸照按同一裁法出「头肩特写」 */}
+        <View className={`hair__hero photo-hero photo-hero--bleed ${enter()}`}>
           <View className="hair__hero-frame">
-            <View className="hair__hero-scrim" />
             {hasResult ? (
               // S3 结果：长按看原图——对比是直觉动作，不是模式切换
               <View
@@ -537,14 +535,16 @@ export default function Hair() {
 
         {hasResult ? (
           <>
-            <View className={`hair__verdict card ${enter(1)}`}>
-              <View className="hair__verdict-head">
-                <Text className="hair__verdict-title serif">{styleName}</Text>
-                {verdictTag ? <Text className="hair__verdict-tag">{verdictTag}</Text> : null}
-              </View>
-              <Text className="hair__verdict-desc">{verdictDesc}</Text>
-              <View className="hair__verdict-foot">
-                <Text className="hair__verdict-note">{HAIR_COPY.resultNote}</Text>
+            <View className={`hair__head ${enter(1)}`}>
+              <View className="hair__verdict card">
+                <View className="hair__verdict-head">
+                  <Text className="hair__verdict-title serif">{styleName}</Text>
+                  {verdictTag ? <Text className="hair__verdict-tag">{verdictTag}</Text> : null}
+                </View>
+                <Text className="hair__verdict-desc">{verdictDesc}</Text>
+                <View className="hair__verdict-foot">
+                  <Text className="hair__verdict-note">{HAIR_COPY.resultNote}</Text>
+                </View>
               </View>
             </View>
 
@@ -552,34 +552,36 @@ export default function Hair() {
                 没图的只是可选项（点它＝选中，主按钮随之变成「生成这个效果」）。
                 高亮跟着「选中」走，不跟「正在展示」走。 */}
             <View className={`hair__turn ${enter(2)}`}>
-              <Text className="hair__turn-label">{HAIR_COPY.directionLabel}</Text>
+              <View className="hair__turn-head">
+                <Text className="hair__turn-label">{HAIR_COPY.directionLabel}</Text>
+              </View>
               <ScrollView scroll-x enhanced showScrollbar={false} className="hair__cards">
                 <View className="hair__cards-rail">
                   {resultSlots.map((slot) => (
-                    <View
-                      key={slot.key}
-                      className={`hair__card${slot.styleId === styleId ? ' hair__card--active' : ''} pressable`}
-                      onClick={() => openSlot(slot)}
-                    >
-                      {slot.preview?.media ? (
-                        <SourceImage className="hair__card-img" media={slot.preview.media} anchor="top" />
-                      ) : slot.media ? (
-                        <SourceImage className="hair__card-img" media={slot.media} anchor="top" />
-                      ) : slot.styleId === CUSTOM_DIRECTION_ID ? (
-                        <View className="hair__card-blank">
-                          <Text className="hair__card-blank-plus">＋</Text>
+                      <View
+                        key={slot.key}
+                        className={`hair__card${slot.styleId === styleId ? ' hair__card--active' : ''} pressable`}
+                        onClick={() => openSlot(slot)}
+                      >
+                        {slot.preview?.media ? (
+                          <SourceImage className="hair__card-img" media={slot.preview.media} anchor="top" />
+                        ) : slot.media ? (
+                          <SourceImage className="hair__card-img" media={slot.media} anchor="top" />
+                        ) : slot.styleId === CUSTOM_DIRECTION_ID ? (
+                          <View className="hair__card-blank">
+                            <Text className="hair__card-blank-plus">＋</Text>
+                          </View>
+                        ) : (
+                          <View className="hair__card-blank">
+                            <Image className="hair__card-blank-icon" src={HAIR_ICON} mode="aspectFit" />
+                          </View>
+                        )}
+                        <View className="hair__card-body">
+                          <Text className="hair__card-name">{slot.name}</Text>
+                          {slot.tag ? <Text className="hair__card-tag">{slot.tag}</Text> : null}
                         </View>
-                      ) : (
-                        <View className="hair__card-blank">
-                          <Image className="hair__card-blank-icon" src={HAIR_ICON} mode="aspectFit" />
-                        </View>
-                      )}
-                      <View className="hair__card-body">
-                        <Text className="hair__card-name">{slot.name}</Text>
-                        {slot.tag ? <Text className="hair__card-tag">{slot.tag}</Text> : null}
                       </View>
-                    </View>
-                  ))}
+                    ))}
                 </View>
               </ScrollView>
             </View>
@@ -605,30 +607,30 @@ export default function Hair() {
           </>
         ) : (
           <>
-            <View className={`hair__hint ${enter(1)}`}>
-              <Text className="hair__hint-title">{HAIR_COPY.title}</Text>
-              <Text className="hair__hint-desc">{activeDesc}</Text>
+            {/* 信息区：与结果页判词卡同一段高度同一位置 */}
+            <View className={`hair__head ${enter(1)}`}>
+              <Text className="hair__head-title">{HAIR_COPY.title}</Text>
+              <Text className="hair__head-desc">{activeDesc}</Text>
             </View>
 
-            {/* S1 性别分段：方向目录按性别分组，先选这一侧再看方向 */}
-            <View className={`hair__gender ${enter(2)}`}>
-              <Text className="hair__gender-label">{HAIR_COPY.genderLabel}</Text>
-              <View className="hair__gender-pills">
-                {GENDERS.map((item) => (
-                  <Pill
-                    key={item.id}
-                    label={item.label}
-                    active={gender === item.id}
-                    onClick={() => !busy && switchGender(item.id)}
-                  />
-                ))}
-              </View>
-            </View>
-
-            {/* S1 方向卡：图 + 名 + 差异标签 + 一句适合谁，选中前的差异全部前置；
+            {/* 方向区：标题行左侧＝这一刻在选什么（性别），右侧＝分段；卡行与结果页同一尺寸同一位置。
                 末尾一张「自定义」卡：没有合适的方向时用自己的话描述 */}
-            <ScrollView scroll-x enhanced showScrollbar={false} className={`hair__cards ${enter(2)}`}>
-              <View className="hair__cards-rail">
+            <View className={`hair__turn ${enter(2)}`}>
+              <View className="hair__turn-head">
+                <Text className="hair__turn-label">{HAIR_COPY.genderLabel}</Text>
+                <View className="hair__gender-pills">
+                  {GENDERS.map((item) => (
+                    <Pill
+                      key={item.id}
+                      label={item.label}
+                      active={gender === item.id}
+                      onClick={() => !busy && switchGender(item.id)}
+                    />
+                  ))}
+                </View>
+              </View>
+              <ScrollView scroll-x enhanced showScrollbar={false} className="hair__cards">
+                <View className="hair__cards-rail">
                 {directions.map((opt) => (
                   <View
                     key={opt.id}
@@ -663,8 +665,9 @@ export default function Hair() {
                     <Text className="hair__card-tag">{customCardLabel}</Text>
                   </View>
                 </View>
-              </View>
-            </ScrollView>
+                </View>
+              </ScrollView>
+            </View>
 
             {failed ? (
               <View className={`hair__failed ${enter()}`}>
@@ -676,7 +679,8 @@ export default function Hair() {
               </View>
             ) : null}
 
-            <View className={`hair__foot hair__foot--inline ${enter(3)}`}>
+            {/* 主按钮同样固定底部：两页的 CTA 位置一致（拇指位），内容从栏底渐显滚过 */}
+            <View className="hair__foot hair__foot--cta">
               <PrimaryButton
                 text={primaryText}
                 loading={busy || generating}

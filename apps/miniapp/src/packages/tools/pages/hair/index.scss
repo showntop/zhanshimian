@@ -1,60 +1,33 @@
-// 发型设计：四步线性流程的样式。hero 一屏一事；方向卡横滑大卡；
-// 结果态 verdict + 历史条 + 沉底 CTA。主按钮区与购买判断同构。
+// 发型设计：四步线性流程的样式。
 //
-// 一屏收束：输入态（S0 确认照片 / S1 选方向 / S2 生成中）页面高 = 一屏，
-// hero 只吃「一屏 − 导语 − 方向卡 − 主按钮」的剩余高度——照片按宽铺满、顶对齐，
-// 超出的下半截从底部裁掉（与 HeroPhoto 的 widthFix 直出一致，不裁脸），
-// 竖版正脸照不再把导语和主按钮顶出首屏（见 .hair--form）。
+// 两页共用一套骨架（选方向页 S0/S1/S2 与结果页 S3）：
+//   占位导航（透明栏 + 深色标题）→ 同一个 4:3 相框（750×562rpx）→ 同一段信息区
+//   → 同尺寸方向卡 → 固定底部 CTA
+// 也就是说：照片高度、方向卡的尺寸与 y 位置、主按钮位置在两页是一致的，
+// 落差只剩「信息区里放什么」（选方向页放导语 + 性别分段，结果页放判词卡）。
 .hair {
   display: flex;
   flex-direction: column;
   gap: 24rpx;
-  min-height: calc(100vh - 200rpx);
+  // 可用高度 = 视口 − 导航占位与呼吸距(≈256rpx) − 页面底部内边距(safe-area + 48rpx)。
+  // 只给 min-height：内容比它矮时余量落在页尾（不是内容中间），比它高时页面滚动。
+  min-height: calc(100vh - 256rpx - env(safe-area-inset-bottom));
+  // 给固定 CTA 栏留位
+  padding-bottom: 260rpx;
 
-  // ---------- hero ----------
-  // 直出 + 框随图走：高度完全由图决定（widthFix），不裁侧不裁头；
-  // onPhoto 透明导航下照片垫到视口顶，顶部压 scrim 保证返回/标题可读
+  // ---------- hero 相框：两页同一个 4:3 框 ----------
+  // 高度写死 562rpx（750rpx 宽的 4:3）；照片按宽铺满、顶对齐、底部越界裁切——
+  // 服务端 4:3 生成图刚好铺满（零裁切），正脸照按同一裁法出「头肩特写」不裁脸。
   &__hero {
-    height: auto;
-    min-height: 430rpx;
+    height: 562rpx;
     border-radius: 0;
     border: 0;
 
-    &--done {
-      height: auto;
-    }
-
     &-frame {
-      position: relative;
-      width: 100%;
-      height: auto;
-    }
-
-    &-scrim {
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 160rpx;
-      z-index: 2;
-      background: linear-gradient(180deg, rgba(30, 34, 30, 0.42), rgba(30, 34, 30, 0));
-      pointer-events: none;
+      inset: 0;
+      width: 100%;
     }
-  }
-
-  // 结果态：顶部有占位导航（照片下移到导航之下），可用高度 = 视口 − 导航占位(≈200rpx)
-  // − 导航呼吸距(24rpx) − 页面底部内边距(safe-area + 48rpx)。不写定高：定了高容易把
-  // 内容顶到固定 CTA 底下；这里只给 min-height，余量交给两个 auto margin 平分。
-  &--done {
-    min-height: calc(100vh - 224rpx - env(safe-area-inset-bottom));
-    // 给固定 CTA 栏留位
-    padding-bottom: 260rpx;
-  }
-
-  // 结果态：余量由两个 auto margin 平分——照片往下让一半、横滑往上让一半，
-  // 空白不再整块堆在底部（内容溢出时 auto margin 自动归零，不会把内容顶出可视区）
-  &--done .hair__hero {
-    margin-top: auto;
   }
 
   // ---------- hero 照片：直出（单层真图，anchor=top 顶对齐、底部越界裁切） ----------
@@ -65,7 +38,8 @@
     position: relative;
     z-index: 1;
     width: 100%;
-    height: auto;
+    // 吃满相框：图比框高就裁底，比框矮就留空（同一裁法，两页一致）
+    height: 100%;
     background-color: transparent;
     border-radius: 0;
 
@@ -79,7 +53,7 @@
 
   &__badge {
     position: absolute;
-    top: 200rpx;
+    top: 24rpx;
     left: 20rpx;
     z-index: 4;
     padding: 8rpx 20rpx;
@@ -105,7 +79,7 @@
 
   &__hero-actions {
     position: absolute;
-    top: 200rpx;
+    top: 24rpx;
     right: 20rpx;
     z-index: 4;
   }
@@ -230,11 +204,15 @@
     color: var(--ink);
   }
 
-  // ---------- 图下导语 / 结果判词 ----------
-  &__hint {
+  // ---------- 信息区：选方向页＝导语，结果页＝判词卡 ----------
+  // 两页共用同一段高度（min-height 200rpx）：下面的方向卡要靠它落在同一个 y 上；
+  // 内容比它矮时垂直居中（导语只有两行也不会顶在照片下沿）。
+  &__head {
     display: flex;
     flex-direction: column;
+    justify-content: center;
     gap: 8rpx;
+    min-height: 200rpx;
 
     &-title {
       font-size: 36rpx;
@@ -253,7 +231,7 @@
   // 白卡（.card）把「三行飘在底色上的字」收拢成一个有分量的信息块，
   // 也把「这张结果是什么/为什么/边界在哪」装进同一个容器里。
   &__verdict {
-    padding: 32rpx 32rpx 24rpx;
+    padding: 24rpx 28rpx 20rpx;
 
     &-head {
       display: flex;
@@ -300,23 +278,10 @@
     }
   }
 
-  // ---------- S1 性别分段：方向目录按性别分组（女士/男士），右侧对齐不占一行高度 ----------
-  &__gender {
+  // ---------- 性别分段（放在方向区标题行右侧） ----------
+  &__gender-pills {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
     gap: 16rpx;
-
-    &-label {
-      font-size: 24rpx;
-      font-weight: 600;
-      color: var(--ink-2);
-    }
-
-    &-pills {
-      display: flex;
-      gap: 16rpx;
-    }
   }
 
   // ---------- S1 方向卡：横滑缩排卡，差异前置（缩排保一屏） ----------
@@ -334,8 +299,8 @@
   }
 
   &__card {
-    // 224×168 = 4:3：缩排保一屏（与首页卡同一显示规范的缩小版）
-    width: 224rpx;
+    // 240×180 = 4:3：两页同一尺寸（选方向页可选项 / 结果页历史与可选项）
+    width: 240rpx;
     border-radius: var(--radius-md);
     background: var(--surface, #fff);
     overflow: hidden;
@@ -347,7 +312,7 @@
 
     &-img {
       width: 100%;
-      height: 168rpx;
+      height: 180rpx;
     }
 
     // 没有参考图的方向（男士）与自定义：同高的浅色块，横滑轨道的节奏不塌
@@ -356,7 +321,7 @@
       align-items: center;
       justify-content: center;
       width: 100%;
-      height: 168rpx;
+      height: 180rpx;
       background: var(--moss-soft);
 
       &-icon {
@@ -409,29 +374,26 @@
     }
   }
 
-  // ---------- 结果页下半屏：换个方向看看 ----------
-  // 复用 S1 的方向卡（同一形状），卡面换成「已生成的结果图」；整块沉到固定 CTA
-  // 上方——判词紧跟照片，余量落在判词与横滑之间，4:3 横图只占一屏三分之一，
-  // 不压住底部整屏会散成「一条图 + 一片空」。卡比 S1 大一号：下半屏要有分量。
+  // ---------- 方向区：两页同一尺寸、同一位置 ----------
+  // 标题行左侧＝这一刻在选什么（选方向页：按性别看方向 + 女士/男士分段；结果页：换个方向看看），
+  // 行高固定 68rpx（与分段 pill 同高），卡的 y 位置两页才对得上。
   &__turn {
     display: flex;
     flex-direction: column;
     gap: 16rpx;
-    margin-top: auto;
+
+    &-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16rpx;
+      min-height: 68rpx;
+    }
 
     &-label {
       font-size: 24rpx;
       font-weight: 600;
       color: var(--ink-2);
-    }
-
-    .hair__card {
-      width: 260rpx;
-    }
-
-    .hair__card-img,
-    .hair__card-blank {
-      height: 200rpx;
     }
   }
 
@@ -468,12 +430,6 @@
     display: flex;
     flex-direction: column;
     gap: 12rpx;
-    margin-top: auto;
-
-    // S1 内联按钮：紧跟方向卡，不满屏的留白留在页面尾部而不是内容中间
-    &--inline {
-      margin-top: 8rpx;
-    }
 
     // S3 固定 CTA 栏：竖幅相框拉高后按钮沉在拇指位，内容从栏底渐显滚过
     &--cta {
@@ -551,38 +507,3 @@
   }
 }
 
-// ---------- 输入态一屏收束（S0/S1/S2）：hero 吃剩余高度，其余元素全留首屏 ----------
-// 相框不再是「图多高就多高」（竖版正脸照能拉到 1300rpx+，把导语、方向卡、主按钮
-// 全顶出屏幕）；改成页面高 = 一屏，hero 拿剩下的高度，照片顶对齐、超出部分裁底。
-// 结果是「一屏 = 照片 + 导语 + 方向卡 + 主按钮」，不用滚屏就能做决定。
-.hair--form {
-  // .page 的底部内边距（safe-area + 48rpx）之外正好是一屏
-  height: calc(100vh - env(safe-area-inset-bottom) - 48rpx);
-  // 矮屏 / 放大字号的保底：宁可页面滚动，也不把 hero 压成一条
-  min-height: 1040rpx;
-
-  .hair__hero {
-    // 唯一可伸缩项：余量全给照片，430rpx 是下限（不塌成横条）
-    flex: 1 1 auto;
-  }
-
-  // frame 绝对铺满 hero 盒：高度交给 flex 算，不再由照片高度决定
-  .hair__hero-frame {
-    position: absolute;
-    inset: 0;
-  }
-
-  // 直出的照片改吃满相框（仍是 widthFix + 顶对齐：按宽铺满、超出裁底，不裁脸）
-  .hair__photo {
-    height: 100%;
-  }
-
-  // 导语 / 性别分段 / 方向卡 / 失败块 / 主按钮按内容排布，不参与压缩（余量只给 hero）
-  .hair__hint,
-  .hair__gender,
-  .hair__cards,
-  .hair__failed,
-  .hair__foot {
-    flex: none;
-  }
-}
