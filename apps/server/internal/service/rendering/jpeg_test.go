@@ -139,12 +139,11 @@ func asRejection(err error, target **RejectionError) bool {
 	return false
 }
 
-// 发型预览域的显示规范：输出统一 3:4 竖构图。配置了裁切比例时 Normalize
-// 在编码前裁切——比目标更宽的图（横图/方图）左右居中裁宽，更瘦的竖长图
-// 顶对齐裁底（人像脸在上半部，切底不切头）。不配置则行为不变——
-// 方案渲染跟随 body 原图（对比滑块左右必须同比例），绝不裁。
+// 发型预览域的显示规范：配置了裁切比例时 Normalize 在编码前统一裁到该比例——
+// 比目标更宽的图（横图/方图）左右居中裁宽，更瘦的竖长图顶对齐裁底（人像脸在
+// 上半部，切底不切头）。不配置则行为不变——方案渲染跟随 body 原图（对比滑块
+// 左右必须同比例），绝不裁。
 func TestNormalizeCropsToConfiguredAspect(t *testing.T) {
-	decoder := NewJPEGNormalizerWithAspect(3, 4)
 	for _, fixture := range []struct {
 		name           string
 		inW, inH       int
@@ -153,9 +152,15 @@ func TestNormalizeCropsToConfiguredAspect(t *testing.T) {
 		{"square", 700, 700, 525, 700},
 		{"tall", 900, 1600, 900, 1200},
 		{"wide", 1600, 900, 675, 900},
+		// 4:3 头肩横构图（发型预览现行规范）：竖图顶对齐裁底＝保头切以下
+		{"landscape-head", 700, 700, 700, 525},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
-			got, err := decoder.Normalize(jpegFixture(t, fixture.inW, fixture.inH), "image/jpeg")
+			aspectW, aspectH := 3, 4
+			if fixture.name == "landscape-head" {
+				aspectW, aspectH = 4, 3
+			}
+			got, err := NewJPEGNormalizerWithAspect(aspectW, aspectH).Normalize(jpegFixture(t, fixture.inW, fixture.inH), "image/jpeg")
 			if err != nil {
 				t.Fatal(err)
 			}
