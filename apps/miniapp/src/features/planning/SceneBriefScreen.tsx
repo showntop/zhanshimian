@@ -8,6 +8,7 @@ import {
   ERROR_COPY,
   SCENE_BRIEF_COPY,
   SCENES,
+  sceneIncompleteText,
 } from '@zsm/core'
 import type { PlanSet } from '@zsm/core'
 import { qualityApi } from '../../app/api/quality'
@@ -48,6 +49,8 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
   const [failed, setFailed] = useState(false)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
+  // 点过「生成」但没答完：标出没选的题（答一题少一题，不用手动关）
+  const [showMissing, setShowMissing] = useState(false)
 
   // 外壳等路由参数到位才挂载本屏，页面 onLoad 早于本屏挂载——
   // 后注册的 useLoad 不会再触发，数据拉取只能走挂载 effect。
@@ -107,8 +110,8 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
   }, [fields])
 
   const sceneLabel = SCENES.find((s) => s.id === scene)?.label ?? ''
-  const answered = fields ? fields.filter((field) => answers[field.key]).length : 0
-  const complete = fields ? answered === fields.length : false
+  const missing = fields ? fields.filter((field) => !answers[field.key]) : []
+  const complete = fields ? missing.length === 0 : false
 
   const pick = (key: string, value: string) => {
     setAnswers((prev) => ({ ...prev, [key]: value }))
@@ -116,13 +119,35 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
 
   const submit = async () => {
     if (!reportId || busy) return
+    // 没答完：主按钮是禁用态（点击被组件挡下），点它的人不知道为什么没反应——
+    // 这里接住并说明还差几题，同时把没选的题标出来（红线：错误不甩锅、给下一步）
+    if (!complete) {
+      setShowMissing(true)
+      void Taro.showToast({ title: sceneIncompleteText(missing.length), icon: 'none' })
+      return
+    }
     setBusy(true)
     try {
       // 重新设计（该场景已有已发布方案集）：带 refresh——同 brief 也强制重出，
       // 语义键去重只复用不新建，refresh 才绕得开（服务端折入一次性 nonce 派生新身份）。
       const refresh = hadPublishedRef.current
       const request = sceneBriefRequest(reportId, scene, answers)
-      if (!request) return
+      if (!request) {
+        // 答案对不上当前选项表（预填了旧档案的值）：静默返回就是「点了没反应」，
+        // 清掉失效答案并说明，让人重选
+        for (const field of fields ?? []) {
+          if (!field.options.some((option) => option.value === answers[field.key])) {
+            setAnswers((prev) => {
+              if (!(field.key in prev)) return prev
+              const next = { ...prev }
+              delete next[field.key]
+              return next
+            })
+          }
+        }
+        void Taro.showToast({ title: SCENE_BRIEF_COPY.answersStale, icon: 'none' })
+        return
+      }
       const body = refresh ? { ...request, refresh: true } : request
       // 幂等键带答案指纹：同答案重发同键保幂等（在途/双击），改答案即新键——
       // 固定键配改过的答案会被服务端判 409（相同幂等键已被用于不同请求）。
@@ -215,9 +240,16 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
       {fields.map((field, index) => (
         <View
           key={field.key}
-          className={`scene-brief__field fade-up delay-${Math.min(index + 1, 3)}`}
+          className={[
+            'scene-brief__field',
+            `fade-up delay-${Math.min(index + 1, 3)}`,
+            showMissing && !answers[field.key] ? 'scene-brief__field--missing' : ''
+          ].join(' ')}
         >
-          <Text className="scene-brief__field-label">{field.label}</Text>
+          <Text className="scene-brief__field-label">
+            {field.label}
+            {showMissing && !answers[field.key] ? `（${SCENE_BRIEF_COPY.missingTag}）` : ''}
+          </Text>
           <View className="scene-brief__options">
             {field.options.map((option) => (
               <Pill
@@ -231,7 +263,14 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
         </View>
       ))}
 
-      <View className="scene-brief__foot fade-up delay-3">
+      {/* 未答完时按钮是禁用态，点击被组件挡下会变成「点了没反应」——
+          包一层接管这次点击，把原因说出来（答完的点击照常走按钮） */}
+      <View
+        className="scene-brief__foot fade-up delay-3"
+        onClick={() => {
+          if (!busy && !complete) void submit()
+        }}
+      >
         <PrimaryButton
           text={SCENE_BRIEF_COPY.generateAction}
           disabled={!complete}

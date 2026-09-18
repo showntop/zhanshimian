@@ -983,6 +983,16 @@
     color: var(--ink);
   }
 
+  // 点过「生成」但这一题没选：标出来——禁用按钮本身不说为什么不能用
+  &__field--missing {
+    padding-left: 20rpx;
+    border-left: 4rpx solid var(--moss);
+
+    .scene-brief__field-label {
+      color: var(--moss-deep);
+    }
+  }
+
   &__options {
     display: flex;
     flex-wrap: wrap;

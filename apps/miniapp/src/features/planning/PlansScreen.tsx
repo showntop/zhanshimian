@@ -446,7 +446,13 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
 
   /** general → 生成形象方案；refresh=true 是「不满意重出」：服务端绕开语义键复用，派生新身份。 */
   const generateGeneral = async (refresh = false) => {
-    if (!report) return
+    if (!report) {
+      // 报告还没到手（bootstrap 未回 / 刚因 404 被重置）：静默 return 就是「点了没反应」，
+      // 重新对账一次并说明（对账到了用户再点一次即可）
+      void bootstrap()
+      Taro.showToast({ title: PLANNING_COPY.loadFailed, icon: 'none' })
+      return
+    }
     setAcceptFailed('')
     try {
       // 换新键的两种情况：上次受理终态 failed（同键 24h 内重放同一份失败）、

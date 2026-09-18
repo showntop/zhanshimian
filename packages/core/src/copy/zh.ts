@@ -728,6 +728,11 @@ export function planSlotLabel(name: string, slot: number): string {
 // ---------- 场合 Brief（Task 8：答案只在页面与 POST body 里） ----------
 // 每个场景的问题与选项。value 必须与契约对应 Brief 的枚举完全一致——
 // sceneBriefRequest 会按这份表校验答案，表错了请求会被服务端 400 拒收。
+/** 场合 Brief 未答完时的提示：告诉用户还差几题（主按钮被点但答不完时用）。 */
+export function sceneIncompleteText(count: number): string {
+  return `还有 ${count} 题没选`
+}
+
 export const SCENE_BRIEF_COPY = {
   title: '场合需求',
   reuseBadge: '复用档案',
@@ -742,6 +747,10 @@ export const SCENE_BRIEF_COPY = {
   analyzingAction: '查看分析进度',
   loadFailed: '页面没有加载成功，请重试',
   submitFailed: '方案没有生成成功，请重试',
+  // 答案与当前选项表对不上（预填了旧档案的值）：不能静默，让人重选
+  answersStale: '有几个选项变了，请重新选择',
+  // 点过「生成」后标在没选的题上
+  missingTag: '未选',
   scenes: {
     interview: {
       label: '面试',
