@@ -35,13 +35,15 @@ import './index.scss'
 const OUTFIT_GUIDE_IMAGE = '/assets/capture/outfit-guide.jpg'
 
 // hero 相框比例（rpx，与 index.scss 一致）：锚点按 aspectFit 可视区重映射。
-// 结果态相框更大（满宽出血 + 820rpx 高），坐标框必须跟着状态走，否则锚点偏移。
+// 竖版全身照在 aspectFit 下由框高决定显影尺寸——框越高，全身照越大：
+// 空态框高 820rpx，结果态满宽出血 750rpx × 框高 1020rpx。
+// 结果态的坐标框必须跟着状态走，否则锚点偏移。
 const HERO_W = 686
-const HERO_H = 640
+const HERO_H = 820
 const HERO_DONE_W = 750
-const HERO_DONE_H = 820
+const HERO_DONE_H = 1020
 // 结果态照片与导航栏之间的呼吸缝：aspectFit 高度受限时头顶必然贴 stage 顶，
-// stage 顶 = 导航底 + 这道缝，头才不会顶着导航栏（stage 内照片区 = 820-56=764rpx）
+// stage 顶 = 导航底 + 这道缝，头才不会顶着导航栏（stage 内照片区 = 1020-56=964rpx）
 const HERO_DONE_GAP = 56
 // 结果态 hero 底部的停靠带：竖版全身照高度受限，脚底必然贴 stage 底——
 // stage 底边抬高 120rpx，板子上叠（88rpx）与底部融化只盖停靠带，不盖脚
@@ -268,7 +270,7 @@ export default function Outfit() {
   const photoDisplayPath = useDisplayablePath(photoPath)
   // 结果态 hero 出血到屏幕顶：导航区 + 一道呼吸缝只铺模糊衬底，前景照片与
   // 锚点层整体下移——否则头部顶进状态栏/灵动岛，或贴着导航栏下沿，都不协调。
-  // hero 总高不变（导航高 + 820rpx），stage 下移的 56rpx 从照片区扣（764rpx）。
+  // hero 总高不变（导航高 + (1020+120)rpx），stage 下移的 56rpx 从照片区扣（964rpx）。
   const nav = getNavMetrics()
   const rpxPx = nav.windowWidth / 750
   const doneHeroStyle = result
@@ -353,7 +355,13 @@ export default function Outfit() {
           ) : (
             <View className="od__upload pressable" onClick={choosePhoto}>
               <SourceImage className="od__upload-backdrop" reference={{ slug: 'natural', variant: 'full' }} />
-              <SourceImage className="od__hero-img" reference={{ slug: 'natural', variant: 'full' }} anchor="top" />
+              {/* 示范图讲的就是「站好、全身入镜」：aspectFit 完整入镜，
+                  aspectFill 居中裁会把头顶和鞋子一起切掉 */}
+              <SourceImage
+                className="od__hero-img"
+                reference={{ slug: 'natural', variant: 'full' }}
+                mode="aspectFit"
+              />
               <View className="od__upload-bar">
                 <Text className="od__upload-bar-plus">＋</Text>
                 <Text className="od__upload-bar-text">{OUTFIT_COPY.uploadTitle}</Text>

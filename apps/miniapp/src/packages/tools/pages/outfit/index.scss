@@ -6,7 +6,9 @@
 
   // ---------- 照片 hero ----------
   &__hero {
-    height: 640rpx;
+    // 框高＝竖版全身照的显影上限（aspectFit 由高受限）：820rpx 才容得下
+    // 3:4 / 9:16 的整身照，再矮照片就只能缩到框中间一小块
+    height: 820rpx;
     border-radius: 0;
     border: 0;
 
@@ -169,6 +171,11 @@
     .od__hero-img {
       position: relative;
       z-index: 1;
+      // 示范图完整入镜（aspectFit）后左右必有 letterbox：
+      // 组件默认底色/圆角会摊成两块灰板、四角还出接缝，
+      // 必须透明露出底下同一张图的失焦衬底
+      background-color: transparent;
+      border-radius: 0;
     }
 
     // 角标让位底部上传条
@@ -252,9 +259,9 @@
       right: 0;
       z-index: 1;
       margin: 0;
-      // 实际高度由页面 inline 设为「实测导航高 + (820+120)rpx」：导航区出血只铺
-      // 衬底，前景照片/锚点 stage 上下各让 56/120rpx（此 940rpx 仅作首帧兜底）
-      height: 940rpx;
+      // 实际高度由页面 inline 设为「实测导航高 + (1020+120)rpx」：导航区出血只铺
+      // 衬底，前景照片/锚点 stage 上下各让 56/120rpx（此 1140rpx 仅作首帧兜底）
+      height: 1140rpx;
       border-radius: 0;
       border: none;
 
