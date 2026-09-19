@@ -1,0 +1,162 @@
+// 今日页 —— 全部 rpx（designWidth: 750）。
+// 参照 Aesop / COS：留白为主，细线分隔，重色只出现在该强调的地方。
+// 层次纪律：视觉是主角 → 标题次之 → 正文 → 主按钮 → 文字链 → 手册行。
+.today {
+  display: flex;
+  flex-direction: column;
+
+  // ---------- 语境（最轻的一层） ----------
+  &__ctx {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 4rpx 2rpx 20rpx;
+  }
+
+  &__ctx-main {
+    font-size: 22rpx;
+    font-weight: 600;
+    color: var(--ink-3);
+  }
+
+  &__ctx-city {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  // ---------- 视觉：唯一主角，出血到屏幕两边 ----------
+  &__visual {
+    height: 400rpx;
+    margin: 0 calc(-1 * var(--page-gutter));
+    background: var(--moss-soft);
+  }
+
+  // 海报式要更高的舞台：出血大字 + 错落素材需要纵向空间
+  &__visual--tall {
+    height: 580rpx;
+  }
+
+  // ---------- 正文 ----------
+  &__body {
+    padding: 40rpx 2rpx 0;
+  }
+
+  &__meta {
+    font-size: 21rpx;
+    font-weight: 600;
+    letter-spacing: 1rpx;
+    color: var(--ink-3);
+  }
+
+  &__title {
+    display: block;
+    margin-top: 18rpx;
+    font-size: 40rpx;
+    line-height: 1.22;
+    font-weight: 700;
+    letter-spacing: -1rpx;
+    color: var(--ink);
+  }
+
+  &__lead {
+    display: block;
+    margin-top: 20rpx;
+    font-size: 27rpx;
+    line-height: 1.72;
+    color: var(--ink-2);
+  }
+
+  // 细线：替代色块容器
+  &__rule {
+    height: 1rpx;
+    margin: 34rpx 0;
+    background: var(--line);
+  }
+
+  // 个性化段落：左侧细线，不用底色块（色块会制造第二个「块」，抢视觉）
+  &__fit {
+    padding-left: 24rpx;
+    border-left: 3rpx solid var(--moss);
+  }
+
+  &__fit-text {
+    font-size: 27rpx;
+    line-height: 1.75;
+    color: var(--ink);
+  }
+
+  &__why {
+    display: block;
+    margin-top: 26rpx;
+    font-size: 22rpx;
+    line-height: 1.7;
+    color: var(--ink-3);
+  }
+
+  // ---------- 行动：一个主按钮 + 一条文字链 ----------
+  &__cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 96rpx;
+    margin-top: 44rpx;
+    border-radius: 999rpx;
+    background: var(--moss-deep);
+  }
+
+  &__cta-text {
+    font-size: 28rpx;
+    font-weight: 700;
+    color: var(--cream);
+  }
+
+  &__link {
+    display: block;
+    margin-top: 26rpx;
+    text-align: center;
+    font-size: 25rpx;
+    font-weight: 600;
+    color: var(--moss);
+  }
+
+  // ---------- 手册入口：轻量行，不是卡片 ----------
+  &__handbook {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6rpx 2rpx;
+  }
+
+  &__handbook-title {
+    font-size: 26rpx;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+
+  &__handbook-go {
+    font-size: 26rpx;
+    font-weight: 700;
+    color: var(--ink-3);
+  }
+
+  // ---------- 空态 ----------
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+    margin-top: 20rpx;
+    padding: 0 2rpx;
+  }
+
+  &__empty-title {
+    font-size: 32rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__empty-body {
+    font-size: 25rpx;
+    line-height: 1.75;
+    color: var(--ink-3);
+  }
+}

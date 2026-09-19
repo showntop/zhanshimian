@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>每日内容 · 内容池实验台</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#626862; --ink3:#686D67;
+  --moss:#587344; --moss-soft:#EDF1EA; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.12); --surface:#FFFFFF;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E7E9E5;color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased;padding:28px 24px 64px}
+.wrap{max-width:1280px;margin:0 auto}
+h1{font-size:21px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.75;max-width:900px}
+.hint{font-size:12px;color:var(--ink3);margin-top:8px;line-height:1.7}
+
+/* 控制面板 */
+.panel{margin-top:18px;padding:16px 18px;border-radius:14px;background:#fff;border:1px solid var(--line);
+  display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end}
+.fld{display:flex;flex-direction:column;gap:6px}
+.fld label{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.3px}
+.fld select,.fld input{padding:7px 10px;border-radius:8px;border:1px solid var(--line);
+  background:var(--bg);font-family:inherit;font-size:13px;color:var(--ink)}
+.fld input[type=range]{padding:0;width:150px}
+.val{font-size:12px;color:var(--moss);font-weight:700}
+.btn{padding:9px 16px;border-radius:999px;background:var(--moss);color:#fff;font-size:13px;
+  font-weight:700;border:0;font-family:inherit;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink2);border:1px solid var(--line);font-weight:600}
+
+/* 主区 */
+.main{display:flex;gap:26px;margin-top:22px;align-items:flex-start;flex-wrap:wrap}
+.phone{width:375px;flex:0 0 375px;background:var(--bg);border-radius:32px;overflow:hidden;
+  box-shadow:0 18px 48px rgba(45,58,35,.20),0 2px 6px rgba(45,58,35,.10)}
+.statusbar{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:12px;font-weight:600}
+.sig{display:flex;gap:4px;align-items:center}
+.sig i{width:4px;height:8px;background:var(--ink);border-radius:1px;display:block}
+.sig i:nth-child(4){height:6px;opacity:.4}
+.topbar{display:flex;align-items:baseline;justify-content:space-between;padding:0 16px 10px}
+.brand{font-size:17px;font-weight:700}.brand .up{color:var(--ink)}.brand .look{color:var(--moss)}
+.topdate{font-size:12px;color:var(--ink3);font-weight:600}
+
+.visual{height:230px;margin:0 16px;border-radius:14px;overflow:hidden;position:relative;background:var(--moss-soft)}
+.vkick{position:absolute;top:12px;left:12px;padding:5px 10px;border-radius:999px;
+  background:rgba(30,35,29,.40);backdrop-filter:blur(10px);color:var(--cream);font-size:10.5px;font-weight:700}
+.body{padding:18px 16px 22px}
+.kicker{font-size:11px;font-weight:700;color:var(--moss);letter-spacing:.4px}
+.h1c{margin-top:10px;font-size:23px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+.lead{margin-top:9px;font-size:13px;line-height:1.65;color:var(--ink2)}
+.fit{margin-top:14px;padding:13px 14px;border-radius:11px;background:var(--moss-soft);
+  font-size:13px;line-height:1.7;color:#2E3B25}
+.why{margin-top:10px;font-size:11.5px;line-height:1.6;color:var(--ink3)}
+.cta{display:block;width:100%;margin-top:18px;padding:15px;border-radius:999px;background:var(--moss);
+  color:#fff;font-size:14px;font-weight:700;border:0;font-family:inherit;cursor:pointer}
+.cta2{display:block;width:100%;margin-top:9px;padding:12px;border-radius:999px;background:transparent;
+  border:1px solid var(--line);color:var(--ink2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer}
+.libline{margin-top:12px;text-align:center;font-size:11px;color:var(--ink3)}
+.libline b{color:var(--moss)}
+
+/* 侧栏 */
+.side{flex:1;min-width:300px;max-width:520px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.card h3{font-size:13px;font-weight:700;margin-bottom:10px}
+.reason{font-size:12px;line-height:1.9;color:var(--ink2);padding-left:16px;position:relative}
+.reason:before{content:'';position:absolute;left:0;top:9px;width:5px;height:5px;border-radius:999px;background:var(--moss)}
+.buckets{display:flex;flex-direction:column;gap:8px}
+.bk{display:flex;align-items:center;gap:10px;font-size:12px}
+.bk .nm{width:74px;color:var(--ink2)}
+.bk .bar{flex:1;height:9px;border-radius:999px;background:rgba(105,115,100,.10);overflow:hidden}
+.bk .bar i{display:block;height:100%;background:var(--moss);border-radius:999px;transition:.3s}
+.bk .n{width:22px;text-align:right;color:var(--ink3);font-weight:700}
+
+/* 内容池全览 */
+.pool{margin-top:26px}
+.pool h2{font-size:16px;font-weight:700;margin-bottom:4px}
+.pool .note{font-size:12px;color:var(--ink2);margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:12px}
+.item{border-radius:12px;padding:13px 14px;border:1px solid var(--line);background:var(--bg);cursor:pointer;transition:.16s}
+.item:hover{border-color:var(--moss)}
+.item.hit{border-color:var(--moss);background:var(--moss-soft)}
+.item.seen{opacity:.45}
+.item .it-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.item .it-type{font-size:10px;font-weight:700;color:var(--moss)}
+.item .it-mod{font-size:10px;color:var(--ink3)}
+.item .it-topic{font-size:13.5px;font-weight:700;margin-top:7px;line-height:1.4}
+.item .it-why{font-size:11px;color:var(--ink3);margin-top:6px;line-height:1.55}
+.item .it-meta{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:10px;padding:2px 7px;border-radius:999px;background:rgba(105,115,100,.12);color:var(--ink3)}
+.tag.asset{background:var(--moss-soft);color:var(--moss)}
+.tag.rev{background:rgba(126,84,69,.12);color:#7E5445}
+
+.warn{margin-top:20px;padding:12px 14px;border-radius:11px;background:rgba(126,84,69,.08);
+  font-size:12px;line-height:1.75;color:#6A4B3E}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>每日内容 · 内容池实验台</h1>
+  <p class="sub">直接读 <code>packages/core/src/daily/mock.ts</code> 编译产物——你看到的就是真实数据，不是副本。
+     切换形象基因、温度、日期类型，看选品怎么变；点下面任意一条可强制预览。</p>
+  <p class="hint">「收下」会把这条加入已看并让对应库 +1，然后自动选下一条——用它跑几天，看是否重复、是否单调。</p>
+
+  <div class="panel">
+    <div class="fld">
+      <label>形象基因</label>
+      <select id="gene"></select>
+    </div>
+    <div class="fld">
+      <label>温度 <span class="val" id="tv"></span></label>
+      <input type="range" id="temp" min="-5" max="35" value="18">
+    </div>
+    <div class="fld">
+      <label>天气</label>
+      <select id="cond">
+        <option>晴</option><option>多云</option><option>阴</option><option>雨</option><option>风</option><option>雪</option>
+      </select>
+    </div>
+    <div class="fld">
+      <label>日期类型</label>
+      <select id="day"><option value="weekday">工作日</option><option value="weekend">周末</option><option value="holiday">节假日</option></select>
+    </div>
+    <div class="fld">
+      <label>季节</label>
+      <select id="season">
+        <option value="spring">春</option><option value="summer">夏</option>
+        <option value="autumn">秋</option><option value="winter" selected>冬</option>
+      </select>
+    </div>
+    <button class="btn ghost" id="reset">重置已看与库</button>
+  </div>
+
+  <div class="main">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+      <div class="topbar">
+        <div class="brand"><span class="up">up</span><span class="look">look</span></div>
+        <div class="topdate" id="topdate"></div>
+      </div>
+      <div class="visual" id="visual"><span class="vkick" id="vkick"></span></div>
+      <div class="body">
+        <div class="kicker" id="kicker"></div>
+        <div class="h1c" id="h1"></div>
+        <p class="lead" id="lead"></p>
+        <div class="fit" id="fit"></div>
+        <div class="why" id="why"></div>
+        <button class="cta" id="cta"></button>
+        <button class="cta2" id="cta2">看看我穿这样 →</button>
+        <div class="libline" id="libline"></div>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <h3>命中原因</h3>
+        <div class="reason" id="reason"></div>
+      </div>
+      <div class="card">
+        <h3>资产库</h3>
+        <div class="buckets" id="buckets"></div>
+      </div>
+      <div class="card">
+        <h3>当前基因</h3>
+        <div class="reason" id="geneline" style="font-size:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pool">
+    <h2>内容池全览（<span id="poolcount"></span> 条）</h2>
+    <p class="note">绿框 = 当前条件下可选；灰掉 = 已收过。点任意一条强制预览。</p>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="warn">
+    <b>全部 reviewed: false</b> —— 这些原理取自通行的形象知识，句式和结构可以确认，
+    但「是否真的适用于这类人」必须经形象顾问逐条确认后才能进生产池。
+    另外：内容池里没有任何一条要求知道用户当天穿什么，也没有任何一条评价身体。
+  </div>
+</div>
+
+<script type="module">
+import { MOCK_CONTENTS, pickDaily, MOCK_GENES } from './_build/daily/mock.js'
+
+const $ = (id) => document.getElementById(id)
+const ASSETS = ['swatch', 'silhouette', 'proportion', 'palette', 'fabric', 'outfit']
+const ASSET_NM = { swatch: '色卡', silhouette: '版型库', proportion: '比例库', palette: '配色库', fabric: '面料库', outfit: '搭配' }
+const TYPE_NM = { color: '色彩', silhouette: '版型', proportion: '比例', fabric: '面料', item: '单品', occasion: '场合', howto: '教程' }
+
+let state = {
+  geneKey: Object.keys(MOCK_GENES)[0],
+  temp: 18, cond: '多云', day: 'weekday', season: 'winter',
+  seen: [], buckets: Object.fromEntries(ASSETS.map((a) => [a, 0])),
+  forced: null,
+}
+
+/* ---------- 程序化视觉 ---------- */
+const PRESET = { base: '#C9CFD4', support: '#8E9A83', accent: '#B4674D',
+  'high-contrast': '#2F3540', mid: '#7E8A72', low: '#D8D3C6' }
+
+function renderVisual(v) {
+  const s = v.spec || {}
+  if (v.modality === 'swatch') {
+    const arr = s.swatches || s.trio || s.rows || []
+    const colors = arr.map((x) => (typeof x === 'string' && x.startsWith('#') ? x : (PRESET[x] || '#C9CFD4')))
+    const pick = s.pick || (s.highlight ? [arr.indexOf(s.highlight)] : [])
+    const drop = s.drop || []
+    return `<div style="height:100%;display:flex;gap:8px;padding:22px 18px;align-items:stretch">
+      ${colors.map((c, i) => `<div style="flex:1;border-radius:9px;background:${c};display:flex;
+        align-items:flex-end;justify-content:center;padding-bottom:9px;font-size:11px;font-weight:800;
+        color:${pick.includes(i) ? '#39492E' : '#8A8F83'}">${pick.includes(i) ? '✓' : drop.includes(i) ? '×' : ''}</div>`).join('')}
+    </div>`
+  }
+  if (v.modality === 'compare') {
+    const parts = s.left && s.right ? [s.left, s.right] : (s.options || s.steps || s.axis ? (s.steps || s.options || [s.left, s.right]) : [])
+    return `<div style="height:100%;display:flex;gap:8px;padding:22px 18px;align-items:stretch">
+      ${parts.map((p, i) => `<div style="flex:1;border-radius:9px;background:${i === 0 ? 'rgba(105,115,100,.20)' : '#8E9A83'};
+        display:flex;align-items:center;justify-content:center;padding:8px;text-align:center;
+        font-size:11px;color:${i === 0 ? '#686D67' : '#EEF0EC'};font-weight:700">${p}</div>`).join('')}
+    </div>`
+  }
+  if (v.modality === 'diagram') {
+    const marks = s.marks || s.zones || s.scale || []
+    const pick = s.pick || s.highlight
+    const avoid = s.avoid
+    return `<div style="height:100%;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:20px 18px">
+      ${marks.map((m) => `<div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+          font-size:11px;font-weight:700;
+          background:${m === pick ? '#8E9A83' : m === avoid ? 'rgba(155,75,69,.16)' : 'rgba(105,115,100,.12)'};
+          color:${m === pick ? '#EEF0EC' : m === avoid ? '#9B4B45' : '#686D67'}">${m}</div>
+      </div>`).join('')}
+    </div>`
+  }
+  if (v.modality === 'video') {
+    return `<div style="height:100%;background:#3A4038;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:10px;color:#EEF0EC">
+      <div style="width:52px;height:52px;border-radius:999px;border:2px solid rgba(238,240,236,.6);
+        display:flex;align-items:center;justify-content:center;font-size:19px">▶</div>
+      <div style="font-size:11.5px">${s.durationSec || 12}s · ${s.steps || 2} 步</div></div>`
+  }
+  return `<div style="height:100%;display:flex;align-items:center;justify-content:center;
+    background:var(--moss-soft);color:#686D67;font-size:12px">${v.alt || ''}</div>`
+}
+
+/* ---------- 渲染 ---------- */
+function currentGene() { return MOCK_GENES[state.geneKey] }
+
+function inputFor() {
+  return {
+    gene: currentGene(), temperature: state.temp, condition: state.cond,
+    dayType: state.day, season: state.season, seen: state.seen, bucketCount: state.buckets,
+  }
+}
+
+function renderCard(pick) {
+  const c = pick.content
+  $('topdate').textContent = `今日 · ${state.temp}° ${state.cond}`
+  $('visual').innerHTML = renderVisual(c.visual) + `<span class="vkick">${TYPE_NM[c.type]} · ${c.visual.modality}</span>`
+  $('kicker').textContent = '今天这一条'
+  $('h1').textContent = c.topic
+  $('lead').textContent = c.lead
+  $('fit').textContent = pick.fitText
+  $('why').textContent = c.why
+  $('cta').textContent = `收进我的${ASSET_NM[c.asset]}`
+  $('libline').innerHTML = `我的${ASSET_NM[c.asset]} · 已有 ${state.buckets[c.asset] ?? 0} 条`
+  $('reason').innerHTML = pick.reason.map((r) => `<div>${r}</div>`).join('')
+}
+
+function renderBuckets() {
+  const max = Math.max(1, ...Object.values(state.buckets))
+  $('buckets').innerHTML = ASSETS.map((a) => `
+    <div class="bk"><span class="nm">${ASSET_NM[a]}</span>
+      <span class="bar"><i style="width:${((state.buckets[a] / max) * 100).toFixed(0)}%"></i></span>
+      <span class="n">${state.buckets[a]}</span></div>`).join('')
+}
+
+function renderGeneLine() {
+  const g = currentGene()
+  $('geneline').innerHTML = Object.entries(g).map(([k, v]) => `<div>${k}：<b>${v}</b></div>`).join('')
+}
+
+function renderPool(currentId) {
+  const inp = inputFor()
+  const hitKeys = new Set(MOCK_CONTENTS.filter((c) => {
+    if (state.seen.includes(c.dedupeKey)) return false
+    if (c.season && !c.season.includes(inp.season)) return false
+    if (c.dayType && !c.dayType.includes(inp.dayType)) return false
+    if (c.weather?.minTemp !== undefined && inp.temperature < c.weather.minTemp) return false
+    if (c.weather?.maxTemp !== undefined && inp.temperature > c.weather.maxTemp) return false
+    if (c.weather?.condition && !c.weather.condition.includes(inp.condition)) return false
+    return true
+  }).map((c) => c.id))
+
+  $('poolcount').textContent = MOCK_CONTENTS.length
+  $('grid').innerHTML = MOCK_CONTENTS.map((c) => `
+    <div class="item ${c.id === currentId ? 'hit' : ''} ${state.seen.includes(c.dedupeKey) ? 'seen' : ''}" data-id="${c.id}">
+      <div class="it-top"><span class="it-type">${TYPE_NM[c.type]}</span><span class="it-mod">${c.visual.modality}</span></div>
+      <div class="it-topic">${c.topic}</div>
+      <div class="it-why">${c.why}</div>
+      <div class="it-meta">
+        <span class="tag asset">${ASSET_NM[c.asset]}</span>
+        ${hitKeys.has(c.id) ? '<span class="tag">当前可选</span>' : '<span class="tag">条件不符</span>'}
+        ${state.seen.includes(c.dedupeKey) ? '<span class="tag">已收</span>' : ''}
+        ${c.reviewed ? '' : '<span class="tag rev">待顾问确认</span>'}
+      </div>
+    </div>`).join('')
+}
+
+function renderAll() {
+  const pick = state.forced
+    ? { content: state.forced, fitText: state.forced.fit(currentGene()), reason: ['强制预览'] }
+    : pickDaily(MOCK_CONTENTS, inputFor())
+  if (!pick) {
+    $('h1').textContent = '今天没有符合条件的内容'
+    $('lead').textContent = '内容池在当前条件下没有可选条目——这正是"池子不够就降频"要防的情况。'
+    $('fit').textContent = ''
+    $('why').textContent = ''
+    $('visual').innerHTML = ''
+    $('reason').innerHTML = ''
+    renderPool(null); renderBuckets(); renderGeneLine()
+    return
+  }
+  renderCard(pick); renderPool(pick.content.id); renderBuckets(); renderGeneLine()
+}
+
+/* ---------- 交互 ---------- */
+$('gene').innerHTML = Object.keys(MOCK_GENES).map((k) => `<option>${k}</option>`).join('')
+$('gene').onchange = (e) => { state.geneKey = e.target.value; state.forced = null; renderAll() }
+$('temp').oninput = (e) => { state.temp = Number(e.target.value); $('tv').textContent = state.temp + '°'; state.forced = null; renderAll() }
+$('cond').onchange = (e) => { state.cond = e.target.value; state.forced = null; renderAll() }
+$('day').onchange = (e) => { state.day = e.target.value; state.forced = null; renderAll() }
+$('season').onchange = (e) => { state.season = e.target.value; state.forced = null; renderAll() }
+$('reset').onclick = () => {
+  state.seen = []; state.buckets = Object.fromEntries(ASSETS.map((a) => [a, 0])); state.forced = null; renderAll()
+}
+$('cta').onclick = () => {
+  const pick = pickDaily(MOCK_CONTENTS, inputFor())
+  if (!pick) return
+  state.seen.push(pick.content.dedupeKey)
+  state.buckets[pick.content.asset] = (state.buckets[pick.content.asset] ?? 0) + 1
+  state.forced = null
+  renderAll()
+}
+document.addEventListener('click', (e) => {
+  const it = e.target.closest('[data-id]')
+  if (!it) return
+  state.forced = MOCK_CONTENTS.find((c) => c.id === it.dataset.id) ?? null
+  renderAll()
+})
+
+$('tv').textContent = state.temp + '°'
+renderAll()
+</script>
+</body>
+</html>

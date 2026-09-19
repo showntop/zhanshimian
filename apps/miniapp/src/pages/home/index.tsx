@@ -4,13 +4,14 @@
 // 数据纪律（新架构不变）：单次 /v1/home/bootstrap 聚合 + resourceCache 缓存优先；
 // 进行中 Operation 只经 useOperationPolling 观察，全部到终态后整页静默对账一次。
 // 图片一律走 SourceImage：角标按 source_kind 投影，不手动叠标、不回退内置图。
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import {
   ANALYSIS_FAIL_COPY,
   APP_NAME,
   APP_SLOGAN,
+  DAILY_COPY,
   ERROR_COPY,
   HOME_COPY,
   HOME_TITLE,
@@ -30,8 +31,10 @@ import { qualityApi } from '../../app/api/quality'
 import { peripherals } from '../../app/api/peripherals'
 import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
 import { useOperationPolling } from '../../app/operations/use-operation-polling'
+import { useDailyPick } from '../../features/daily/use-daily-pick'
 import { usePageShell } from '../../hooks/use-page-visibility'
 import AppHeader from '../../components/app-header'
+import DailyPoster from '../../components/daily-poster'
 import PrimaryButton from '../../components/primary-button'
 import SourceImage from '../../components/source-image'
 import ErrorState from '../../components/error-state'
@@ -220,6 +223,25 @@ export default function Home() {
   const featured = planSet ? [...planSet.variants].sort((a, b) => a.slot - b.slot)[0] : undefined
   const findingsCount = (report?.findings ?? []).length
 
+  // 每日内容：与今日页共用同一份选品，首页只放海报（精简），点进去看完整
+  const { pick: dailyPick, bucketName: dailyBucketName, saveCurrent } = useDailyPick()
+
+  // 海报角落编号用日期而非序号：序号是静态的，日期才有"每天换一张"的时间感
+  const todaySeq = useMemo(() => {
+    const now = new Date()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    return `${month}.${day}`
+  }, [])
+
+  const goToday = useCallback(() => {
+    void Taro.navigateTo({ url: '/pages/today/index' })
+  }, [])
+
+  const goReport = useCallback(() => {
+    void Taro.navigateTo({ url: `/pages/report/index?id=${encodeURIComponent(report?.id ?? '')}` })
+  }, [report?.id])
+
   // 方案 Tab 角标（与 PlansScreen 同一规则：在途受理 + 各套在途渲染）。
   // 首页是默认 tab、启动即挂载，方案 tab 懒挂载——首页不设的话，
   // 在首页等待生成的用户不点方案 tab 永远看不到红点。
@@ -346,35 +368,26 @@ export default function Home() {
             </View>
           ) : (
             <View>
-              <View
-                className="home__hero home__hero--report card--hero pressable"
-                onClick={() =>
-                  void Taro.navigateTo({ url: `/pages/report/index?id=${encodeURIComponent(report?.id ?? '')}` })
-                }
-              >
-                <View className="home__report-main">
-                  <View className={`home__hero-copy ${enter(1)}`}>
-                    <Text className="home__hero-eyebrow">{HOME_COPY.reportReady}</Text>
-                    <Text className="home__hero-title">{report?.priority_title}</Text>
-                    <Text className="home__hero-desc">{report?.priority_copy}</Text>
-                  </View>
-                  <View className="home__report-visual">
-                    <SourceImage
-                      className="home__report-image"
-                      media={report?.source_media.face.media}
-                      anchor="top"
-                      frameAspect={248 / 314}
-                    />
-                    <View className="home__report-shade" />
-                  </View>
+              {dailyPick ? (
+                <View className={enter(1)}>
+                  <DailyPoster
+                    type={dailyPick.content.type}
+                    visual={dailyPick.content.visual}
+                    topic={dailyPick.content.topic}
+                    fitText={dailyPick.fitText}
+                    seq={todaySeq}
+                    saveLabel={DAILY_COPY.saveAction}
+                    onSave={saveCurrent}
+                    onOpen={goToday}
+                  />
                 </View>
-                <View className="home__report-action">
-                  <Text className="home__report-action-label">{HOME_COPY.viewReport}</Text>
-                  <Text className="home__report-action-meta">
-                    <Text className="home__report-action-count">{findingsCount}</Text>
-                    {HOME_COPY.findingsSuffix}
-                  </Text>
-                </View>
+              ) : null}
+              {/* 报告退位：不再是首页主角，但入口保留，降级为一行 */}
+              <View className="home__archive" onClick={goReport}>
+                <Text className="home__archive-text">{HOME_COPY.viewReport}</Text>
+                <Text className="home__archive-meta">
+                  {findingsCount}{HOME_COPY.findingsSuffix}
+                </Text>
               </View>
             </View>
           )}

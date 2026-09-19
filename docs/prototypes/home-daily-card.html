@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>首页「今天这一条」· 视觉重做</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#626862; --ink3:#686D67;
+  --moss:#587344; --moss-soft:#EDF1EA; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E4E6E2;color:var(--ink);-webkit-font-smoothing:antialiased;padding:26px 22px 60px}
+.wrap{max-width:1220px;margin:0 auto}
+h1{font-size:21px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.75;max-width:920px}
+.tabs{display:flex;gap:7px;margin:18px 0 16px;flex-wrap:wrap}
+.tab{padding:8px 15px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  color:var(--ink2);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--moss-deep);border-color:var(--moss-deep);color:var(--cream)}
+.main{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+
+/* ================= 手机 ================= */
+.phone{width:375px;flex:0 0 375px;background:var(--bg);border-radius:30px;overflow:hidden;
+  box-shadow:0 18px 46px rgba(45,58,35,.20)}
+.sb{height:42px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:12px;font-weight:600}
+.sig{display:flex;gap:4px;align-items:center}
+.sig i{width:4px;height:8px;background:var(--ink);border-radius:1px;display:block}
+.sig i:nth-child(4){height:6px;opacity:.4}
+.navbar{display:flex;align-items:center;justify-content:space-between;padding:4px 20px 0}
+.brand{font-size:17px;font-weight:700}.brand .up{color:var(--ink)}.brand .look{color:var(--moss)}
+.right{font-size:11px;color:var(--ink3)}
+.greet{padding:16px 20px 0}
+.gt{display:flex;align-items:baseline;justify-content:space-between}
+.gk{font-size:12px;font-weight:600;color:var(--ink2)}
+.gd{font-size:11px;color:var(--ink3)}
+.gtitle{margin-top:5px;font-size:19px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+
+/* ================= 卡片：全出血视觉 + 咬合 ================= */
+.dcard{position:relative;margin-top:16px}
+.dvis{
+  position:relative;height:296px;overflow:hidden;
+  background:linear-gradient(150deg,#F3F5F0 0%,#E9EEE6 52%,#F1F2EC 100%);
+}
+/* 背景流动色团：极慢，只做位移，不做 filter 动画 */
+.blob{position:absolute;border-radius:50%;opacity:.9}
+.b1{width:280px;height:280px;left:-70px;top:-90px;
+  background:radial-gradient(circle,rgba(197,215,185,.85) 0%,rgba(197,215,185,0) 70%);
+  animation:drift1 23s ease-in-out infinite}
+.b2{width:250px;height:250px;right:-70px;top:60px;
+  background:radial-gradient(circle,rgba(227,220,200,.8) 0%,rgba(227,220,200,0) 70%);
+  animation:drift2 29s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,26px) scale(1.1)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-26px,20px) scale(1.08)}}
+
+/* 类别标签：浮在视觉区右上 */
+.dtag{
+  position:absolute;top:14px;left:20px;z-index:8;
+  padding:4px 10px;border-radius:999px;background:rgba(30,35,29,.40);
+  color:var(--cream);font-size:10.5px;font-weight:700;letter-spacing:.4px;
+  backdrop-filter:blur(10px);
+}
+
+/* ---------- 非对称构图：三种内容各一套 ---------- */
+.stage-el{position:absolute;z-index:4}
+
+/* A 色卡：四根高低不一的色条，底部对齐，依次起伏 */
+.cards{position:absolute;left:22px;right:22px;bottom:34px;height:172px;
+  display:flex;align-items:flex-end;gap:10px}
+.cards i{
+  flex:1;border-radius:5px;display:block;
+  box-shadow:0 8px 20px rgba(45,58,35,.13);
+  animation:wave 4.6s ease-in-out infinite;
+}
+.cards i:nth-child(1){height:78%;animation-delay:0s}
+.cards i:nth-child(2){height:96%;animation-delay:.42s}
+.cards i:nth-child(3){height:62%;animation-delay:.84s}
+.cards i:nth-child(4){height:84%;animation-delay:1.26s}
+@keyframes wave{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+/* 选中项：抬起 + moss 描边，和今日页同语言 */
+.cards i.on{box-shadow:0 0 0 2px var(--moss),0 12px 26px rgba(45,58,35,.20)}
+.cards i.off{opacity:.62}
+
+/* B 对比：两块错位不等大，交替呼吸 */
+.duo{position:absolute;inset:0}
+.duo .blk{position:absolute;border-radius:6px}
+.duo .flat{left:22px;bottom:44px;width:44%;height:58%;
+  animation:breatheA 5.2s ease-in-out infinite}
+.duo .layered{right:26px;top:44px;width:36%;height:50%;overflow:hidden;
+  animation:breatheB 5.2s ease-in-out infinite}
+.duo .layered .sheen{position:absolute;inset:0;
+  background:linear-gradient(170deg,rgba(255,255,255,.30) 0%,rgba(255,255,255,0) 52%);
+  animation:sheenMove 5.2s ease-in-out infinite}
+/* 交替：一个微微抬头，另一个同时压低，差异被"看出来" */
+@keyframes breatheA{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(4px) scale(.985)}}
+@keyframes breatheB{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.02)}}
+@keyframes sheenMove{0%,100%{opacity:.75;transform:translateX(0)}50%{opacity:1;transform:translateX(5px)}}
+.duo .note{position:absolute;left:22px;bottom:16px;font-size:10.5px;color:var(--ink3);letter-spacing:.3px}
+
+/* C 示意：非对称刻度，选中项带脉冲 */
+.axis{position:absolute;left:22px;right:22px;top:52px;bottom:38px;display:flex;flex-direction:column;justify-content:space-between}
+.axis .row{display:flex;align-items:center;gap:12px;position:relative;padding-left:0}
+.axis .dot{width:9px;height:9px;border-radius:50%;flex:0 0 9px;
+  background:#fff;border:1.5px solid rgba(55,62,52,.34);transition:.3s}
+.axis .lb{font-size:12px;font-weight:600;color:var(--ink2);white-space:nowrap}
+.axis .row.on .dot{width:15px;height:15px;flex-basis:15px;background:var(--moss);border-color:var(--moss);
+  animation:pulse 2.8s ease-in-out infinite}
+.axis .row.on .lb{font-weight:700;color:var(--ink)}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(88,115,68,.36)}50%{box-shadow:0 0 0 9px rgba(88,115,68,0)}}
+/* 轴线：非对称——从第一行下方起，到最后一行的点收尾 */
+.axis .rail{position:absolute;left:4px;top:12px;bottom:12px;width:1.5px;background:rgba(55,62,52,.18)}
+
+/* ---------- 咬合卡 ---------- */
+.dbody{
+  position:relative;z-index:9;margin:-26px 16px 0;background:#fff;border-radius:14px;
+  padding:16px 16px 15px;box-shadow:0 8px 22px rgba(52,59,47,.13);
+}
+.deyebrow{font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--moss)}
+.dtitle{margin-top:7px;font-size:21px;line-height:1.24;font-weight:700;letter-spacing:-.6px}
+.dlead{margin-top:8px;font-size:13px;line-height:1.62;color:var(--ink2)}
+.dacts{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+.dcta{padding:9px 15px;border-radius:999px;background:var(--moss-deep);color:var(--cream);
+  font-size:12.5px;font-weight:700;border:0;font-family:inherit;cursor:pointer}
+.dmore{font-size:11.5px;font-weight:600;color:var(--moss)}
+
+/* 下方区块占位 */
+.below{padding:22px 16px 24px}
+.bh{font-size:16px;font-weight:700;margin-bottom:8px}
+.brule{width:24px;height:2px;background:var(--moss);margin-bottom:11px}
+.brow{display:flex;gap:8px;margin-bottom:8px}
+.bph{flex:1;height:56px;border-radius:10px;background:rgba(105,115,100,.10)}
+.bph.l{height:86px}
+
+/* ================= 说明 ================= */
+.note{flex:1;min-width:300px;max-width:470px}
+.note h3{font-size:17px;font-weight:700}
+.note .sub2{font-size:12px;color:var(--moss);font-weight:600;margin:4px 0 14px}
+.note dl{border-top:1px solid var(--line);padding-top:12px}
+.note dt{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-top:12px}
+.note dt:first-child{margin-top:0}
+.note dd{font-size:12.5px;line-height:1.8;color:var(--ink);margin-top:3px}
+.goodline{margin-top:14px;padding:11px 13px;border-radius:10px;background:rgba(88,115,68,.10);
+  font-size:12px;line-height:1.7;color:#3D5230}
+.warnline{margin-top:12px;padding:11px 13px;border-radius:10px;background:rgba(126,84,69,.08);
+  font-size:12px;line-height:1.7;color:#6A4B3E}
+.code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:rgba(105,115,100,.12);padding:1px 5px;border-radius:4px}
+table{border-collapse:collapse;width:100%;margin-top:10px;font-size:12px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;color:var(--ink3);font-weight:700}
+.stage{display:none}.stage.on{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>首页「今天这一条」· 视觉重做</h1>
+  <p class="sub">现状：120px 的小方块塞两个色块，外面套白卡——和下面「发型设计」是同一套语言，主角没有主角相。
+    这一版把视觉<b>通栏出血</b>、改成<b>非对称构图</b>，并加上<b>慢速动效</b>（流动的背景、起伏的色卡、交替呼吸的对比）。
+    动效一律只做 transform/opacity，周期 4.6–29 秒，是"呼吸"不是"闪烁"。</p>
+
+  <div class="tabs">
+    <button class="tab on" data-stage="a">A 色卡类</button>
+    <button class="tab" data-stage="b">B 对比类</button>
+    <button class="tab" data-stage="c">C 示意类</button>
+    <button class="tab" data-stage="d">D 现状对照</button>
+  </div>
+
+  <div class="main">
+    <!-- ===== A 色卡 ===== -->
+    <div class="stage on" id="stage-a">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet">
+          <div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div>
+        </div>
+        <div class="dcard">
+          <div class="dvis">
+            <div class="blob b1"></div><div class="blob b2"></div>
+            <div class="dtag">色卡 · 第 09 条</div>
+            <div class="cards">
+              <i class="on" style="background:#FBFBF8"></i>
+              <i class="on" style="background:#F2F4F1"></i>
+              <i class="off" style="background:#EFEADC"></i>
+              <i class="off" style="background:#E6DECD"></i>
+            </div>
+          </div>
+          <div class="dbody">
+            <div class="deyebrow">今天这一条</div>
+            <div class="dtitle">冬天的白，不止一种</div>
+            <div class="dlead">你是冷调肤色。本白和冷白贴着皮肤，气色往上走；米白、奶油白里的黄调，会把冷皮衬得发闷。</div>
+            <div class="dacts">
+              <button class="dcta">收进我的色卡</button>
+              <span class="dmore">看看我穿这样 ›</span>
+            </div>
+          </div>
+        </div>
+        <div class="below">
+          <div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div>
+        </div>
+      </div>
+      <div class="note">
+        <h3>A · 色卡类</h3>
+        <div class="sub2">四根高低不一的色条 · 波浪式起伏</div>
+        <dl>
+          <dt>非对称在哪</dt><dd>四根色条<b>高度 62% / 78% / 84% / 96% 各不相同</b>、底部对齐——不是四条等长的色带。选中的两根用 moss 描边抬起，另两根降饱和。</dd>
+          <dt>动效</dt><dd>每根错峰 <span class="code">0.42s</span> 上下浮动，周期 4.6s。形成一道从左到右缓缓走过的波——像布料的起伏，不是闪烁。</dd>
+          <dt>为什么这样对</dt><dd>色卡本来就是"一卷布样"的隐喻。高低错落让它是布样，等高并排就只是色块表。</dd>
+          <dt>背景</dt><dd>两团极慢色雾（23s / 29s）在底层漂移，让整块区域始终有微微的"活"。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- ===== B 对比 ===== -->
+    <div class="stage" id="stage-b">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet">
+          <div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div>
+        </div>
+        <div class="dcard">
+          <div class="dvis">
+            <div class="blob b1"></div><div class="blob b2"></div>
+            <div class="dtag">面料 · 第 12 条</div>
+            <div class="duo">
+              <div class="blk flat" style="background:#5A6156"></div>
+              <div class="blk layered" style="background:#7C8A76">
+                <div class="sheen"></div>
+              </div>
+              <div class="note">哑光收边界 · 光泽扩边界</div>
+            </div>
+          </div>
+          <div class="dbody">
+            <div class="deyebrow">今天这一条</div>
+            <div class="dtitle">光泽会放大体积</div>
+            <div class="dlead">你骨架偏小。小面积光泽是加分项——一个缎面包或一双漆皮鞋就够，不必全身。</div>
+            <div class="dacts">
+              <button class="dcta">收进我的面料库</button>
+              <span class="dmore">看看我穿这样 ›</span>
+            </div>
+          </div>
+        </div>
+        <div class="below">
+          <div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div>
+        </div>
+      </div>
+      <div class="note">
+        <h3>B · 对比类</h3>
+        <div class="sub2">两块错位不等大 · 交替呼吸</div>
+        <dl>
+          <dt>非对称在哪</dt><dd>左下 44%×58%，右上 36%×50%——<b>大小不同、对角线错开</b>，不齐平、不对称。下面一行小注给对比的落点。</dd>
+          <dt>动效</dt><dd>两块<b>反向呼吸</b>：左边往下 4px 的同时右边往上 6px，周期 5.2s。差异是被"看出来"的，不需要读字。光泽块上的高光缓慢横移，模拟材质反光。</dd>
+          <dt>为什么这样对</dt><dd>这是"哑光 vs 光泽"——如果两块一样大并排，眼睛会当成两个色块；错位+反向呼吸之后，它们才像"同一件东西的两种材质"。</dd>
+          <dt>克制</dt><dd>动画幅度都在 10px 以内。超越这个量级就从"呼吸"变成"跳动"，会烦。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- ===== C 示意 ===== -->
+    <div class="stage" id="stage-c">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet">
+          <div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div>
+        </div>
+        <div class="dcard">
+          <div class="dvis">
+            <div class="blob b1"></div><div class="blob b2"></div>
+            <div class="dtag">比例 · 第 07 条</div>
+            <div class="axis">
+              <div class="rail"></div>
+              <div class="row"><span class="dot"></span><span class="lb">胸前</span></div>
+              <div class="row on"><span class="dot"></span><span class="lb">腰线附近 — 重心停在这里最稳</span></div>
+              <div class="row"><span class="dot"></span><span class="lb">胯部</span></div>
+            </div>
+          </div>
+          <div class="dbody">
+            <div class="deyebrow">今天这一条</div>
+            <div class="dtitle">包背在哪，重心就在哪</div>
+            <div class="dlead">包是全身唯一可以随意移动的重点。它的落点会成为视觉重心——想拉长就让它靠近腰线。</div>
+            <div class="dacts">
+              <button class="dcta">收进我的比例库</button>
+              <span class="dmore">看看我穿这样 ›</span>
+            </div>
+          </div>
+        </div>
+        <div class="below">
+          <div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div>
+        </div>
+      </div>
+      <div class="note">
+        <h3>C · 示意类</h3>
+        <div class="sub2">刻度轴 · 选中项脉冲</div>
+        <dl>
+          <dt>非对称在哪</dt><dd>刻度轴不用居中——线靠左、标签右延伸，三行不等距。选中的那一行<b>点和字同时放大加重</b>，视觉重量明显偏向它。</dd>
+          <dt>动效</dt><dd>选中点做<span class="code">pulse</span>：一圈 moss 光环从里向外扩散消失，周期 2.8s。像心跳，安静地提示"是这里"。</dd>
+          <dt>为什么不做人形</dt><dd>这一版我明确<b>放弃了</b>画人形——上一轮试过，用 CSS 拼出来的是"药丸+圆"，业余。刻度轴干净、信息明确、不假装自己是插画。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- ===== D 现状对照 ===== -->
+    <div class="stage" id="stage-d">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet">
+          <div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div>
+        </div>
+        <!-- 现状：白卡 + 120rpx 小图 -->
+        <div style="margin:16px 16px 0;padding:9px;border-radius:12px;background:#fff;border:1px solid var(--line);box-shadow:0 3px 9px rgba(52,59,47,.07);display:flex;gap:11px">
+          <div style="width:90px;height:90px;flex:0 0 90px;border-radius:9px;overflow:hidden;background:var(--moss-soft);display:flex;align-items:center;justify-content:center;gap:5px;padding:14px">
+            <span style="flex:1;height:60%;border-radius:4px;background:#5A6156"></span>
+            <span style="flex:1;height:82%;border-radius:4px;background:#7C8A76"></span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column">
+            <div class="deyebrow">今天这一条</div>
+            <div style="margin-top:5px;font-size:16.5px;line-height:1.3;font-weight:700;letter-spacing:-.5px">光泽会放大体积</div>
+            <div style="margin-top:5px;font-size:11.5px;line-height:1.55;color:var(--ink2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">你骨架偏小。小面积光泽是加分项（领口、包或鞋），否则整体会闷。</div>
+            <div style="margin-top:auto;font-size:12px;font-weight:700;color:var(--moss)">收进我的面料库</div>
+          </div>
+        </div>
+        <div class="below">
+          <div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div>
+        </div>
+      </div>
+      <div class="note">
+        <h3>D · 现状对照</h3>
+        <div class="sub2">就是你现在看到的这一张</div>
+        <dl>
+          <dt>问题一：视觉被压成 90px</dt><dd>两个色块挤在 90×90 里，还没有一张图标大。信息量再大也看不出来。</dd>
+          <dt>问题二：和下面同语言</dt><dd>它和「发型设计」「穿搭诊断」用的是同一套圆角白卡。工具卡这样没问题，但这条是<b>每天的主角</b>，混在里面就没有主角相。</dd>
+          <dt>问题三：静态</dt><dd>完全没有动态。用户划过去，眼睛不会为它停一下。</dd>
+          <dt>问题四：文字被截</dt><dd>个性化那段做了 3 行截断，最关键的那句"否则整体会闷"经常被切掉。</dd>
+        </dl>
+        <div class="goodline">对照着看 A/B/C：同样是"一条内容"，出血 + 非对称 + 慢动效之后，它才占据首屏视觉重心，下面那些卡片自动退成背景。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('.tab')
+  if (!t) return
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('on', b === t))
+  document.querySelectorAll('.stage').forEach((s) => s.classList.toggle('on', s.id === 'stage-' + t.dataset.stage))
+})
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+// 首页「今天这一条」海报**容器**。
+//
+// 这里只管装：底板、视觉画框、承载块、文字。
+// 画什么（色卡 / 位置图 / 对比 / 素材）在 poster-visual.scss。
+//
+// 高度 520rpx（≈260px @375 宽）。纵向可用区间 8%~38%，三条硬约束见 core/daily/poster.ts。
+//
+// 两条不能破的规则：
+//   1. __plate-wrap 必须有 min-height —— 它决定承载块是不是"构图里最大的那块"。
+//   2. 承载块用负 inset 向外扩 —— 所以它比文字大，但永远跟着文字长（长标题不会溢出）。
+
+.daily-poster {
+  position: relative;
+  height: 520rpx;
+  overflow: hidden;
+  // 通栏：抵消页面内容区左右留白。出血是海报的基本语言
+  margin-left: -32rpx;
+  margin-right: -32rpx;
+
+  --dp-mark: rgba(238, 240, 236, 0.62);
+
+  &--dark {
+    --dp-mark: rgba(32, 35, 32, 0.5);
+  }
+
+  &__base {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+  }
+
+  // 视觉画框：内容图形画在里面。位置尺寸由 shell.stage 给
+  &__stage {
+    position: absolute;
+    z-index: 4;
+  }
+
+  // ---------- 承载块 + 文字 ----------
+  // 容器高度由文字撑开；min-height 是兜底最小尺寸，不是目标高度。
+  // 设得比文字高会留下空白（曾设 220rpx 而文字只有约 150rpx，多出的全堆在底部）。
+  &__plate-wrap {
+    position: absolute;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 180rpx;
+  }
+
+  // 负 inset 让它比文字块大一圈，同时跟随文字高度
+  &__plate {
+    position: absolute;
+    left: -8%;
+    right: -14%;
+    top: -24rpx;
+    bottom: -24rpx;
+    border-radius: 18rpx;
+    box-shadow:
+      0 4rpx 10rpx rgba(45, 58, 35, 0.06),
+      0 18rpx 36rpx rgba(45, 58, 35, 0.12),
+      0 40rpx 64rpx rgba(45, 58, 35, 0.08);
+  }
+
+  &__text {
+    position: relative;
+    z-index: 7;
+  }
+
+  // 文字色跟承载块走，不跟底板走 —— fabric 类是"深块压浅底"
+  &__text--light {
+    --dp-tink: #eef0ec;
+    --dp-tink-soft: rgba(238, 240, 236, 0.8);
+    --dp-tcta-bg: #eef0ec;
+    --dp-tcta-fg: #26302a;
+  }
+
+  &__text--dark {
+    --dp-tink: #1c1f1c;
+    --dp-tink-soft: #565c55;
+    --dp-tcta-bg: #33402d;
+    --dp-tcta-fg: #eef0ec;
+  }
+
+  &__title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    color: var(--dp-tink);
+    font-size: 40rpx;
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: -1.4rpx;
+  }
+
+  // 两行：一行会截出"一个缎…"这种半句词，比多占 30rpx 难看得多
+  &__hook {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-top: 8rpx;
+    color: var(--dp-tink-soft);
+    font-size: 21rpx;
+    line-height: 1.5;
+  }
+
+  &__acts {
+    display: flex;
+    align-items: center;
+    margin-top: 14rpx;
+  }
+
+  &__cta {
+    padding: 10rpx 24rpx;
+    border-radius: 999rpx;
+    background: var(--dp-tcta-bg);
+  }
+
+  &__cta-text {
+    color: var(--dp-tcta-fg);
+    font-size: 24rpx;
+    font-weight: 700;
+  }
+
+  &__link {
+    margin-left: 18rpx;
+    color: var(--dp-tink-soft);
+    font-size: 21rpx;
+    font-weight: 600;
+  }
+
+  // ---------- 角落编号与竖排标 ----------
+  &__seq {
+    position: absolute;
+    left: 24rpx;
+    top: 20rpx;
+    z-index: 9;
+    color: var(--dp-mark);
+    font-size: 19rpx;
+    font-weight: 700;
+    letter-spacing: 2rpx;
+  }
+
+  &__vmark {
+    position: absolute;
+    right: 20rpx;
+    top: 18rpx;
+    z-index: 9;
+    color: var(--dp-mark);
+    font-size: 17rpx;
+    font-weight: 700;
+    letter-spacing: 3rpx;
+    writing-mode: vertical-rl;
+  }
+}

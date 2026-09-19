@@ -367,6 +367,29 @@
     font-variant-numeric: tabular-nums;
   }
 
+  // ---------- 每日内容（今天这一条）----------
+  // 已改为海报式（图文同层、承载块跟随文字），样式收在 components/daily-poster/index.scss
+
+  // 报告退位：不再是首页主角，入口降级为一行
+  &__archive {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-top: 16rpx;
+    padding: 8rpx 6rpx;
+  }
+
+  &__archive-text {
+    font-size: 24rpx;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+
+  &__archive-meta {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
   // ---------- 工具（1 张发型主卡 + 2 张安静卡；三色区分 + 场景风线稿图标） ----------
   &__tools {
     display: flex;

@@ -348,6 +348,53 @@ export const HOME_COPY = {
   wardrobeEntryDesc: '让方案用上你已有的衣服'
 } as const
 
+// ---------- 每日内容（今天这一条） ----------
+// 红线沿用：不评价身体、不制造清单式压迫、不做连续天数与断签提醒。
+// 池子不够时宁可不推，也不用「塞衣角」这类通用条目凑数。
+export const DAILY_COPY = {
+  eyebrow: '今天这一条',
+  handbookTitle: '我的手册',
+  handbookEntry: '我的手册',
+  handbookEntryDesc: '收下的每一条，都在这里',
+  seeItAction: '看看我穿这样 ›',
+  // 按钮统一「收下」：分类名里的"场合 / 技巧"组合成「收进我的场合」会拗口。
+  // 分类在手册里呈现，toast 补一句「已收进 · 颜色」。
+  saveAction: '收下',
+  savedToastPrefix: '已收进 · ',
+  emptyTitle: '今天没有可推的内容',
+  emptyBody: '内容池在当前条件下没有合适的条目。宁可不推，也不凑数。',
+  handbookEmptyTitle: '手册还是空的',
+  handbookEmptyBody: '收下今天这一条，手册就开始变厚了。',
+  // 手册的分类：去掉"库"字、用两个字的常用词，不用"色卡 / 廓形"这类专业词。
+  // 「色卡」和「配色库」用户分不清，合并为「颜色」。
+  bucketNames: {
+    color: '颜色',
+    fit: '版型',
+    proportion: '比例',
+    fabric: '面料',
+    occasion: '场合',
+    howto: '技巧',
+    outfit: '搭配',
+  },
+  typeNames: {
+    color: '颜色',
+    silhouette: '版型',
+    proportion: '比例',
+    fabric: '面料',
+    item: '单品',
+    occasion: '场合',
+    howto: '技巧',
+  },
+} as const
+
+export function dailyBucketName(bucket: string): string {
+  return DAILY_COPY.bucketNames[bucket as keyof typeof DAILY_COPY.bucketNames] ?? '手册'
+}
+
+export function dailyTypeName(type: string): string {
+  return DAILY_COPY.typeNames[type as keyof typeof DAILY_COPY.typeNames] ?? ''
+}
+
 // ---------- 首页任务完成轻提醒 ----------
 // 轮询到终态时按 kind（render 再按 subject_type）给具体文案；execution_feedback 是后台写入，不打扰。
 export const TASK_DONE_COPY = {

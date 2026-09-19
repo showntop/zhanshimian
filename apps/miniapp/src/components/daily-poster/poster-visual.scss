@@ -1,0 +1,270 @@
+// 内容视觉：画什么由 content.visual 决定，这里是四类图形的画法。
+//
+// 统一原则：每个图形都必须"读得出来"。
+//   色卡   → 底色 + 色名 + 适合/不适合
+//   对比   → 两块 + 各自的标签
+//   位置图 → 若干带状态的条目
+//   素材位 → 明确标为素材位，绝不画假图充数
+
+.pv {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+
+  --pv-ink: rgba(238, 240, 236, 0.62);
+  --pv-ink-on: #eef0ec;
+  --pv-line: rgba(238, 240, 236, 0.24);
+  --pv-accent: #c4763f;
+
+  &--dark {
+    --pv-ink: rgba(32, 35, 32, 0.55);
+    --pv-ink-on: #1c1f1c;
+    --pv-line: rgba(32, 35, 32, 0.18);
+  }
+
+  // ---------- 色卡 ----------
+  &__swatch {
+    display: flex;
+    align-items: flex-end;
+    height: 100%;
+  }
+
+  &__sw-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+  }
+
+  // 适合的两格更高并有描边，不适合的降透明度 —— 差别靠形态，不靠文字
+  &__sw-chip {
+    width: 84%;
+    height: 58%;
+    border-radius: 8rpx;
+    box-shadow:
+      inset 0 0 0 1rpx rgba(255, 255, 255, 0.14),
+      0 6rpx 14rpx rgba(45, 58, 35, 0.14);
+
+    &.is-pick {
+      height: 80%;
+      box-shadow:
+        inset 0 0 0 3rpx rgba(238, 240, 236, 0.46),
+        0 8rpx 18rpx rgba(45, 58, 35, 0.2);
+    }
+
+    &.is-drop {
+      opacity: 0.46;
+    }
+  }
+
+  &__sw-label {
+    margin-top: 12rpx;
+    color: var(--pv-ink);
+    font-size: 17rpx;
+    white-space: nowrap;
+
+    &.is-pick {
+      color: var(--pv-ink-on);
+      font-weight: 700;
+    }
+  }
+
+  // ---------- 对比 ----------
+  &__compare {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 100%;
+  }
+
+  &__cmp-side {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__cmp-side--right {
+    margin-left: 28rpx;
+  }
+
+  &__cmp-block {
+    height: 96rpx;
+    border-radius: 8rpx;
+    box-shadow:
+      inset 0 0 0 1rpx rgba(255, 255, 255, 0.14),
+      0 8rpx 18rpx rgba(45, 58, 35, 0.16);
+
+    // 有光泽的一侧叠一层斜向高光；静止，不做动画
+    // （sheen 的动效由承载层负责，这里只做材质区分）
+    &--layered {
+      background-image: linear-gradient(
+        118deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.42) 46%,
+        rgba(255, 255, 255, 0) 100%
+      );
+    }
+  }
+
+  &__cmp-label {
+    margin-top: 12rpx;
+    color: var(--pv-ink);
+    font-size: 17rpx;
+
+    &.is-on {
+      color: var(--pv-ink-on);
+      font-weight: 700;
+    }
+  }
+
+  &__cmp-marker {
+    position: absolute;
+    right: 0;
+    top: -6rpx;
+    color: var(--pv-ink);
+    font-size: 16rpx;
+    font-weight: 700;
+    letter-spacing: 0.6rpx;
+  }
+
+  // ---------- 位置图 / 刻度 ----------
+  // 两者结构相同：若干"带状态的条目"，只在方向与间距上区分
+  &__body,
+  &__scale {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+  }
+
+  &__zone {
+    display: flex;
+    align-items: center;
+
+    &.is-pick {
+      .pv__zone-bar {
+        width: 62rpx;
+        height: 16rpx;
+        background: var(--pv-ink-on);
+      }
+
+      .pv__zone-label {
+        color: var(--pv-ink-on);
+        font-weight: 700;
+      }
+    }
+
+    // 避开项用暖色标出 —— 全图唯一的强调色，且它确实在说事
+    &.is-avoid {
+      .pv__zone-bar {
+        background: var(--pv-accent);
+      }
+    }
+  }
+
+  &__zone-bar {
+    flex: 0 0 auto;
+    width: 46rpx;
+    height: 12rpx;
+    border-radius: 999rpx;
+    background: var(--pv-line);
+  }
+
+  &__zone-label {
+    margin-left: 16rpx;
+    color: var(--pv-ink);
+    font-size: 18rpx;
+    white-space: nowrap;
+  }
+
+  &__zone--row {
+    .pv__zone-bar {
+      width: 22rpx;
+      height: 10rpx;
+    }
+  }
+
+  // ---------- 海报体：出血大字 + 素材层 ----------
+  &__art {
+    position: relative;
+    height: 100%;
+  }
+
+  &__art-slot {
+    position: absolute;
+    height: 116rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2rpx dashed rgba(238, 240, 236, 0.36);
+    border-radius: 8rpx;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  &__art-hint {
+    color: rgba(238, 240, 236, 0.6);
+    font-size: 16rpx;
+  }
+
+  &__art-word {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+  }
+
+  &__art-main {
+    color: var(--pv-ink-on);
+    font-size: 54rpx;
+    font-weight: 800;
+    letter-spacing: -2rpx;
+  }
+
+  &__art-sub {
+    margin-left: 10rpx;
+    color: var(--pv-ink);
+    font-size: 24rpx;
+    font-weight: 700;
+  }
+
+  // ---------- 素材位（单品图 / 视频） ----------
+  &__slot {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2rpx dashed rgba(238, 240, 236, 0.4);
+    border-radius: 10rpx;
+    background: rgba(255, 255, 255, 0.08);
+
+    .pv--dark & {
+      border-color: rgba(32, 35, 32, 0.26);
+      background: rgba(32, 35, 32, 0.05);
+    }
+  }
+
+  &__slot-text {
+    color: var(--pv-ink-on);
+    font-size: 19rpx;
+    font-weight: 700;
+  }
+
+  &__slot-sub {
+    margin-top: 6rpx;
+    padding: 0 24rpx;
+    color: var(--pv-ink);
+    font-size: 15rpx;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  &__alt {
+    color: var(--pv-ink);
+    font-size: 17rpx;
+    line-height: 1.5;
+  }
+}

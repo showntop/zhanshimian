@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>首页视觉中心 · 着色器版</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#5E665D; --ink3:#8A9189;
+  --moss:#587344; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.13);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E4E6E2;color:var(--ink);-webkit-font-smoothing:antialiased;padding:26px 22px 60px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-size:21px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.75;max-width:930px}
+.tabs{display:flex;gap:7px;margin:18px 0 16px;flex-wrap:wrap}
+.tab{padding:8px 15px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  color:var(--ink2);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--moss-deep);border-color:var(--moss-deep);color:var(--cream)}
+.main{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+
+.phone{width:375px;flex:0 0 375px;background:var(--bg);border-radius:30px;overflow:hidden;
+  box-shadow:0 18px 46px rgba(45,58,35,.20)}
+.sb{height:42px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:12px;font-weight:600}
+.sig{display:flex;gap:4px;align-items:center}
+.sig i{width:4px;height:8px;background:var(--ink);border-radius:1px;display:block}
+.sig i:nth-child(4){height:6px;opacity:.4}
+.navbar{display:flex;align-items:center;justify-content:space-between;padding:4px 20px 0}
+.brand{font-size:17px;font-weight:700}.brand .up{color:var(--ink)}.brand .look{color:var(--moss)}
+.right{font-size:11px;color:var(--ink3)}
+.greet{padding:14px 20px 0}
+.gt{display:flex;align-items:baseline;justify-content:space-between}
+.gk{font-size:12px;font-weight:600;color:var(--ink2)}
+.gd{font-size:11px;color:var(--ink3)}
+.gtitle{margin-top:4px;font-size:18px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+
+/* ===================== 视觉区：通栏出血 ===================== */
+.hero{position:relative;margin-top:14px}
+.vis{
+  position:relative;height:252px;overflow:hidden;
+  /* 第 1 层：底色渐变 */
+  background:linear-gradient(155deg,#F3F5F0 0%,#E9EEE6 55%,#F1F2EC 100%);
+}
+/* 第 2 层：色雾（有机漂移，解压感主要来源） */
+.fog{position:absolute;border-radius:50%;mix-blend-mode:multiply;opacity:.85}
+/* 第 3 层：颗粒（着色器感的底噪，静态，不参与动画） */
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.28'/></svg>")}
+
+/* 眉标：浮在视觉区左上，编号在右下——两端对角，这是第一层非对称 */
+.vtag{position:absolute;top:13px;left:18px;z-index:9;
+  padding:4px 10px;border-radius:999px;background:rgba(30,35,29,.38);
+  color:var(--cream);font-size:10px;font-weight:700;letter-spacing:.5px;backdrop-filter:blur(10px)}
+.vseq{position:absolute;right:18px;bottom:14px;z-index:9;
+  font-size:10.5px;font-weight:700;color:rgba(32,35,32,.42);font-variant-numeric:tabular-nums;letter-spacing:.6px}
+
+/* ---------- A 色彩：布样错位叠加 ---------- */
+.sw{position:absolute;inset:0}
+.sw i{position:absolute;border-radius:4px;display:block;
+  box-shadow:0 10px 24px rgba(45,58,35,.16);animation:float 7s ease-in-out infinite}
+.sw i:nth-child(1){width:31%;height:44%;left:5%;top:22%;transform:rotate(-4deg);animation-delay:0s}
+.sw i:nth-child(2){width:24%;height:33%;left:38%;top:12%;transform:rotate(3deg);animation-delay:1.1s}
+.sw i:nth-child(3){width:20%;height:28%;left:35%;top:52%;transform:rotate(-2deg);animation-delay:2.2s}
+.sw i:nth-child(4){width:26%;height:36%;right:-6%;top:38%;transform:rotate(5deg);animation-delay:3.3s}
+/* 主推的那片：更大、压在最上、带光晕 */
+.sw i.hero{width:34%;height:52%;left:9%;top:20%;transform:rotate(-3deg);z-index:5;
+  box-shadow:0 0 0 2px var(--moss),0 16px 34px rgba(45,58,35,.22)}
+@keyframes float{0%,100%{translate:0 0}50%{translate:0 -7px}}
+
+/* ---------- B 版型：肩线对比 ---------- */
+.sh{position:absolute;inset:0}
+.sh svg{position:absolute;inset:0;width:100%;height:100%}
+.sh .lb{position:absolute;font-size:10px;font-weight:700;letter-spacing:.3px}
+.sh .lb.a{left:9%;bottom:16%;color:rgba(32,35,32,.55)}
+.sh .lb.b{right:8%;top:20%;color:var(--moss)}
+/* 肩点：脉冲 */
+.shp{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--moss);
+  animation:pulse 3.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(88,115,68,.42)}50%{box-shadow:0 0 0 11px rgba(88,115,68,0)}}
+
+/* ---------- C 面料：纤维纹理 + 光泽扫过 ---------- */
+.fb{position:absolute;inset:0}
+.fb .piece{position:absolute;border-radius:5px;overflow:hidden;
+  box-shadow:0 12px 28px rgba(45,58,35,.18)}
+.fb .p1{width:40%;height:52%;left:6%;top:26%;transform:rotate(-3deg)}
+.fb .p2{width:33%;height:44%;right:5%;top:14%;transform:rotate(4deg)}
+/* 纤维：各向异性 turbulence，横向拉丝 */
+.fb .fiber{position:absolute;inset:0;opacity:.55;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.02 0.85' numOctaves='4' seed='7'/><feColorMatrix type='saturate' values='0'/></filter><rect width='200' height='200' filter='url(%23f)' opacity='0.5'/></svg>")}
+/* 光泽：一条斜向高光缓慢扫过（解压的核心） */
+.fb .sheen{position:absolute;top:-60%;left:-40%;width:70%;height:220%;
+  background:linear-gradient(100deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.62) 50%,rgba(255,255,255,0) 100%);
+  transform:rotate(18deg);animation:sweep 6.5s ease-in-out infinite}
+@keyframes sweep{0%{translate:-30% 0}55%,100%{translate:220% 0}}
+
+/* ---------- D 比例：光点轴 ---------- */
+.ax{position:absolute;inset:0}
+.ax .rail{position:absolute;left:26%;top:16%;bottom:16%;width:1.5px;
+  background:linear-gradient(180deg,rgba(55,62,52,.08),rgba(88,115,68,.55),rgba(55,62,52,.08))}
+.ax .pt{position:absolute;left:26%;border-radius:50%;transform:translateX(-50%);background:#fff;
+  border:1.5px solid rgba(55,62,52,.30)}
+.ax .pt.on{background:var(--moss);border-color:var(--moss);animation:pulse 3.2s ease-in-out infinite}
+.ax .cap{position:absolute;left:34%;font-size:10.5px;color:rgba(32,35,32,.5);white-space:nowrap;transform:translateY(-50%)}
+.ax .cap.on{color:var(--ink);font-weight:700}
+.ax .ghost{position:absolute;left:26%;width:34%;height:1px;background:rgba(88,115,68,.28);transform:translateX(0)}
+
+/* ---------- E 单品：真实素材位（高密度才配大面积） ---------- */
+.plate{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(160deg,#EDEFE9,#E1E5DC)}
+.plate span{font-size:11px;color:var(--ink3);text-align:center;line-height:1.7;padding:0 24px}
+.plate .mask{position:absolute;inset:0;border:1px dashed rgba(88,115,68,.30);border-radius:0}
+
+/* ===================== 咬合卡：首页只给三件事 ===================== */
+.body{
+  position:relative;z-index:10;margin:-22px 14px 0;background:#fff;border-radius:14px;
+  padding:15px 16px 14px;box-shadow:0 8px 22px rgba(52,59,47,.13);
+}
+.title{font-size:22px;line-height:1.22;font-weight:700;letter-spacing:-.7px}
+.title .dim{color:var(--ink3)}
+.hook{margin-top:7px;font-size:12.5px;line-height:1.6;color:var(--ink2)}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:13px}
+.cta{padding:9px 15px;border-radius:999px;background:var(--moss-deep);color:var(--cream);
+  font-size:12.5px;font-weight:700;border:0;font-family:inherit;cursor:pointer}
+.more{font-size:11.5px;font-weight:600;color:var(--moss)}
+
+.below{padding:20px 16px 24px}
+.bh{font-size:16px;font-weight:700;margin-bottom:8px}
+.brule{width:24px;height:2px;background:var(--moss);margin-bottom:11px}
+.brow{display:flex;gap:8px;margin-bottom:8px}
+.bph{flex:1;height:56px;border-radius:10px;background:rgba(105,115,100,.10)}
+.bph.l{height:86px}
+
+.note{flex:1;min-width:300px;max-width:470px}
+.note h3{font-size:17px;font-weight:700}
+.note .sub2{font-size:12px;color:var(--moss);font-weight:600;margin:4px 0 13px}
+.note dl{border-top:1px solid var(--line);padding-top:12px}
+.note dt{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-top:12px}
+.note dt:first-child{margin-top:0}
+.note dd{font-size:12.5px;line-height:1.78;color:var(--ink);margin-top:3px}
+.goodline{margin-top:14px;padding:11px 13px;border-radius:10px;background:rgba(88,115,68,.10);
+  font-size:12px;line-height:1.7;color:#3D5230}
+.warnline{margin-top:12px;padding:11px 13px;border-radius:10px;background:rgba(126,84,69,.08);
+  font-size:12px;line-height:1.7;color:#6A4B3E}
+.layers{margin-top:12px;font-size:11.5px;line-height:1.9;color:var(--ink2)}
+.layers b{color:var(--ink);font-weight:700}
+.stage{display:none}.stage.on{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>首页视觉中心 · 着色器版</h1>
+  <p class="sub">按六条约束重做：视觉区 252px 通栏出血，每块视觉至少叠 <b>4 层</b>（渐变底 / 色雾 / 颗粒 / 主体 / 光影），
+    元素<b>大小不一、旋转、错位、部分裁切</b>。首页只留标题 + 一句 + 一个动作，观察与原理全部下沉到今日页。</p>
+
+  <div class="tabs">
+    <button class="tab on" data-stage="a">A 色彩 · 布样</button>
+    <button class="tab" data-stage="b">B 版型 · 肩线</button>
+    <button class="tab" data-stage="c">C 面料 · 光泽</button>
+    <button class="tab" data-stage="d">D 比例 · 光点轴</button>
+    <button class="tab" data-stage="e">E 单品 · 素材位</button>
+  </div>
+
+  <div class="main">
+    <!-- ===== A ===== -->
+    <div class="stage on" id="stage-a">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet"><div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div></div>
+
+        <div class="hero">
+          <div class="vis">
+            <div class="fog" style="width:290px;height:290px;left:-80px;top:-100px;background:radial-gradient(circle,rgba(198,216,186,.75),rgba(198,216,186,0) 70%);animation:fog1 26s ease-in-out infinite"></div>
+            <div class="fog" style="width:250px;height:250px;right:-70px;top:40px;background:radial-gradient(circle,rgba(228,221,201,.7),rgba(228,221,201,0) 70%);animation:fog2 33s ease-in-out infinite"></div>
+            <div class="sw">
+              <i class="hero" style="background:#FBFBF8"></i>
+              <i style="background:#F2F4F1"></i>
+              <i style="background:#EFEADC"></i>
+              <i style="background:#E6DECD"></i>
+            </div>
+            <div class="grain"></div>
+            <div class="vtag">色卡</div>
+            <div class="vseq">09 / 24</div>
+          </div>
+          <div class="body">
+            <div class="title">冬天的白，<span class="dim">不止一种</span></div>
+            <div class="hook">你是冷调肤色，挑白色先看它是偏蓝还是偏黄。</div>
+            <div class="foot"><button class="cta">收进我的色卡</button><span class="more">今日页看完整 ›</span></div>
+          </div>
+        </div>
+
+        <div class="below"><div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div></div>
+      </div>
+      <div class="note">
+        <h3>A · 色彩</h3><div class="sub2">四片布样，错位 · 旋转 · 裁切</div>
+        <div class="layers">
+          <b>①</b> 底色渐变　<b>②</b> 两团色雾（26s / 33s 漂移）<br>
+          <b>③</b> 布样四片：31% / 24% / 20% / 26% 宽，旋转 −4°~+5°，右下一片<b>被右边裁掉</b><br>
+          <b>④</b> 主推片压最上层，moss 描边 + 更大阴影<br>
+          <b>⑤</b> 全屏颗粒（feTurbulence 静态底噪）
+        </div>
+        <dl>
+          <dt>非对称在哪</dt><dd>四片<b>没有一片对齐</b>——宽度、高度、旋转角、层叠顺序全不同。主推片占 34%×52%，压住其他三片。</dd>
+          <dt>动效</dt><dd>色雾 26s/33s 有机漂移（解压）；布样错峰 1.1s 缓慢浮动 7px（呼吸）。四片不会同步，看起来像布料被风轻轻吹。</dd>
+          <dt>为什么不再"空"</dt><dd>上一版是 4 个等高色块。这版有 <b>5 层视觉</b>，且层与层之间有<b>遮挡关系</b>——有遮挡就有景深，有景深就不空。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- ===== B ===== -->
+    <div class="stage" id="stage-b">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet"><div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div></div>
+
+        <div class="hero">
+          <div class="vis" style="background:linear-gradient(150deg,#3E4B36 0%,#4B5A40 55%,#37422F 100%)">
+            <div class="fog" style="width:260px;height:260px;left:-60px;top:-70px;background:radial-gradient(circle,rgba(160,190,140,.30),rgba(160,190,140,0) 70%);animation:fog1 30s ease-in-out infinite;mix-blend-mode:screen"></div>
+            <div class="sh">
+              <svg viewBox="0 0 375 252" preserveAspectRatio="none">
+                <!-- 落肩：肩线平缓外扩，肩点低 -->
+                <path d="M 30 78 Q 92 66 132 92 L 152 168" fill="none"
+                      stroke="rgba(238,240,236,.34)" stroke-width="2" stroke-linecap="round"
+                      stroke-dasharray="5 5"/>
+                <!-- 正肩：肩点明确，转折锐利 -->
+                <path d="M 168 62 L 240 58 L 250 172" fill="none"
+                      stroke="#EEF0EC" stroke-width="2.4" stroke-linecap="round"/>
+                <!-- 肩点位置参照线 -->
+                <line x1="240" y1="46" x2="240" y2="196" stroke="rgba(88,115,68,.55)" stroke-width="1" stroke-dasharray="3 4"/>
+                <line x1="132" y1="52" x2="132" y2="196" stroke="rgba(238,240,236,.22)" stroke-width="1" stroke-dasharray="3 4"/>
+              </svg>
+              <div class="shp" style="left:63.8%;top:21.5%"></div>
+              <div class="lb a" style="color:rgba(238,240,236,.45)">落肩 · 肩点掉到上臂</div>
+              <div class="lb b">正肩 · 肩缝落在肩点</div>
+            </div>
+            <div class="grain" style="opacity:.28"></div>
+            <div class="vtag" style="background:rgba(238,240,236,.16)">版型</div>
+            <div class="vseq" style="color:rgba(238,240,236,.42)">03 / 24</div>
+          </div>
+          <div class="body">
+            <div class="title">落肩正在抹掉<span class="dim">你的肩线</span></div>
+            <div class="hook">你肩偏窄，选肩缝正好落在肩点的。</div>
+            <div class="foot"><button class="cta">收进我的版型库</button><span class="more">今日页看完整 ›</span></div>
+          </div>
+        </div>
+
+        <div class="below"><div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div></div>
+      </div>
+      <div class="note">
+        <h3>B · 版型</h3><div class="sub2">深底 + 两条肩线，虚线 vs 实线</div>
+        <div class="layers">
+          <b>①</b> 深绿渐变底（和其他类型拉开差异）<br>
+          <b>②</b> 一团 screen 混合的浅雾（30s）<br>
+          <b>③</b> <b>虚线</b>落肩轮廓 vs <b>实线</b>正肩轮廓——两条不等长、不同曲率、不在一个水平面<br>
+          <b>④</b> 两条竖向参照线标出肩点位置 + moss 脉冲点<br>
+          <b>⑤</b> 颗粒压到 0.28
+        </div>
+        <dl>
+          <dt>为什么这条配得上"图"</dt><dd>肩线是<b>几何关系</b>——"肩点掉到上臂"这句话用文字说三句都不如一条线清楚。<b>这是真需要看的那一类。</b></dd>
+          <dt>非对称在哪</dt><dd>两条肩线一虚一实、一平一锐、<b>高度错开</b>（78 vs 62），正肩那条更长更重。标注分列左下和右上。</dd>
+          <dt>为什么不做深底以外的配色</dt><dd>深色让 cream 线条跳出来。这也是<b>类型间差异化</b>——色卡类是浅底，版型类是深底，翻到不同内容有换页感。</dd>
+          <dt>风险</dt><dd>肩线是简化轮廓，不是真人。若被读成"身材示意"要立刻换抽象表达。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- ===== C ===== -->
+    <div class="stage" id="stage-c">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet"><div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div></div>
+
+        <div class="hero">
+          <div class="vis" style="background:linear-gradient(155deg,#EFEDE6 0%,#E4E5DC 100%)">
+            <div class="fog" style="width:270px;height:270px;right:-70px;top:-80px;background:radial-gradient(circle,rgba(214,206,186,.62),rgba(214,206,186,0) 70%);animation:fog2 28s ease-in-out infinite"></div>
+            <div class="fb">
+              <div class="piece p1" style="background:#6B6F66">
+                <div class="fiber"></div>
+              </div>
+              <div class="piece p2" style="background:#8B9A82">
+                <div class="fiber"></div>
+                <div class="sheen"></div>
+              </div>
+            </div>
+            <div class="grain"></div>
+            <div class="vtag">面料</div>
+            <div class="vseq">12 / 24</div>
+          </div>
+          <div class="body">
+            <div class="title">光泽会<span class="dim">放大体积</span></div>
+            <div class="hook">你骨架偏小，光泽留一处就够。</div>
+            <div class="foot"><button class="cta">收进我的面料库</button><span class="more">今日页看完整 ›</span></div>
+          </div>
+        </div>
+
+        <div class="below"><div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div></div>
+      </div>
+      <div class="note">
+        <h3>C · 面料</h3><div class="sub2">纤维纹理 + 光泽扫过</div>
+        <div class="layers">
+          <b>①</b> 暖灰渐变底　<b>②</b> 一团米色雾（28s）<br>
+          <b>③</b> 两块面料：40%×52% 与 33%×44%，旋转 −3°/+4°，错位<br>
+          <b>④</b> <b>纤维纹理</b>：feTurbulence 各向异性（0.02 × 0.85）做横向拉丝<br>
+          <b>⑤</b> 右边那块叠<b>斜向高光扫过</b>（6.5s）
+        </div>
+        <dl>
+          <dt>这条的动效是全场最解压的</dt><dd>高光从左上斜着扫到右下，6.5s 一轮。它是<b>材质本身的语言</b>——光泽面料就该反光，而哑光那块永远不亮。<b>差异不用文字讲，看一遍就知道。</b></dd>
+          <dt>为什么用程序化纹理而不是图</dt><dd>面料的"纤维感"恰恰是<b>程序化最擅长的</b>——各向异性的噪声就是织物。它明确是抽象材质，不会被人误读成照片。</dd>
+          <dt>非对称在哪</dt><dd>两块不等大、旋转方向相反、一上一下错开。只有小的那块有光泽——<b>重点不在大的那块</b>。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- ===== D ===== -->
+    <div class="stage" id="stage-d">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet"><div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div></div>
+
+        <div class="hero">
+          <div class="vis" style="background:linear-gradient(160deg,#F1F3EE 0%,#E7EAE3 100%)">
+            <div class="fog" style="width:300px;height:300px;left:-90px;top:20px;background:radial-gradient(circle,rgba(190,208,178,.55),rgba(190,208,178,0) 70%);animation:fog1 24s ease-in-out infinite"></div>
+            <div class="ax">
+              <div class="rail"></div>
+              <div class="pt" style="top:22%;width:8px;height:8px"></div>
+              <div class="cap" style="top:22%">胸前</div>
+              <div class="pt on" style="top:52%;width:14px;height:14px"></div>
+              <div class="cap on" style="top:52%">腰线附近 — 重心最稳</div>
+              <div class="pt" style="top:80%;width:8px;height:8px"></div>
+              <div class="cap" style="top:80%">胯部</div>
+              <div class="ghost" style="top:52%"></div>
+            </div>
+            <div class="grain"></div>
+            <div class="vtag">比例</div>
+            <div class="vseq">07 / 24</div>
+          </div>
+          <div class="body">
+            <div class="title">包背在哪，<span class="dim">重心就在哪</span></div>
+            <div class="hook">想拉长，就让包靠近腰线。</div>
+            <div class="foot"><button class="cta">收进我的比例库</button><span class="more">今日页看完整 ›</span></div>
+          </div>
+        </div>
+
+        <div class="below"><div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div></div>
+      </div>
+      <div class="note">
+        <h3>D · 比例</h3><div class="sub2">光点轴 · 脉冲定位</div>
+        <div class="layers">
+          <b>①</b> 浅绿渐变底　<b>②</b> 色雾（24s）<br>
+          <b>③</b> 纵向轴线（两端渐隐）　<b>④</b> 三个光点：8px / <b>14px</b> / 8px，<b>间距不等</b>（22% / 52% / 80%）<br>
+          <b>⑤</b> 中间点 moss 填充 + 3.2s 脉冲光环 + 横向引出线
+        </div>
+        <dl>
+          <dt>非对称在哪</dt><dd>轴不在中间（26%），三个点<b>间距不等</b>，中间那个明显更大更亮，标签向右延伸打破竖轴平衡。</dd>
+          <dt>动效</dt><dd>只有中间点脉冲——<b>全场只有一个动的东西</b>。视觉焦点毫无歧义，眼睛一进来就落在"腰线附近"。</dd>
+          <dt>这一块留白最多</dt><dd>右侧大片是空的，但因为有颗粒和色雾，空得有质感。<b>留白不是没内容，是让那一个点说话。</b></dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- ===== E ===== -->
+    <div class="stage" id="stage-e">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet"><div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div></div>
+
+        <div class="hero">
+          <div class="vis" style="background:none">
+            <div class="plate"><div class="mask"></div><span>真实素材位<br>单品图 / 编辑图 / 生成图</span></div>
+            <div class="vtag">单品</div>
+            <div class="vseq">14 / 24</div>
+          </div>
+          <div class="body">
+            <div class="title">18° 穿得住的，<span class="dim">是薄毛呢</span></div>
+            <div class="hook">你骨架偏小，挑能自然垂下来的。</div>
+            <div class="foot"><button class="cta">收进我的面料库</button><span class="more">今日页看完整 ›</span></div>
+          </div>
+        </div>
+
+        <div class="below"><div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div></div>
+      </div>
+      <div class="note">
+        <h3>E · 单品</h3><div class="sub2">唯一必须真实素材的一类</div>
+        <dl>
+          <dt>为什么不画</dt><dd>单品是具体物件，程序化画不出来——画出来就是"假图"，比留空更糟。</dd>
+          <dt>素材优先级</dt><dd>① 用户衣橱照片 <code>WardrobeItem.media</code>（零授权问题，且最相关）<br>
+            ② 编辑图 / 授权图库<br>
+            ③ 生成图，按需，带 <code>source_kind=generated_preview</code></dd>
+          <dt>所以日常主力是 A–D</dt><dd>A/B/C/D 四类<b>全部程序化</b>，零素材成本、零授权风险，且已经够丰富。E 只在真有图时出现。</dd>
+        </dl>
+        <div class="warnline">视频同理：动作类内容（怎么卷袖、怎么塞衣角）确实该用视频，但那需要真实拍摄。
+          在那之前，C 类的"光泽扫过"是程序化能达到的最接近质感。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes fog1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(34px,28px) scale(1.10)}}
+@keyframes fog2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-28px,22px) scale(1.08)}}
+</style>
+<script>
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('.tab')
+  if (!t) return
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('on', b === t))
+  document.querySelectorAll('.stage').forEach((s) => s.classList.toggle('on', s.id === 'stage-' + t.dataset.stage))
+})
+</script>
+</body>
+</html>

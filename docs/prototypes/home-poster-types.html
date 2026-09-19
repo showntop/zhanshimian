@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>首页海报 · 七种内容类型</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#5E665D; --ink3:#8A9189;
+  --moss:#587344; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.13);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E4E6E2;color:var(--ink);-webkit-font-smoothing:antialiased;padding:24px 22px 60px}
+.wrap{max-width:1320px;margin:0 auto}
+h1{font-size:21px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.75;max-width:980px}
+.ctrl{display:flex;gap:7px;margin:16px 0;flex-wrap:wrap;align-items:center}
+.ctrl .lb{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-right:2px}
+.btn{padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn.on{background:var(--moss-deep);border-color:var(--moss-deep);color:var(--cream)}
+.main{display:flex;gap:32px;align-items:flex-start;flex-wrap:wrap}
+
+.phone{background:var(--bg);border-radius:28px;overflow:hidden;position:relative;flex:0 0 390px;width:390px;
+  height:844px;box-shadow:0 18px 46px rgba(45,58,35,.20)}
+.sb{height:47px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:12px;font-weight:600}
+.sig{display:flex;gap:4px;align-items:center}
+.sig i{width:4px;height:8px;background:var(--ink);border-radius:1px;display:block}
+.sig i:nth-child(4){height:6px;opacity:.4}
+.navbar{display:flex;align-items:center;justify-content:space-between;padding:2px 20px 0}
+.brand{font-size:16px;font-weight:700}.brand .up{color:var(--ink)}.brand .look{color:var(--moss)}
+.right{font-size:10.5px;color:var(--ink3)}
+.greet{padding:12px 20px 0}
+.gt{display:flex;align-items:baseline;justify-content:space-between}
+.gk{font-size:11.5px;font-weight:600;color:var(--ink2)}
+.gd{font-size:10.5px;color:var(--ink3)}
+.gtitle{margin-top:4px;font-size:17px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+
+/* 海报区：高度由 --ph 控制，可在控制条切换 */
+.poster{--ph:300px;position:relative;margin:12px 0 0;overflow:hidden;height:var(--ph)}
+.base{position:absolute;inset:0}
+.plate,.el{position:absolute;border-radius:8px}
+.plate{box-shadow:0 4px 10px rgba(45,58,35,.06),0 18px 36px rgba(45,58,35,.12),0 40px 64px rgba(45,58,35,.08);
+  animation:float 9s ease-in-out infinite}
+.el{overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 2px 6px rgba(45,58,35,.06),
+  0 12px 24px rgba(45,58,35,.10),0 28px 48px rgba(45,58,35,.07);
+  animation:float 8s ease-in-out infinite}
+/* 受光渐变：纯色块因此有明暗面 */
+.shade{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(148deg,rgba(255,255,255,.18) 0%,rgba(255,255,255,.02) 38%,rgba(0,0,0,.04) 68%,rgba(0,0,0,.14) 100%)}
+.no{position:absolute;left:6px;bottom:4px;font-size:8px;font-weight:700;letter-spacing:.5px;opacity:.45}
+.sheen{position:absolute;top:-60%;left:-40%;width:70%;height:220%;transform:rotate(18deg);
+  background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.6) 50%,rgba(255,255,255,0));
+  animation:sweep 6.5s ease-in-out infinite}
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.32;z-index:6;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.28'/></svg>")}
+.fog{position:absolute;border-radius:50%;pointer-events:none;z-index:1}
+.vmark{position:absolute;z-index:8;font-size:8.5px;font-weight:700;letter-spacing:2px;
+  writing-mode:vertical-rl;opacity:.42}
+
+.txt{position:absolute;z-index:9}
+.txt .seq{font-size:9.5px;font-weight:700;letter-spacing:1.1px;opacity:.62;font-variant-numeric:tabular-nums}
+.txt .tt{margin-top:8px;font-size:21px;line-height:1.2;font-weight:700;letter-spacing:-.7px}
+.txt .hh{margin-top:7px;font-size:11px;line-height:1.55;opacity:.8;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.txt .acts{margin-top:12px;display:flex;align-items:center;gap:12px}
+.txt .cta{padding:8px 14px;border-radius:999px;font-size:12px;font-weight:700;border:0;
+  font-family:inherit;cursor:pointer;white-space:nowrap}
+.txt .lnk{font-size:10.5px;font-weight:600;white-space:nowrap}
+/* 文字色跟承载块走，不跟底板走 —— 用独立类，避免和后代的 tone 类互相覆盖 */
+.txt--light{color:var(--cream)}
+.txt--light .cta{background:var(--cream);color:#26302A}
+.txt--light .lnk{color:rgba(238,240,236,.78)}
+.txt--dark{color:var(--ink)}
+.txt--dark .cta{background:var(--moss-deep);color:var(--cream)}
+.txt--dark .lnk{color:var(--moss)}
+/* 全图唯一的点缀：靠色相而不是明度跳出来 */
+.accent{position:absolute;z-index:7;border-radius:3px;
+  box-shadow:0 4px 10px rgba(45,58,35,.18)}
+
+/* ===== 信息图形：元素本身在表达信息，不做装饰 ===== */
+/* 比例 · 落点标注图 */
+.g-body{position:absolute;left:34%;top:12%;width:12%;height:64%;border-radius:999px;
+  background:linear-gradient(180deg,rgba(238,240,236,.17),rgba(238,240,236,.06))}
+.g-rule{position:absolute;left:14%;right:26%;height:0}
+.g-rule--cover{top:36%;border-top:2px dashed rgba(238,240,236,.34)}
+.g-rule--show{top:56%;border-top:3px solid var(--cream)}
+.g-lb{position:absolute;right:5%;font-size:9.5px;font-weight:700;letter-spacing:.2px;
+  color:rgba(238,240,236,.55)}
+.g-lb--show{color:var(--cream)}
+.g-brace{position:absolute;left:20%;top:36%;height:20%;width:2px;background:rgba(238,240,236,.42)}
+.g-brace::before,.g-brace::after{content:'';position:absolute;left:-4px;width:10px;height:2px;
+  background:rgba(238,240,236,.42)}
+.g-brace::before{top:0}.g-brace::after{bottom:0}
+.g-brace span{position:absolute;left:10px;top:50%;transform:translateY(-50%);white-space:nowrap;
+  font-size:9px;font-weight:700;color:rgba(238,240,236,.72)}
+
+/* 色彩 · 色卡带色名与冷暖标注 */
+.g-sw{position:absolute;border-radius:5px;overflow:hidden}
+.g-sw span{position:absolute;left:6px;bottom:4px;font-size:8px;font-weight:700;
+  letter-spacing:.4px;opacity:.62}
+
+/* 面料 · 垂感示意：一条顺滑垂线 vs 一条硬折线 */
+.g-drape{position:absolute;height:0;border-top:2px solid rgba(238,240,236,.5);border-radius:999px}
+.g-drape--stiff{transform:rotate(9deg);transform-origin:left center;border-color:rgba(238,240,236,.3)}
+
+/* 标注：贴着元素说明它在讲什么。元素没有标注就是装饰块 */
+.g-note{position:absolute;z-index:8;font-size:9px;font-weight:700;line-height:1.5;
+  letter-spacing:.2px;white-space:nowrap}
+.g-note--dim{color:rgba(238,240,236,.52)}
+.g-note--on{color:var(--cream)}
+.g-note--ink{color:rgba(32,35,32,.55)}
+.g-note--inkon{color:#1C1F1C}
+/* 引线：标注与元素的连接 */
+.g-lead{position:absolute;width:1px;background:rgba(238,240,236,.32)}
+
+/* 素材/视频占位 */
+.ph{position:absolute;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.14);border:1px dashed rgba(238,240,236,.42);border-radius:6px}
+.ph span{font-size:9px;font-weight:700;letter-spacing:.4px;opacity:.85;text-align:center;line-height:1.5;padding:0 10px}
+.play{width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(238,240,236,.62);
+  display:flex;align-items:center;justify-content:center}
+.play i{width:0;height:0;border-left:9px solid rgba(238,240,236,.82);
+  border-top:6px solid transparent;border-bottom:6px solid transparent;margin-left:3px}
+
+.below{padding:14px 16px 18px}
+.below .bh{font-size:15px;font-weight:700;margin-bottom:7px}
+.brule{width:22px;height:2px;background:var(--moss);margin-bottom:9px}
+.brow{display:flex;gap:8px;margin-bottom:8px}
+.bph{flex:1;height:48px;border-radius:10px;background:rgba(105,115,100,.11)}
+.bph.l{height:74px}
+
+.note{flex:1;min-width:330px;max-width:560px}
+.note h3{font-size:17px;font-weight:700}
+.note .sub2{font-size:12px;color:var(--moss);font-weight:600;margin:4px 0 13px}
+table{border-collapse:collapse;width:100%;margin-top:8px;font-size:12px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:10.5px;color:var(--ink3);font-weight:700}
+.note dl{border-top:1px solid var(--line);padding-top:12px;margin-top:14px}
+.note dt{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-top:12px}
+.note dt:first-child{margin-top:0}
+.note dd{font-size:12.5px;line-height:1.78;color:var(--ink);margin-top:3px}
+.fix{margin-top:14px;padding:11px 13px;border-radius:10px;background:rgba(88,115,68,.10);
+  font-size:12px;line-height:1.75;color:#3D5230}
+.warnline{margin-top:12px;padding:11px 13px;border-radius:10px;background:rgba(126,84,69,.08);
+  font-size:12px;line-height:1.7;color:#6A4B3E}
+code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:rgba(105,115,100,.12);padding:1px 5px;border-radius:4px}
+@keyframes float{0%,100%{translate:0 0}50%{translate:0 -5px}}
+@keyframes fog1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(26px,20px) scale(1.08)}}
+@keyframes fog2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-20px,15px) scale(1.06)}}
+@keyframes sweep{0%{translate:-30% 0}55%,100%{translate:220% 0}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(88,115,68,.40)}50%{box-shadow:0 0 0 10px rgba(88,115,68,0)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>首页海报 · 七种内容类型</h1>
+  <p class="sub">沿用 v1 的构图（<b>承载块 + 图文同层</b>：文字整块压在最大的那个色块上），高度压到 <b>300px</b>。
+    七种类型不是同一套模板换颜色——承载块位置、元素形状、文字色都按内容定制。</p>
+
+  <div class="ctrl">
+    <span class="lb">类型</span>
+    <button class="btn on" data-t="color">色彩</button>
+    <button class="btn" data-t="silhouette">版型</button>
+    <button class="btn" data-t="proportion">比例</button>
+    <button class="btn" data-t="fabric">面料</button>
+    <button class="btn" data-t="occasion">场合</button>
+    <button class="btn" data-t="howto">教程</button>
+    <button class="btn" data-t="item">单品</button>
+    <span class="lb" style="margin-left:10px">高度</span>
+    <button class="btn" data-h="272">272</button>
+    <button class="btn on" data-h="300">300</button>
+    <button class="btn" data-h="328">328</button>
+    <button class="btn" data-h="360">360</button>
+  </div>
+
+  <div class="main">
+    <div class="phone">
+      <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+      <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+      <div class="greet"><div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+        <div class="gtitle">晚上好，继续今天的形象计划</div></div>
+      <div class="poster" id="poster"></div>
+      <div class="below">
+        <div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+        <div class="bph l"></div>
+        <div class="brow"><div class="bph"></div><div class="bph"></div></div>
+      </div>
+    </div>
+
+    <div class="note">
+      <h3>这版的做法</h3>
+      <div class="sub2">承载块 + 图文同层，高度 300</div>
+      <table>
+        <tr><th>类型</th><th>承载块</th><th>其他元素</th></tr>
+        <tr><td>色彩</td><td>左下 · 极深黑</td><td>两片材质对比（哑光 / 光泽）</td></tr>
+        <tr><td>版型</td><td>左下 · 深绿</td><td>肩线轮廓（虚线落肩 / 实线正肩）</td></tr>
+        <tr><td>比例</td><td>右下 · 深青</td><td>纵向刻度轴 + 脉冲光点</td></tr>
+        <tr><td>面料</td><td>左下 · 浅米</td><td>两块纤维纹理，一块有光泽扫过</td></tr>
+        <tr><td>场合</td><td>左下 · 深灰绿</td><td>正式度刻度条，选中档高亮</td></tr>
+        <tr><td>教程</td><td>左下 · 中绿</td><td>视频位（播放键 + 两步提示）</td></tr>
+        <tr><td>单品</td><td>左下 · 浅灰</td><td>单品图位</td></tr>
+      </table>
+
+      <h3 style="margin-top:20px">关于"卡太大"</h3>
+      <dl>
+        <dt>从 392 降到 300</dt><dd>占屏从 46% 降到 <b>36%</b>，下方从露出 2–3 行变成 <b>3–4 行</b>。
+          承载块从 62% 高收到 <b>52%</b>，其余元素也等比缩小。</dd>
+        <dt>还能更矮吗</dt><dd>能到 272（占屏 32%），但承载块只剩 142px，装下"编号+两行标题+钩子+按钮"已经很紧，
+          <b>四边几乎没有呼吸</b>。再往下就只能砍钩子或按钮。</dd>
+        <dt>我的建议</dt><dd><b>300 是平衡点</b>：海报感还在，下方也露出足够内容。切换上面的高度按钮直接对比。</dd>
+      </dl>
+
+      <div class="fix">七种里 <b>色彩 / 版型 / 比例 / 面料 / 场合</b> 是程序化视觉，零成本零授权；
+        <b>教程 / 单品</b> 需要真实素材（视频 / 单品图），现在是占位。</div>
+      <div class="warnline">一个要注意的：承载块现在是<b>固定尺寸</b>的。
+        如果哪天标题特别长，文字会溢出承载块——落到其他元素或空白上，对比度就不可控了。
+        落地时要么限制标题字数上限，要么让承载块按文字高度自适应（推荐后者）。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const FIBER = "url(&quot;data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.02 0.85' numOctaves='4' seed='7'/><feColorMatrix type='saturate' values='0'/></filter><rect width='200' height='200' filter='url(%23f)' opacity='0.5'/></svg>&quot;)"
+
+const TYPES = {
+  color: {
+    name: '色彩', seq: '01 / 24', vmark: 'COLOR', tone: 'light',
+    title: '全黑<br>并不自动显瘦', hook: '显瘦靠轮廓和材质，不是颜色深浅。',
+    cta: '收进我的配色库',
+    base: 'linear-gradient(155deg,#3A3F38 0%,#2B302A 55%,#22261F 100%)',
+    fogs: [{w:220,h:220,r:'-50px',t:'-60px',c:'rgba(160,170,155,.20)',a:'fog1 28s'}],
+    plate: {l:'2%', t:'44%', w:'72%', h:'54%', rot:-3, bg:'#161A15'},
+    els: [
+      {l:'40%', t:'8%',  w:'44%', h:'24%', rot:5,  bg:'#252A24', no:'01', d:'.3s'},
+      {l:'56%', t:'28%', w:'36%', h:'20%', rot:-7, bg:'#3E453C', sheen:1, no:'02', d:'1.6s', z:8},
+    ],
+    graph: 'color',
+    text: {l:'11%', t:'52%', w:'58%'},
+  },
+  silhouette: {
+    name: '版型', seq: '06 / 24', vmark: 'SILHOUETTE', tone: 'light',
+    title: '落肩在退潮<br>肩线回来了', hook: '你肩偏窄，选肩缝落在肩点的。',
+    cta: '收进我的版型库',
+    base: 'linear-gradient(155deg,#38452F 0%,#42503A 55%,#2C3826 100%)',
+    svg: true,
+    plate: {l:'2%', t:'46%', w:'74%', h:'52%', rot:2, bg:'#26311F'},
+    els: [
+      {l:'62%', t:'6%',  w:'32%', h:'22%', rot:5,  bg:'#8E9A86', no:'01', d:'.7s'},
+      {l:'74%', t:'30%', w:'26%', h:'18%', rot:-7, bg:'#C3CBBB', no:'02', d:'2.0s'},
+    ],
+    text: {l:'10%', t:'54%', w:'60%'},
+  },
+  proportion: {
+    name: '比例', seq: '11 / 24', vmark: 'PROPORTION', tone: 'light',
+    title: '裤长露踝<br>比例立刻不一样', hook: '裤脚落在踝骨上方，小腿最细处露出来。',
+    cta: '收进我的版型库',
+    base: 'linear-gradient(160deg,#1F3A3E 0%,#28484D 55%,#17302F 100%)',
+    plate: {l:'22%', t:'44%', w:'72%', h:'54%', rot:-3, bg:'#0D2124'},
+    els: [],
+    graph: 'proportion',
+    text: {l:'30%', t:'50%', w:'58%'},
+  },
+  fabric: {
+    name: '面料', seq: '13 / 24', vmark: 'FABRIC', tone: 'dark', plateTone: 'light',
+    title: '光泽会<br>放大体积', hook: '你骨架偏小，光泽留一处就够。',
+    cta: '收进我的面料库',
+    base: 'linear-gradient(158deg,#DCDCCF 0%,#CFD2C2 55%,#C6CABA 100%)',
+    fogs: [{w:200,h:200,r:'-50px',t:'-40px',c:'rgba(206,196,172,.34)',a:'fog2 30s'}],
+    plate: {l:'2%', t:'44%', w:'74%', h:'54%', rot:-2, bg:'#33402D'},
+    els: [
+      {l:'6%', t:'9%',  w:'40%', h:'26%', rot:-5, bg:'#6E7367', fiber:1, no:'01', d:'.3s'},
+      {l:'52%', t:'8%', w:'34%', h:'22%', rot:7,  bg:'#939E88', fiber:1, sheen:1, no:'02', d:'1.5s'},
+    ],
+    graph: 'fabric',
+    text: {l:'11%', t:'52%', w:'58%'},
+  },
+  occasion: {
+    name: '场合', seq: '18 / 24', vmark: 'OCCASION', tone: 'light',
+    title: '面试的正式度<br>差一级最稳', hook: '比目标岗位的日常，高一级就够。',
+    cta: '收进我的搭配',
+    base: 'linear-gradient(155deg,#333B34 0%,#3E4740 55%,#2A322B 100%)',
+    plate: {l:'2%', t:'46%', w:'72%', h:'52%', rot:2, bg:'#212824'},
+    scale: {l:'60%', t:'8%', h:'64%'},
+    text: {l:'10%', t:'54%', w:'58%'},
+  },
+  howto: {
+    name: '教程', seq: '21 / 24', vmark: 'HOW-TO', tone: 'light',
+    title: '袖子怎么卷<br>才不会滑', hook: '两折互相压住，才有摩擦力。',
+    cta: '收进我的版型库',
+    base: 'linear-gradient(160deg,#2F4436 0%,#3A5342 55%,#26382C 100%)',
+    plate: {l:'2%', t:'46%', w:'72%', h:'52%', rot:-2, bg:'#1D2C22'},
+    media: {l:'56%', t:'5%', w:'40%', h:'34%', rot:4, label: '12 秒 · 两步'},
+    text: {l:'10%', t:'54%', w:'56%'},
+  },
+  item: {
+    name: '单品', seq: '14 / 24', vmark: 'ITEM', tone: 'dark',
+    title: '18° 穿得住的<br>是薄毛呢', hook: '你骨架偏小，挑能自然垂下来的。',
+    cta: '收进我的面料库',
+    base: 'linear-gradient(160deg,#EEF0EA 0%,#E5E8E1 100%)',
+    fogs: [{w:200,h:200,r:'-50px',t:'-40px',c:'rgba(196,210,190,.42)',a:'fog1 29s'}],
+    plate: {l:'2%', t:'44%', w:'72%', h:'54%', rot:-2, bg:'#E9EBE4'},
+    media: {l:'54%', t:'4%', w:'44%', h:'36%', rot:3, label: '单品图', light:1},
+    text: {l:'11%', t:'52%', w:'56%'},
+  },
+}
+
+let cur = 'color'
+
+/* 用 CSS 模拟图片/视频素材的明暗（真实版是 <image> / <video>） */
+function mediaBox(m, kind) {
+  const inner = kind === 'howto'
+    ? `<div class="play" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)"><i></i></div>
+       <span style="position:absolute;bottom:8px;left:0;right:0">${m.label}</span>`
+    : `<span>${m.label}<br><span style="opacity:.7">真实素材位</span></span>`
+  const bg = m.light
+    ? 'background:linear-gradient(165deg,#C9D2C0,#8E9A82)'
+    : 'background:linear-gradient(165deg,#5E7A63,#2F4436)'
+  return `<div class="ph" style="left:${m.l};top:${m.t};width:${m.w};height:${m.h};transform:rotate(${m.rot}deg);z-index:7;${bg}">
+      ${inner}</div>`
+}
+
+function render() {
+  const c = TYPES[cur]
+  const P = document.getElementById('poster')
+  P.className = 'poster ' + c.tone
+  let h = `<div class="base" style="background:${c.base}"></div>`
+  ;(c.fogs || []).forEach(f => {
+    h += `<div class="fog" style="width:${f.w}px;height:${f.h}px;${f.l ? 'left:' + f.l : ''}${f.r ? 'right:' + f.r : ''};top:${f.t};background:radial-gradient(circle,${f.c},transparent 70%);animation:${f.a} ease-in-out infinite"></div>`
+  })
+  if (c.svg) {
+    h += `<svg viewBox="0 0 390 300" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;z-index:2">
+      <path d="M 40 84 Q 108 70 152 100 L 172 176" fill="none" stroke="rgba(238,240,236,.28)" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 5"/>
+      <path d="M 186 68 L 266 64 L 276 182" fill="none" stroke="#EEF0EC" stroke-width="2.4" stroke-linecap="round"/>
+      <line x1="266" y1="52" x2="266" y2="206" stroke="rgba(180,196,168,.6)" stroke-width="1" stroke-dasharray="3 4"/>
+    </svg>`
+  }
+  // 刻度轴（比例 / 场合共用）
+  if (c.axis) {
+    h += `<div style="position:absolute;left:${c.axis.l};top:${c.axis.t};height:${c.axis.h};width:1.5px;z-index:4;
+      background:linear-gradient(180deg,rgba(238,240,236,.06),rgba(238,240,236,.42),rgba(238,240,236,.06))"></div>`
+    ;[['14%','8px','',],['52%','15px','on'],['86%','8px','']].forEach(([top, sz, on]) => {
+      h += `<div style="position:absolute;left:${c.axis.l};top:${top};width:${sz};height:${sz};border-radius:50%;
+        transform:translateX(-50%);z-index:5;background:${on ? '#EEF0EC' : 'rgba(238,240,236,.35)'};
+        ${on ? 'animation:pulse 3s ease-in-out infinite' : ''}"></div>`
+    })
+  }
+  if (c.scale) {
+    h += `<div style="position:absolute;left:${c.scale.l};top:${c.scale.t};width:30%;height:${c.scale.h};z-index:4;
+      display:flex;flex-direction:column;justify-content:space-between">
+      ${['休闲', 'Smart Casual', '正式', '礼服'].map((t, i) => `
+        <div style="display:flex;align-items:center;gap:7px">
+          <span style="width:${i === 1 ? 12 : 7}px;height:${i === 1 ? 12 : 7}px;border-radius:50%;flex:0 0 auto;
+            background:${i === 1 ? '#EEF0EC' : 'rgba(238,240,236,.32)'};${i === 1 ? 'animation:pulse 3s ease-in-out infinite' : ''}"></span>
+          <span style="font-size:9.5px;font-weight:${i === 1 ? 700 : 500};color:rgba(238,240,236,${i === 1 ? .95 : .5});white-space:nowrap">${t}</span>
+        </div>`).join('')}
+    </div>`
+  }
+  ;(c.els || []).forEach(e => {
+    h += `<div class="el" style="left:${e.l};top:${e.t};width:${e.w};height:${e.h};
+      transform:rotate(${e.rot}deg);background:${e.bg};z-index:${e.z || 5};animation-delay:${e.d}">
+      ${e.fiber ? `<div style="position:absolute;inset:0;opacity:.5;background-image:${FIBER}"></div>` : ''}
+      <div class="shade"></div>
+      ${e.sheen ? `<div class="sheen"></div>` : ''}
+      ${e.no ? `<span class="no" style="color:rgba(40,48,36,.34)">${e.no}</span>` : ''}
+    </div>`
+  })
+  // 信息图形：元素本身在表达位置关系，而不是摆一块装饰色
+  if (c.graph === 'proportion') {
+    h += `<div class="g-body"></div>
+      <div class="g-rule g-rule--cover"></div>
+      <div class="g-rule g-rule--show"></div>
+      <div class="g-brace"><span>约 5cm</span></div>
+      <div class="g-lb g-lb--cover" style="top:31%">盖住脚踝</div>
+      <div class="g-lb g-lb--show" style="top:50%">踝骨上方 · 推荐</div>`
+  }
+  if (c.graph === 'color') {
+    h += `<div class="g-note g-note--dim" style="left:7%;top:13%">哑光 · 连成一个面</div>
+      <div class="g-note g-note--on" style="left:7%;top:33%">有光泽 · 分出层次</div>`
+  }
+  if (c.graph === 'fabric') {
+    h += `<div class="g-note g-note--ink" style="left:8%;top:38%">哑光 · 收边界</div>
+      <div class="g-note g-note--inkon" style="left:56%;top:33%">光泽 · 扩边界</div>`
+  }
+  if (c.accent) {
+    h += `<div class="accent" style="left:${c.accent.l};top:${c.accent.t};width:${c.accent.w};height:${c.accent.h};transform:rotate(${c.accent.rot}deg);background:${c.accent.bg}"></div>`
+  }
+  if (c.media) h += mediaBox(c.media, cur)
+  // 承载块压在元素之上，文字再压在承载块之上
+  h += `<div class="plate" style="left:${c.plate.l};top:${c.plate.t};width:${c.plate.w};height:${c.plate.h};
+    transform:rotate(${c.plate.rot}deg);background:${c.plate.bg};z-index:6;animation-delay:.9s"></div>`
+  h += `<div class="grain" style="${c.tone === 'light' ? 'opacity:.18' : ''}"></div>`
+  h += `<div class="vmark" style="right:8px;top:14px;${c.tone === 'light' ? 'color:rgba(238,240,236,.6)' : ''}">${c.vmark}</div>`
+  const t = c.text
+  h += `<div class="txt txt--${c.plateTone || c.tone}" style="left:${t.l};top:${t.t};width:${t.w}">
+      <div class="seq">${c.seq}</div>
+      <div class="tt">${c.title}</div>
+      <div class="hh">${c.hook}</div>
+      <div class="acts"><button class="cta">${c.cta}</button><span class="lnk">今日页 ›</span></div>
+    </div>`
+  P.innerHTML = h
+}
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.btn')
+  if (!b) return
+  if (b.dataset.t) { cur = b.dataset.t; document.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x === b)); render() }
+  if (b.dataset.h) {
+    document.querySelectorAll('[data-h]').forEach(x => x.classList.toggle('on', x === b))
+    document.querySelector('.poster').style.setProperty('--ph', b.dataset.h + 'px')
+  }
+})
+render()
+</script>
+</body>
+</html>

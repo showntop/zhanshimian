@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>首页卡片 · 排版驱动（修正版）</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#5E665D; --ink3:#8A9189;
+  --moss:#587344; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.13);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E4E6E2;color:var(--ink);-webkit-font-smoothing:antialiased;padding:26px 22px 60px}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:21px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.75;max-width:900px}
+.tabs{display:flex;gap:7px;margin:18px 0 16px;flex-wrap:wrap}
+.tab{padding:8px 15px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  color:var(--ink2);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--moss-deep);border-color:var(--moss-deep);color:var(--cream)}
+.main{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+
+.phone{width:375px;flex:0 0 375px;background:var(--bg);border-radius:30px;overflow:hidden;
+  box-shadow:0 18px 46px rgba(45,58,35,.20)}
+.sb{height:42px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:12px;font-weight:600}
+.sig{display:flex;gap:4px;align-items:center}
+.sig i{width:4px;height:8px;background:var(--ink);border-radius:1px;display:block}
+.sig i:nth-child(4){height:6px;opacity:.4}
+.navbar{display:flex;align-items:center;justify-content:space-between;padding:4px 20px 0}
+.brand{font-size:17px;font-weight:700}.brand .up{color:var(--ink)}.brand .look{color:var(--moss)}
+.right{font-size:11px;color:var(--ink3)}
+.greet{padding:16px 20px 0}
+.gt{display:flex;align-items:baseline;justify-content:space-between}
+.gk{font-size:12px;font-weight:600;color:var(--ink2)}
+.gd{font-size:11px;color:var(--ink3)}
+.gtitle{margin-top:5px;font-size:19px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+
+/* ============ 卡片本体：排版驱动 ============ */
+.card{margin:14px 16px 0;background:#fff;border-radius:14px;padding:20px 18px 17px;
+  box-shadow:0 6px 18px rgba(52,59,47,.10)}
+/* 编号与眉标：不对称——眉标左、编号右，且编号下沉 2px */
+.head{display:flex;align-items:flex-end;justify-content:space-between}
+.eyebrow{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--moss)}
+.seq{font-size:11px;font-weight:700;color:var(--ink3);font-variant-numeric:tabular-nums;
+  letter-spacing:.5px;transform:translateY(1px)}
+/* 标题：大字号 + 断行，本身就是视觉主体 */
+.title{margin-top:14px;font-size:26px;line-height:1.22;font-weight:700;letter-spacing:-.9px}
+.title .dim{color:var(--ink3)}
+/* 观察段：左侧细线 + 缩进，和标题区隔开 */
+.obs{margin-top:14px;padding-left:13px;border-left:2px solid rgba(88,115,68,.34);
+  font-size:13px;line-height:1.72;color:var(--ink2)}
+/* 行动行：唯一加重的正文 */
+.act{margin-top:12px;font-size:14px;line-height:1.6;font-weight:700;color:var(--ink)}
+/* 细分隔线 */
+.rule{height:1px;background:var(--line);margin:16px 0}
+/* 原理块：最小字号，弱化处理 */
+.why{font-size:11.5px;line-height:1.7;color:var(--ink3)}
+.why b{font-weight:700;color:var(--ink2)}
+/* 色带：全宽但只有 44px —— 一条布样，不是大方块 */
+.strip{display:flex;gap:3px;height:44px;margin:16px 0}
+.strip i{flex:1;border-radius:3px;display:block;position:relative}
+.strip i.on::after{content:'';position:absolute;inset:0;border-radius:3px;
+  box-shadow:inset 0 0 0 2px var(--moss)}
+.strip i.off{opacity:.45}
+.strip-cap{font-size:11px;color:var(--ink3);margin-top:-8px}
+/* 底部动作 */
+.foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px}
+.cta{padding:10px 16px;border-radius:999px;background:var(--moss-deep);color:var(--cream);
+  font-size:12.5px;font-weight:700;border:0;font-family:inherit;cursor:pointer}
+.more{font-size:11.5px;font-weight:600;color:var(--moss)}
+
+/* 素材占位（C 用）：明确标注为真实素材位，不是成品 */
+.plate{height:250px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:
+    repeating-linear-gradient(135deg,rgba(120,130,115,.05) 0 10px,rgba(120,130,115,.02) 10px 20px),
+    linear-gradient(160deg,#EBEEE6,#E2E6DD);
+  border:1px dashed rgba(88,115,68,.30);margin:16px 0}
+.plate span{font-size:11.5px;color:var(--ink3);letter-spacing:.2px;text-align:center;line-height:1.7;padding:0 20px}
+
+.below{padding:22px 16px 24px}
+.bh{font-size:16px;font-weight:700;margin-bottom:8px}
+.brule{width:24px;height:2px;background:var(--moss);margin-bottom:11px}
+.brow{display:flex;gap:8px;margin-bottom:8px}
+.bph{flex:1;height:56px;border-radius:10px;background:rgba(105,115,100,.10)}
+.bph.l{height:86px}
+
+.note{flex:1;min-width:300px;max-width:460px}
+.note h3{font-size:17px;font-weight:700}
+.note .sub2{font-size:12px;color:var(--moss);font-weight:600;margin:4px 0 14px}
+.note dl{border-top:1px solid var(--line);padding-top:12px}
+.note dt{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-top:12px}
+.note dt:first-child{margin-top:0}
+.note dd{font-size:12.5px;line-height:1.8;color:var(--ink);margin-top:3px}
+.goodline{margin-top:14px;padding:11px 13px;border-radius:10px;background:rgba(88,115,68,.10);
+  font-size:12px;line-height:1.7;color:#3D5230}
+.warnline{margin-top:12px;padding:11px 13px;border-radius:10px;background:rgba(126,84,69,.08);
+  font-size:12px;line-height:1.7;color:#6A4B3E}
+.stage{display:none}.stage.on{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>首页卡片 · 排版驱动（修正版）</h1>
+  <p class="sub">上一版错了：<b>用尺寸掩盖内容单薄</b>。色卡是低密度信息，80px 和 300px 传达的一样多，
+    放大只会更明显地暴露它没内容。这一版反过来——<b>视觉区的大小由内容需要决定</b>：
+    "读"的内容不给大面积，靠排版做主角；"看"的内容才给面积，且前提是真实素材到位。</p>
+
+  <div class="tabs">
+    <button class="tab on" data-stage="a">A 色卡类 · 小色带</button>
+    <button class="tab" data-stage="b">B 原理类 · 无图</button>
+    <button class="tab" data-stage="c">C 单品类 · 真实素材位</button>
+  </div>
+
+  <div class="main">
+    <!-- ===== A ===== -->
+    <div class="stage on" id="stage-a">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet">
+          <div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div>
+        </div>
+
+        <div class="card">
+          <div class="head"><span class="eyebrow">今天这一条</span><span class="seq">色彩 09 / 24</span></div>
+          <div class="title">冬天的白，<br><span class="dim">不止一种</span></div>
+          <div class="obs">你是冷调肤色。本白和冷白贴着皮肤，气色往上走；米白、奶油白里的黄调，会把冷皮衬得发闷。</div>
+          <div class="act">挑白色时，先看它是偏蓝还是偏黄。</div>
+          <div class="strip">
+            <i class="on" style="background:#FBFBF8"></i>
+            <i class="on" style="background:#F2F4F1"></i>
+            <i class="off" style="background:#EFEADC"></i>
+            <i class="off" style="background:#E6DECD"></i>
+          </div>
+          <div class="strip-cap">左二偏冷，是你的；右二偏暖，靠近脸会闷。</div>
+          <div class="rule"></div>
+          <div class="why"><b>原理</b>　白色不是无色，它有色温。冷皮配冷白，是让颜色顺着肤色走。</div>
+          <div class="foot">
+            <button class="cta">收进我的色卡</button>
+            <span class="more">看看我穿这样 ›</span>
+          </div>
+        </div>
+
+        <div class="below">
+          <div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div>
+        </div>
+      </div>
+      <div class="note">
+        <h3>A · 色卡类</h3>
+        <div class="sub2">色带 44px，横跨全宽</div>
+        <dl>
+          <dt>改了什么</dt><dd>色卡从 300px 大方块缩成 <b>44px 高、横跨全宽的一条</b>。它是"布样"，不是"画面"。4 个颜色一个不少，但不再假装自己撑得起一屏。</dd>
+          <dt>空出来的面积给了谁</dt><dd>给了标题。26px 的大字断成两行，<b>标题本身就是视觉主体</b>——这比任何色块都更有存在感，而且不需要素材。</dd>
+          <dt>排版的三个细节</dt><dd>① 眉标在左、编号在右且下沉 1px（不对称）；② 观察段左侧 2px moss 细线 + 13px 缩进，和标题分层；③ 原理块降到 11.5px 灰字，主动弱化。</dd>
+          <dt>信息层级</dt><dd>眉标 → 标题 → 观察 → 行动 → 色带 → 原理 → 动作，七层靠<b>字号和字重</b>区分，不靠色块。</dd>
+        </dl>
+        <div class="goodline">这版没有一处是为了"填满"而存在。每个元素要么承载信息，要么承载节奏。</div>
+      </div>
+    </div>
+
+    <!-- ===== B ===== -->
+    <div class="stage" id="stage-b">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet">
+          <div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div>
+        </div>
+
+        <div class="card">
+          <div class="head"><span class="eyebrow">今天这一条</span><span class="seq">版型 03 / 24</span></div>
+          <div class="title">落肩<br>正在抹掉<br><span class="dim">你的肩线</span></div>
+          <div class="obs">你肩偏窄、骨架偏小。落肩会把本来就不宽的肩再吃掉一层，上半身的框架就没了。</div>
+          <div class="act">选肩缝正好落在肩点的。</div>
+          <div class="rule"></div>
+          <div class="why"><b>原理</b>　上装的肩线决定上半身的轮廓框架，不是袖子的宽窄。</div>
+          <div class="foot">
+            <button class="cta">收进我的版型库</button>
+            <span class="more">看看我穿这样 ›</span>
+          </div>
+        </div>
+
+        <div class="below">
+          <div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div>
+        </div>
+      </div>
+      <div class="note">
+        <h3>B · 原理类</h3>
+        <div class="sub2">一张图都不给</div>
+        <dl>
+          <dt>关键判断</dt><dd>这条的核心是<b>认知</b>，不是图像。硬配一张 CSS 肩线示意图，只会把"落肩吃掉肩"这么清晰的一句话，稀释成一张看不懂的图。</dd>
+          <dt>标题三行是刻意的</dt><dd><code>落肩 / 正在抹掉 / 你的肩线</code>——最后一行用<span class="dim">灰字</span>，制造阅读的落点。这就是排版在承担视觉功能。</dd>
+          <dt>卡片会更矮</dt><dd>这一屏比 A 矮约 90px。我认为这是对的：<b>内容少的日子就少占地方</b>，比每天强撑一个固定高度诚实。</dd>
+          <dt>代价</dt><dd>每天都长这个样，卡片高度随内容浮动。如果你要首屏稳定，可以给一个 min-height，但那等于回到"撑场面"。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- ===== C ===== -->
+    <div class="stage" id="stage-c">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet">
+          <div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div>
+        </div>
+
+        <div class="card">
+          <div class="head"><span class="eyebrow">今天这一条</span><span class="seq">单品 14 / 24</span></div>
+          <div class="title">18° 穿得住的，<br><span class="dim">是薄毛呢不是夹棉</span></div>
+          <div class="plate"><span>这里是真实素材位<br>单品图 / 编辑图 / 生成图</span></div>
+          <div class="obs">你骨架偏小。硬挺的厚面料会自己撑出形状，把你套在里面；中等厚度 + 垂感的更合适。</div>
+          <div class="act">今天挑外套，先看它能不能自然垂下来。</div>
+          <div class="rule"></div>
+          <div class="why"><b>原理</b>　面料量感要匹配骨架量感。骨架小的人，面料的"存在感"越强越吃亏。</div>
+          <div class="foot">
+            <button class="cta">收进我的面料库</button>
+            <span class="more">看看我穿这样 ›</span>
+          </div>
+        </div>
+
+        <div class="below">
+          <div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div>
+        </div>
+      </div>
+      <div class="note">
+        <h3>C · 单品类</h3>
+        <div class="sub2">唯一该给大面积的一类</div>
+        <dl>
+          <dt>为什么这一类配得上面积</dt><dd>单品图是<b>高密度视觉</b>——材质、版型、厚度、垂感全在图里，放大会看到更多东西。这不是撑场面，是内容本身需要。</dd>
+          <dt>但前提是真实素材</dt><dd>虚线框是<b>故意留空的</b>。我现在拿不出真实单品图，所以不画假的填满它——那正是上一版犯的错。</dd>
+          <dt>素材从哪来</dt><dd>① 用户衣橱自己的照片（<code>WardrobeItem.media</code>，零授权问题）；② 编辑图 / 授权图库；③ 生成图（按需，带 <code>source_kind=generated_preview</code>）。</dd>
+          <dt>素材决定节奏</dt><dd>素材到位前，日常主力是 <b>A / B 这类排版驱动</b>；C 只在确实有图时才出现。</dd>
+        </dl>
+        <div class="warnline">这一条要诚实面对：<b>没有真实素材，就不要假装自己有视觉。</b>
+          排版驱动能做出好设计，假图撑面积做不出来。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('.tab')
+  if (!t) return
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('on', b === t))
+  document.querySelectorAll('.stage').forEach((s) => s.classList.toggle('on', s.id === 'stage-' + t.dataset.stage))
+})
+</script>
+</body>
+</html>

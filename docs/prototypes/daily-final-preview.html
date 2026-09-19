@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>每日内容 · 最终界面（Aesop / COS 式编辑极简）</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#626862; --ink3:#686D67;
+  --moss:#587344; --moss-soft:#EDF1EA; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.12); --surface:#FFFFFF;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E7E9E5;color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased;padding:28px 24px 60px}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:21px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.75;max-width:900px}
+.hint{font-size:12px;color:var(--ink3);margin-top:8px;line-height:1.7}
+
+.tabs{display:flex;gap:7px;margin:18px 0 16px;flex-wrap:wrap}
+.tab{padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  color:var(--ink2);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--moss-deep);border-color:var(--moss-deep);color:var(--cream)}
+.main{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+.phone{width:375px;flex:0 0 375px;height:800px;background:var(--bg);border-radius:32px;overflow:hidden;
+  display:flex;flex-direction:column;box-shadow:0 18px 48px rgba(45,58,35,.20)}
+@media (max-width:1000px){.phone{flex:0 0 auto;width:375px}}
+.sb{height:44px;flex:0 0 44px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 22px;font-size:12px;font-weight:600}
+.sig{display:flex;gap:4px;align-items:center}
+.sig i{width:4px;height:8px;background:var(--ink);border-radius:1px;display:block}
+.sig i:nth-child(4){height:6px;opacity:.4}
+.navbar{display:flex;align-items:center;gap:10px;padding:0 16px 8px}
+.back{font-size:20px;line-height:1;opacity:.82}
+.brand{font-size:17px;font-weight:700}.brand .up{color:var(--ink)}.brand .look{color:var(--moss)}
+.screen{flex:1;overflow-y:auto;padding:0 16px 24px}
+
+/* ---------- 首页 ---------- */
+.greet{padding:6px 2px 16px}
+.gt{display:flex;align-items:baseline;justify-content:space-between}
+.gk{font-size:12px;font-weight:600;color:var(--ink2)}
+.gd{font-size:11px;color:var(--ink3)}
+.gtitle{margin-top:5px;font-size:19px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+.daily{display:flex;gap:12px;padding:11px;border-radius:12px;background:#fff;
+  border:1px solid var(--line);box-shadow:0 3px 9px rgba(52,59,47,.06)}
+.dv-visual{width:92px;height:92px;flex:0 0 92px;border-radius:8px;overflow:hidden;background:var(--moss-soft)}
+.daily-copy{flex:1;min-width:0;display:flex;flex-direction:column}
+.daily-eyebrow{font-size:10px;font-weight:700;letter-spacing:.7px;color:var(--moss)}
+.daily-topic{margin-top:6px;font-size:17px;line-height:1.28;font-weight:700;letter-spacing:-.5px}
+.daily-fit{margin-top:6px;font-size:11.5px;line-height:1.55;color:var(--ink2);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.daily-act{margin-top:auto;font-size:12px;font-weight:700;color:var(--moss)}
+.archive{display:flex;justify-content:space-between;margin-top:12px;padding:4px 3px}
+.archive-t{font-size:12px;font-weight:600;color:var(--ink2)}
+.archive-m{font-size:11px;color:var(--ink3)}
+.section{margin-top:24px}
+.st{font-size:16px;font-weight:700;margin-bottom:7px}
+.rule{width:24px;height:2px;background:var(--moss);margin-bottom:11px}
+.box{height:60px;border-radius:10px;background:rgba(105,115,100,.10);margin-bottom:8px}
+.box.tall{height:96px}
+
+/* ---------- 今日页：语境 / 视觉 / 正文 ---------- */
+.ctx{display:flex;align-items:baseline;justify-content:space-between;padding:4px 2px 14px}
+.ctx-main{font-size:12px;font-weight:600;color:var(--ink3)}
+.ctx-city{font-size:12px;color:var(--ink3)}
+.visual{height:200px;margin:0 -16px;background:var(--moss-soft);flex:0 0 200px}
+.body{padding:20px 2px 0}
+.meta{font-size:11.5px;font-weight:600;letter-spacing:.5px;color:var(--ink3)}
+.title{display:block;margin-top:9px;font-size:22px;line-height:1.22;font-weight:700;letter-spacing:-.6px}
+.lead{display:block;margin-top:11px;font-size:14.5px;line-height:1.72;color:var(--ink2)}
+.hr{height:1px;margin:18px 0;background:var(--line)}
+.fit{padding-left:12px;border-left:2px solid var(--moss);font-size:14.5px;line-height:1.75;color:var(--ink)}
+.why{display:block;margin-top:14px;font-size:12px;line-height:1.7;color:var(--ink3)}
+.cta{height:48px;border-radius:999px;background:var(--moss-deep);color:var(--cream);
+  display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;margin-top:24px;cursor:pointer}
+.link{margin-top:13px;text-align:center;font-size:13px;font-weight:600;color:var(--moss)}
+.handbook{display:flex;align-items:center;justify-content:space-between;padding:3px 2px}
+.handbook-t{font-size:14px;font-weight:600;color:var(--ink2)}
+.handbook-go{font-size:14px;font-weight:700;color:var(--ink3)}
+
+/* ---------- 手册 ---------- */
+.hb-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 2px 14px}
+.hb-title{font-size:19px;font-weight:700;letter-spacing:-.5px}
+.hb-count{font-size:12px;color:var(--ink3)}
+.hb-group{margin-bottom:18px}
+.hb-gh{display:flex;align-items:baseline;gap:6px;padding:0 2px 8px}
+.hb-gn{font-size:14px;font-weight:700}
+.hb-gc{font-size:11px;font-weight:700;color:var(--moss)}
+.hb-item{display:flex;gap:10px;margin-bottom:7px;padding:10px;border-radius:10px;
+  background:#fff;border:1px solid var(--line)}
+.hb-vis{width:66px;height:66px;flex:0 0 66px;border-radius:7px;overflow:hidden;background:var(--moss-soft)}
+.hb-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.hb-type{font-size:10px;font-weight:700;color:var(--moss)}
+.hb-topic{font-size:13.5px;font-weight:700;line-height:1.35}
+.hb-fit{font-size:11px;line-height:1.55;color:var(--ink2);display:-webkit-box;
+  -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.hb-empty{padding:28px 18px;border-radius:10px;background:#fff;border:1px solid var(--line)}
+.hb-empty-t{font-size:15px;font-weight:700}
+.hb-empty-b{font-size:12px;color:var(--ink3);margin-top:7px;line-height:1.7}
+
+/* ---------- 程序化视觉（复刻 DailyVisual） ---------- */
+.dv{width:100%;height:100%;display:flex}
+/* 色卡：色块在上，标签在下 */
+.dv-swatch{gap:8px;padding:20px 16px 22px;align-items:stretch}
+.sw-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+.sw{flex:1;min-height:0;border-radius:4px;position:relative}
+.sw.pick{box-shadow:0 0 0 2px var(--moss),0 5px 12px rgba(45,58,35,.16)}
+.sw.drop{opacity:.66}
+.sw-mark{position:absolute;right:5px;bottom:4px;font-size:11px;font-weight:800;color:var(--moss-deep)}
+.sw-mark.drop{color:rgba(126,84,69,.9)}
+.sw-lb{text-align:center;font-size:10.5px;font-weight:600;color:var(--ink2)}
+/* 对比：左扁平，右有层次 */
+.dv-cmp{gap:10px;padding:20px 16px 22px;align-items:stretch}
+.cp-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+.cp{position:relative;flex:1;min-height:0;border-radius:4px;overflow:hidden}
+.cp.layered{box-shadow:0 0 0 2px var(--moss),0 5px 12px rgba(45,58,35,.18)}
+.cp-fill{position:absolute;inset:0}
+.cp-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.cp-sheen{position:absolute;left:0;right:0;top:0;height:44%;
+  background:linear-gradient(180deg,rgba(255,255,255,.24),rgba(255,255,255,0))}
+.cp-lb{text-align:center;font-size:10.5px;font-weight:600;line-height:1.4;color:var(--ink2)}
+/* 位置类：标在人体轮廓上 */
+.dv-body{align-items:center;justify-content:center;padding:15px 16px 17px}
+.fig{position:relative;height:100%;display:flex;flex-direction:column;align-items:center}
+.fig-img{width:100%;height:100%;object-fit:contain;display:block}
+.fig-bare{height:100%;display:flex;flex-direction:column;align-items:center}
+.fig-head{width:30px;height:30px;border-radius:50%;background:rgba(55,62,52,.10)}
+.fig-torso{position:relative;width:86px;flex:1;margin-top:5px;border-radius:28px 28px 8px 8px;background:rgba(55,62,52,.07)}
+.fig-mark{position:absolute;left:50%;width:0;transform:translateY(-50%)}
+.fig-dot{position:absolute;left:-4.5px;top:0;width:9px;height:9px;border-radius:50%;
+  background:#fff;border:1px solid rgba(55,62,52,.32)}
+.fig-lb{position:absolute;left:12px;top:0;transform:translateY(-50%);white-space:nowrap;
+  font-size:11px;font-weight:600;color:var(--ink2)}
+.fig-mark.pick .fig-dot{left:-6.5px;width:13px;height:13px;background:var(--moss);
+  border-color:var(--moss);box-shadow:0 3px 8px rgba(45,58,35,.24)}
+.fig-mark.pick .fig-lb{font-weight:700;color:var(--ink)}
+.fig-mark.avoid .fig-dot{background:rgba(126,84,69,.6);border-color:rgba(126,84,69,.6)}
+.fig-mark.avoid .fig-lb{color:#6a4b3e}
+/* 程度类：刻度轴 */
+.dv-axis{position:relative;flex-direction:column;justify-content:space-between;padding:18px 16px 20px}
+.axis-line{position:absolute;left:39px;top:30px;bottom:30px;width:1px;background:rgba(55,62,52,.18)}
+.ax{position:relative;z-index:2;display:flex;align-items:center;min-height:34px;padding-left:56px}
+.ax .dot{position:absolute;left:34px;top:50%;margin-top:-5px;width:10px;height:10px;border-radius:50%;
+  background:#fff;border:1px solid rgba(55,62,52,.30)}
+.ax.pick .dot{left:31px;margin-top:-8px;width:16px;height:16px;background:var(--moss);border-color:var(--moss)}
+.ax .lb{font-size:12px;font-weight:600;color:var(--ink2)}
+.ax.pick .lb{font-weight:700;color:var(--ink)}
+.ax.avoid .dot{background:rgba(126,84,69,.55);border-color:rgba(126,84,69,.55)}
+.ax.avoid .lb{color:#6a4b3e}
+/* 动作演示 */
+.dv-vid{flex-direction:column;align-items:center;justify-content:center;gap:9px;background:#343a33}
+.vd-btn{width:46px;height:46px;border-radius:999px;border:1px solid rgba(238,240,236,.55);
+  display:flex;align-items:center;justify-content:center;color:var(--cream);font-size:15px}
+.vd-meta{font-size:10.5px;color:rgba(238,240,236,.7)}
+/* 海报式：去容器，素材直接浮在页面上 */
+.dv-poster{position:relative;display:block;overflow:hidden;background:var(--bg)}
+.pt-word{position:absolute;left:-18px;top:32px;z-index:1;font-size:132px;line-height:.82;
+  font-weight:900;letter-spacing:-9px;color:rgba(88,115,68,.16);white-space:nowrap}
+.pt-word.sub{top:148px;left:44px;color:rgba(88,115,68,.10)}
+.pt-item{position:absolute;z-index:3;mix-blend-mode:multiply;object-fit:contain}
+.pt-rule{position:absolute;left:0;right:0;top:265px;z-index:4;height:1px;background:rgba(55,62,52,.16)}
+.pt-chip{position:absolute;left:198px;top:88px;z-index:5;padding:6px 12px;border-radius:999px;
+  background:#d9744f;color:#fff;font-size:10px;font-weight:800;letter-spacing:.6px;
+  transform:rotate(-3deg);box-shadow:0 5px 13px rgba(217,116,79,.3)}
+.dv-photo{align-items:center;justify-content:center;padding:16px;background:var(--moss-soft);
+  font-size:11px;color:var(--ink3);text-align:center}
+
+/* ---------- 侧栏 ---------- */
+.side{flex:1;min-width:280px;max-width:480px}
+.panel{padding:14px 16px;border-radius:12px;background:#fff;border:1px solid var(--line)}
+.fld{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.fld label{font-size:11px;font-weight:700;color:var(--ink3)}
+.fld select,.fld input{width:100%;padding:6px 9px;border-radius:7px;border:1px solid var(--line);
+  background:var(--bg);font-family:inherit;font-size:12.5px}
+.btn{padding:8px 14px;border-radius:999px;background:var(--moss);color:#fff;font-size:12.5px;
+  font-weight:700;border:0;font-family:inherit;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink2);border:1px solid var(--line);font-weight:600}
+.note{margin-top:14px;font-size:12px;line-height:1.8;color:var(--ink2)}
+.note b{color:var(--ink)}
+.reason{font-size:11.5px;line-height:1.9;color:var(--ink2)}
+.warnline{margin-top:14px;padding:10px 12px;border-radius:10px;background:rgba(126,84,69,.08);
+  font-size:11.5px;line-height:1.75;color:#6A4B3E}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>每日内容 · 最终界面</h1>
+  <p class="sub">参照 <strong>Aesop / COS 的编辑式极简</strong>：大留白、细线分隔、排印为主，
+    重色只出现在该强调的地方。视觉是唯一主角，其余全部降权。
+    上一版「色彩场」已废弃（低饱和色做不出可见氛围，只会让画面发白）。</p>
+  <p class="hint">切「今日」点主按钮可收下，再进「手册」看它入库；连收几天选品会自动换条且不重复。</p>
+
+  <div class="tabs">
+    <button class="tab on" data-screen="home">首页</button>
+    <button class="tab" data-screen="today">今日</button>
+    <button class="tab" data-screen="handbook">我的手册</button>
+  </div>
+
+  <div class="main">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+      <div class="navbar" id="navbar"></div>
+      <div class="screen" id="screen"></div>
+    </div>
+
+    <div class="side">
+      <div class="panel">
+        <div class="fld"><label>形象基因</label><select id="gene"></select></div>
+        <div class="fld"><label>强制预览某一条</label><select id="pool"></select></div>
+        <div class="fld"><label>气温</label><input type="range" id="temp" min="-5" max="35" value="15"></div>
+        <div class="fld"><label>天气</label>
+          <select id="cond"><option>晴</option><option>多云</option><option>阴</option><option>雨</option><option>风</option><option>雪</option></select>
+        </div>
+        <div class="fld"><label>日期类型</label>
+          <select id="day"><option value="weekday">工作日</option><option value="weekend">周末</option><option value="holiday">节假日</option></select>
+        </div>
+        <button class="btn ghost" id="reset">清空手册</button>
+      </div>
+      <div class="panel" style="margin-top:14px">
+        <div class="reason" id="reason"></div>
+        <div class="note" id="geneline"></div>
+        <div class="warnline">内容原理待形象顾问逐条确认（<code>reviewed: false</code>）。
+          语境取自服务端 <code>TodayContext</code>（真实）；内容池与形象基因目前是 mock；收下记录存本地。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { MOCK_CONTENTS, MOCK_GENES, MOCK_GENE_DEFAULT, pickDaily, countBuckets } from './_build/daily/index.js'
+
+const $ = (id) => document.getElementById(id)
+const BUCKET_NM = { swatch:'色卡', silhouette:'版型库', proportion:'比例库', palette:'配色库', fabric:'面料库', outfit:'搭配' }
+const TYPE_NM = { color:'色彩', silhouette:'版型', proportion:'比例', fabric:'面料', item:'单品', occasion:'场合', howto:'教程' }
+
+let screen = 'home'
+const state = { geneKey:'冷调 · 小骨架 · 肩窄', temp:15, cond:'多云', day:'weekday', season:'winter', saves:[], forced:null }
+
+function gene() { return MOCK_GENES[state.geneKey] ?? MOCK_GENE_DEFAULT }
+function inputFor() {
+  return { gene: gene(), temperature: state.temp, condition: state.cond, dayType: state.day,
+    season: state.season, seen: state.saves.map((s) => s.key),
+    bucketCount: countBuckets(state.saves.map((s) => s.asset)) }
+}
+
+/* 素材地址：完整 URL 直接用，文件名则回退到本地 assets（与小程序契约一致） */
+const imgSrc = (x) => (String(x).startsWith('http') ? String(x) : `./assets/${x}`)
+
+/* 复刻 DailyVisual */
+function visualHTML(v, compact = false) {
+  const s = v.spec || {}
+  const recs = (x) => (Array.isArray(x) ? x.filter((i) => i && typeof i === 'object') : [])
+  const str = (x) => (typeof x === 'string' ? x : '')
+
+  if (v.modality === 'swatch') {
+    return `<div class="dv dv-swatch">${recs(s.items).map((it) => {
+      const tone = str(it.tone), label = str(it.label), st = str(it.state)
+      return `<div class="sw-col">
+        <div class="sw ${st === 'pick' ? 'pick' : ''} ${st === 'drop' ? 'drop' : ''}" style="background:${tone}">
+          ${st === 'pick' ? '<span class="sw-mark">✓</span>' : ''}
+          ${st === 'drop' ? '<span class="sw-mark drop">×</span>' : ''}
+        </div>
+        ${!compact && label ? `<div class="sw-lb">${label}</div>` : ''}</div>`
+    }).join('')}</div>`
+  }
+  if (v.modality === 'compare') {
+    // 有真实素材就渲图，没有就退回色块 —— 保证素材缺失时不空屏
+    const blk = (o, layered) => {
+      const tone = str(o.tone), label = str(o.label), img = str(o.image)
+      const inner = img
+        ? `<img class="cp-img" src="${imgSrc(img)}" alt="">`
+        : (layered ? `<div class="cp-fill" style="background:${tone}"></div><div class="cp-sheen"></div>` : '')
+      const bg = (!img && !layered) ? `style="background:${tone}"` : ''
+      return `<div class="cp-col">
+        <div class="cp${layered ? ' layered' : ''}" ${bg}>${inner}</div>
+        ${!compact && label ? `<div class="cp-lb">${label}</div>` : ''}</div>`
+    }
+    return `<div class="dv dv-cmp">${blk(s.left || {}, false)}${blk(s.right || {}, (s.right || {}).layered === true)}</div>`
+  }
+  if (v.modality === 'diagram') {
+    const items = recs(s.items)
+    // 位置类：画在人体上（悬空的点没有参照）
+    if (str(s.kind) === 'body') {
+      const total = items.length
+      const figure = str(s.image)
+      const marks = items.map((it, i) => {
+        const st = str(it.state)
+        const ratio = total > 1 ? i / (total - 1) : 0.5
+        const top = figure !== '' ? Math.round(41 + ratio * 20) : Math.round(((i + 1) / (total + 1)) * 100)
+        return `<div class="fig-mark ${st === 'pick' ? 'pick' : ''} ${st === 'avoid' ? 'avoid' : ''}" style="top:${top}%">
+          <span class="fig-dot"></span>${!compact && str(it.label) ? `<span class="fig-lb">${str(it.label)}</span>` : ''}</div>`
+      }).join('')
+      if (figure !== '') {
+        return `<div class="dv dv-body"><div class="fig">
+          <img class="fig-img" src="${imgSrc(figure)}" alt="">${marks}</div></div>`
+      }
+      return `<div class="dv dv-body"><div class="fig">
+        <div class="fig-bare"><div class="fig-head"></div><div class="fig-torso">${marks}</div></div>
+      </div></div>`
+    }
+    // 程度类：刻度轴
+    return `<div class="dv dv-axis"><div class="axis-line"></div>${items.map((it) => {
+      const st = str(it.state)
+      return `<div class="ax ${st === 'pick' ? 'pick' : ''} ${st === 'avoid' ? 'avoid' : ''}">
+        <span class="dot"></span><span class="lb">${str(it.label)}</span></div>`
+    }).join('')}</div>`
+  }
+  if (v.modality === 'poster') {
+    const word = s.word || {}, chip = s.chip || {}
+    const rotate = word.rotate ?? -7
+    const layers = (s.layers || []).filter((l) => l && typeof l === 'object')
+    return `<div class="dv dv-poster">
+      <div class="pt-word" style="transform:rotate(${rotate}deg)">${str(word.main)}</div>
+      ${str(word.sub) ? `<div class="pt-word sub" style="transform:rotate(${rotate}deg)">${str(word.sub)}</div>` : ''}
+      ${layers.map((l) => `<img class="pt-item" src="${imgSrc(str(l.image))}"
+        style="left:${str(l.x)};top:${str(l.y)};width:${(l.w || 200) / 2}px;transform:rotate(${l.rotate || 0}deg)">`).join('')}
+      <div class="pt-rule"></div>
+      ${str(chip.text) ? `<div class="pt-chip">${str(chip.text)}</div>` : ''}
+    </div>`
+  }
+  if (v.modality === 'video') {
+    return `<div class="dv dv-vid"><div class="vd-btn">▶</div>
+      <div class="vd-meta">${Number(s.durationSec ?? 12)} 秒 · ${Number(s.steps ?? 2)} 步</div></div>`
+  }
+  return `<div class="dv dv-photo">${v.alt || ''}</div>`
+}
+
+function renderHome(pick) {
+  const card = pick ? `
+    <div class="daily">
+      <div class="dv-visual">${visualHTML(pick.content.visual, true)}</div>
+      <div class="daily-copy">
+        <div class="daily-eyebrow">今天这一条</div>
+        <div class="daily-topic">${pick.content.topic}</div>
+        <div class="daily-fit">${pick.fitText}</div>
+        <div class="daily-act">收进我的${BUCKET_NM[pick.content.asset] ?? '手册'}</div>
+      </div>
+    </div>` : `<div class="daily"><div class="daily-copy" style="padding:12px">
+      <div class="daily-topic">今天没有可推的内容</div>
+      <div class="daily-fit">池子在当前条件下没有合适条目。宁可不推，也不凑数。</div></div></div>`
+
+  return `
+    <div class="greet">
+      <div class="gt"><div class="gk">今天最好看</div><div class="gd">11月8日 · 周六</div></div>
+      <div class="gtitle">下午好</div>
+    </div>
+    ${card}
+    <div class="archive"><span class="archive-t">查看报告与建议 ›</span><span class="archive-m">4 个可提升点</span></div>
+    <div class="section"><div class="st">直接解决眼前的一件事</div><div class="rule"></div>
+      <div class="box tall"></div>
+      <div style="display:flex;gap:6px"><div class="box" style="flex:1"></div><div class="box" style="flex:1"></div></div></div>
+    <div class="section"><div class="st">按场合开始</div><div class="rule"></div><div class="box"></div></div>`
+}
+
+function renderToday(pick) {
+  if (!pick) {
+    return `<div class="ctx"><span class="ctx-main">今天 ${state.temp}° ${state.cond}</span></div>
+      <div class="body"><div class="title">今天没有可推的内容</div>
+      <div class="lead">池子在当前条件下没有合适条目。宁可不推，也不凑数。</div></div>`
+  }
+  const seq = String(state.saves.length + 1).padStart(2, '0')
+  return `
+    <div class="ctx">
+      <span class="ctx-main">11月8日 · ${state.temp}° ${state.cond}</span>
+      <span class="ctx-city">杭州</span>
+    </div>
+    <div class="visual" style="height:${pick.content.visual.modality === 'poster' ? 290 : 200}px">${visualHTML(pick.content.visual)}</div>
+    <div class="body">
+      <div class="meta">${TYPE_NM[pick.content.type]} · 第 ${seq} 条</div>
+      <div class="title">${pick.content.topic}</div>
+      <div class="lead">${pick.content.lead}</div>
+      <div class="hr"></div>
+      <div class="fit">${pick.fitText}</div>
+      <div class="why">${pick.content.why}</div>
+      <div class="cta" id="saveBtn">收进我的${BUCKET_NM[pick.content.asset] ?? '手册'}</div>
+      <div class="link">看看我穿这样 ›</div>
+      <div class="hr"></div>
+      <div class="handbook">
+        <span class="handbook-t">我的手册</span>
+        <span class="handbook-go">${state.saves.length} ›</span>
+      </div>
+    </div>`
+}
+
+function renderHandbook() {
+  const groups = ['swatch','silhouette','proportion','palette','fabric','outfit']
+    .map((b) => ({ b, name: BUCKET_NM[b], items: state.saves.filter((s) => s.asset === b) }))
+    .filter((g) => g.items.length > 0)
+
+  if (groups.length === 0) {
+    return `<div class="hb-head"><div class="hb-title">我的手册</div><div class="hb-count">已收 0 条</div></div>
+      <div class="hb-empty"><div class="hb-empty-t">手册还是空的</div>
+      <div class="hb-empty-b">收下今天这一条，手册就开始变厚了。</div></div>`
+  }
+  return `<div class="hb-head"><div class="hb-title">我的手册</div>
+      <div class="hb-count">已收 ${state.saves.length} 条</div></div>
+    ${groups.map((g) => `
+      <div class="hb-group">
+        <div class="hb-gh"><div class="hb-gn">${g.name}</div><div class="hb-gc">${g.items.length}</div></div>
+        ${g.items.map((sv) => {
+          const c = MOCK_CONTENTS.find((x) => x.dedupeKey === sv.key)
+          if (!c) return ''
+          return `<div class="hb-item">
+            <div class="hb-vis">${visualHTML(c.visual, true)}</div>
+            <div class="hb-copy"><div class="hb-type">${TYPE_NM[c.type]}</div>
+              <div class="hb-topic">${c.topic}</div>
+              <div class="hb-fit">${c.fit(gene())}</div></div></div>`
+        }).join('')}
+      </div>`).join('')}`
+}
+
+function render() {
+  const pick = state.forced
+    ? { content: state.forced, fitText: state.forced.fit(gene()), reason: ['强制预览（手动选中）'] }
+    : pickDaily(MOCK_CONTENTS, inputFor())
+  $('navbar').innerHTML = screen === 'home'
+    ? `<div class="brand"><span class="up">up</span><span class="look">look</span></div>`
+    : `<span class="back">‹</span>`
+
+  if (screen === 'home') $('screen').innerHTML = renderHome(pick)
+  else if (screen === 'today') $('screen').innerHTML = renderToday(pick)
+  else $('screen').innerHTML = renderHandbook()
+
+  $('reason').innerHTML = pick ? pick.reason.map((r) => `<div>· ${r}</div>`).join('') : '<div>· 当前条件下池子已空</div>'
+  $('geneline').innerHTML = Object.entries(gene()).map(([k, v]) => `${k}：<b>${v}</b>`).join(' · ')
+
+  const btn = $('saveBtn')
+  if (btn) btn.onclick = () => {
+    if (!pick || state.saves.some((s) => s.key === pick.content.dedupeKey)) return
+    state.saves.push({ key: pick.content.dedupeKey, asset: pick.content.asset, savedAt: new Date().toISOString() })
+    render()
+  }
+}
+
+$('gene').innerHTML = Object.keys(MOCK_GENES).map((k) => `<option${k === state.geneKey ? ' selected' : ''}>${k}</option>`).join('')
+$('gene').onchange = (e) => { state.geneKey = e.target.value; render() }
+$('pool').innerHTML = '<option value="">（按选品自动）</option>' +
+  MOCK_CONTENTS.map((c) => `<option value="${c.dedupeKey}">${TYPE_NM[c.type]} · ${c.topic}</option>`).join('')
+$('pool').onchange = (e) => {
+  state.forced = e.target.value ? (MOCK_CONTENTS.find((c) => c.dedupeKey === e.target.value) || null) : null
+  render()
+}
+$('temp').oninput = (e) => { state.temp = Number(e.target.value); render() }
+$('cond').onchange = (e) => { state.cond = e.target.value; render() }
+$('day').onchange = (e) => { state.day = e.target.value; render() }
+$('reset').onclick = () => { state.saves = []; render() }
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('.tab')
+  if (!t) return
+  screen = t.dataset.screen
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('on', b === t))
+  render()
+})
+
+render()
+</script>
+</body>
+</html>
