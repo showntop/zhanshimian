@@ -11,6 +11,12 @@
   padding-bottom: calc(env(safe-area-inset-bottom) + 20rpx);
 }
 
+// 想让这一屏「整体往下挪」不要在这里加 padding-top：页面定高 100vh +
+// 内容顶部对齐，fitStageToViewport 会把上方多出来的高度 1:1 从卡高里扣回去
+// （底部那行原地不动，只是照片变小）。真正可调的是底部预留：
+// PlansDeck 的 PAGE_BOTTOM_PX 与 STAGE_BUDGET_BASE 里的底垫项，
+// 二者一起调小，卡才有空间往下长，说明行（重新生成）才会真的更贴屏底。
+
 // ---------- 方案 tab ----------
 // planning 整屏等待（受理后到方案发布前）的外壳；内容在 .plan-progress
 .planning-screen {
@@ -245,6 +251,22 @@
     background: var(--surface);
     border: 1rpx dashed var(--line);
     text-align: center;
+
+    // 生成中变体：反「空态卡片」语言 —— 无圆角、左右出血、只有上下实线，
+    // 像一张钉在工作台上的纸样，而不是一个等待容器
+    &--atelier {
+      align-items: stretch;
+      gap: 20rpx;
+      padding: 40rpx 0 36rpx;
+      border: none;
+      border-top: 1rpx solid rgba(32, 35, 32, 0.18);
+      border-bottom: 1rpx solid rgba(32, 35, 32, 0.18);
+      border-radius: 0;
+      background: linear-gradient(180deg, #f4f5f2 0%, #eef0ec 100%);
+      text-align: left;
+      // 出血：巨大宋体数字压到右边界被裁，是印刷出血而非溢出
+      overflow: hidden;
+    }
 
     &-title {
       font-size: 34rpx;
@@ -492,6 +514,219 @@
     }
   }
 
+  // ---------- 生成中「纸样台」 ----------
+  // 创意方向：裁缝纸样 / 版型车间 —— 反圆润、反居中、反均匀留白。
+  // 不使用居中卡片 + 渐变光斑那套（那是 AI 味的来源），改用印刷/工程制图的语法。
+  //
+  // 色彩：墨绿 #39492E（品牌）× 锈铜 #C4622D（针脚/别针）× 蓝墨 #2C3E6B（工程刻度）。
+  // 三种色相互相不和谐，但同属「纸样/车间」材质语言，撞而不脏；不用警示红（红线 1）。
+  // 字体：巨号宋体撞全局无衬线；拉丁数字用等宽 + 大字距，像工程图注记。
+  // 数字规律（全部取自产品自身）：
+  //   三套方案 → 3：出血水印数字、三条版型条、所有倾角恒为 3deg 的倍数（3/6/24）；
+  //   1–2 分钟 → 三行各约 40s，因此填充周期 2.4s = 3×0.8s，条与条错峰 0.8s；
+  //   8pt 体系 → 刻度周期 8rpx 与 24rpx（1:3），针脚 10rpx 实 / 24rpx 循环。
+  &__atelier {
+    position: relative;
+    // 负空间刻意失衡：上 64 / 下 0（紧），左内缩 72（给尺子），右侧 0（出血）
+    padding: 64rpx 0 0 72rpx;
+
+    // 竖向裁缝尺：两条不同周期的刻度叠加，1:3 韵律但不对称
+    &-gauge {
+      position: absolute;
+      left: 22rpx;
+      top: 56rpx;
+      bottom: 12rpx;
+      width: 30rpx;
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 12rpx;
+        background: repeating-linear-gradient(
+          180deg,
+          rgba(32, 35, 32, 0.5) 0 2rpx,
+          rgba(32, 35, 32, 0) 2rpx 24rpx
+        );
+      }
+
+      &::after {
+        content: '';
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 8rpx;
+        background: repeating-linear-gradient(
+          180deg,
+          rgba(44, 62, 107, 0.45) 0 1rpx,
+          rgba(44, 62, 107, 0) 1rpx 8rpx
+        );
+      }
+    }
+
+    // 尺上编号：等宽拉丁，位置刻意不均（16% / 52% / 86%）
+    &-no {
+      position: absolute;
+      left: 0;
+      font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+      font-size: 17rpx;
+      letter-spacing: 1rpx;
+      color: rgba(32, 35, 32, 0.42);
+      transform: rotate(-3deg);
+
+      &--1 {
+        top: 16%;
+      }
+
+      &--2 {
+        top: 52%;
+        color: rgba(196, 98, 45, 0.6);
+      }
+
+      &--3 {
+        top: 86%;
+      }
+    }
+
+    // 出血水印：宋体「3」，压出右边界被裁（.plans__scene-empty--atelier 的 overflow 负责裁切）
+    &-numeral {
+      position: absolute;
+      right: -46rpx;
+      top: -18rpx;
+      font-family: 'Songti SC', 'STSong', 'SimSun', serif;
+      font-size: 300rpx;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -14rpx;
+      color: rgba(57, 73, 46, 0.1);
+      transform: rotate(-6deg);
+    }
+
+    // 别针：锈铜细线 + 针头圆点，倾角 24deg（3×8），轻微摆动如走针
+    &-needle {
+      position: absolute;
+      right: 108rpx;
+      top: 40rpx;
+      width: 2rpx;
+      height: 104rpx;
+      background: #c4622d;
+      transform-origin: top center;
+      animation: plans-atelier-needle 0.8s ease-in-out infinite alternate;
+
+      &::after {
+        content: '';
+        position: absolute;
+        left: -5rpx;
+        top: -8rpx;
+        width: 12rpx;
+        height: 12rpx;
+        border-radius: 50%;
+        background: #c4622d;
+      }
+    }
+
+    &-slots {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 30rpx;
+    }
+
+    // 版型条：右端参差（100% / 72% / 63%），起始缩进也不同 → 负空间不对称。
+    // 方角（2rpx），不用品牌圆角
+    &-slot {
+      position: relative;
+      height: 58rpx;
+      border-radius: 2rpx;
+      background: var(--cream);
+      border: 1rpx solid rgba(32, 35, 32, 0.14);
+      overflow: hidden;
+
+      &--1 {
+        width: 100%;
+      }
+
+      &--2 {
+        width: 72%;
+
+        .plans__atelier-fill {
+          background: #c4622d;
+          animation-delay: 0.8s;
+        }
+      }
+
+      &--3 {
+        width: 45%;
+        margin-left: 18%;
+
+        .plans__atelier-fill {
+          background: #2c3e6b;
+          animation-delay: 1.6s;
+        }
+
+        .plans__atelier-stitch {
+          animation-delay: 0.16s;
+        }
+      }
+    }
+
+    // 填充：一条条被「裁出来」又回退重缝，周期 2.4s，三条错峰 0.8s
+    &-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+      transform-origin: left center;
+      transform: scaleX(0);
+      opacity: 0.92;
+      background: var(--moss-deep);
+      animation: plans-atelier-fill 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+    }
+
+    // 针脚：锈铜虚线向右走针，10rpx 实 / 24rpx 循环（transform 位移，GPU 合成）
+    &-stitch {
+      position: absolute;
+      left: 0;
+      right: -24rpx;
+      top: 14rpx;
+      height: 2rpx;
+      background: repeating-linear-gradient(
+        90deg,
+        rgba(196, 98, 45, 0.85) 0 10rpx,
+        rgba(196, 98, 45, 0) 10rpx 24rpx
+      );
+      animation: plans-atelier-stitch 0.8s linear infinite;
+    }
+
+    &-foot {
+      display: flex;
+      align-items: flex-start;
+      gap: 16rpx;
+      padding: 0 24rpx 0 72rpx;
+    }
+
+    // 引导竖线：倾角 3deg
+    &-rule {
+      flex: none;
+      width: 2rpx;
+      height: 78rpx;
+      background: var(--moss);
+      opacity: 0.45;
+      transform: rotate(3deg);
+    }
+
+    &-text {
+      flex: 1;
+      font-size: 26rpx;
+      line-height: 1.7;
+      color: var(--ink);
+    }
+  }
+
   // 选择面板卡（紧凑横排）：左侧三张 3:4 缩略图，右侧方案名 + chips。
   // 高度约为竖排的一半，空间让位给 hero
   &__chooser {
@@ -661,6 +896,56 @@
 
   to {
     opacity: 1;
+  }
+}
+
+// ---------- 纸样台动效 ----------
+// 走针：别针在 3deg 与 -21deg 之间摆（幅度是 3 的倍数）
+@keyframes plans-atelier-needle {
+  from {
+    transform: rotate(18deg);
+  }
+
+  to {
+    transform: rotate(30deg);
+  }
+}
+
+// 裁制：版型条被裁出来 → 停一拍 → 回退重缝（2.4s = 3×0.8s）
+@keyframes plans-atelier-fill {
+  0% {
+    transform: scaleX(0);
+  }
+
+  45% {
+    transform: scaleX(1);
+  }
+
+  72% {
+    transform: scaleX(1);
+  }
+
+  100% {
+    transform: scaleX(0);
+  }
+}
+
+// 针脚走线：位移一个完整循环（24rpx），无缝
+@keyframes plans-atelier-stitch {
+  from {
+    transform: translateX(-24rpx);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plans__atelier-needle,
+  .plans__atelier-fill,
+  .plans__atelier-stitch {
+    animation: none;
   }
 }
 

@@ -45,8 +45,14 @@ const SAFE_INSET = (() => {
   return Math.max(0, SYSTEM.screenHeight - area.bottom)
 })()
 const FULL_WIDTH = SYSTEM.windowWidth - 32
-const PAGE_BOTTOM_PX = 10 + SAFE_INSET
-const STAGE_BUDGET_BASE = Math.max(320, SYSTEM.windowHeight - NAV.navHeight - (204 + SAFE_INSET))
+// 实测收缩的允许下限：说明行底边到屏底只留 4rpx（2px）+ safe-area。
+// 原来留 20rpx（10px），一屏里底部空出一截、整屏看着偏上——这一项是
+// 「整体往下挪」真正生效的杠杆（在页面上加 padding-top 会被实测 1:1 扣回卡高）。
+const PAGE_BOTTOM_PX = 2 + SAFE_INSET
+// 208 = tab 行 40 + 进度行 20 + 行距 50 + 控制组 62 + 说明行 14
+// + 底垫 2 + 安全余量 6 + 舞台底缘出血 14（28rpx，纸堆下缘错落的余量，
+// 见 plans-deck.scss &__stage）。出血不计进去初值就会偏高、首帧再被实测收缩。
+const STAGE_BUDGET_BASE = Math.max(320, SYSTEM.windowHeight - NAV.navHeight - (208 + SAFE_INSET))
 const HINT_ROW_PX = 40
 /** 渲染未就绪时按 1.35 竖版预估，onLoad 后校正。 */
 const ESTIMATE_ASPECT = 1.35
@@ -324,6 +330,8 @@ export default function PlansDeck({
               卡居中由 wrapper 定宽定位（SwipeCard 自身的 transform 留给拖拽）。
               key 随 variant 重挂 → 手势状态复位 */}
           <View className="plans-deck__stage" style={{ height: `${stage.height}px` }}>
+            {/* 桌上的碎纸片：纯装饰（无照片、不可点），只负责让纸堆显得随手撂下 */}
+            <View className="plans-deck__scrap" />
             {under2 ? (
               <View
                 className="plans-deck__card plans-deck__card--under2"

@@ -745,11 +745,36 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
           </View>
         ) : acceptInFlight && acceptSceneRef.current === scene ? (
           // 生成中只归受理所属的场景：别的场景走空态/骨架，
-          // 在途受理由 foreignPlanSetOps 的横幅提示
-          <View className="plans__scene-empty">
-            <View className="plans__generating">
-              <View className="plans__generating-spin spinner" />
-              <Text className="plans__generating-text">{PLANNING_COPY.sceneGenerating}</Text>
+          // 在途受理由 foreignPlanSetOps 的横幅提示。
+          // 视觉 = 纸样台：竖裁缝尺 + 三条参差版型条 + 出血宋体「3」
+          // （构图/配色/数字规律见 index.scss .plans__atelier 注释）
+          <View className="plans__scene-empty plans__scene-empty--atelier">
+            <View className="plans__atelier">
+              <View className="plans__atelier-gauge">
+                <Text className="plans__atelier-no plans__atelier-no--1">01</Text>
+                <Text className="plans__atelier-no plans__atelier-no--2">02</Text>
+                <Text className="plans__atelier-no plans__atelier-no--3">03</Text>
+              </View>
+              <Text className="plans__atelier-numeral">3</Text>
+              <View className="plans__atelier-needle" />
+              <View className="plans__atelier-slots">
+                <View className="plans__atelier-slot plans__atelier-slot--1">
+                  <View className="plans__atelier-fill" />
+                  <View className="plans__atelier-stitch" />
+                </View>
+                <View className="plans__atelier-slot plans__atelier-slot--2">
+                  <View className="plans__atelier-fill" />
+                  <View className="plans__atelier-stitch" />
+                </View>
+                <View className="plans__atelier-slot plans__atelier-slot--3">
+                  <View className="plans__atelier-fill" />
+                  <View className="plans__atelier-stitch" />
+                </View>
+              </View>
+            </View>
+            <View className="plans__atelier-foot">
+              <View className="plans__atelier-rule" />
+              <Text className="plans__atelier-text">{PLANNING_COPY.sceneGenerating}</Text>
             </View>
           </View>
         ) : planSetId || switching ? (

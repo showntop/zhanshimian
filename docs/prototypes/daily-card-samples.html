@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>uplook · 每日一条：内容样本（5 条）</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#626862; --ink3:#686D67;
+  --moss:#587344; --moss-soft:#EDF1EA; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.12); --surface:#FFFFFF; --gutter:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Helvetica Neue',sans-serif;
+  background:#E7E9E5;color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased;
+  padding:32px 24px 64px;
+}
+.wrap{max-width:1180px;margin:0 auto}
+code{font-family:ui-monospace,Menlo,monospace;font-size:.92em;background:rgba(105,115,100,.12);
+  padding:1px 5px;border-radius:4px}
+
+.doc-head{margin-bottom:22px}
+.doc-head h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
+.doc-head p{margin-top:6px;font-size:13px;color:var(--ink2);max-width:860px;line-height:1.75}
+.doc-head .warn{margin-top:8px;font-size:12px;color:var(--ink3);line-height:1.7}
+.avatar{
+  margin-top:12px;padding:11px 14px;border-radius:10px;background:rgba(105,115,100,.09);
+  font-size:12px;color:var(--ink2);display:inline-block;
+}
+.avatar b{color:var(--ink);font-weight:700}
+
+/* ---------- 切换 ---------- */
+.switch{display:flex;gap:7px;margin:20px 0 18px;flex-wrap:wrap;align-items:center}
+.sw{
+  padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  color:var(--ink2);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:.16s;
+}
+.sw:hover{border-color:var(--moss)}
+.sw.on{background:var(--moss-deep);border-color:var(--moss-deep);color:var(--cream)}
+.switch .lab{font-size:11px;color:var(--ink3);margin-right:2px}
+
+.main{display:flex;gap:30px;align-items:flex-start}
+@media (max-width:1040px){.main{flex-direction:column;align-items:center}}
+@media (max-width:1040px){.phone{flex:0 0 auto;width:375px}}
+
+/* ---------- 手机卡 ---------- */
+.phone{
+  width:375px;flex:0 0 375px;background:var(--bg);border-radius:32px;overflow:hidden;
+  box-shadow:0 18px 48px rgba(45,58,35,.20),0 2px 6px rgba(45,58,35,.10);
+}
+.statusbar{height:44px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 22px;font-size:12px;font-weight:600}
+.statusbar .sig{display:flex;gap:4px;align-items:center}
+.statusbar .sig i{width:4px;height:8px;background:var(--ink);border-radius:1px;display:block}
+.statusbar .sig i:nth-child(4){height:6px;opacity:.4}
+.topbar{display:flex;align-items:baseline;justify-content:space-between;padding:0 var(--gutter) 10px}
+.brand{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.brand .up{color:var(--ink)} .brand .look{color:var(--moss)}
+.topdate{font-size:12px;color:var(--ink3);font-weight:600}
+
+/* 视觉区 */
+.visual{height:250px;margin:0 var(--gutter);border-radius:14px;overflow:hidden;position:relative;
+  background:var(--moss-soft)}
+.visual svg{width:100%;height:100%;display:block}
+.vkicker{
+  position:absolute;top:12px;left:12px;padding:5px 10px;border-radius:999px;
+  background:rgba(30,35,29,.40);backdrop-filter:blur(10px);color:var(--cream);
+  font-size:10.5px;font-weight:700;letter-spacing:.3px;
+}
+
+/* 文字 */
+.body{padding:20px var(--gutter) 22px}
+.kicker{font-size:11px;font-weight:700;color:var(--moss);letter-spacing:.4px}
+.h1{margin-top:11px;font-size:24px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+.lead{margin-top:10px;font-size:13.5px;line-height:1.65;color:var(--ink2)}
+.fit{
+  margin-top:16px;padding:14px 15px;border-radius:11px;background:var(--moss-soft);
+  font-size:13.5px;line-height:1.7;color:#2E3B25;
+}
+.fit b{font-weight:700;color:var(--moss-deep)}
+.why{margin-top:11px;font-size:12px;line-height:1.65;color:var(--ink3)}
+.today{
+  margin-top:13px;padding:11px 13px;border-radius:10px;border:1px solid var(--line);
+  font-size:12.5px;line-height:1.65;color:var(--ink2);
+}
+.today em{font-style:normal;font-weight:700;color:var(--ink)}
+.cta{
+  display:block;width:100%;margin-top:20px;padding:15px;border-radius:999px;
+  background:var(--moss);color:#fff;font-size:14px;font-weight:700;border:0;
+  font-family:inherit;cursor:pointer;
+}
+.cta:active{transform:scale(.978)}
+.libline{margin-top:11px;text-align:center;font-size:11px;color:var(--ink3)}
+.libline b{color:var(--moss);font-weight:700}
+
+/* ---------- 右侧：输入构成 ---------- */
+.note{flex:1;min-width:300px;max-width:520px}
+.note h2{font-size:17px;font-weight:700}
+.note .sub{font-size:12px;color:var(--moss);font-weight:600;margin:4px 0 14px}
+.blk{border-top:1px solid var(--line);padding:13px 0}
+.blk:first-of-type{border-top:0}
+.blk h3{font-size:12px;font-weight:700;color:var(--ink3);letter-spacing:.4px}
+.blk ul{list-style:none;margin-top:7px}
+.blk li{font-size:12.5px;line-height:1.8;color:var(--ink2);padding-left:15px;position:relative}
+.blk li:before{content:'';position:absolute;left:0;top:9px;width:5px;height:5px;border-radius:999px;
+  background:var(--moss)}
+.blk li b{color:var(--ink);font-weight:700}
+.score{margin-top:16px;padding:13px 15px;border-radius:11px;background:#fff;border:1px solid var(--line)}
+.score h3{font-size:12px;font-weight:700;margin-bottom:9px}
+.score table{width:100%;border-collapse:collapse;font-size:11.5px}
+.score td{padding:5px 0;color:var(--ink2)}
+.score td:first-child{width:88px;color:var(--ink3)}
+.score .y{color:var(--moss);font-weight:700}
+.score .n{color:#9B4B45;font-weight:700}
+.warnline{margin-top:16px;padding:11px 13px;border-radius:10px;background:rgba(126,84,69,.08);
+  font-size:12px;line-height:1.7;color:#6A4B3E}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="doc-head">
+    <h1>每日一条 · 内容样本（5 条）</h1>
+    <p>句式：<strong>杂志选题（通用）→ 你的形象基因 + 适配边界 → 原理 → 今天的世界 → 收进资产库</strong>。
+      核心约束：内容不依赖「你今天穿什么」，所以不臆想；个性化只落在「适配说明」那一句。</p>
+    <div class="avatar">
+      虚拟用户画像：<b>女 / 28 / 职场 / 冷肤色 / 肩偏窄骨架小 / 脸偏圆颈不长 / 158cm</b> —— 只为让内容具体，非真实数据
+    </div>
+    <p class="warn">点上方 1–5 切换。右侧列出每条<strong>用了哪些输入</strong>，以及它对「不臆想」这条约束的达标情况。</p>
+  </div>
+
+  <div class="switch" id="switch"><span class="lab">样本</span></div>
+
+  <div class="main">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+      <div class="topbar">
+        <div class="brand"><span class="up">up</span><span class="look">look</span></div>
+        <div class="topdate" id="topdate"></div>
+      </div>
+      <div class="visual" id="visual"></div>
+      <div class="body">
+        <div class="kicker" id="kicker"></div>
+        <h1 class="h1" id="h1"></h1>
+        <p class="lead" id="lead"></p>
+        <div class="fit" id="fit"></div>
+        <div class="why" id="why"></div>
+        <div class="today" id="today"></div>
+        <button class="cta" id="cta"></button>
+        <div class="libline" id="libline"></div>
+      </div>
+    </div>
+
+    <div class="note">
+      <h2>这条用了什么</h2>
+      <div class="sub" id="note-sub"></div>
+      <div class="blk">
+        <h3>输入构成</h3>
+        <ul id="inputs"></ul>
+      </div>
+      <div class="blk">
+        <h3>资产动作</h3>
+        <ul id="asset"></ul>
+      </div>
+      <div class="score">
+        <h3>对「不臆想」的达标检查</h3>
+        <table id="check"></table>
+      </div>
+      <div class="warnline">
+        <b>原理需要顾问确认。</b>这 5 条的原理取自通行的形象知识，我能保证句式与结构，但具体表述、边界和「是否
+        真的适用于这类人」必须由形象顾问逐条确认。专业内核不是我能编的部分。
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ---------------- 5 条内容样本 ---------------- */
+const CARDS = [
+  {
+    k:'版型', date:'11月8日 周五 · 18° 多云', vk:'11月 · 版型',
+    title:'落肩在退潮，肩线回来了',
+    lead:'这两季的风衣和西装都在收肩。对你来说，这是个好消息。',
+    fit:'你<b>肩偏窄、骨架偏小</b>，落肩会把本来就不宽的肩再吃掉一层。选<b>肩缝正好落在肩点</b>的——上半身的框架立刻就有了。',
+    why:'原理：上装的肩线决定上半身的轮廓框架，不是袖子的宽窄。',
+    today:'18° 还不需要夹棉，<em>薄毛呢或厚针织</em>就够。夹棉会自己撑出轮廓，反而压过你的骨架。',
+    cta:'收进我的版型库', lib:'版型库 · 已有 7 条', libN:7,
+    visual:'shoulder',
+    inputs:[
+      '<b>形象基因</b>：肩偏窄 / 骨架偏小（稳定层，不随时效变）',
+      '<b>天气</b>：18° 多云 → 决定面料厚度那段',
+      '<b>历史</b>：版型库已收 7 条，未收过「结构肩」→ 不重复',
+      '<b>趋势</b>：秋冬结构肩回归（内容源，通用）'
+    ],
+    asset:['归入<b>我的版型库</b>（结构化资产，可按肩线/腰线/廓形翻）',
+           '后续买外套时，库里这条就是对照标准'],
+    check:[['依赖今天穿什么','n','否'],
+           ['依赖稳定特征','y','是（肩宽/骨架）'],
+           ['有认知增量','y','肩线决定框架，不是袖子'],
+           ['有可执行边界','y','肩缝落在肩点'],
+           ['跟天气有关','y','面料厚度那句']]
+  },
+  {
+    k:'色彩', date:'11月8日 周五 · 18° 多云', vk:'11月 · 色彩',
+    title:'冬天的白，不止一种',
+    lead:'本白、米白、奶油白——挂在架子上差不多，上身差很多。',
+    fit:'你是<b>冷肤色</b>。本白和冷白贴着皮肤，气色往上走；米白和奶油白里的黄调，会把冷皮衬得发闷。',
+    why:'原理：白色也有色温。挑白和挑蓝一样，先看冷暖再看明度。',
+    today:'冬天面料厚、面积大，正好是白色能大面积用的时候——<em>夏天大面积浅色容易膨胀，冬天不会</em>。',
+    cta:'收进我的色卡', lib:'色卡 · 已有 12 色', libN:12,
+    visual:'white',
+    inputs:[
+      '<b>形象基因</b>：冷肤色（稳定层）',
+      '<b>季节</b>：冬季 → 决定「可以大面积用白」这段',
+      '<b>历史</b>：色卡已有 12 色，未收过白色系 → 不重复',
+      '<b>趋势</b>：冬季白色单品（内容源，通用）'
+    ],
+    asset:['归入<b>我的色卡</b>（一排色块，最直观的资产）',
+           '买衣服时可直接对照，是本手册里使用率最高的一页'],
+    check:[['依赖今天穿什么','n','否'],
+           ['依赖稳定特征','y','是（肤色冷暖）'],
+           ['有认知增量','y','白色也有色温'],
+           ['有可执行边界','y','本白/冷白，避开米白'],
+           ['跟天气有关','y','冬季可大面积']]
+  },
+  {
+    k:'领口', date:'11月9日 周六 · 15° 阴', vk:'11月 · 领口',
+    title:'高领季，圆脸怎么挑领口',
+    lead:'一入冬满屏都是高领。但不是每个高领都适合你。',
+    fit:'你<b>脸型偏圆、颈不算长</b>。全包的高领会从下巴直接连到衣服，脖子就没了。换成<b>小 V 领</b>，或者只到下巴下两指的<b>半高领</b>。',
+    why:'原理：领口不只是一个开口，它决定了别人看到的颈长。',
+    today:'15° 用不上全高领，<em>半高领</em>足够暖，还留出颈部的那一段。',
+    cta:'收进我的版型库', lib:'版型库 · 已有 8 条', libN:8,
+    visual:'neck',
+    inputs:[
+      '<b>形象基因</b>：脸型偏圆 / 颈长偏短（稳定层）',
+      '<b>天气</b>：15° 阴 → 决定「半高领够用」',
+      '<b>历史</b>：版型库已有肩线 1 条，领口是新的类别 → 递进',
+      '<b>趋势</b>：冬季高领回潮（内容源，通用）'
+    ],
+    asset:['归入<b>我的版型库</b>，按部位分类（肩线 / 领口 / 腰线）',
+           '与上一条「肩线」同库，形成上半身的完整规则'],
+    check:[['依赖今天穿什么','n','否'],
+           ['依赖稳定特征','y','是（脸型/颈长）'],
+           ['有认知增量','y','领口决定可见颈长'],
+           ['有可执行边界','y','小 V 领或半高领'],
+           ['跟天气有关','y','15° 不需要全高领']]
+  },
+  {
+    k:'比例', date:'11月10日 周日 · 20° 晴', vk:'11月 · 比例',
+    title:'冬天最容易显矮的，是上下截断',
+    lead:'深色上衣 + 浅色裤子 + 黑鞋——视觉上被切成三段。',
+    fit:'你<b>身高 158</b>。让下装和鞋同色，腿在视觉上就不断。冬天穿靴子最容易做到：<b>靴子和裤子一个色</b>就行。',
+    why:'原理：同色延伸不断线，真正截断比例的是强对比，不是身高本身。',
+    today:'20° 踝靴够用，<em>正好配一条同色长裤</em>，不用上长靴。',
+    cta:'收进我的配色库', lib:'配色库 · 已有 5 条', libN:5,
+    visual:'tone',
+    inputs:[
+      '<b>用户资料</b>：身高 158（自填，非体型评价）',
+      '<b>天气</b>：20° 晴 → 决定「踝靴够用」',
+      '<b>历史</b>：配色库已有 5 条，未收过同色延伸 → 不重复',
+      '<b>趋势</b>：冬季靴款（内容源，通用）'
+    ],
+    asset:['归入<b>我的配色库</b>（与色卡不同：色卡是单个颜色，配色库是组合规则）',
+           '规则类资产越攒越有用，能覆盖大部分日常搭配决策'],
+    check:[['依赖今天穿什么','n','否'],
+           ['依赖稳定特征','y','是（身高，自填资料）'],
+           ['有认知增量','y','截断来自对比，不是身高'],
+           ['有可执行边界','y','下装与鞋同色'],
+           ['跟天气有关','y','20° 踝靴']]
+  },
+  {
+    k:'面料', date:'11月11日 周一 · 12° 风', vk:'11月 · 面料',
+    title:'冬天的厚，不等于硬',
+    lead:'同样是厚，垂下去的和撑起来的，穿在小骨架上是两回事。',
+    fit:'你<b>骨架偏小</b>。硬挺的厚面料会自己撑出一个形状，把你套在里面；<b>垂感好的</b>——细针织、薄羊毛——是顺着你走。',
+    why:'原理：面料的「量感」要匹配骨架的量感。不是越厚越暖，也不是越挺越有型。',
+    today:'12° 有风，<em>中等厚度 + 垂感</em>比一件硬壳外套更暖，也不会把你压住。',
+    cta:'收进我的面料库', lib:'面料库 · 已有 3 条', libN:3,
+    visual:'fabric',
+    inputs:[
+      '<b>形象基因</b>：骨架偏小（稳定层）',
+      '<b>天气</b>：12° 有风 → 决定厚度与防风那段',
+      '<b>历史</b>：面料库仅 3 条，属于最薄的库 → 优先补',
+      '<b>趋势</b>：秋冬面料（内容源，通用）'
+    ],
+    asset:['归入<b>我的面料库</b>（最薄的一库，优先补充）',
+           '面料是冬天最先被忽略、但最影响轮廓的一层'],
+    check:[['依赖今天穿什么','n','否'],
+           ['依赖稳定特征','y','是（骨架量感）'],
+           ['有认知增量','y','量感要匹配，不是越厚越好'],
+           ['有可执行边界','y','垂感 > 硬挺'],
+           ['跟天气有关','y','12° 有风']]
+  },
+]
+
+/* ---------------- 视觉（CSS/SVG 模拟，非真实素材） ---------------- */
+const VIS = {
+  shoulder:`<svg viewBox="0 0 343 250">
+    <rect width="343" height="250" fill="#E3E7DE"/>
+    <g opacity=".92">
+      <path d="M96 60 L128 52 L150 96 L150 214 L42 214 L42 96 Z" fill="#B9BEB4"/>
+      <path d="M96 60 L128 52 L150 96" fill="none" stroke="#8A8F83" stroke-width="2"/>
+      <circle cx="112" cy="56" r="4" fill="#8A8F83"/>
+      <text x="86" y="236" font-size="11" fill="#686D67" font-family="sans-serif">落肩</text>
+    </g>
+    <g>
+      <path d="M210 58 L246 58 L262 92 L262 214 L194 214 L194 92 Z" fill="#8E9A83"/>
+      <circle cx="212" cy="60" r="4.5" fill="#39492E"/>
+      <circle cx="244" cy="60" r="4.5" fill="#39492E"/>
+      <text x="206" y="236" font-size="11" fill="#39492E" font-family="sans-serif" font-weight="700">肩缝落在肩点</text>
+    </g>
+  </svg>`,
+  white:`<svg viewBox="0 0 343 250">
+    <rect width="343" height="250" fill="#E3E7DE"/>
+    <rect x="34" y="46" width="128" height="158" rx="8" fill="#FBFBF8"/>
+    <rect x="180" y="46" width="128" height="158" rx="8" fill="#EFEADC"/>
+    <circle cx="98" cy="132" r="30" fill="#EDE9DF"/>
+    <circle cx="244" cy="132" r="30" fill="#EDE9DF"/>
+    <text x="34" y="34" font-size="12" fill="#39492E" font-family="sans-serif" font-weight="700">本白 / 冷白</text>
+    <text x="180" y="34" font-size="12" fill="#686D67" font-family="sans-serif">米白 / 奶油白</text>
+    <text x="98" y="132" font-size="11" fill="#39492E" text-anchor="middle" font-family="sans-serif" font-weight="700">✓</text>
+    <text x="244" y="132" font-size="11" fill="#9B4B45" text-anchor="middle" font-family="sans-serif">×</text>
+  </svg>`,
+  neck:`<svg viewBox="0 0 343 250">
+    <rect width="343" height="250" fill="#E3E7DE"/>
+    <g>
+      <ellipse cx="66" cy="70" rx="26" ry="32" fill="#C6C4B9"/>
+      <path d="M42 96 L90 96 L90 150 L42 150 Z" fill="#A9ADA2"/>
+      <path d="M50 150 C58 140 74 140 82 150 L82 200 L50 200 Z" fill="#8E9287"/>
+      <text x="40" y="224" font-size="11" fill="#686D67" text-anchor="middle" font-family="sans-serif">全高领</text>
+    </g>
+    <g>
+      <ellipse cx="172" cy="70" rx="26" ry="32" fill="#C6C4B9"/>
+      <path d="M148 96 L196 96 L196 150 L148 150 Z" fill="#A9ADA2"/>
+      <path d="M156 150 C164 142 180 142 188 150 L188 200 L156 200 Z" fill="#8E9287"/>
+      <path d="M156 150 C164 142 180 142 188 150" fill="none" stroke="#39492E" stroke-width="3"/>
+      <text x="172" y="224" font-size="11" fill="#39492E" text-anchor="middle" font-family="sans-serif" font-weight="700">半高领</text>
+    </g>
+    <g>
+      <ellipse cx="278" cy="70" rx="26" ry="32" fill="#C6C4B9"/>
+      <path d="M254 96 L302 96 L302 150 L254 150 Z" fill="#A9ADA2"/>
+      <path d="M262 150 L262 200 L294 200 L294 150 L278 176 Z" fill="#8E9287"/>
+      <text x="278" y="224" font-size="11" fill="#39492E" text-anchor="middle" font-family="sans-serif" font-weight="700">小 V 领</text>
+    </g>
+  </svg>`,
+  tone:`<svg viewBox="0 0 343 250">
+    <rect width="343" height="250" fill="#E3E7DE"/>
+    <g>
+      <rect x="46" y="34" width="70" height="90" rx="6" fill="#3F463C"/>
+      <rect x="46" y="130" width="70" height="66" rx="6" fill="#DCD8CD"/>
+      <rect x="46" y="202" width="70" height="26" rx="6" fill="#2E332C"/>
+      <text x="81" y="244" font-size="11" fill="#686D67" text-anchor="middle" font-family="sans-serif">截成三段</text>
+    </g>
+    <g>
+      <rect x="196" y="34" width="70" height="90" rx="6" fill="#3F463C"/>
+      <rect x="196" y="130" width="70" height="66" rx="6" fill="#4A5247"/>
+      <rect x="196" y="202" width="70" height="26" rx="6" fill="#4A5247"/>
+      <text x="231" y="244" font-size="11" fill="#39492E" text-anchor="middle" font-family="sans-serif" font-weight="700">下装与鞋同色</text>
+    </g>
+  </svg>`,
+  fabric:`<svg viewBox="0 0 343 250">
+    <rect width="343" height="250" fill="#E3E7DE"/>
+    <g>
+      <path d="M52 40 L136 40 L140 200 C120 214 68 214 48 200 Z" fill="#A9ADA2"/>
+      <path d="M52 40 L136 40 L137 96 C110 104 78 104 51 96 Z" fill="#8E9287" opacity=".5"/>
+      <text x="94" y="228" font-size="11" fill="#686D67" text-anchor="middle" font-family="sans-serif">硬挺：自己撑出形状</text>
+    </g>
+    <g>
+      <path d="M212 40 L296 40 L296 120 C286 176 276 206 254 214 C232 206 222 176 212 120 Z" fill="#8E9A83"/>
+      <path d="M228 40 L236 40 C244 120 250 176 254 212 C246 178 236 120 228 40 Z" fill="#39492E" opacity=".18"/>
+      <text x="254" y="228" font-size="11" fill="#39492E" text-anchor="middle" font-family="sans-serif" font-weight="700">垂感：顺着你走</text>
+    </g>
+  </svg>`,
+}
+
+/* ---------------- 渲染 ---------------- */
+const $ = (id) => document.getElementById(id)
+let cur = 0
+
+$('switch').innerHTML = '<span class="lab">样本</span>' + CARDS.map((c, i) =>
+  `<button class="sw${i === 0 ? ' on' : ''}" data-i="${i}">${i + 1} · ${c.k}</button>`).join('')
+
+function render() {
+  const c = CARDS[cur]
+  $('topdate').textContent = c.date
+  // 角标随视觉一起重建：单独持有 id 的话，切换时会被 innerHTML 覆盖掉，第二次渲染就取不到
+  $('visual').innerHTML = VIS[c.visual] + `<span class="vkicker">${c.vk}</span>`
+  $('kicker').textContent = c.k
+  $('h1').textContent = c.title
+  $('lead').textContent = c.lead
+  $('fit').innerHTML = c.fit
+  $('why').textContent = c.why
+  $('today').innerHTML = c.today
+  $('cta').textContent = c.cta
+  $('libline').innerHTML = `${c.lib}　·　收下后 <b>+1</b>`
+
+  $('note-sub').textContent = `第 ${cur + 1} 条 · ${c.k}`
+  $('inputs').innerHTML = c.inputs.map((t) => `<li>${t}</li>`).join('')
+  $('asset').innerHTML = c.asset.map((t) => `<li>${t}</li>`).join('')
+  $('check').innerHTML = c.check.map((r) =>
+    `<tr><td>${r[0]}</td><td class="${r[1]}">${r[2]}</td></tr>`).join('')
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-i]')
+  if (!btn) return
+  cur = Number(btn.dataset.i)
+  document.querySelectorAll('.sw').forEach((b) => b.classList.toggle('on', b === btn))
+  render()
+})
+
+render()
+</script>
+</body>
+</html>
