@@ -356,8 +356,8 @@
     height: auto;
     overflow: visible;
     gap: 0;
-    // 给固定 CTA 栏留位
-    padding-bottom: 300rpx;
+    // 给固定 CTA 栏留位（栏高含安全区，垫必须同含 env，否则滚到底差一截）
+    padding-bottom: calc(env(safe-area-inset-bottom) + 320rpx);
 
     .pk__hero {
       // 钉住不滚：卡片（z3）从它上面滚过；文档流占位由页面同高 spacer 补上。

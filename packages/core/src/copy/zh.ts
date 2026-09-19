@@ -549,6 +549,9 @@ export const PURCHASE_COPY = {
   mastheadMeta: '工具 · 检验',
   adviceLabel: '检验结论',
   tipsLabel: '送检须知',
+  // 选完商品图后须知区不撤：换成「怎么读这张单」，票据行常驻填实版心
+  readingTipsLabel: '读单须知',
+  readingTips: ['结论盖章，落在照片右上', '要注意的点，列在单据上', '判断可保存，回头再对'],
   stampText: '已检验',
   serialLabel: '单号',
   dateLabel: '日期',

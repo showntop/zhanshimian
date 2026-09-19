@@ -480,18 +480,20 @@ export default function Purchase() {
           </>
         ) : (
           <>
-            {!shownMedia && !photoPath ? (
-              <View className={`pk__notice ${enter(1)}`}>
-                <Text className="pk__notice-label">{PURCHASE_COPY.tipsLabel}</Text>
-                {PURCHASE_COPY.uploadTips.map((tip, index) => (
-                  <View key={tip} className="pk__notice-row">
-                    <Text className="pk__notice-text">{tip}</Text>
-                    <View className="pk__notice-dots" />
-                    <Text className="pk__notice-no">{String(index + 1).padStart(2, '0')}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
+            {/* 须知/读单：票据行常驻（与穿搭页同构）——无图教送检，
+                有图教读单；版心不因选完照片而空一段 */}
+            <View className={`pk__notice ${enter(1)}`}>
+              <Text className="pk__notice-label">
+                {shownMedia || photoPath ? PURCHASE_COPY.readingTipsLabel : PURCHASE_COPY.tipsLabel}
+              </Text>
+              {(shownMedia || photoPath ? PURCHASE_COPY.readingTips : PURCHASE_COPY.uploadTips).map((tip, index) => (
+                <View key={tip} className="pk__notice-row">
+                  <Text className="pk__notice-text">{tip}</Text>
+                  <View className="pk__notice-dots" />
+                  <Text className="pk__notice-no">{String(index + 1).padStart(2, '0')}</Text>
+                </View>
+              ))}
+            </View>
             {rejectedMsg ? (
               <View className={`pk__rejected ${enter(1)}`}>
                 <Text className="pk__rejected-text">{rejectedMsg}</Text>

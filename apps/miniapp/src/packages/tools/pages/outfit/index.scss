@@ -430,9 +430,11 @@
     display: flex;
     flex-direction: column;
     gap: 40rpx;
-    // 上叠钉住的照片：负边距顶进照片停靠带（与旧 sheet 同一机械）
+    // 上叠钉住的照片：负边距顶进照片停靠带（与旧 sheet 同一机械）。
+    // 底垫 = 固定 CTA 栏全高（按钮 96 + 说明行 + 上下距 + 安全区）+ 余量，
+    // 否则滚到底时最后一段（边注）被 CTA 渐变盖住
     margin: -88rpx calc(-1 * var(--page-gutter)) 0;
-    padding: 40rpx var(--page-gutter) 8rpx;
+    padding: 40rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 280rpx);
     background: var(--bg);
     box-shadow: var(--shadow-sheet);
   }
