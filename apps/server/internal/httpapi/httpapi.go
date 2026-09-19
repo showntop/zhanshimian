@@ -33,6 +33,7 @@ func New(deps Dependencies, logger *slog.Logger, devLoginEnabled bool, runtime R
 		deleteObject: deps.DeleteObject,
 		assessment:   deps.Assessment,
 		planning:     deps.Planning,
+		decisions:    deps.Decisions,
 		renders:      deps.Renders,
 		execution:    deps.Execution,
 		feedback:     deps.Feedback,
@@ -86,6 +87,8 @@ func New(deps Dependencies, logger *slog.Logger, devLoginEnabled bool, runtime R
 	mux.Handle("GET /v1/plan-sets", api.auth(http.HandlerFunc(api.listPlanSets)))
 	mux.Handle("GET /v1/plan-sets/{id}", api.auth(http.HandlerFunc(api.getPlanSet)))
 	mux.Handle("POST /v1/plan-variants/{id}/render-runs", api.auth(api.requireIdempotency(http.HandlerFunc(api.createRenderRun))))
+	mux.Handle("PUT /v1/plan-variants/{id}/decision", api.auth(api.requireIdempotency(http.HandlerFunc(api.putPlanVariantDecision))))
+	mux.Handle("DELETE /v1/plan-variants/{id}/decision", api.auth(http.HandlerFunc(api.deletePlanVariantDecision)))
 	mux.Handle("GET /v1/render-runs/{id}", api.auth(http.HandlerFunc(api.getRenderRun)))
 	mux.Handle("PUT /v1/plan-sets/{id}/selection", api.auth(api.requireIdempotency(http.HandlerFunc(api.putSelection))))
 	mux.Handle("POST /v1/selections/{id}/executions", api.auth(api.requireIdempotency(http.HandlerFunc(api.createExecution))))

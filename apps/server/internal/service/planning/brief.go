@@ -132,22 +132,25 @@ func BriefHash(brief domain.SceneBrief) string {
 }
 
 // planningInputFingerprint is the deterministic structure PlanningInputHash
-// serializes. Memory items are sorted by ID so the digest is order independent.
+// serializes. Memory items are sorted by ID and decision items by variant ID,
+// so the digest is order independent.
 type planningInputFingerprint struct {
-	ReportID             string                      `json:"report_id"`
-	ProfileSnapshot      json.RawMessage             `json:"profile_snapshot"`
-	BriefHash            string                      `json:"brief_hash"`
-	Memories             []domain.FeedbackMemoryItem `json:"memories"`
-	PlannerSchemaVersion string                      `json:"planner_schema_version"`
-	StyleRuleVersion     string                      `json:"style_rule_version"`
+	ReportID             string                       `json:"report_id"`
+	ProfileSnapshot      json.RawMessage              `json:"profile_snapshot"`
+	BriefHash            string                       `json:"brief_hash"`
+	Memories             []domain.FeedbackMemoryItem  `json:"memories"`
+	Decisions            []domain.VariantDecisionItem `json:"decisions"`
+	PlannerSchemaVersion string                       `json:"planner_schema_version"`
+	StyleRuleVersion     string                       `json:"style_rule_version"`
 }
 
 // PlanningInputHash folds the report identity, profile snapshot, brief hash,
-// recent preference memories and both schema versions into one digest. Unlike
-// BriefHash (which only canonicalizes the SceneBrief), a new preference memory
-// changes this hash, so the same report/scene/answers yields a new PlanSet
-// identity instead of reusing stale published content.
-func PlanningInputHash(reportID string, profileSnapshot json.RawMessage, briefHash string, memories []domain.PreferenceMemory) string {
+// recent preference memories, recent variant decisions and both schema
+// versions into one digest. Unlike BriefHash (which only canonicalizes the
+// SceneBrief), a new preference memory or a new like/skip decision changes
+// this hash, so the same report/scene/answers yields a new PlanSet identity
+// instead of reusing stale published content.
+func PlanningInputHash(reportID string, profileSnapshot json.RawMessage, briefHash string, memories []domain.PreferenceMemory, decisions []domain.VariantDecisionItem) string {
 	items := make([]domain.FeedbackMemoryItem, 0, len(memories))
 	for _, memory := range memories {
 		items = append(items, domain.FeedbackMemoryItem{
@@ -155,9 +158,12 @@ func PlanningInputHash(reportID string, profileSnapshot json.RawMessage, briefHa
 		})
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
+	ordered := make([]domain.VariantDecisionItem, len(decisions))
+	copy(ordered, decisions)
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].VariantID < ordered[j].VariantID })
 	raw, err := json.Marshal(planningInputFingerprint{
 		ReportID: reportID, ProfileSnapshot: profileSnapshot, BriefHash: briefHash,
-		Memories: items, PlannerSchemaVersion: PlannerSchemaVersion, StyleRuleVersion: StyleRuleVersion,
+		Memories: items, Decisions: ordered, PlannerSchemaVersion: PlannerSchemaVersion, StyleRuleVersion: StyleRuleVersion,
 	})
 	if err != nil {
 		// The fingerprint shape is plain strings and raw JSON; marshal cannot fail.

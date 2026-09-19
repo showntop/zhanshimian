@@ -101,7 +101,8 @@ func TestHandlerCommitStopsRenderStartsOnRateLimit(t *testing.T) {
 	}
 }
 
-func TestHandlerEnqueuesSecondContentAttemptAfterQualityReject(t *testing.T) {	deps := validHandlerDependencies()
+func TestHandlerEnqueuesSecondContentAttemptAfterQualityReject(t *testing.T) {
+	deps := validHandlerDependencies()
 	deps.generator.output = invalidDifferenceCandidate()
 	handler := NewHandlerForTest(deps)
 	result, err := handler.Execute(context.Background(), validGenerateLease(1))
@@ -316,9 +317,12 @@ func TestHandlerVerifierTransportErrorKeepsContentBudget(t *testing.T) {
 type fakeGenerator struct {
 	output GeneratedPlanSet
 	err    error
+	// inputs 记录每次收到的生成输入,供 decision_memory 注入断言读取。
+	inputs []GenerationInput
 }
 
-func (f *fakeGenerator) Generate(context.Context, GenerationInput) (GeneratedPlanSet, error) {
+func (f *fakeGenerator) Generate(_ context.Context, input GenerationInput) (GeneratedPlanSet, error) {
+	f.inputs = append(f.inputs, input)
 	return f.output, f.err
 }
 
@@ -367,6 +371,7 @@ type handlerDepsBundle struct {
 	operations *fakeOpWriter
 	enqueuer   *fakeEnqueuer
 	renders    *fakeRenderStarter
+	decisions  *fakeDecisionStore
 }
 
 func (b handlerDepsBundle) toDeps() HandlerDeps {
@@ -383,6 +388,9 @@ func (b handlerDepsBundle) toDeps() HandlerDeps {
 	// 接口塞 typed nil 会绕过 startRenders 的 nil 守卫，未装配就是真 nil
 	if b.renders != nil {
 		deps.Renders = b.renders
+	}
+	if b.decisions != nil {
+		deps.Decisions = b.decisions
 	}
 	return deps
 }

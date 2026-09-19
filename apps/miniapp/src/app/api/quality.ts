@@ -17,6 +17,8 @@ import type {
   Operation,
   PlanSet,
   PlanSetAccepted,
+  PlanVariantDecision,
+  PutPlanVariantDecisionRequest,
   PutSelectionRequest,
   RenderRunAccepted,
   Report,
@@ -124,6 +126,24 @@ export const qualityApi = {
         body,
       })
       .then(dataOrThrow),
+
+  /** 卡堆决策：PUT 语义——首次写入与改主意都是 200；重试换新幂等键。 */
+  putVariantDecision: (
+    planVariantId: string,
+    decision: PutPlanVariantDecisionRequest['decision'],
+    idempotencyKey: string,
+  ): Promise<PlanVariantDecision> =>
+    client
+      .PUT('/v1/plan-variants/{id}/decision', {
+        params: { path: { id: planVariantId }, header: { 'Idempotency-Key': idempotencyKey } },
+        body: { decision },
+      })
+      .then(dataOrThrow),
+
+  /** 撤销决策：服务端幂等删除，行不存在也回 204。 */
+  deleteVariantDecision: async (planVariantId: string): Promise<void> => {
+    noContentOrThrow(await client.DELETE('/v1/plan-variants/{id}/decision', { params: { path: { id: planVariantId } } }))
+  },
 
   createExecution: (selectionId: string, idempotencyKey: string): Promise<Execution> =>
     client

@@ -1,5 +1,16 @@
 // 方案集三屏（方案 tab / 方案详情 / 场合 Brief）。
 // 页面外壳（.page 内边距、AppHeader）归 pages/*，这里只管内容。
+// 决策台页的硬锁：页面高度恒等于视口（tab 页 webview 本就不含 tabBar），
+// overflow 吞掉一切纸面预算误差——页面物理上不可滚动。这是根本保证，
+// 预算/实测收缩只负责排版好看（不让说明行被裁）。底部呼吸用 .safe-bottom
+// 规范（inset + 20rpx），不用 .page--tab 默认的 48rpx 大垫。
+.page--deck {
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 20rpx);
+}
+
 // ---------- 方案 tab ----------
 // planning 整屏等待（受理后到方案发布前）的外壳；内容在 .plan-progress
 .planning-screen {
@@ -169,8 +180,8 @@
   display: flex;
   flex-direction: column;
   gap: 20rpx;
-  // 悬浮选择坞（收益词 + 三选一 + CTA + 重新设计链接 + 安全区）让位
-  padding-bottom: 500rpx;
+  // 卡堆决策台没有悬浮坞了：控制组/说明都是文档流，只留呼吸底垫
+  padding-bottom: 24rpx;
 
   &__tabs {
     display: flex;

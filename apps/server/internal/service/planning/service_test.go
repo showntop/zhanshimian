@@ -115,7 +115,7 @@ func TestCreatePlanSetFoldsPreferenceMemoriesIntoPlanningInputHash(t *testing.T)
 		t.Fatalf("memories read = %d calls limit=%d, want 1/%d", memories.calls, memories.limit, planningMemoryLimit)
 	}
 	payload := starter.command.Task.Payload.(GenerateTaskPayload)
-	want := PlanningInputHash(report.ID, report.ProfileSnapshot, payload.BriefHash, memories.memories)
+	want := PlanningInputHash(report.ID, report.ProfileSnapshot, payload.BriefHash, memories.memories, nil)
 	if payload.PlanningInputHash == "" || payload.PlanningInputHash != want {
 		t.Fatalf("planning_input_hash = %q, want %q", payload.PlanningInputHash, want)
 	}

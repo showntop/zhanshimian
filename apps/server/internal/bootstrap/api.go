@@ -185,6 +185,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		Assessment: assessmentSvc,
 		Body:       bodySvc,
 		Planning:   core.Planning,
+		Decisions:  core.Planning,
 		Renders:    renderingSvc,
 		Execution:  executionSvc,
 		Feedback:   feedbackSvc,

@@ -1,14 +1,15 @@
-// 方案 tab：旧线（recovery/ui-0911）选择页视觉在新数据模型上的恢复——
-// 场景胶囊 tab + 拖动对比 hero（满宽、高度随照片比例）+ 细节卡（why 折叠）
-// + 吸底毛玻璃选择坞（收益词 / 三选一 / 差异 chips / CTA / 来源说明）。
+// 方案 tab：卡堆决策台——三套方案满幅堆叠，左滑跳过/右滑喜欢（按钮与手势
+// 等价），栈空落结果态；下方往期方案区按「集」回装卡堆。对比滑块移出展示页
+// （深看一套是详情页的事，展示页只管三选一）。
 //
 // 架构不让步的部分：
 // 1. 不读 Storage 的 reportId / sceneBrief——入口只有「交接条」和「问服务端」；
-//    compareHint 这类 UI 偏好仍走 services/storage（偏好不是业务状态）；
+//    deckHint 这类 UI 偏好仍走 services/storage（偏好不是业务状态）；
 // 2. 唯一轮询路径是 useOperationPolling，盯受理 operation 与各套在途渲染，
 //    settled 后整体刷新方案集；刷新期间继续显示当前 PlanSet，到达后整体替换；
-// 3. 对比左图只用方案集绑定的报告（boundBodyMedia），绑定不了就退单图，
-//    绝不拿"手头最近一份报告"的照片凑对比。
+//    卡堆的决策/撤销在刷新后以本地栈为准（渲染内容经 freshById 跟上服务端）；
+// 3. 决策乐观落栈、PUT 失败本地回退——服务端是决策的事实来源，
+//    重进页面 / 重取方案集都会以 variant.decision 恢复。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { ScrollView, Text, View } from '@tarojs/components'
@@ -17,7 +18,6 @@ import {
   ERROR_COPY,
   PLANNING_COPY,
   SCENES,
-  planSlotLabel,
 } from '@zsm/core'
 import type { DisplayMedia, PlanSet, PlanVariant, Report } from '@zsm/core'
 import { qualityApi } from '../../app/api/quality'
@@ -28,28 +28,32 @@ import { useOperationPolling } from '../../app/operations/use-operation-polling'
 import { useShowOnce } from '../../hooks/use-page-visibility'
 import { handleBillingError } from '../../services/billing'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../services/storage'
-import { getNavMetrics } from '../../components/app-header'
-import CompareSlider from '../../components/compare-slider'
 import EmptyState from '../../components/empty-state'
 import ErrorState from '../../components/error-state'
+import BottomSheet from '../../components/bottom-sheet'
 import PlanProgressView from './PlanProgressView'
 import PrimaryButton from '../../components/primary-button'
-import RenderState from '../../components/render-state'
+import PlansDeck from './PlansDeck'
+import PlansHistory from './PlansHistory'
 import Skeleton from '../../components/skeleton'
-import SourceImage from '../../components/source-image'
-import TextLink from '../../components/text-link'
 import {
   analyzingAssessmentOperationId,
   boundBodyMedia,
   briefFingerprint,
+  createDecisionStack,
   createIdempotencyKey,
+  deckOrder,
+  decideCard,
   inFlightPlanSetOperationIds,
   planProgressView,
   planSetRetryMarkerKey,
   planSetSceneKey,
   planSetView,
+  topCard,
+  undoCard,
   sortedVariants,
-  variantRenderView,
+  type DecisionKind,
+  type DecisionStack,
 } from './model'
 import './index.scss'
 
@@ -64,20 +68,7 @@ const RENDER_IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
 /** general 的 brief 固定（没有 Brief 页）；「不满意重出」走 refresh 绕开语义键去重。 */
 const GENERAL_BRIEF = { focus: 'balanced', preparation: 'closet', impression: 'natural' } as const
 
-// hero 高度跟随照片比例（旧线思路保留）：三套方案图同一管线产出、宽高比一致，
-// 切换不跳动，因此让照片自己定高度——满宽 + 完整，无侧边区。
-// 上限 = 内容视口高（防极端竖图把首屏撑死），下限 320px；tab 行不占 hero 预算——
-// 页面可滚动，hero 只管自己不超过一屏，把空间让给照片。
-// 这是基于 windowHeight 的 px 计算，是 rpx 规约的显式例外（与旧线相同）。
-const NAV = getNavMetrics()
-// spacer 的 margin-bottom（24rpx）换算成 px：hero 上限要扣除导航下的这段净距
-const HEADER_GAP_PX = 12
-const MAX_HERO_PX = Math.max(
-  320,
-  Math.round(NAV.windowHeight - NAV.navHeight - HEADER_GAP_PX),
-)
-// 渲染未就绪且原本照片也缺失时，状态块只给紧凑高度——不摆一整框空状态
-const EMPTY_STATE_HERO_PX = 240
+const EMPTY_STACK: DecisionStack = { cards: [], cursor: 0, history: [] }
 
 interface PlansScreenProps {
   planSetId?: string
@@ -105,6 +96,9 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   const [planSet, setPlanSet] = useState<PlanSet | null>(() =>
     planSetId ? resourceCache.read<PlanSet>(resourceKey('plan-set', planSetId)) ?? null : null,
   )
+  // 往期方案区：当前报告 + 场景下的全部方案集（含当前集），日期倒序。
+  // 旧实现只留最新一份、旧集沉没——历史闭环就是把这份全量接住。
+  const [sets, setSets] = useState<PlanSet[]>([])
   const [scene, setScene] = useState<string>('general')
   const [bootstrapped, setBootstrapped] = useState(Boolean(planSetId))
   const [analyzingOperationId, setAnalyzingOperationId] = useState('')
@@ -113,12 +107,13 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   const [failed, setFailed] = useState(false)
   // 切场景请求在途：tab 已高亮、数据未到期间给内联指示，不让旧内容冒充新场景
   const [switching, setSwitching] = useState(false)
-  const [activeId, setActiveId] = useState('')
-  const [whyOpen, setWhyOpen] = useState(false)
+  // 卡堆决策状态机 + 网络在途；deckHint 是「左滑跳过 · 右滑喜欢」的一次性提示
+  const [stack, setStack] = useState<DecisionStack>(EMPTY_STACK)
+  const [deciding, setDeciding] = useState(false)
   const [retryingId, setRetryingId] = useState('')
-  const [compareHint, setCompareHint] = useState(() => !readStorage(STORAGE_KEYS.compareHint))
-  // 方案图真实宽高（onLoad 采集，决定 hero 高度）
-  const [photoDims, setPhotoDims] = useState<Record<string, { w: number; h: number }>>({})
+  const [deckHint, setDeckHint] = useState(() => readStorage(STORAGE_KEYS.deckHint) === '')
+  // 往期弹层开关（历史收进 BottomSheet，不占文档流）
+  const [historyOpen, setHistoryOpen] = useState(false)
   const planSetRef = useRef<PlanSet | null>(null)
   planSetRef.current = planSet
   const planSetIdRef = useRef(planSetId)
@@ -131,6 +126,10 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   sceneRef.current = scene
   const reportRef = useRef(report)
   reportRef.current = report
+  const decidingRef = useRef(false)
+  decidingRef.current = deciding
+  const stackRef = useRef<DecisionStack>(EMPTY_STACK)
+  stackRef.current = stack
   // 切场景乱序保护：后发的请求赢，先到的慢响应不得盖回去
   const sceneReqRef = useRef(0)
   // 受理的场景归属：OperationRef 不带场景，受理时记下。用 ref 而不是
@@ -197,6 +196,7 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       }
       setReport(current)
       const list = await qualityApi.listPlanSets(current.id, 'general')
+      setSets([...list].sort((a, b) => b.created_at.localeCompare(a.created_at)))
       const latest = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
       if (latest) {
         setPlanSetId(latest.id)
@@ -380,7 +380,9 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         void qualityApi
           .listPlanSets(currentReport.id, currentScene)
           .then((list) => {
-            const latest = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
+            const sorted = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at))
+            setSets(sorted)
+            const latest = sorted[0]
             if (latest && latest.id !== planSetIdRef.current) {
               setPlanSetId(latest.id)
               setPlanSet(latest)
@@ -404,25 +406,30 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   }, [watchedCount])
 
   const variants = planSet ? sortedVariants(planSet) : []
+
+  // 卡堆装载：方案集换身份（受理新集/切场景/装回往期）时整体重建，
+  // 服务端已决（variant.decision）随之恢复；同集刷新不重建——会话内的
+  // 撤销栈和乐观决策不被后台对账掀掉，渲染内容经 freshById 跟上。
+  const planSetKeyRef = useRef('')
   useEffect(() => {
-    if (variants.length === 0) return
-    if (variants.some((v) => v.id === activeId)) return
-    const recommended = variants.find((v) => v.recommended) ?? variants[0]
-    if (recommended) setActiveId(recommended.id)
-  }, [variants, activeId])
-  const activeVariant = variants.find((v) => v.id === activeId) ?? null
+    const key = planSet?.id ?? ''
+    if (key === planSetKeyRef.current) return
+    planSetKeyRef.current = key
+    setStack(planSet ? createDecisionStack(deckOrder(planSet)) : EMPTY_STACK)
+  }, [planSet])
 
   /** 切场景：高亮先切、旧内容保留到响应到达；在途给内联指示，乱序响应不得盖回。 */
   const switchScene = async (next: string) => {
     const req = ++sceneReqRef.current
     setScene(next)
-    setWhyOpen(false)
     if (!report) return
     setSwitching(true)
     try {
       const list = await qualityApi.listPlanSets(report.id, next as PlanSet['scene'])
       if (req !== sceneReqRef.current) return
-      const latest = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
+      const sorted = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at))
+      setSets(sorted)
+      const latest = sorted[0]
       if (latest) {
         setPlanSetId(latest.id)
         setPlanSet(latest)
@@ -537,14 +544,6 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     }
   }
 
-  /** 切换方案：轻震动反馈（沿用旧线 swiper 手势的触感），收起 why 展开。 */
-  const pickVariant = (variant: PlanVariant) => {
-    if (variant.id === activeId) return
-    setActiveId(variant.id)
-    setWhyOpen(false)
-    void Taro.vibrateShort({ type: 'light' })
-  }
-
   const openDetail = (variant: PlanVariant) => {
     void Taro.navigateTo({
       url:
@@ -561,7 +560,86 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     else void bootstrap()
   }
 
-  // 对比左图：绑定校验不过就抛错——这里接住并退单图（与 PlanDetailScreen 同一条规则）
+  // ---------- 卡堆决策：乐观落栈，失败回退；服务端是事实来源 ----------
+
+  const handleDecide = (variantId: string, decision: DecisionKind) => {
+    if (decidingRef.current) return
+    const top = topCard(stackRef.current)
+    // 手势回调在飞出动画后到达，此间用户可能已用按钮决策过：顶卡对不上就丢弃
+    if (!top || top.variant.id !== variantId) return
+    setStack(decideCard(stackRef.current, decision))
+    setDeciding(true)
+    void (async () => {
+      try {
+        await qualityApi.putVariantDecision(variantId, decision, createIdempotencyKey(`decision:${variantId}`))
+        // 第一次决策顺手收掉手势提示（与 compareHint 同一条 UI 偏好规则）
+        if (readStorage(STORAGE_KEYS.deckHint) === '') writeStorage(STORAGE_KEYS.deckHint, '1')
+        setDeckHint(false)
+      } catch (error) {
+        if (handleBillingError(error)) {
+          setStack(undoCard(stackRef.current))
+          return
+        }
+        // 保存失败：本地回退这一张（服务端为准），下次进来还是未决
+        setStack(undoCard(stackRef.current))
+        Taro.showToast({ title: PLANNING_COPY.deckDecisionFailed, icon: 'none' })
+      } finally {
+        setDeciding(false)
+      }
+    })()
+  }
+
+  const handleUndo = () => {
+    if (decidingRef.current) return
+    const current = stackRef.current
+    const index = current.history[current.history.length - 1]
+    const target = index === undefined ? undefined : current.cards[index]
+    if (!target) return
+    setStack(undoCard(current))
+    setDeciding(true)
+    void (async () => {
+      try {
+        await qualityApi.deleteVariantDecision(target.variant.id)
+      } catch {
+        // 撤销没存上：本地已回退，但服务端还留着旧决策——重进页面会恢复
+        Taro.showToast({ title: PLANNING_COPY.deckDecisionFailed, icon: 'none' })
+      } finally {
+        setDeciding(false)
+      }
+    })()
+  }
+
+  /** 装回往期集：列表里是全量图，直接换当前集；后台再对账一次签名 URL。 */
+  const loadPast = (setId: string) => {
+    if (setId === planSetIdRef.current) return
+    const target = sets.find((set) => set.id === setId)
+    if (!target) return
+    setPlanSetId(setId)
+    setPlanSet(target)
+    void refreshPlanSet(setId)
+  }
+
+  const backToLatest = () => {
+    const latest = sets[0]
+    if (latest) loadPast(latest.id)
+  }
+
+  /** 结果态/说明行的重新生成：场景方案回 Brief 页改答案，general refresh 重出。 */
+  const regenerateActive = () => {
+    if (planSet && planSet.scene !== 'general') {
+      void Taro.navigateTo({ url: `${SCENE_ROUTE}?scene=${planSet.scene}` })
+      return
+    }
+    void generateGeneral(true)
+  }
+
+  const dismissDeckHint = () => {
+    setDeckHint(false)
+    writeStorage(STORAGE_KEYS.deckHint, '1')
+  }
+
+  // 对比左图：绑定校验不过就抛错——这里接住并退单图（与 PlanDetailScreen 同一条规则）。
+  // 展示页不再摆对比交互，这张图只做两件事：规划等待的照片锚 + 未就绪卡的占位。
   let leftMedia: DisplayMedia | null = null
   if (planSet) {
     const candidate = report && report.id === planSet.report_id ? report : boundReport
@@ -721,15 +799,9 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     )
   }
 
-  const activeRender = activeVariant ? variantRenderView(activeVariant) : null
-  const heroReady = activeRender?.kind === 'ready'
-  // 对比只在 general 场景开启（旧线行为保留）；左图缺失一律退单图
-  const canCompare = Boolean(heroReady && leftMedia && scene === 'general')
-  // 尺寸未就绪时按 82% 上限预估，onLoad 后校正
-  const activeDims = activeVariant ? photoDims[activeVariant.id] : undefined
-  const heroPx = activeDims
-    ? Math.min(MAX_HERO_PX, Math.round((NAV.windowWidth * activeDims.h) / activeDims.w))
-    : Math.round(MAX_HERO_PX * 0.82)
+  // ---------- 卡堆决策台 + 往期方案区 ----------
+  // 当前集在往期列表里不再是第一份 → 往期浏览态（徽标 + 回到最新）。
+  const viewingPast = sets.length > 0 && planSetId !== sets[0]?.id
 
   return (
     <View className="plans">
@@ -759,192 +831,40 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         sceneEmptyCard
       ) : (
         <>
-        {/* 拖动对比 hero：照片满宽完整展示（高度跟随照片比例），无侧边区无裁切。
-            相框常驻（旧线结构）：就绪出对比图；未就绪展示原本照片单图 + 状态 pill
-            （都没有才退紧凑状态块）——页面骨架不随渲染结果塌缩，
-            后面的信息卡永远不会上叠场景 tab。key 随方案切换重挂载 → 交叉淡入。 */}
-        {activeVariant && activeRender ? (
-          <View className="plans__hero">
-            <View
-              className="plans__hero-frame"
-              style={{ height: `${activeRender.kind === 'ready' || leftMedia ? heroPx : EMPTY_STATE_HERO_PX}px` }}
-              key={activeVariant.id}
-              onClick={() => {
-                if (!compareHint) return
-                setCompareHint(false)
-                writeStorage(STORAGE_KEYS.compareHint, '1')
+          <PlansDeck
+            stack={stack}
+            variants={variants}
+            fallbackMedia={leftMedia}
+            pastBadge={viewingPast}
+            pastCount={Math.max(0, sets.length - 1)}
+            hintVisible={deckHint}
+            retryingId={retryingId}
+            busy={deciding}
+            onDecide={handleDecide}
+            onUndo={handleUndo}
+            onHintDismiss={dismissDeckHint}
+            onOpenHistory={() => setHistoryOpen(true)}
+            onBackToLatest={backToLatest}
+            onOpenDetail={openDetail}
+            onRegenerate={() => void regenerateActive()}
+            onRetryRender={(variant) => void retryVariant(variant)}
+          />
+          {/* 往期收进弹层：历史常驻文档流会让页面总高必然超过一屏（滚动的主因），
+              页面锁死后历史只能从「往期 N ›」入口进 */}
+          <BottomSheet
+            open={historyOpen}
+            title={PLANNING_COPY.historyTitle}
+            onClose={() => setHistoryOpen(false)}
+          >
+            <PlansHistory
+              sets={sets}
+              activeSetId={planSetId}
+              onSelect={(setId) => {
+                setHistoryOpen(false)
+                loadPast(setId)
               }}
-            >
-              {activeRender.kind === 'ready' ? (
-                <>
-                  <CompareSlider
-                    single={!canCompare}
-                    current={<SourceImage className="plans__hero-img" media={leftMedia} mode="widthFix" />}
-                    plan={
-                      <SourceImage
-                        className="plans__hero-img"
-                        media={activeRender.media}
-                        mode="widthFix"
-                        onLoad={(e) => {
-                          const w = Number(e.detail.width)
-                          const h = Number(e.detail.height)
-                          if (!w || !h) return
-                          setPhotoDims((prev) =>
-                            prev[activeVariant.id]?.w === w && prev[activeVariant.id]?.h === h
-                              ? prev
-                              : { ...prev, [activeVariant.id]: { w, h } },
-                          )
-                        }}
-                      />
-                    }
-                    currentLabel={PLANNING_COPY.currentLabel}
-                    planLabel={PLANNING_COPY.planLabel}
-                  />
-                  {compareHint && canCompare ? (
-                    <Text className="plans__hint">{PLANNING_COPY.compareHint}</Text>
-                  ) : null}
-                </>
-              ) : leftMedia ? (
-                <>
-                  {/* 渲染未就绪但原本照片在架：单图展示当前形象（标「原本」）+
-                      底部状态 pill（生成中转圈 / 失败点按重试 / 暂不可用），
-                      与详情页同一处理——不摆一整框空状态把文字方案挤出首屏 */}
-                  <SourceImage className="plans__hero-img" media={leftMedia} mode="widthFix" />
-                  <Text className="plans__hero-current-label">{PLANNING_COPY.currentLabel}</Text>
-                  <View
-                    className="plans__hero-state-pill"
-                    onClick={
-                      activeRender.kind === 'failed' && activeRender.retryable
-                        ? () => void retryVariant(activeVariant)
-                        : undefined
-                    }
-                  >
-                    {RENDER_IN_FLIGHT.has(activeRender.kind) || retryingId === activeVariant.id ? (
-                      <View className="spinner spinner--on-deep plans__hero-state-spin" />
-                    ) : null}
-                    <Text className="plans__hero-state-text">
-                      {activeRender.kind === 'queued'
-                        ? PLANNING_COPY.renderQueued
-                        : activeRender.kind === 'generating'
-                          ? PLANNING_COPY.renderGenerating
-                          : activeRender.kind === 'checking'
-                            ? PLANNING_COPY.renderChecking
-                            : activeRender.kind === 'unavailable'
-                              ? PLANNING_COPY.renderUnavailable
-                              : activeRender.retryable
-                                ? `${PLANNING_COPY.renderFailed} · ${PLANNING_COPY.renderRetry}`
-                                : PLANNING_COPY.renderFailed}
-                    </Text>
-                  </View>
-                </>
-              ) : (
-                <View className="plans__hero-state">
-                  <RenderState view={activeRender} onRetry={() => void retryVariant(activeVariant)} />
-                </View>
-              )}
-              <View className="plans__hero-fade" />
-            </View>
-          </View>
-        ) : null}
-
-        {/* 细节卡（第 2 屏起）：descriptor + 折叠 why，正常文档流跟随 hero。
-            负边距上叠 hero 的改法在没有 hero（渲染未就绪）时会把卡片拉上去
-            盖住场景 tab——回旧线，不再负边距，状态也不再进这张卡。 */}
-        {activeVariant ? (
-          <View className="plans__info fade-up delay-1">
-            <Text className="plans__summary">{activeVariant.descriptor}</Text>
-            {activeVariant.rationale ? (
-              <View className="plans__why-wrap" onClick={() => setWhyOpen(!whyOpen)}>
-                <Text className={`plans__why ${whyOpen ? 'plans__why--open' : ''}`}>{activeVariant.rationale}</Text>
-                <Text className="plans__why-toggle">{whyOpen ? PLANNING_COPY.whyClose : PLANNING_COPY.whyLabel}</Text>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-
-        {/* 悬浮选择坞（旧线结构）：收益词顶行 + 三选一（方案名 + 差异 chips）
-            + CTA + 来源说明。浮在照片底部上方不占文档流——照片有多高就展示多高，
-            选择要素常驻第一屏。 */}
-        {activeVariant && activeRender ? (
-          <View className="plans__dock dock-glass fade-up delay-2">
-            {activeVariant.outcome_tags.length > 0 ? (
-              <View className="plans__outcome">
-                {activeVariant.outcome_tags.slice(0, 3).map((tag) => (
-                  <Text key={tag} className="plans__outcome-tag">{tag}</Text>
-                ))}
-              </View>
-            ) : null}
-            <View className="plans__chooser">
-              <View className="plans__choices">
-                {variants.map((item) => {
-                  const itemRender = variantRenderView(item)
-                  return (
-                    <View
-                      key={item.id}
-                      className={`plans__choice ${item.id === activeId ? 'plans__choice--active' : ''} pressable`}
-                      onClick={() => pickVariant(item)}
-                    >
-                      <View className="plans__choice-thumb">
-                        {itemRender.kind === 'ready' ? (
-                          <SourceImage className="plans__choice-img" media={itemRender.media} mode="aspectFit" />
-                        ) : RENDER_IN_FLIGHT.has(itemRender.kind) ? (
-                          <View className="spinner plans__choice-spin" />
-                        ) : (
-                          <Text className="plans__choice-state">
-                            {itemRender.kind === 'unavailable'
-                              ? PLANNING_COPY.renderThumbUnavailable
-                              : PLANNING_COPY.renderThumbFailed}
-                          </Text>
-                        )}
-                        {item.recommended ? (
-                          <Text className="plans__choice-badge">{PLANNING_COPY.recommended}</Text>
-                        ) : null}
-                      </View>
-                    </View>
-                  )
-                })}
-              </View>
-              <View className="plans__chooser-info">
-                <Text className="plans__name">{activeVariant.name}</Text>
-                {activeVariant.difference_tags.length > 0 ? (
-                  <View className="plans__diffs">
-                    {activeVariant.difference_tags.slice(0, 3).map((tag) => (
-                      <Text key={tag} className="plans__diff">{tag}</Text>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            </View>
-            <PrimaryButton text={PLANNING_COPY.viewDetail} onClick={() => openDetail(activeVariant)} />
-            <Text className="plans__cta-note">
-              {activeRender.kind === 'ready' && activeRender.media.source_kind === 'demo_example'
-                ? PLANNING_COPY.ctaNoteDemo
-                : PLANNING_COPY.ctaNote}
-            </Text>
-            {/* 重新设计入口：场景回 Brief 页预填改答案；general 直接 refresh 重出，
-                重拍仅作为更新档案的路径保留 */}
-            {scene === 'general' ? (
-              <>
-                <TextLink
-                  className="plans__redesign"
-                  text={PLANNING_COPY.regenerateAction}
-                  onClick={() => void generateGeneral(true)}
-                />
-                <TextLink
-                  className="plans__redesign"
-                  text={PLANNING_COPY.updateGeneralLink}
-                  onClick={() => void Taro.navigateTo({ url: CAPTURE_ROUTE })}
-                />
-              </>
-            ) : (
-              <TextLink
-                className="plans__redesign"
-                text={PLANNING_COPY.redesignAction}
-                onClick={() => void Taro.navigateTo({ url: `${SCENE_ROUTE}?scene=${scene}` })}
-              />
-            )}
-          </View>
-        ) : null}
+            />
+          </BottomSheet>
         </>
       )}
     </View>

@@ -330,3 +330,100 @@ export function sceneBriefRequest(
       return null
   }
 }
+
+// ---------- 卡堆决策台 ----------
+// 展示页的纯决策状态机：三套方案满幅堆叠，左滑跳过、右滑喜欢。
+// 全部纯函数、不碰 Taro 不碰网络——网络同步在 PlansScreen（乐观写 +
+// 失败回退），动画在手势组件，这里只回答「现在顶上是哪张、还能不能撤」。
+
+export type DecisionKind = NonNullable<PlanVariant['decision']>['decision']
+
+/** 一张卡 = 一个方案 + 用户态度。null = 未决（含服务端也没给过决策）。 */
+export interface DecisionCard {
+  variant: PlanVariant
+  decision: DecisionKind | null
+}
+
+export interface DecisionStack {
+  cards: readonly DecisionCard[]
+  /** 顶部未决卡下标；>= cards.length 即本轮已看完。 */
+  cursor: number
+  /** 本会话已决卡下标，按决策先后（撤销弹栈；服务端历史决策不入栈）。 */
+  history: readonly number[]
+}
+
+/** 卡堆位次：推荐的先看，其余按服务端席位 slot。 */
+export function deckOrder(planSet: Pick<PlanSet, 'variants'>): PlanVariant[] {
+  const sorted = sortedVariants(planSet)
+  return [...sorted.filter((variant) => variant.recommended), ...sorted.filter((variant) => !variant.recommended)]
+}
+
+/**
+ * 装载一轮卡堆：按 deckOrder 排列，从 variant.decision 恢复服务端已决，
+ * cursor 停在第一张未决卡。history 恒空——服务端历史决策不可「撤销」，
+ * 撤销只对本会话内做出的决策负责；重取数据后以服务端为准整体重建。
+ */
+export function createDecisionStack(variants: readonly PlanVariant[]): DecisionStack {
+  const cards = variants.map<DecisionCard>((variant) => ({
+    variant,
+    decision: variant.decision?.decision ?? null,
+  }))
+  const cursor = cards.findIndex((card) => card.decision === null)
+  return { cards, cursor: cursor === -1 ? cards.length : cursor, history: [] }
+}
+
+/** 顶部未决卡；本轮已看完时为 null。 */
+export function topCard(stack: DecisionStack): DecisionCard | null {
+  return stack.cards[stack.cursor] ?? null
+}
+
+export function isStackEnded(stack: DecisionStack): boolean {
+  return stack.cursor >= stack.cards.length
+}
+
+/** 进度点：done 含服务端历史决策。 */
+export function stackProgress(stack: DecisionStack): { done: number; total: number } {
+  return {
+    done: stack.cards.filter((card) => card.decision !== null).length,
+    total: stack.cards.length,
+  }
+}
+
+/**
+ * 对顶部未决卡做决策：写决策、推 history、cursor 前进到下一张未决卡。
+ * 顶部不存在或已决时原样返回（纯函数，不抛错）。
+ */
+export function decideCard(stack: DecisionStack, decision: DecisionKind): DecisionStack {
+  const top = topCard(stack)
+  if (!top || top.decision !== null) return stack
+  const cards = stack.cards.map((card, index) =>
+    index === stack.cursor ? { ...card, decision } : card,
+  )
+  let cursor = stack.cards.length
+  for (let index = stack.cursor + 1; index < cards.length; index++) {
+    if (cards[index]?.decision === null) {
+      cursor = index
+      break
+    }
+  }
+  return { cards, cursor, history: [...stack.history, stack.cursor] }
+}
+
+/** 单步撤销：弹栈、把该卡清回未决、cursor 退回。history 空时原样返回。 */
+export function undoCard(stack: DecisionStack): DecisionStack {
+  if (stack.history.length === 0) return stack
+  const index = stack.history[stack.history.length - 1]
+  if (index === undefined) return stack
+  const cards = stack.cards.map((card, position) =>
+    position === index ? { ...card, decision: null } : card,
+  )
+  return { cards, cursor: index, history: stack.history.slice(0, -1) }
+}
+
+/** 结算视图：按决策先后返回做出该态度的方案列表。 */
+export function decidedCards(stack: DecisionStack, decision: DecisionKind): PlanVariant[] {
+  return stack.history
+    .map((index) => stack.cards[index])
+    .filter((card): card is DecisionCard => card !== undefined && card.decision === decision)
+    .map((card) => card.variant)
+}

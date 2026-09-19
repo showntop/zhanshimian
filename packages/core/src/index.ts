@@ -41,6 +41,8 @@ export type {
   PlanSetAccepted,
   PlanStep,
   PlanVariant,
+  PlanVariantDecision,
+  PutPlanVariantDecisionRequest,
   PutSelectionRequest,
   RenderRun,
   RenderRunAccepted,

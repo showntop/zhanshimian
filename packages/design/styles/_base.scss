@@ -42,6 +42,19 @@ button::after {
   padding-bottom: calc(env(safe-area-inset-bottom) + 48rpx);
 }
 
+// 锁高一屏的页面（穿搭诊断 / 购买判断的空态）：外壳自身锁死视口并纵排，
+// 内容容器 flex:1 吃掉「视口 − 导航占位」的全部余量——高度不再由 JS 计算，
+// 底部安全区只在容器那一处用 env() 垫一次（两处都垫 = 底部一大段空白）。
+// 结果态需要滚动，页面去掉这个类即可。
+.page--lock {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
 .safe-bottom {
   height: calc(env(safe-area-inset-bottom) + 20rpx);
 }

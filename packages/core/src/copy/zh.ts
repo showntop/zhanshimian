@@ -517,7 +517,15 @@ export const OUTFIT_COPY = {
   findingsLift: '还可以改',
   save: '保存这条建议',
   saved: '已保存',
-  toPlans: '去看搭配方案'
+  toPlans: '去看搭配方案',
+  // 改衣单排版（量体/裁缝隐喻）：标题区、须知、结果各节的编辑式标签
+  mastheadMeta: '量体 · 改衣',
+  adviceLabel: '改衣单',
+  tipsLabel: '拍摄须知',
+  // 选完照片后须知区不撤：换成「怎么读这张单」，段落常驻填实版心
+  readingTipsLabel: '读单须知',
+  readingTips: ['最值得调整的一处，钉在照片上', '只谈穿搭，不评长相', '换个场景，随时再诊'],
+  keepNoteLabel: '边注'
 } as const
 
 export const PURCHASE_COPY = {
@@ -536,7 +544,15 @@ export const PURCHASE_COPY = {
   findingsKeep: '已经合适',
   findingsLift: '还要注意',
   save: '保存这条判断',
-  saved: '已保存'
+  saved: '已保存',
+  // 检验单排版（送检/票据隐喻）：题头、送检位、盖章与单据行
+  mastheadMeta: '工具 · 检验',
+  adviceLabel: '检验结论',
+  tipsLabel: '送检须知',
+  stampText: '已检验',
+  serialLabel: '单号',
+  dateLabel: '日期',
+  uploadSlotLabel: '送检处'
 } as const
 
 // ---------- 工具页：发型设计 ----------
@@ -702,7 +718,24 @@ export const PLANNING_COPY = {
   updateGeneralLink: '照片或状态变了？重新拍摄后会生成新方案 ›',
   // 场景方案受理在途：tab 标记后缀 + 顶部全局提示（定位不到场景的在途操作）
   tabInFlightSuffix: '· 制作中',
-  inFlightBanner: '有方案正在制作中，完成后会自动更新'
+  inFlightBanner: '有方案正在制作中，完成后会自动更新',
+  // 卡堆决策台：满幅卡片堆叠，左滑跳过、右滑喜欢，按钮与手势等价
+  deckSkip: '跳过',
+  deckLike: '喜欢',
+  deckUndo: '撤销',
+  deckHint: '左滑跳过 · 右滑喜欢',
+  deckRoundPrefix: '本轮',
+  deckRoundSuffix: '套',
+  resultLikedTitle: '这一轮你喜欢',
+  resultLikedEmpty: '这轮没有留下喜欢的方案',
+  resultSkippedLink: '再看看跳过的',
+  resultRegenerate: '生成新的一轮',
+  historyTitle: '往期方案',
+  historyEntry: '往期',
+  historyBadge: '往期',
+  historyBackLatest: '回到最新',
+  historyLikeCount: '个喜欢',
+  deckDecisionFailed: '这条态度没有保存成功，请重试'
 } as const
 
 /** 服务端阶段码 → 中文。键必须与 apps/server 的 planning ports 完全一致：

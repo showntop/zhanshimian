@@ -39,6 +39,22 @@ type PreferenceMemoryReader interface {
 	ListPreferenceMemories(ctx context.Context, userID string, limit int) ([]domain.PreferenceMemory, error)
 }
 
+// DecisionReader reads the user's recent variant decisions to seed the next
+// planning run (fingerprint + decision_memory snapshot). Mirrors
+// PreferenceMemoryReader; nil-tolerant at every consumption site.
+type DecisionReader interface {
+	ListRecentDecisions(ctx context.Context, userID string, limit int) ([]domain.VariantDecisionItem, error)
+}
+
+// DecisionStore owns the per-variant like/skip decisions (UPSERT semantics:
+// re-deciding overwrites, undo deletes). Satisfied by *postgres.Store.
+type DecisionStore interface {
+	DecisionReader
+	UpsertVariantDecision(ctx context.Context, userID string, command domain.UpsertVariantDecisionCommand) (domain.PlanVariantDecision, error)
+	DeleteVariantDecision(ctx context.Context, userID, planVariantID string) error
+	ListDecisionsByVariantIDs(ctx context.Context, userID string, planVariantIDs []string) (map[string]domain.PlanVariantDecision, error)
+}
+
 // OperationStarter inserts the public operation and its initial content task
 // in one transaction, idempotent on (user_id, kind, dedupe_key). The bool
 // reports whether this call created the pair.

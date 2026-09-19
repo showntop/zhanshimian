@@ -54,6 +54,7 @@ func WirePlanning(cfg config.Config, store *postgres.Store, runtime ai.Structure
 		Tasks:      operations,
 		Store:      store,
 		Memories:   store,
+		Decisions:  store,
 		Renders:    autoRenders,
 	})
 	registry, err := taskrunner.NewRegistry(
@@ -70,6 +71,7 @@ func WirePlanning(cfg config.Config, store *postgres.Store, runtime ai.Structure
 			Store:      store,
 			Renders:    renders,
 			Memories:   store,
+			Decisions:  store,
 		}),
 		Registry:   registry,
 		Definition: def,

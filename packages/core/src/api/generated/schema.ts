@@ -1018,6 +1018,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/plan-variants/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 表达对方案版本的态度（喜欢或跳过，重复提交即改主意） */
+        put: operations["putPlanVariantDecision"];
+        post?: never;
+        /** 清除对方案版本的态度（幂等：不存在也返回 204） */
+        delete: operations["deletePlanVariantDecision"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/render-runs/{id}": {
         parameters: {
             query?: never;
@@ -1639,8 +1657,23 @@ export interface components {
             difference_tags: string[];
             steps: components["schemas"]["PlanStep"][];
             render: components["schemas"]["RenderStatusView"];
+            decision?: components["schemas"]["PlanVariantDecision"];
             /** Format: date-time */
             created_at: string;
+        };
+        PlanVariantDecision: {
+            /** Format: uuid */
+            plan_variant_id: string;
+            /** @enum {string} */
+            decision: "like" | "skip";
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PutPlanVariantDecisionRequest: {
+            /** @enum {string} */
+            decision: "like" | "skip";
         };
         PlanSet: {
             /** Format: uuid */
@@ -4228,6 +4261,65 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putPlanVariantDecision: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 同一用户同一语义创建请求的幂等键 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutPlanVariantDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description 决策已写入（新建或更新） */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PlanVariantDecision"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deletePlanVariantDecision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已清除，无响应体 */
+            204: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };
     };

@@ -99,6 +99,44 @@ type PlanVariant struct {
 	// 读投影字段:由 Planning read model 合并的当前渲染视图,不落库。
 	// nil 表示该 variant 尚无渲染头(从未触发渲染或读模型未装配)。
 	Render *RenderStatusView
+
+	// 读投影字段:由 Planning read model 合并的当前卡堆决策,不落方案图。
+	// nil 表示用户未表达过态度。
+	Decision *PlanVariantDecision
+}
+
+// PlanVariantDecisionKind 是卡堆决策的封闭值域:右滑喜欢、左滑跳过。
+type PlanVariantDecisionKind string
+
+const (
+	DecisionLike PlanVariantDecisionKind = "like"
+	DecisionSkip PlanVariantDecisionKind = "skip"
+)
+
+// PlanVariantDecision 是一行决策事实。UPSERT 语义:改主意覆盖同一行,
+// updated_at 前移;撤销即整行删除。
+type PlanVariantDecision struct {
+	PlanVariantID string
+	PlanSetID     string
+	Decision      PlanVariantDecisionKind
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+// VariantDecisionItem 是决策进入规划指纹与生成器快照的最小投影。
+// 带上 variant 的 key/name,模型才能理解"用户跳过了哪一类方向"。
+type VariantDecisionItem struct {
+	VariantID string    `json:"variant_id"`
+	Key       string    `json:"key"`
+	Name      string    `json:"name"`
+	Decision  string    `json:"decision"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// UpsertVariantDecisionCommand 是写入一条决策的跨层命令。
+type UpsertVariantDecisionCommand struct {
+	PlanVariantID string
+	Decision      PlanVariantDecisionKind
 }
 
 type PlanStep struct {

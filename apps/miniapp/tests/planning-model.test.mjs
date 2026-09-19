@@ -6,14 +6,22 @@ import {
   analyzingAssessmentOperationId,
   boundBodyMedia,
   briefFingerprint,
+  createDecisionStack,
   createIdempotencyKey,
+  decidedCards,
+  deckOrder,
+  decideCard,
   inFlightPlanSetOperationIds,
+  isStackEnded,
   planProgressView,
   planSetView,
   sceneBriefPrefill,
   sceneBriefRequest,
   sortedVariants,
+  stackProgress,
   stepDetailLines,
+  topCard,
+  undoCard,
   variantRenderView,
 } from '../src/features/planning/model.ts'
 
@@ -297,4 +305,114 @@ test('a published brief prefills the scene brief page, table-checked field by fi
   assert.deepEqual(sceneBriefPrefill('interview', null), {})
   assert.deepEqual(sceneBriefPrefill('general', { focus: 'balanced' }), {})
   assert.deepEqual(sceneBriefPrefill('mars', { when: 'today' }), {})
+})
+
+// ---------- 卡堆决策台 ----------
+
+const deckVariant = (id, overrides = {}) =>
+  variant({ id, slot: Number(id.slice(1)), name: `方案 ${id}`, ...overrides })
+
+const deck = () => [
+  deckVariant('v2', { slot: 2 }),
+  deckVariant('v1', { slot: 1, recommended: true }),
+  deckVariant('v3', { slot: 3 }),
+]
+
+// createDecisionStack 接收「已排序」的 variants(排序是 deckOrder 的职责,
+// PlansScreen 用 createDecisionStack(deckOrder(planSet)) 装载)。
+const orderedDeck = () => deckOrder({ variants: deck() })
+
+test('deck order puts the recommended variant on top, rest by slot', () => {
+  assert.deepEqual(deckOrder({ variants: deck() }).map((v) => v.id), ['v1', 'v2', 'v3'])
+  // 无推荐:纯 slot 序,不凭空推谁
+  const noPick = deck().map((v) => ({ ...v, recommended: false }))
+  assert.deepEqual(deckOrder({ variants: noPick }).map((v) => v.id), ['v1', 'v2', 'v3'])
+})
+
+test('createDecisionStack restores server decisions and lands on the first undecided card', () => {
+  const variants = [
+    deckVariant('v1', { recommended: true, decision: { decision: 'like', plan_variant_id: 'v1', created_at: 't', updated_at: 't' } }),
+    deckVariant('v2', { decision: { decision: 'skip', plan_variant_id: 'v2', created_at: 't', updated_at: 't' } }),
+    deckVariant('v3'),
+  ]
+  const stack = createDecisionStack(variants)
+  assert.equal(stack.cursor, 2)
+  assert.deepEqual(stack.history, [])
+  assert.equal(topCard(stack).variant.id, 'v3')
+  // 全部已决:cursor 落到末尾 = 本轮结束
+  const allDecided = createDecisionStack([variants[0], variants[1]])
+  assert.equal(isStackEnded(allDecided), true)
+  assert.equal(topCard(allDecided), null)
+})
+
+test('decideCard writes the decision and skips forward to the next undecided', () => {
+  const stack = createDecisionStack(orderedDeck())
+  const after = decideCard(stack, 'like')
+  assert.deepEqual(after.cards.map((c) => c.decision), ['like', null, null])
+  assert.deepEqual(after.history, [0])
+  assert.equal(topCard(after).variant.id, 'v2')
+  // 继续决策推进到第三张
+  assert.equal(topCard(decideCard(after, 'skip')).variant.id, 'v3')
+})
+
+test('decideCard after the stack ended is a no-op', () => {
+  const stack = createDecisionStack(orderedDeck())
+  const done = decideCard(decideCard(decideCard(stack, 'like'), 'skip'), 'like')
+  assert.equal(isStackEnded(done), true)
+  assert.equal(decideCard(done, 'skip'), done)
+})
+
+test('undoCard rewinds one decision and clears it', () => {
+  const stack = decideCard(createDecisionStack(orderedDeck()), 'like')
+  const undone = undoCard(stack)
+  assert.deepEqual(undone.cards.map((c) => c.decision), [null, null, null])
+  assert.deepEqual(undone.history, [])
+  assert.equal(undone.cursor, 0)
+  assert.equal(topCard(undone).variant.id, 'v1')
+})
+
+test('undoCard with an empty history is a no-op', () => {
+  const stack = createDecisionStack(orderedDeck())
+  assert.equal(undoCard(stack), stack)
+})
+
+test('undoCard after server-restored decisions does not resurrect them', () => {
+  // 服务端历史决策不入 history:重取前的会话撤销不能掀掉服务端事实
+  const variants = [deckVariant('v1', { decision: { decision: 'like', plan_variant_id: 'v1', created_at: 't', updated_at: 't' } }), deckVariant('v2')]
+  const stack = createDecisionStack(variants)
+  assert.equal(undoCard(stack), stack)
+})
+
+test('decidedCards returns variants in decision order per kind', () => {
+  let stack = createDecisionStack(orderedDeck())
+  stack = decideCard(stack, 'like') // v1(推荐在顶)
+  stack = decideCard(stack, 'skip') // v2
+  stack = decideCard(stack, 'like') // v3
+  assert.deepEqual(decidedCards(stack, 'like').map((v) => v.id), ['v1', 'v3'])
+  assert.deepEqual(decidedCards(stack, 'skip').map((v) => v.id), ['v2'])
+})
+
+test('stackProgress counts decided cards including server-restored ones', () => {
+  const variants = [
+    deckVariant('v1', { recommended: true, decision: { decision: 'like', plan_variant_id: 'v1', created_at: 't', updated_at: 't' } }),
+    deckVariant('v2'),
+    deckVariant('v3'),
+  ]
+  assert.deepEqual(stackProgress(createDecisionStack(variants)), { done: 1, total: 3 })
+  const mid = decideCard(createDecisionStack(variants), 'skip')
+  assert.deepEqual(stackProgress(mid), { done: 2, total: 3 })
+})
+
+test('rebuilding the stack after a refetch takes the server as truth', () => {
+  let stack = decideCard(createDecisionStack(orderedDeck()), 'like')
+  // 本地乐观 after decide → 服务端回填后的重取应该还原同一态度,并清空会话 history
+  const refetched = orderedDeck().map((v) =>
+    v.id === 'v1' ? { ...v, decision: { decision: 'like', plan_variant_id: 'v1', created_at: 't', updated_at: 't' } } : v,
+  )
+  const rebuilt = createDecisionStack(refetched)
+  assert.deepEqual(rebuilt.cards.map((c) => c.decision), ['like', null, null])
+  assert.deepEqual(rebuilt.history, [])
+  // 旧栈的 undo 不能跨过重建边界
+  assert.equal(undoCard(rebuilt), rebuilt)
+  assert.equal(stack.cards[0].decision, 'like')
 })

@@ -6,7 +6,9 @@ import AppHeader from '../../components/app-header'
 import PlansScreen from '../../features/planning/PlansScreen'
 
 export default function Plans() {
-  const pageClass = usePageClass(true, 'page--tab')
+  // page--deck：决策台底部呼吸回归 .safe-bottom 规范（inset + 20rpx），
+  // 不用 .page--tab 默认的 48rpx 大垫——一屏预算里这段是实打实占掉的
+  const pageClass = usePageClass(true, 'page--tab page--deck')
 
   return (
     <View className={pageClass}>

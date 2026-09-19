@@ -26,8 +26,6 @@ import AppHeader, { getNavMetrics } from '../../../../components/app-header'
 import { useDisplayablePath } from '../../../../hooks/use-displayable-path'
 import PrimaryButton from '../../../../components/primary-button'
 import SourceImage from '../../../../components/source-image'
-import PhotoAnnotationLayer from '../../../../components/photo-annotation'
-import Pill from '../../../../components/pill'
 import ErrorState from '../../../../components/error-state'
 import './index.scss'
 
@@ -75,7 +73,9 @@ export default function Outfit() {
   const resumingRef = useRef(false)
   // 本页点了「再诊断一次」或重选照片：不要立刻用服务端旧结论盖回去
   const freshStartRef = useRef(false)
-  const { pageClass, enter } = usePageShell(true, '', 'outfit')
+  // 空态/日限态一屏锁：外壳 .page--lock 锁 100vh 纵排、容器 flex:1 吃满余量，
+  // 高度与安全区都在 CSS 里（安全区只垫一次）。结果态要滚动，去掉锁。
+  const { pageClass, enter } = usePageShell(true, result ? '' : 'page--lock', 'outfit')
 
   const applySession = useCallback((item: Diagnosis) => {
     setResult(item)
@@ -319,9 +319,35 @@ export default function Outfit() {
   const keepFindings = domainFindings.filter((item) => item.tone === 'positive')
   const liftFindings = domainFindings.filter((item) => item.tone !== 'positive')
 
+  // 编号锚点：只有「还可以改」的观察上照片——页里的 ①②③ 与改衣单索引一一对应。
+  // 坐标用 photoDims 实测的 aspectFit 可视区换算（与羽化 mask 同一套几何）。
+  const CIRCLED = ['①', '②', '③', '④', '⑤', '⑥']
+  let numberedPins: { key: string; mark: string; x: number; y: number }[] = []
+  if (result && !busy && photoDims && photoDims.w > 0 && photoDims.h > 0 && photoMaskVars) {
+    const sc = Math.min(stageWpx / photoDims.w, stageHpx / photoDims.h)
+    const vw = photoDims.w * sc
+    const vh = photoDims.h * sc
+    const offL = (stageWpx - vw) / 2
+    const offT = (stageHpx - vh) / 2
+    numberedPins = liftFindings
+      .map((finding, index) => {
+        if (finding.anchor_x == null || finding.anchor_y == null) return null
+        return {
+          key: `${finding.category}-${finding.label}`,
+          mark: CIRCLED[index] ?? String(index + 1),
+          x: offL + finding.anchor_x * vw,
+          y: offT + finding.anchor_y * vh,
+        }
+      })
+      .filter((pin): pin is { key: string; mark: string; x: number; y: number } => pin !== null)
+  }
+
   return (
     <View className={pageClass}>
       <AppHeader title="穿搭诊断" back onPhoto={Boolean(result)} />
+      {/* 空态/日限态一屏钉死：外壳 .page--lock 锁 100vh 纵排，容器 flex:1
+          吃满导航以下的全部余量（高度不进 JS，安全区只由 CSS env 垫一次）。
+          结果态解除锁走「钉屏照片 + 单据上滚」 */}
       <View className={`od${result ? ' od--done' : ''}`}>
         <View className={`od__hero photo-hero photo-hero--bleed ${enter()}`} style={doneHeroStyle}>
           {shownMedia ? (
@@ -337,6 +363,7 @@ export default function Outfit() {
                   mode="aspectFit"
                   onLoad={(e) => setPhotoDims({ w: Number(e.detail.width), h: Number(e.detail.height) })}
                 />
+                {/* 裁切角标：量体裁衣的取景框——四角 L 形墨线压在照片四角 */}
               </View>
             </>
           ) : photoPath ? (
@@ -380,25 +407,25 @@ export default function Outfit() {
               <Text className="od__mask-text">{OUTFIT_COPY.busyHint}</Text>
             </View>
           ) : null}
-          {!busy && domainFindings.length > 0 ? (
+          {result ? (
+            // 标记层：不进 photo stage（羽化 mask 会把角标一起渐隐），
+            // 角标常驻取景框，编号锚点与改衣单索引一一对应
             <View className="od__stage od__stage--anno" style={doneStageStyle}>
-              <PhotoAnnotationLayer
-                items={domainFindings
-                  .filter((finding) => finding.anchor_x != null && finding.anchor_y != null)
-                  .map((finding) => ({
-                    id: `${finding.category}-${finding.label}`,
-                    label: finding.label,
-                    detail: finding.label,
-                    anchorX: finding.anchor_x ?? 0.5,
-                    anchorY: finding.anchor_y ?? 0.5,
-                  }))}
-                activeId=""
-                frameW={result ? HERO_DONE_W : HERO_W}
-                frameH={result ? HERO_DONE_H - HERO_DONE_GAP : HERO_H}
-                photoDims={photoDims ?? undefined}
-                onTap={() => {}}
-                showDrawer={false}
-              />
+              <View className="od__crop od__crop--tl" />
+              <View className="od__crop od__crop--tr" />
+              <View className="od__crop od__crop--bl" />
+              <View className="od__crop od__crop--br" />
+              {!busy
+                ? numberedPins.map((pin) => (
+                    <Text
+                      key={pin.key}
+                      className="od__pin"
+                      style={{ left: `${pin.x}px`, top: `${pin.y}px` }}
+                    >
+                      {pin.mark}
+                    </Text>
+                  ))
+                : null}
             </View>
           ) : null}
         </View>
@@ -408,30 +435,39 @@ export default function Outfit() {
 
         {result ? (
           <>
-            <View className={`od__sheet ${enter(1)}`}>
+            <View className={`od__slip ${enter(1)}`}>
+              {/* 改衣单：编辑排版的核心——小字眉题 + 衬线大标 + 细规线围出的引文区 */}
               <View className="od__advice">
-                <Text className="od__advice-scene">按「{CONTEXTS.find((c) => c.key === scene)?.label ?? scene}」场景诊断</Text>
+                <View className="od__mast od__mast--slip">
+                  <Text className="od__mast-meta">{OUTFIT_COPY.adviceLabel}</Text>
+                  <Text className="od__mast-rule">按「{CONTEXTS.find((c) => c.key === scene)?.label ?? scene}」</Text>
+                </View>
                 {adviceLead ? <Text className="od__advice-lead">{adviceLead}</Text> : null}
                 <Text className="od__advice-title serif">{adviceAction}</Text>
                 {adviceBody ? <Text className="od__advice-body">{adviceBody}</Text> : null}
               </View>
 
-              {keepFindings.length > 0 ? (
-                <View className="od__keep">
-                  <Text className="od__keep-label">{OUTFIT_COPY.findingsKeep}</Text>
-                  <Text className="od__keep-text">{keepFindings.map((item) => item.label).join('、')}</Text>
+              {/* 还可以改：编号索引——①②③ 与照片锚点一一对应，细规线分行 */}
+              {liftFindings.length > 0 ? (
+                <View className="od__index">
+                  <Text className="od__index-label">{OUTFIT_COPY.findingsLift}</Text>
+                  {liftFindings.map((finding) => {
+                    const pinIndex = liftFindings.indexOf(finding)
+                    return (
+                      <View key={`${finding.category}-${finding.label}`} className="od__index-row">
+                        <Text className="od__index-mark serif">{CIRCLED[pinIndex] ?? '·'}</Text>
+                        <Text className="od__index-text">{finding.label}</Text>
+                      </View>
+                    )
+                  })}
                 </View>
               ) : null}
 
-              {liftFindings.length > 0 ? (
-                <View className="od__lifts">
-                  <Text className="od__lifts-label">{OUTFIT_COPY.findingsLift}</Text>
-                  {liftFindings.map((finding) => (
-                    <View key={`${finding.category}-${finding.label}`} className="od__lift">
-                      <Text className="od__lift-dot">·</Text>
-                      <Text className="od__lift-text">{finding.label}</Text>
-                    </View>
-                  ))}
+              {/* 已经合适：页边批注——竖规线 + 小字，安静退到页边 */}
+              {keepFindings.length > 0 ? (
+                <View className="od__keepnote">
+                  <Text className="od__keepnote-label">{OUTFIT_COPY.keepNoteLabel} · {OUTFIT_COPY.findingsKeep}</Text>
+                  <Text className="od__keepnote-text">{keepFindings.map((item) => item.label).join('、')}</Text>
                 </View>
               ) : null}
 
@@ -460,18 +496,43 @@ export default function Outfit() {
           </>
         ) : (
           <>
-            <View className={`od__hint ${enter(1)}`}>
-              <Text className="od__hint-title">{OUTFIT_COPY.title}</Text>
-              <Text className="od__hint-desc">{OUTFIT_COPY.desc}</Text>
-              {!shownMedia && !photoPath ? (
-                <Text className="od__hint-tips">{OUTFIT_COPY.uploadTips.join(' · ')}</Text>
-              ) : null}
+            {/* 刊头：衬线大标两行叠排 + 眉题细字——杂志开篇的排版 */}
+            <View className={`od__masthead ${enter(1)}`}>
+              <View className="od__mast">
+                <Text className="od__mast-meta">{OUTFIT_COPY.mastheadMeta}</Text>
+                <Text className="od__mast-rule">№ 01</Text>
+              </View>
+              <Text className="od__masthead-title serif">{OUTFIT_COPY.title}</Text>
+              <Text className="od__masthead-desc">{OUTFIT_COPY.desc}</Text>
             </View>
+
+            {/* 须知/读单：编号细目常驻（旧版信息结构）——无照片教拍摄，
+                有照片教读单；版心不因选完照片而空一段 */}
+            <View className={`od__notice ${enter(1)}`}>
+              <Text className="od__notice-label">
+                {shownMedia || photoPath ? OUTFIT_COPY.readingTipsLabel : OUTFIT_COPY.tipsLabel}
+              </Text>
+              {(shownMedia || photoPath ? OUTFIT_COPY.readingTips : OUTFIT_COPY.uploadTips).map((tip, index) => (
+                <View key={tip} className="od__notice-row">
+                  <Text className="od__notice-no serif">{String(index + 1).padStart(2, '0')}</Text>
+                  <Text className="od__notice-text">{tip}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* 场景章节：目录式选择——衬线序号 + 下划线激活 */}
             <View className={`od__context ${enter(2)}`}>
               <Text className="od__context-label">{OUTFIT_COPY.sceneLabel}</Text>
-              <View className="od__context-pills">
-                {CONTEXTS.map((c) => (
-                  <Pill key={c.key} label={c.label} active={scene === c.key} onClick={() => !busy && setScene(c.key)} />
+              <View className="od__context-list">
+                {CONTEXTS.map((c, index) => (
+                  <View
+                    key={c.key}
+                    className={`od__chapter pressable ${scene === c.key ? 'od__chapter--active' : ''}`}
+                    onClick={() => !busy && setScene(c.key)}
+                  >
+                    <Text className="od__chapter-no serif">{['一', '二', '三'][index]}</Text>
+                    <Text className="od__chapter-label">{c.label}</Text>
+                  </View>
                 ))}
               </View>
             </View>

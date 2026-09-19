@@ -2426,6 +2426,72 @@ paths:
             schema:
               type: object
               additionalProperties: false
+  "/v1/plan-variants/{id}/decision":
+    put:
+      operationId: putPlanVariantDecision
+      summary: 表达对方案版本的态度（喜欢或跳过，重复提交即改主意）
+      tags:
+      - Planning
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PutPlanVariantDecisionRequest"
+      responses:
+        '200':
+          description: 决策已写入（新建或更新）
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - data
+                properties:
+                  data:
+                    "$ref": "#/components/schemas/PlanVariantDecision"
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - "$ref": "#/components/parameters/IdempotencyKey"
+    delete:
+      operationId: deletePlanVariantDecision
+      summary: 清除对方案版本的态度（幂等：不存在也返回 204）
+      tags:
+      - Planning
+      responses:
+        '204':
+          description: 已清除，无响应体
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
   "/v1/render-runs/{id}":
     get:
       operationId: getRenderRun
@@ -4139,9 +4205,45 @@ components:
           maxItems: 3
         render:
           "$ref": "#/components/schemas/RenderStatusView"
+        decision:
+          "$ref": "#/components/schemas/PlanVariantDecision"
         created_at:
           type: string
           format: date-time
+    PlanVariantDecision:
+      type: object
+      additionalProperties: false
+      required:
+      - plan_variant_id
+      - decision
+      - created_at
+      - updated_at
+      properties:
+        plan_variant_id:
+          type: string
+          format: uuid
+        decision:
+          type: string
+          enum:
+          - like
+          - skip
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PutPlanVariantDecisionRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - decision
+      properties:
+        decision:
+          type: string
+          enum:
+          - like
+          - skip
     PlanSet:
       type: object
       additionalProperties: false

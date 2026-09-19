@@ -1,4 +1,6 @@
-// 购买判断：单品图上传 + 同步诊断。空态不堆预览卡；结果是一句判断，不套报告卡。
+// 购买判断：单品图上传 + 同步诊断。呈现走「检验单」票据排版——送检处、
+// 巨号判断、盖章、双栏对峙、点线收据、撕票孔 CTA；照片本体仍是满幅标本，
+// 硬边语言全在纸面（单据）上。
 // 同步请求跨页存活：会话见 services/purchase-session（模块级 inflight + storage 草稿），
 // 退回首页再进入可恢复进行中/结论；复访先展示草稿，服务端 latest 只在更新时接管。
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -23,7 +25,6 @@ import { readStorage, writeStorage } from '../../../../services/storage'
 import { splitAdviceTitle } from '../../../../services/advice-title'
 import AppHeader, { getNavMetrics } from '../../../../components/app-header'
 import { useDisplayablePath } from '../../../../hooks/use-displayable-path'
-import PrimaryButton from '../../../../components/primary-button'
 import SourceImage from '../../../../components/source-image'
 import ErrorState from '../../../../components/error-state'
 import './index.scss'
@@ -31,8 +32,9 @@ import './index.scss'
 // 会话单例挂在页面模块上：模块只装载一次，inflight 与草稿因此跨页存活。
 const purchaseSession = sharedPurchaseSession({ read: readStorage, write: writeStorage })
 
-// 结果态沉浸 hero（与穿搭诊断同构）：满宽出血 + 透明导航；stage 上下各让
-// 导航呼吸缝 56rpx / 底部停靠带 120rpx，锐图四边按 photoDims 实测羽化。
+// 结果态沉浸 hero（照片标本层，与穿搭诊断同一套机械）：
+// 满宽出血 + 透明导航；stage 上下各让导航呼吸缝 56rpx / 底部停靠带 120rpx，
+// 锐图四边按 photoDims 实测羽化。
 const HERO_H = 640
 const HERO_DONE_H = 820
 const HERO_DONE_GAP = 56
@@ -55,7 +57,9 @@ export default function Purchase() {
 
   const resumingRef = useRef(false)
   const freshStartRef = useRef(false)
-  const { pageClass, enter } = usePageShell(true, '', 'purchase')
+  // 空态/日限态一屏锁：外壳 .page--lock 锁 100vh 纵排、容器 flex:1 吃满余量，
+  // 高度与安全区都在 CSS 里（安全区只垫一次）。结果态要滚动，去掉锁。
+  const { pageClass, enter } = usePageShell(true, result ? '' : 'page--lock', 'purchase')
 
   const applySession = useCallback((item: Diagnosis) => {
     setResult(item)
@@ -287,17 +291,35 @@ export default function Purchase() {
     : ''
   const keepFindings = (result?.findings ?? []).filter((item) => item.tone === 'positive')
   const liftFindings = (result?.findings ?? []).filter((item) => item.tone !== 'positive')
+  // 单据行：短单号 + 短日期（都是服务端真数据，票据感不是编的）
+  const serialNo = result ? result.id.replace(/-/g, '').slice(0, 10).toUpperCase() : ''
+  const serialDate = result ? result.created_at.slice(5, 10).replace('-', '.') : ''
 
   return (
     <View className={pageClass}>
       <AppHeader title="购买判断" back onPhoto={Boolean(result)} />
+      {/* 空态/日限态一屏钉死：外壳 .page--lock 锁 100vh 纵排，容器 flex:1
+          吃满导航以下的全部余量（高度不进 JS，安全区只由 CSS env 垫一次）。
+          结果态解除锁走「钉屏照片 + 单据上滚」 */}
       <View className={`pk${result ? ' pk--done' : ''}`}>
-        <View className={`pk__hero photo-hero photo-hero--bleed ${enter()}`} style={doneHeroStyle}>
+        {/* 题头前置（选择态）：巨号问句开场，照片是「送检物」不是题图——
+            票据叙事 = 题头 → 空托盘 → 须知 → 动作 */}
+        {!result && !limit ? (
+          <View className={`pk__masthead ${enter()}`}>
+            <View className="pk__mast">
+              <Text className="pk__mast-meta">{PURCHASE_COPY.mastheadMeta}</Text>
+              <View className="pk__mast-dash" />
+            </View>
+            <Text className="pk__question">{PURCHASE_COPY.title}</Text>
+            <Text className="pk__question-sub">{PURCHASE_COPY.desc}</Text>
+          </View>
+        ) : null}
+        <View className={`pk__hero photo-hero photo-hero--bleed ${enter(1)}`} style={doneHeroStyle}>
           {shownMedia ? (
             <>
               <SourceImage className="pk__photo-backdrop" media={shownMedia} mode="aspectFill" />
               <View className="pk__photo-stage" style={photoStageStyle}>
-                {/* 对焦模糊层 + 羽化锐图：与穿搭诊断同构，横竖图都无矩形硬边 */}
+                {/* 对焦模糊层 + 羽化锐图：照片是「标本层」，硬边语言全在下方单据上 */}
                 <SourceImage className="pk__photo-blur" media={shownMedia} mode="aspectFit" />
                 <SourceImage
                   className="pk__hero-img pk__hero-img--fit"
@@ -329,9 +351,17 @@ export default function Purchase() {
                 anchor="top"
                 frameAspect={HERO_ASPECT}
               />
-              <View className="pk__upload-bar">
-                <Text className="pk__upload-bar-plus">＋</Text>
-                <Text className="pk__upload-bar-text">{PURCHASE_COPY.uploadTitle}</Text>
+              {/* 送检处：硬边取件口——墨描边 + 内侧虚线裁切线 + 骑框标签；
+                  空态的主动作就是「放入检体」：居中大 ＋，整个托盘可点 */}
+              <View className="pk__slot">
+                <View className="pk__slot-frame" />
+                <Text className="pk__slot-label">{PURCHASE_COPY.uploadSlotLabel}</Text>
+                <View className="pk__slot-action">
+                  <View className="pk__slot-plus-circle">
+                    <Text className="pk__slot-plus">＋</Text>
+                  </View>
+                  <Text className="pk__slot-text">{PURCHASE_COPY.uploadTitle}</Text>
+                </View>
               </View>
             </View>
           )}
@@ -339,6 +369,13 @@ export default function Purchase() {
             // 结果态导航透明不占位：chip 让到导航栏下方（真机测量 px，同穿搭诊断）
             <View className="pk__hero-alt-wrap" style={result ? { top: `${getNavMetrics().navHeight + 8}px` } : undefined}>
               <Text className="pk__hero-alt pressable" onClick={choosePhoto}>{PURCHASE_COPY.reselect}</Text>
+            </View>
+          ) : null}
+          {/* 盖章：结果落在照片右上——双线框、苔绿印泥、微旋转 */}
+          {result ? (
+            <View className="pk__stamp" style={{ top: `${getNavMetrics().navHeight + 76 * rpxPx}px` }}>
+              <Text className="pk__stamp-text">{PURCHASE_COPY.stampText}</Text>
+              {serialDate ? <Text className="pk__stamp-date">{serialDate}</Text> : null}
             </View>
           ) : null}
           {busy ? (
@@ -353,27 +390,61 @@ export default function Purchase() {
 
         {result ? (
           <>
-            <View className={`pk__sheet ${enter(1)}`}>
-              <View className="pk__advice">
-                {adviceLead ? <Text className="pk__advice-lead">{adviceLead}</Text> : null}
-                <Text className="pk__advice-title serif">{adviceAction}</Text>
-                {adviceBody ? <Text className="pk__advice-body">{adviceBody}</Text> : null}
+            <View className={`pk__ticket ${enter(1)}`}>
+              {/* 单据头：结论标签 + 单号（真数据） */}
+              <View className="pk__mast">
+                <Text className="pk__mast-meta">{PURCHASE_COPY.adviceLabel}</Text>
+                <Text className="pk__mast-serial">
+                  {PURCHASE_COPY.serialLabel} {serialNo}
+                </Text>
               </View>
 
-              {keepFindings.length > 0 ? (
-                <View className="pk__keep">
-                  <Text className="pk__keep-label">{PURCHASE_COPY.findingsKeep}</Text>
-                  <Text className="pk__keep-text">{keepFindings.map((item) => item.label).join('、')}</Text>
+              {/* 巨号判断：黑体 800、紧字距——票据上的大字结论 */}
+              <View className="pk__verdict">
+                {adviceLead ? <Text className="pk__verdict-lead">{adviceLead}</Text> : null}
+                <Text className="pk__verdict-title">{adviceAction}</Text>
+                {adviceBody ? <Text className="pk__verdict-body">{adviceBody}</Text> : null}
+              </View>
+
+              {/* 双栏对峙：合适 vs 注意——硬边面板 + 大号计数 */}
+              {keepFindings.length > 0 || liftFindings.length > 0 ? (
+                <View className={`pk__versus ${keepFindings.length > 0 && liftFindings.length > 0 ? '' : 'pk__versus--single'}`}>
+                  {keepFindings.length > 0 ? (
+                    <View className="pk__panel pk__panel--keep">
+                      <View className="pk__panel-head">
+                        <Text className="pk__panel-count">{keepFindings.length}</Text>
+                        <Text className="pk__panel-title">{PURCHASE_COPY.findingsKeep}</Text>
+                      </View>
+                      {keepFindings.map((finding) => (
+                        <Text key={`${finding.category}-${finding.label}`} className="pk__panel-item">
+                          {finding.label}
+                        </Text>
+                      ))}
+                    </View>
+                  ) : null}
+                  {liftFindings.length > 0 ? (
+                    <View className="pk__panel pk__panel--lift">
+                      <View className="pk__panel-head">
+                        <Text className="pk__panel-count">{liftFindings.length}</Text>
+                        <Text className="pk__panel-title">{PURCHASE_COPY.findingsLift}</Text>
+                      </View>
+                      {liftFindings.map((finding) => (
+                        <Text key={`${finding.category}-${finding.label}`} className="pk__panel-item">
+                          {finding.label}
+                        </Text>
+                      ))}
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
 
-              {liftFindings.length > 0 ? (
-                <View className="pk__lifts">
-                  <Text className="pk__lifts-label">{PURCHASE_COPY.findingsLift}</Text>
-                  {liftFindings.map((finding) => (
-                    <View key={`${finding.category}-${finding.label}`} className="pk__lift">
-                      <Text className="pk__lift-dot">·</Text>
-                      <Text className="pk__lift-text">{finding.label}</Text>
+              {/* 标签行：点线收据脚注 */}
+              {result.tags.length > 0 ? (
+                <View className="pk__tags">
+                  {result.tags.map((tag) => (
+                    <View key={tag} className="pk__tags-row">
+                      <Text className="pk__tags-text">{tag}</Text>
+                      <View className="pk__tags-dots" />
                     </View>
                   ))}
                 </View>
@@ -382,12 +453,17 @@ export default function Purchase() {
               {error ? <ErrorState message={error} onRetry={() => void analyze(false)} /> : null}
             </View>
 
-            {/* CTA 固定底部：必须是 sheet 平级节点（fade-up 的 transform 会困住 fixed） */}
+            {/* 撕票孔 CTA：虚线撕边 + 双侧半圆缺口，固定底部（sheet 平级，不被 fade-up 的 transform 困住） */}
             <View className="pk__cta">
-              <PrimaryButton text={PURCHASE_COPY.save} onClick={() => void save()} />
-              <View className="pk__result-row">
-                <Text className="pk__result-alt pressable" onClick={retryFresh}>{PURCHASE_COPY.again}</Text>
+              <View className="pk__cta-notch pk__cta-notch--l" />
+              <View className="pk__cta-notch pk__cta-notch--r" />
+              <View
+                className={`pk__go pressable ${busy ? 'pk__go--busy' : ''}`}
+                onClick={() => void save()}
+              >
+                <Text className="pk__go-text">{PURCHASE_COPY.save}</Text>
               </View>
+              <Text className="pk__cta-alt pressable" onClick={retryFresh}>{PURCHASE_COPY.again}</Text>
             </View>
           </>
         ) : limit ? (
@@ -397,30 +473,42 @@ export default function Purchase() {
               {limit.body ? <Text className="pk__hint-desc">{limit.body}</Text> : null}
             </View>
             <View className={`pk__foot ${enter(2)}`}>
-              <PrimaryButton text={PURCHASE_COPY.lastResult} onClick={() => void viewHistory()} />
+              <View className="pk__go pk__go--block pressable" onClick={() => void viewHistory()}>
+                <Text className="pk__go-text">{PURCHASE_COPY.lastResult}</Text>
+              </View>
             </View>
           </>
         ) : (
           <>
-            <View className={`pk__hint ${enter(1)}`}>
-              <Text className="pk__hint-title">{PURCHASE_COPY.title}</Text>
-              <Text className="pk__hint-desc">{PURCHASE_COPY.desc}</Text>
-              {!shownMedia && !photoPath ? (
-                <Text className="pk__hint-tips">{PURCHASE_COPY.uploadTips.join(' · ')}</Text>
-              ) : null}
-            </View>
+            {!shownMedia && !photoPath ? (
+              <View className={`pk__notice ${enter(1)}`}>
+                <Text className="pk__notice-label">{PURCHASE_COPY.tipsLabel}</Text>
+                {PURCHASE_COPY.uploadTips.map((tip, index) => (
+                  <View key={tip} className="pk__notice-row">
+                    <Text className="pk__notice-text">{tip}</Text>
+                    <View className="pk__notice-dots" />
+                    <Text className="pk__notice-no">{String(index + 1).padStart(2, '0')}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
             {rejectedMsg ? (
               <View className={`pk__rejected ${enter(1)}`}>
                 <Text className="pk__rejected-text">{rejectedMsg}</Text>
               </View>
             ) : error ? <ErrorState message={error} onRetry={() => void analyze(false)} /> : null}
             <View className={`pk__foot ${enter(2)}`}>
-              <PrimaryButton
-                text={rejectedMsg ? '重新选择照片' : busy ? PURCHASE_COPY.busy : PURCHASE_COPY.start}
-                loading={busy}
-                disabled={!rejectedMsg && !photoPath && !photoMedia}
+              <View
+                className={`pk__go pk__go--block pressable ${busy ? 'pk__go--busy' : ''} ${
+                  !rejectedMsg && !photoPath && !photoMedia ? 'pk__go--disabled' : ''
+                }`}
                 onClick={() => (rejectedMsg ? choosePhoto() : void analyze(false))}
-              />
+              >
+                {busy ? <View className="pk__go-spin spinner spinner--on-deep" /> : null}
+                <Text className="pk__go-text">
+                  {rejectedMsg ? '重新选择照片' : busy ? PURCHASE_COPY.busy : PURCHASE_COPY.start}
+                </Text>
+              </View>
               <View className="pk__foot-row">
                 <Text className="pk__foot-alt pressable" onClick={() => void analyze(true)}>{PURCHASE_COPY.demo}</Text>
               </View>

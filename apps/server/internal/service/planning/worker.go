@@ -50,9 +50,12 @@ type HandlerDeps struct {
 	Tasks      TaskEnqueuer
 	Store      PlanSetStore
 	Memories   PreferenceMemoryReader
+	// Decisions 是卡堆决策只读端口：decision_memory 快照的唯一来源。
+	// nil 容忍：未装配时不注入决策快照（降级/单测）。
+	Decisions DecisionReader
 	// Renders 是发布后的形象图自动触发端口；nil 时只产文字方案（降级/单测）。
-	Renders    RenderStarter
-	NewIDs     func() string
+	Renders RenderStarter
+	NewIDs  func() string
 }
 
 func NewHandler(deps HandlerDeps) *Handler {
@@ -81,6 +84,19 @@ func (h *Handler) Execute(ctx context.Context, lease domain.TaskLease) (domain.T
 	}
 	if memories != nil {
 		report.ProfileSnapshot, err = embedFeedbackMemory(report.ProfileSnapshot, memories)
+		if err != nil {
+			return domain.TaskResult{}, err
+		}
+	}
+	// decision_memory 快照：把最近喜欢/跳过的方向作为上下文喂给生成器，
+	// 与 feedback_memory 同一接缝（profile_snapshot 附加根键）。对 grounding
+	// 门惰性——没有专用 source type，模型只能经合法 profile_preference 引用。
+	decisions, err := h.listDecisions(ctx, lease.Task.UserID)
+	if err != nil {
+		return domain.TaskResult{}, err
+	}
+	if len(decisions) > 0 {
+		report.ProfileSnapshot, err = embedDecisions(report.ProfileSnapshot, decisions)
 		if err != nil {
 			return domain.TaskResult{}, err
 		}
@@ -399,6 +415,16 @@ func (h *Handler) listMemories(ctx context.Context, userID string) ([]domain.Pre
 		return nil, nil
 	}
 	return h.deps.Memories.ListPreferenceMemories(ctx, userID, planningMemoryLimit)
+}
+
+// listDecisions reads the user's recent variant decisions for the
+// decision_memory snapshot, tolerating a nil reader so callers that never
+// wired decisions still behave correctly.
+func (h *Handler) listDecisions(ctx context.Context, userID string) ([]domain.VariantDecisionItem, error) {
+	if h.deps.Decisions == nil {
+		return nil, nil
+	}
+	return h.deps.Decisions.ListRecentDecisions(ctx, userID, planningDecisionLimit)
 }
 
 func (h *Handler) stage(lease domain.TaskLease, decision pendingDecision) {

@@ -1,0 +1,432 @@
+// 卡堆决策台的样式：满幅沉浸卡（照片驱动卡高）、双层景深、环形控制组。
+// 卡高/分段进度条都是内联 px 计算；这里只管视觉语言——与详情页同源的
+// 奶油渐变融色、苔绿主色只留给「喜欢」一处。
+.plans-deck {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+
+  // ---------- 进度行 ----------
+  &__progress {
+    display: flex;
+    align-items: center;
+    gap: 20rpx;
+    padding: 0 8rpx;
+  }
+
+  &__round {
+    flex-shrink: 0;
+    font-size: 24rpx;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+
+  &__bar {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8rpx;
+  }
+
+  &__seg {
+    flex: 1;
+    height: 6rpx;
+    border-radius: 999rpx;
+    background: var(--line);
+    transition: background 0.25s ease;
+
+    &--done {
+      background: var(--moss);
+    }
+
+    // 顶卡所在段：半填充，表示「正在决定这张」
+    &--top:not(&--done) {
+      background: rgba(88, 115, 68, 0.35);
+    }
+  }
+
+  &__past-badge {
+    padding: 4rpx 18rpx;
+    border-radius: 999rpx;
+    background: var(--moss-soft);
+    color: var(--moss-deep);
+    font-size: 22rpx;
+    font-weight: 600;
+  }
+
+  &__back-latest {
+    font-size: 24rpx;
+  }
+
+  // 「往期 N ›」入口：压在进度条右端，主色弱强调
+  &__history-entry {
+    flex-shrink: 0;
+    margin-left: 16rpx;
+    font-size: 24rpx;
+    font-weight: 600;
+    color: var(--moss-deep);
+  }
+
+  // ---------- 卡堆舞台 ----------
+  &__stage {
+    position: relative;
+    // 高度由一屏预算 + 照片比例内联注入；overflow 裁掉景深卡的下缘溢出，
+    // 不给页面滚动留缝
+    overflow: hidden;
+  }
+
+  &__card {
+    // 宽高与水平居中由内联样式注入（left 50% + 负 margin）：
+    // SwipeCard 自身的 transform 全部留给拖拽/飞出，不掺定位
+    position: absolute;
+    top: 0;
+    left: 50%;
+
+    // 双层景深：次卡、末卡各退一档，制造「后面还有两套」的纵深感
+    &--under1 {
+      transform: scale(0.965) translateY(16rpx);
+      opacity: 0.55;
+      z-index: 1;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--moss-soft);
+      border: 1rpx solid var(--line);
+    }
+
+    &--under2 {
+      transform: scale(0.92) translateY(34rpx);
+      opacity: 0.3;
+      z-index: 0;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--moss-soft);
+      border: 1rpx solid var(--line);
+    }
+
+    &--top {
+      z-index: 2;
+    }
+  }
+
+  // 卡面：照片满幅铺满整卡，文字浮在底部渐变上
+  &__body {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--moss-soft);
+  }
+
+  &__photo {
+    position: absolute;
+    inset: 0;
+    background: var(--moss-soft);
+    overflow: hidden;
+  }
+
+  // 满宽照片自然高（= 卡高），底部超出部分裁掉（顶对齐保头部）
+  .plans-deck__img {
+    width: 100%;
+  }
+
+  .plans-deck__img .source-image__img {
+    height: auto;
+  }
+
+  // 底部奶油渐变：照片下缘融进页面底色，文字坐上去不压画面
+  &__veil {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 300rpx;
+    background: linear-gradient(
+      180deg,
+      rgba(244, 245, 242, 0) 0%,
+      rgba(244, 245, 242, 0.72) 30%,
+      var(--bg) 100%
+    );
+    pointer-events: none;
+  }
+
+  // 渲染未就绪的状态浮层：居中半透明小卡，不与底部文字打架
+  &__state {
+    position: absolute;
+    inset: 0 0 200rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  &__state-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 60%;
+    padding: 24rpx 36rpx;
+    border-radius: var(--radius-md);
+    background: rgba(244, 245, 242, 0.88);
+    border: 1rpx solid var(--line);
+    pointer-events: auto;
+
+    .render-state {
+      align-items: center;
+      background: transparent;
+      text-align: center;
+    }
+  }
+
+  // 卡面信息：浮在渐变上
+  &__meta {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    padding: 0 28rpx 22rpx;
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10rpx;
+  }
+
+  &__tag {
+    padding: 4rpx 16rpx;
+    border-radius: 999rpx;
+    background: rgba(244, 245, 242, 0.88);
+    border: 1rpx solid rgba(88, 115, 68, 0.35);
+    color: var(--moss-deep);
+    font-size: 20rpx;
+    font-weight: 600;
+  }
+
+  &__name {
+    font-size: 34rpx;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 1rpx;
+  }
+
+  &__desc {
+    font-size: 23rpx;
+    line-height: 1.55;
+    color: var(--ink-2);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  // 查看方案：卡面渐变区里的小胶囊（深看是入口不是终点）
+  &__detail-chip {
+    align-self: flex-start;
+    display: flex;
+    align-items: center;
+    gap: 6rpx;
+    margin-top: 4rpx;
+    padding: 8rpx 22rpx;
+    border-radius: 999rpx;
+    border: 1rpx solid rgba(88, 115, 68, 0.55);
+    background: rgba(244, 245, 242, 0.9);
+  }
+
+  &__detail-chip-text {
+    font-size: 22rpx;
+    font-weight: 600;
+    color: var(--moss-deep);
+  }
+
+  &__detail-chip-chevron {
+    font-size: 26rpx;
+    color: var(--moss-deep);
+    line-height: 1;
+  }
+
+  // 手势提示：文档流一行（悬浮会盖到人脸上），点击即收
+  &__hint-row {
+    display: flex;
+    justify-content: center;
+    animation: plans-frame-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  &__hint-pill {
+    padding: 8rpx 24rpx;
+    border-radius: 999rpx;
+    background: var(--scrim);
+    color: #ffffff;
+    font-size: 22rpx;
+    white-space: nowrap;
+  }
+
+  // ---------- 控制组：环形按钮 + 标签（缩小一档，保证一屏）----------
+  &__controls {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 80rpx;
+    padding-top: 4rpx;
+  }
+
+  &__action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8rpx;
+    min-width: 112rpx;
+  }
+
+  &__circle {
+    width: 92rpx;
+    height: 92rpx;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &--undo {
+      width: 76rpx;
+      height: 76rpx;
+      margin-top: 8rpx;
+      background: transparent;
+      border: 1rpx solid var(--line);
+    }
+
+    &--skip {
+      background: var(--surface-strong);
+      border: 1rpx solid var(--line);
+      box-shadow: 0 8rpx 20rpx rgba(31, 34, 30, 0.08);
+    }
+
+    // 喜欢：决策台唯一的主色实心
+    &--like {
+      background: var(--moss);
+      box-shadow: 0 14rpx 32rpx rgba(88, 115, 68, 0.35);
+    }
+
+    &--disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+  }
+
+  &__glyph {
+    font-size: 34rpx;
+    color: var(--ink-2);
+    line-height: 1;
+
+    &--like {
+      color: #ffffff;
+      font-size: 38rpx;
+    }
+
+    &--undo {
+      font-size: 30rpx;
+      color: var(--ink-3);
+    }
+  }
+
+  &__action-label {
+    font-size: 20rpx;
+    color: var(--ink-2);
+  }
+
+  // ---------- 来源说明（一行）----------
+  &__note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16rpx;
+    padding-bottom: 4rpx;
+  }
+
+  &__note-text {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__note-link {
+    font-size: 22rpx;
+  }
+
+  // ---------- 栈空结果态 ----------
+  &__result {
+    display: flex;
+    flex-direction: column;
+    gap: 18rpx;
+    padding: 40rpx 8rpx 20rpx;
+  }
+
+  &__result-title {
+    font-size: 34rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__result-empty {
+    font-size: 26rpx;
+    color: var(--ink-2);
+  }
+
+  &__strip {
+    display: flex;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  &__strip-card {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 8rpx;
+    width: 200rpx;
+    margin-right: 16rpx;
+  }
+
+  &__strip-photo {
+    width: 200rpx;
+    height: 260rpx;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--moss-soft);
+    border: 1rpx solid var(--line);
+    position: relative;
+  }
+
+  &__strip-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8rpx;
+  }
+
+  &__strip-empty-text {
+    font-size: 18rpx;
+    color: var(--ink-3);
+    text-align: center;
+  }
+
+  &__strip-name {
+    font-size: 24rpx;
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__skipped-toggle {
+    align-self: flex-start;
+    font-size: 24rpx;
+  }
+
+  &__regen {
+    align-self: center;
+    font-size: 26rpx;
+  }
+}

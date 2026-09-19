@@ -30,6 +30,8 @@ const requiredOperationIds = new Set([
   'listPlanSets',
   'createRenderRun',
   'getRenderRun',
+  'putPlanVariantDecision',
+  'deletePlanVariantDecision',
   'putPlanSetSelection',
   'createSelectionExecution',
   'getExecution',

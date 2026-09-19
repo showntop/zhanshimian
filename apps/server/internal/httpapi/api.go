@@ -24,6 +24,7 @@ type API struct {
 	assessment      *assessment.Service
 	home            HomeService
 	planning        planSetService
+	decisions       decisionService
 	renders         renderService
 	execution       executionService
 	feedback        feedbackService
@@ -61,6 +62,7 @@ type Dependencies struct {
 
 	Assessment *assessment.Service
 	Planning   planSetService
+	Decisions  decisionService
 	Renders    renderService
 	Execution  executionService
 	Feedback   feedbackService

@@ -149,18 +149,19 @@ type planSetResponse struct {
 }
 
 type planVariantDTO struct {
-	ID             string            `json:"id"`
-	Slot           int               `json:"slot"`
-	Key            string            `json:"key"`
-	Name           string            `json:"name"`
-	Descriptor     string            `json:"descriptor"`
-	Rationale      string            `json:"rationale"`
-	Recommended    bool              `json:"recommended"`
-	OutcomeTags    []string          `json:"outcome_tags"`
-	DifferenceTags []string          `json:"difference_tags"`
-	Steps          []planStepPayload `json:"steps"`
-	Render         renderStatusDTO   `json:"render"`
-	CreatedAt      string            `json:"created_at"`
+	ID             string                  `json:"id"`
+	Slot           int                     `json:"slot"`
+	Key            string                  `json:"key"`
+	Name           string                  `json:"name"`
+	Descriptor     string                  `json:"descriptor"`
+	Rationale      string                  `json:"rationale"`
+	Recommended    bool                    `json:"recommended"`
+	OutcomeTags    []string                `json:"outcome_tags"`
+	DifferenceTags []string                `json:"difference_tags"`
+	Steps          []planStepPayload       `json:"steps"`
+	Render         renderStatusDTO         `json:"render"`
+	Decision       *planVariantDecisionDTO `json:"decision,omitempty"`
+	CreatedAt      string                  `json:"created_at"`
 }
 
 type renderStatusDTO struct {
@@ -261,6 +262,7 @@ func publicPlanSet(planSet domain.PlanSet) planSetResponse {
 			DifferenceTags: nonNilStrings(variant.DifferenceTags),
 			Steps:          steps,
 			Render:         renderStatusOf(variant),
+			Decision:       decisionStatusOf(variant),
 			CreatedAt:      formatPublicTime(variant.CreatedAt),
 		})
 	}
@@ -334,6 +336,20 @@ func renderStatusOf(variant domain.PlanVariant) renderStatusDTO {
 		RenderRunID:   variant.Render.RenderRunID,
 		PublicationID: variant.Render.PublicationID,
 		Media:         renderMediaDTO(variant.Render.Media),
+	}
+}
+
+// decisionStatusOf 把决策读投影折算成 DTO;nil(未决/决策端口未装配)时
+// 字段整体缺席——契约里 decision 不是 required,旧客户端不受影响。
+func decisionStatusOf(variant domain.PlanVariant) *planVariantDecisionDTO {
+	if variant.Decision == nil {
+		return nil
+	}
+	return &planVariantDecisionDTO{
+		PlanVariantID: variant.Decision.PlanVariantID,
+		Decision:      string(variant.Decision.Decision),
+		CreatedAt:     formatPublicTime(variant.Decision.CreatedAt),
+		UpdatedAt:     formatPublicTime(variant.Decision.UpdatedAt),
 	}
 }
 

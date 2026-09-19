@@ -19,6 +19,7 @@ type Dependencies struct {
 	Store      PlanSetStore
 	Renders    CurrentRenderReader
 	Memories   PreferenceMemoryReader
+	Decisions  DecisionStore
 	Billing    billing.Reserver
 	IDs        func() string
 }
@@ -50,13 +51,19 @@ func (s *Service) CreatePlanSet(ctx context.Context, cmd CreateCommand) (CreateR
 	if err != nil {
 		return CreateResult{}, err
 	}
+	// 卡堆决策参与指纹：新决策改变方案集身份——重新生成既绕开语义键复用，
+	// 内容也由 decision_memory 快照引导（见 worker embedDecisions）。
+	decisions, err := s.listDecisions(ctx, cmd.UserID)
+	if err != nil {
+		return CreateResult{}, err
+	}
 	briefHash := BriefHash(brief)
 	key := PlanSetKey{
 		UserID:               cmd.UserID,
 		ReportID:             cmd.ReportID,
 		Scene:                brief.Scene,
 		BriefHash:            briefHash,
-		PlanningInputHash:    PlanningInputHash(report.ID, report.ProfileSnapshot, briefHash, memories),
+		PlanningInputHash:    PlanningInputHash(report.ID, report.ProfileSnapshot, briefHash, memories, decisions),
 		PlannerSchemaVersion: PlannerSchemaVersion,
 	}
 	if cmd.Refresh {
@@ -110,7 +117,7 @@ func (s *Service) CreatePlanSet(ctx context.Context, cmd CreateCommand) (CreateR
 }
 
 // GetPlanSet 返回不可变方案图;若装配了渲染只读端口,则在一次批量读取中
-// 合并各 variant 的当前渲染状态(不逐套 N+1,不写渲染表)。
+// 合并各 variant 的当前渲染状态(不逐套 N+1,不写渲染表);决策读投影同理合并。
 func (s *Service) GetPlanSet(ctx context.Context, userID, planSetID string) (domain.PlanSet, error) {
 	planSet, err := s.deps.Store.Get(ctx, userID, planSetID)
 	if err != nil {
@@ -119,31 +126,51 @@ func (s *Service) GetPlanSet(ctx context.Context, userID, planSetID string) (dom
 	if err := s.mergeRenders(ctx, userID, &planSet); err != nil {
 		return domain.PlanSet{}, err
 	}
+	if err := s.mergeDecisions(ctx, userID, &planSet); err != nil {
+		return domain.PlanSet{}, err
+	}
 	return planSet, nil
 }
 
-// ListPlanSets 返回报告下的方案集列表;渲染状态跨方案集一次批量合并,
-// 不按方案集逐个查询。
+// ListPlanSets 返回报告下的方案集列表;渲染状态与决策跨方案集各一次批量
+// 合并,不按方案集逐个查询。
 func (s *Service) ListPlanSets(ctx context.Context, userID, reportID string, scene *domain.Scene) ([]domain.PlanSet, error) {
 	sets, err := s.deps.Store.List(ctx, userID, reportID, scene)
 	if err != nil {
 		return nil, err
 	}
-	if s.deps.Renders == nil || len(sets) == 0 {
+	if len(sets) == 0 {
 		return sets, nil
 	}
-	variantIDs := make([]string, 0, len(sets)*3)
-	for _, planSet := range sets {
-		for _, variant := range planSet.Variants {
-			variantIDs = append(variantIDs, variant.ID)
+	if s.deps.Renders != nil {
+		variantIDs := make([]string, 0, len(sets)*3)
+		for _, planSet := range sets {
+			for _, variant := range planSet.Variants {
+				variantIDs = append(variantIDs, variant.ID)
+			}
+		}
+		current, err := s.deps.Renders.ListCurrentByVariantIDs(ctx, userID, variantIDs)
+		if err != nil {
+			return nil, err
+		}
+		for index := range sets {
+			mergeRenderViews(&sets[index], current)
 		}
 	}
-	current, err := s.deps.Renders.ListCurrentByVariantIDs(ctx, userID, variantIDs)
-	if err != nil {
-		return nil, err
-	}
-	for index := range sets {
-		mergeRenderViews(&sets[index], current)
+	if s.deps.Decisions != nil {
+		variantIDs := make([]string, 0, len(sets)*3)
+		for _, planSet := range sets {
+			for _, variant := range planSet.Variants {
+				variantIDs = append(variantIDs, variant.ID)
+			}
+		}
+		decisions, err := s.deps.Decisions.ListDecisionsByVariantIDs(ctx, userID, variantIDs)
+		if err != nil {
+			return nil, err
+		}
+		for index := range sets {
+			mergeDecisionViews(&sets[index], decisions)
+		}
 	}
 	return sets, nil
 }
