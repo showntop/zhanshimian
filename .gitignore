@@ -24,3 +24,8 @@ apps/*/.env
 .DS_Store
 coverage/
 *.log
+
+# 本地临时物料与 Serena 索引
+.serena/
+tmp/
+tmp2/
