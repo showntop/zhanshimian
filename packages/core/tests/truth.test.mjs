@@ -79,7 +79,14 @@ test('lookVideo: 空/WebP/WebM/非法拒绝，MP4 协议地址通过', () => {
 })
 
 test('常量与 isDisplayableImage 契约', () => {
-  assert.deepEqual([...LOCAL_LOOK_SLUGS], ['natural', 'sharp', 'warm'])
+  assert.deepEqual([...LOCAL_LOOK_SLUGS], [
+    'natural',
+    'sharp',
+    'warm',
+    'men-crop',
+    'men-side',
+    'men-texture'
+  ])
   assert.deepEqual([...LOOK_VARIANTS], ['full', 'portrait', 'report', 'hair', 'plan'])
   assert.equal(isDisplayableImage('http://dev.local:58000/a.jpg'), true)
   assert.equal(isDisplayableImage('ftp://x/a.jpg'), false)

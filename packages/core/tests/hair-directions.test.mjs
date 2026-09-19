@@ -31,9 +31,21 @@ test('方向名就是生成提示词：不出现红线禁词，且不与自定�
   }
 })
 
-test('没有包内参考图的方向不带 slug（不借别性别的模特图）', () => {
-  const men = hairDirectionViews('men', [])
-  assert.ok(men.every((view) => !view.slug), '男士方向不得指向内置模特图')
+test('参考图不跨性别：每一侧的 slug 都是本侧自己的素材', () => {
+  // 两侧都要看得见发型长什么样（不盲选），但男士只能拿 men-*、女士只能拿 women 三款
+  for (const gender of HAIR_GENDERS) {
+    const views = hairDirectionViews(gender, [])
+    for (const view of views) {
+      assert.ok(view.slug, `${gender} 方向「${view.name}」缺参考图，选择会变成盲选`)
+      const isMenAsset = String(view.slug).startsWith('men-')
+      assert.equal(isMenAsset, gender === 'men', `方向「${view.name}」的参考图跨性别了：${view.slug}`)
+    }
+  }
+  // 男士三张与女士三张不共用同一份素材
+  const womenSlugs = new Set(hairDirectionViews('women', []).map((view) => view.slug))
+  for (const view of hairDirectionViews('men', [])) {
+    assert.ok(!womenSlugs.has(view.slug), `男士方向借用了女士素材：${view.slug}`)
+  }
 })
 
 test('合并规则：服务端条目在前、unisex 两侧都出现、同 id 不重复', () => {

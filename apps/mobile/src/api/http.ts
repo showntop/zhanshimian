@@ -14,16 +14,23 @@ import { STORAGE_KEYS, tokenStore, writeStorage } from '../storage'
 
 export const baseURL = resolveBaseURL()
 
-const EXAMPLES: Record<LookSlug, number> = {
+// 男士发型方向（men-*）只有发型位有素材，与小程序同图同命名。
+const EXAMPLES: Partial<Record<LookSlug, number>> = {
   natural: require('../../assets/examples/natural.jpg'),
   sharp: require('../../assets/examples/sharp.jpg'),
   warm: require('../../assets/examples/warm.jpg'),
+  'men-crop': require('../../assets/examples/men-crop.jpg'),
+  'men-side': require('../../assets/examples/men-side.jpg'),
+  'men-texture': require('../../assets/examples/men-texture.jpg'),
 }
 
 setLocalLooksResolver({
   resolve(slug: LookSlug, _variant: LookVariant): string {
-    const asset = Image.resolveAssetSource(EXAMPLES[slug] ?? EXAMPLES.natural)
-    return asset?.uri ?? ''
+    // 没有对应素材就返回空（由调用方决定占位）——绝不回落到 natural，
+    // 否则男士方向会拿到女模特图（红线 3）
+    const asset = EXAMPLES[slug]
+    if (!asset) return ''
+    return Image.resolveAssetSource(asset)?.uri ?? ''
   },
 })
 

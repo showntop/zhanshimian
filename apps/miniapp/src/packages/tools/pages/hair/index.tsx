@@ -18,7 +18,8 @@ import {
   type DisplayMedia,
   type HairGender,
   type HairPreview,
-  type HairStyle
+  type HairStyle,
+  type LookSlug
 } from '@zsm/core'
 import { usePageShell, useShowOnce } from '../../../../hooks/use-page-visibility'
 import { peripherals } from '../../../../app/api/peripherals'
@@ -61,26 +62,51 @@ interface ResultSlot {
   tag?: string
   desc?: string
   media?: DisplayMedia | null
+  /** 包内参考图 slug：没生成过这个方向时用参考图撑卡面（不盲选） */
+  slug?: LookSlug
   preview?: HairPreview
 }
 
-// hero 照片两种出法，同一个相框（.hair--form：框高 = 一屏剩余高度）：
-// - 输入态（默认）：widthFix 按宽铺满、顶对齐、底部越界裁切——正脸照不裁脸不裁侧；
-// - 结果态（fill）：aspectFill 铺满相框。生成图是 4:3 横图、相框偏竖，居中裁的是
-//   两侧肩线，脸在画面中央不受影响；换来的是两页照片同位同高。
-function HeroPhoto(props: { media?: DisplayMedia | null; localPath?: string; fill?: boolean }) {
-  const { media, localPath, fill } = props
+/** 生成时间：只要「月日 时:分」——详情里的一行辅助信息，不需要年份 */
+function formatAt(iso?: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}`
+}
+
+/** 卡面角标里的短日期：9/18——完整时间在详情浮层里 */
+function formatDay(iso?: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getMonth() + 1}/${d.getDate()}`
+}
+
+// hero 照片：两态同一套映射规则（.hair--form：框高 = 一屏剩余高度）。
+// 不指定 mode，交给 SourceImage 按「图/框比例」自动选：
+// - 图比框瘦（9:16、3:4 竖照）→ 铺宽裁底：正脸照不裁脸不裁侧，只截掉下缘；
+// - 图比框扁（4:3、1:1 生成图）→ 铺高裁侧：填满框、纵向完整，不切到头顶。
+// 生成图是肩颈以上特写且比例不固定，用户原照比例也不固定——只有同一规则才能让
+// 任何比例都「填满框 + 不切头」，长按对比的两层也才不会错位。
+function HeroPhoto(props: {
+  media?: DisplayMedia | null
+  localPath?: string
+  /** 相框宽高比：组件据此在「铺宽裁底 / 铺高裁侧」之间自动选 */
+  frameAspect?: number
+}) {
+  const { media, localPath, frameAspect } = props
   // 工具新渲染层按 CORS 拦截 http://tmp/：本地路径渲染前换出（真机原样）
   const localDisplay = useDisplayablePath(localPath ?? '')
   return (
     <View className="hair__photo">
       {media ? (
-        <SourceImage
-          className={`hair__photo-img${fill ? ' hair__photo-img--fill' : ''}`}
-          media={media}
-          anchor={fill ? 'center' : 'top'}
-          mode={fill ? 'aspectFill' : 'widthFix'}
-        />
+        // 两态同一套规则（不指定 mode）：由组件按图/框比例自动选裁底还是裁侧。
+        // 生成图是肩颈以上特写且比例不定，用户原照可能是 9:16 全身——只有同一规则
+        // 才能保证「都填满框、都不切头」。长按对比的两层也走这里，切换才不错位。
+        <SourceImage className="hair__photo-img" media={media} anchor="top" frameAspect={frameAspect} />
       ) : localPath ? (
         <Image className="hair__photo-img" src={localDisplay} mode="widthFix" />
       ) : null}
@@ -99,6 +125,8 @@ export default function Hair() {
   const [customText, setCustomText] = useState('')
   const [customDraft, setCustomDraft] = useState('')
   const [customOpen, setCustomOpen] = useState(false)
+  // 结果详情（生成时间 / 基于的照片 / 方向）：浮层，不占一屏里的文档流
+  const [detailOpen, setDetailOpen] = useState(false)
   const [preview, setPreview] = useState<HairPreview | null>(null)
   // 生成历史（新到旧）：结果页底部横滑回放，「换个方向」的结果都留在这里
   const [history, setHistory] = useState<HairPreview[]>([])
@@ -115,7 +143,7 @@ export default function Hair() {
   const [genStage, setGenStage] = useState(0)
   // 用户已亲手选了照片 = 新意图：异步 resume 落地时不得把旧结果 adopt 回来劫持页面
   const freshIntentRef = useRef(false)
-  const { pageClass, enter } = usePageShell(!loading || Boolean(preview), '', 'hair')
+  const { pageClass, enter } = usePageShell(!loading || Boolean(preview), 'page--hair', 'hair')
 
   const touchHistory = (item: HairPreview) => {
     setHistory((prev) => [item, ...prev.filter((p) => p.id !== item.id)])
@@ -368,6 +396,37 @@ export default function Hair() {
   const failureText = failedOperation?.public_message || HAIR_COPY.generateFailed
   const readyHistory = history.filter((item) => item.state === 'ready' && item.media)
 
+  // 相框宽高比必须实测：框高是 flex 算出来的，写死就会在图/框比例判断上出错。
+  // 换结果时区块增减可能改变框高，所以跟着结果 id 再测一次。
+  const [heroFrame, setHeroFrame] = useState<{ w: number; h: number } | null>(null)
+  useEffect(() => {
+    Taro.nextTick(() => {
+      Taro.createSelectorQuery()
+        .select('.hair__hero')
+        .boundingClientRect((rect) => {
+          const w = Number((rect as { width?: number })?.width)
+          const h = Number((rect as { height?: number })?.height)
+          if (w > 0 && h > 0) setHeroFrame({ w, h })
+        })
+        .exec()
+    })
+  }, [preview?.id])
+  const heroAspect = heroFrame ? heroFrame.w / heroFrame.h : undefined
+
+  // 已生成的最新一张：选择态卡轨的第一张就是它——生成页因此能切回结果
+  const latestReady = useMemo(() => {
+    const dated = readyHistory.filter((item) => item.created_at)
+    dated.sort((a, b) => (String(a.created_at) < String(b.created_at) ? 1 : -1))
+    return dated[0] ?? readyHistory[0] ?? null
+  }, [readyHistory])
+
+  // 方向 id → 已生成的预览：卡面靠它区分「已生成（回放）」与「未生成（生成）」
+  const doneByStyle = useMemo(() => {
+    const map = new Map<string, HairPreview>()
+    for (const item of readyHistory) if (item.style_id) map.set(item.style_id, item)
+    return map
+  }, [readyHistory])
+
   // 结果页下半屏的横滑槽位：当前性别的全部方向 + 目录外的历史（换过性别、方向已下架）。
   // 有结果的方向带生成图（点它回放，不再花一次生成），没试过的带参考图（点它直接生成）——
   // 4:3 横图只占屏高三分之一，下半屏靠这条轨和固定 CTA 撑住。
@@ -379,6 +438,7 @@ export default function Hair() {
       tag: view.tag,
       desc: view.desc,
       media: view.media,
+      slug: view.slug,
       preview: readyHistory.find((item) => item.style_id === view.id),
     }))
     for (const item of readyHistory) {
@@ -392,6 +452,7 @@ export default function Hair() {
         name: known?.name ?? truncateLabel(item.style_name || HAIR_COPY.customName),
         tag: known?.tag,
         desc: known?.desc,
+        slug: known?.slug,
         preview: item,
       })
     }
@@ -447,22 +508,29 @@ export default function Hair() {
           （照片垫到视口顶 + scrim）、同一套一屏收束（hero 吃剩余高度）——
           照片同位同高、判词复用导语段、方向卡同尺寸同 y、主按钮同位（内联）。 */}
       <AppHeader title="发型设计" back onPhoto />
-      <View className="hair hair--form">
+      <View className={`hair hair--form${hasResult ? ' hair--done' : ''}`}>
         <View className={`hair__hero photo-hero photo-hero--bleed ${enter()}`}>
           <View className="hair__hero-frame">
             <View className="hair__hero-scrim" />
             {hasResult ? (
               // S3 结果：长按看原图——对比是直觉动作，不是模式切换
-              <View
-                className="hair__compare"
+              <>
+                <View
+                  className="hair__compare"
                 onTouchStart={() => setHoldOriginal(true)}
                 onTouchEnd={() => setHoldOriginal(false)}
                 onTouchCancel={() => setHoldOriginal(false)}
               >
-                <HeroPhoto media={preview!.media} fill />
+                <HeroPhoto media={preview!.media} frameAspect={heroAspect} />
+                {/* 杂志大片的四角裁切规线：结果态专属的编辑感记号 */}
+                <View className="hair__crop hair__crop--tl" />
+                <View className="hair__crop hair__crop--tr" />
+                <View className="hair__crop hair__crop--bl" />
+                <View className="hair__crop hair__crop--br" />
                 {preview!.source_media ? (
                   <View className={`hair__compare-original${holdOriginal ? ' hair__compare-original--on' : ''}`}>
-                    <HeroPhoto media={preview!.source_media} fill />
+                    {/* 对比层与结果层同规则：长按切换只是换图，构图不位移 */}
+                    <HeroPhoto media={preview!.source_media} frameAspect={heroAspect} />
                     <View className="hair__badge">
                       <Text>原本</Text>
                     </View>
@@ -474,10 +542,11 @@ export default function Hair() {
                   </View>
                 ) : null}
               </View>
+              </>
             ) : preview?.source_media ? (
               // S2 生成中：源图 + 沉浸等待（阶段文案 + 可离开明示），不是原地盖 mask
               <>
-                <HeroPhoto media={preview.source_media} />
+                <HeroPhoto media={preview.source_media} frameAspect={heroAspect} />
                 <View className="hair__badge">
                   <Text>原本</Text>
                 </View>
@@ -505,7 +574,7 @@ export default function Hair() {
             ) : reportFace ? (
               // S0 档案正脸：生成默认用这张，进来先看到自己的脸
               <>
-                <HeroPhoto media={reportFace} />
+                <HeroPhoto media={reportFace} frameAspect={heroAspect} />
                 <View className="hair__badge">
                   <Text>原本</Text>
                 </View>
@@ -525,15 +594,10 @@ export default function Hair() {
               </View>
             )}
             {!hasResult && !generating && !failed && (pendingPath || reportFace) ? (
-              // 输入透明化：将用哪张脸生成必须上屏
-              <>
-                <View className="hair__use-photo">
-                  <Text>{HAIR_COPY.useThisPhoto}</Text>
-                </View>
-                <View className="hair__hero-actions">
-                  <Text className="hair__hero-alt pressable" onClick={choosePhoto}>{HAIR_COPY.reselect}</Text>
-                </View>
-              </>
+              // 输入透明化：将用哪张脸生成必须上屏（换照片的动作已移到 CTA 下面）
+              <View className="hair__use-photo">
+                <Text>{HAIR_COPY.useThisPhoto}</Text>
+              </View>
             ) : null}
           </View>
         </View>
@@ -542,18 +606,26 @@ export default function Hair() {
           <>
             {/* 判词复用导语段（同类名同排布）：方向名当标题、说明当副行，
                 两页这一段的高度与位置因此一致，下面的卡行才有同一个 y */}
+            {/* 结论色带：整页的结论时刻。日期与详情都收进这条，hero 浮层只留长按提示 */}
             <View className={`hair__hint ${enter(1)}`}>
-              <Text className="hair__hint-title serif">{styleName}</Text>
-              <Text className="hair__hint-desc">{verdictDesc}</Text>
+              <View className="hair__hint-main">
+                <View className="hair__hint-titlerow">
+                  <Text className="hair__hint-title serif">{styleName}</Text>
+                  <Text className="hair__hint-day">{`✓ ${formatDay(preview?.created_at)}`}</Text>
+                </View>
+                <Text className="hair__hint-desc">{verdictDesc}</Text>
+              </View>
+              <Text className="hair__hint-detail pressable" onClick={() => setDetailOpen(true)}>
+                {`${HAIR_COPY.detail} ›`}
+              </Text>
             </View>
 
             {/* 方向区标题行：对应选择态的性别行（左标签 + 右动作），行高一致。
                 换方向由下面的卡行承担，这里右侧只留「换张照片」这条路 */}
+            {/* 右侧动作已下移到 CTA 下面（重来类动作跟着主按钮走）；
+                这一行只留标签，行高仍与选择态的性别分段一致 */}
             <View className={`hair__gender ${enter(2)}`}>
               <Text className="hair__gender-label">{HAIR_COPY.directionLabel}</Text>
-              <Text className="hair__gender-alt pressable" onClick={() => setPreview(null)}>
-                {HAIR_COPY.retakePhoto}
-              </Text>
             </View>
 
             {/* 卡面语义只有两类：有生成图＝试过的（点它调出来看），没图＝可选项
@@ -563,13 +635,22 @@ export default function Hair() {
                 {resultSlots.map((slot) => (
                   <View
                     key={slot.key}
-                    className={`hair__card${slot.styleId === styleId ? ' hair__card--active' : ''} pressable`}
+                    className={`hair__card${slot.styleId === styleId ? ' hair__card--active' : ''}${
+                      slot.preview?.media || slot.media || slot.slug ? '' : ' hair__card--blanked'
+                    } pressable`}
                     onClick={() => openSlot(slot)}
                   >
                     {slot.preview?.media ? (
                       <SourceImage className="hair__card-img" media={slot.preview.media} anchor="top" />
                     ) : slot.media ? (
                       <SourceImage className="hair__card-img" media={slot.media} anchor="top" />
+                    ) : slot.slug ? (
+                      // 没试过的方向同样给参考图：先看长什么样，点了才生成
+                      <SourceImage
+                        className="hair__card-img"
+                        reference={{ slug: slot.slug, variant: 'hair' }}
+                        mode="aspectFill"
+                      />
                     ) : slot.styleId === CUSTOM_DIRECTION_ID ? (
                       <View className="hair__card-blank">
                         <Text className="hair__card-blank-plus">＋</Text>
@@ -583,10 +664,24 @@ export default function Hair() {
                       <Text className="hair__card-name">{slot.name}</Text>
                       {slot.tag ? <Text className="hair__card-tag">{slot.tag}</Text> : null}
                     </View>
+                    {slot.preview ? (
+                      <Text className="hair__card-state hair__card-state--done">
+                        {`✓ ${formatDay(slot.preview.created_at)}`}
+                      </Text>
+                    ) : (
+                      <Text className="hair__card-state">{HAIR_COPY.slotTodo}</Text>
+                    )}
                   </View>
                 ))}
               </View>
             </ScrollView>
+
+            {/* 参考图来源说明（红线 2：角标不上屏，来源由这行文字承担）。
+                两态用同一个条件：这一行出现/消失会让 hero（唯一可伸缩项）变高变矮，
+                切换时照片就跳一下 */}
+            {directions.some((opt) => opt.slug) ? (
+              <Text className="hair__ref-note">{HAIR_COPY.referenceNote}</Text>
+            ) : null}
 
             {/* 主按钮与选择态同一位置（内联，按钮下不再挂链接） */}
             <View className={`hair__foot hair__foot--inline ${enter(3)}`}>
@@ -599,13 +694,23 @@ export default function Hair() {
                   else void save()
                 }}
               />
+              {/* 重来类动作跟在 CTA 下面；这一行两态都在，foot 高度恒定 */}
+              <View className="hair__foot-row">
+                <Text className="hair__foot-alt pressable" onClick={() => setPreview(null)}>
+                  {HAIR_COPY.retakePhoto}
+                </Text>
+              </View>
             </View>
           </>
         ) : (
           <>
             <View className={`hair__hint ${enter(1)}`}>
-              <Text className="hair__hint-title">{HAIR_COPY.title}</Text>
-              <Text className="hair__hint-desc">{activeDesc}</Text>
+              <View className="hair__hint-main">
+                <View className="hair__hint-titlerow">
+                  <Text className="hair__hint-title serif">{HAIR_COPY.title}</Text>
+                </View>
+                <Text className="hair__hint-desc">{activeDesc}</Text>
+              </View>
             </View>
 
             {/* S1 性别分段：方向目录按性别分组，先选这一侧再看方向 */}
@@ -627,30 +732,66 @@ export default function Hair() {
                 末尾一张「自定义」卡：没有合适的方向时用自己的话描述 */}
             <ScrollView scroll-x enhanced showScrollbar={false} className={`hair__cards ${enter(2)}`}>
               <View className="hair__cards-rail">
+                {/* 回程入口：生成页能切回结果。放在卡轨里而不是另起一行——
+                    横滑轨道长度变化不影响 hero（唯一可伸缩项）高度，两态仍同高 */}
+                {latestReady ? (
+                  <View
+                    className="hair__card hair__card--done pressable"
+                    onClick={() => adoptFromHistory(latestReady)}
+                  >
+                    <SourceImage className="hair__card-img" media={latestReady.media} anchor="top" />
+                    <Text className="hair__card-state hair__card-state--done">
+                      {`✓ ${formatDay(latestReady.created_at)}`}
+                    </Text>
+                    <View className="hair__card-body">
+                      <Text className="hair__card-name">{truncateLabel(latestReady.style_name)}</Text>
+                      <Text className="hair__card-tag">{HAIR_COPY.backToResult}</Text>
+                    </View>
+                  </View>
+                ) : null}
                 {directions.map((opt) => (
                   <View
                     key={opt.id}
-                    className={`hair__card${styleId === opt.id ? ' hair__card--active' : ''} pressable`}
+                    className={`hair__card${styleId === opt.id ? ' hair__card--active' : ''}${
+                      opt.media || opt.slug ? '' : ' hair__card--blanked'
+                    } pressable`}
                     onClick={() => setStyleId(opt.id)}
                   >
                     {opt.media ? (
                       <SourceImage className="hair__card-img" media={opt.media} anchor="top" />
+                    ) : opt.slug ? (
+                      // 包内参考图（红线 3 的唯一入口 exampleImage）：先看见发型长什么样
+                      // 再决定，卡面自带弱化 + 下方来源说明
+                      <SourceImage
+                        className="hair__card-img"
+                        reference={{ slug: opt.slug, variant: 'hair' }}
+                        mode="aspectFill"
+                      />
                     ) : (
-                      // 内置示例模特已从主流程退役（红线修订）：没有服务端图的方向只出
-                      // 文字卡，不再拿内置模特图当「风格参考」混在卡面里
                       <View className="hair__card-blank">
                         <Image className="hair__card-blank-icon" src={HAIR_ICON} mode="aspectFit" />
                       </View>
                     )}
+                    {/* 卡面只留名与差异标签：一句「适合谁」由上方导语按选中项承载，
+                        不再挤在 224rpx 的卡里 */}
                     <View className="hair__card-body">
                       <Text className="hair__card-name">{opt.name}</Text>
                       {opt.tag ? <Text className="hair__card-tag">{opt.tag}</Text> : null}
-                      {opt.desc ? <Text className="hair__card-desc">{opt.desc}</Text> : null}
                     </View>
+                    {/* 状态角标：已生成＝你自己的效果图（点了回放），未生成＝内置参考图 */}
+                    {doneByStyle.get(opt.id) ? (
+                      <Text className="hair__card-state hair__card-state--done">
+                        {`✓ ${formatDay(doneByStyle.get(opt.id)?.created_at)}`}
+                      </Text>
+                    ) : (
+                      <Text className="hair__card-state">{HAIR_COPY.slotTodo}</Text>
+                    )}
                   </View>
                 ))}
                 <View
-                  className={`hair__card hair__card--custom${customActive ? ' hair__card--active' : ''} pressable`}
+                  className={`hair__card hair__card--custom hair__card--blanked${
+                    customActive ? ' hair__card--active' : ''
+                  } pressable`}
                   onClick={() => !busy && openCustom()}
                 >
                   <View className="hair__card-blank">
@@ -674,6 +815,11 @@ export default function Hair() {
               </View>
             ) : null}
 
+            {/* 与结果态同位同条件：这一行的出现/消失会改变 hero（唯一可伸缩项）的高度 */}
+            {directions.some((opt) => opt.slug) ? (
+              <Text className="hair__ref-note">{HAIR_COPY.referenceNote}</Text>
+            ) : null}
+
             <View className={`hair__foot hair__foot--inline ${enter(3)}`}>
               <PrimaryButton
                 text={primaryText}
@@ -684,13 +830,19 @@ export default function Hair() {
                   else void generate(false)
                 }}
               />
-              {needsPhoto ? (
-                <View className="hair__foot-row">
+              {/* 次级动作常驻（有照片＝重选，没照片＝看示例）：与结果态的 foot
+                  同为「按钮 + 一行」，foot 高度不随态变，hero 也就不会漂 */}
+              <View className="hair__foot-row">
+                {needsPhoto ? (
                   <Text className="hair__foot-alt pressable" onClick={() => void generate(true)}>
                     {HAIR_COPY.demo}
                   </Text>
-                </View>
-              ) : null}
+                ) : (
+                  <Text className="hair__foot-alt pressable" onClick={choosePhoto}>
+                    {HAIR_COPY.reselect}
+                  </Text>
+                )}
+              </View>
             </View>
           </>
         )}
@@ -724,6 +876,29 @@ export default function Hair() {
             onClick={submitCustom}
           />
           {!customDraft.trim() ? <Text className="hair__custom-empty">{HAIR_COPY.customEmpty}</Text> : null}
+        </View>
+      </BottomSheet>
+
+      {/* 结果详情：生成时间 / 基于哪张照片 / 方向。浮层承载，不占一屏里的文档流 */}
+      <BottomSheet open={detailOpen} title={HAIR_COPY.detailTitle} onClose={() => setDetailOpen(false)}>
+        <View className="hair__detail">
+          <View className="hair__detail-row">
+            <Text className="hair__detail-label">{HAIR_COPY.detailTime}</Text>
+            <Text className="hair__detail-value">{formatAt(preview?.created_at)}</Text>
+          </View>
+          <View className="hair__detail-row">
+            <Text className="hair__detail-label">{HAIR_COPY.detailSource}</Text>
+            {preview?.source_media ? (
+              <SourceImage className="hair__detail-thumb" media={preview.source_media} anchor="top" />
+            ) : (
+              <Text className="hair__detail-value">—</Text>
+            )}
+          </View>
+          <View className="hair__detail-row">
+            <Text className="hair__detail-label">{HAIR_COPY.detailDirection}</Text>
+            <Text className="hair__detail-value">{styleName}</Text>
+          </View>
+          <Text className="hair__detail-note">{HAIR_COPY.resultNote}</Text>
         </View>
       </BottomSheet>
     </View>

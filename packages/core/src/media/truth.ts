@@ -7,7 +7,9 @@
 // - isBundledAsset()：服务端下发的 /assets/(looks|plans|portraits|reports|hair)/*
 //   是与包内同源的内置模特素材，命中时按示例图对待（叠角标），不论 URL 是否可渲染。
 
-export const LOCAL_LOOK_SLUGS = ['natural', 'sharp', 'warm'] as const
+// 后三个是发型页的男士方向参考图：只有 hair 位有真实资产（assets/hair/men-*.jpg），
+// 其它 variant 位不存在对应素材——映射里填的是同一张，但**只有 hair 位允许使用**。
+export const LOCAL_LOOK_SLUGS = ['natural', 'sharp', 'warm', 'men-crop', 'men-side', 'men-texture'] as const
 export const LOOK_VARIANTS = ['full', 'portrait', 'report', 'hair', 'plan'] as const
 
 export type LookSlug = (typeof LOCAL_LOOK_SLUGS)[number]
@@ -40,6 +42,29 @@ const BUNDLED_LOOK_PATHS: Record<LookSlug, Record<LookVariant, string>> = {
     report: '/assets/reports/warm.jpg',
     hair: '/assets/hair/warm.jpg',
     plan: '/assets/plans/warm.jpg'
+  },
+  // 男士发型方向：只有 hair 位有真实资产，其余位是为了满足映射完整性填的同一个
+  // 路径——**调用方只能用 variant: 'hair'**，拿它当 full/portrait 用就是错配素材。
+  'men-crop': {
+    full: '/assets/hair/men-crop.jpg',
+    portrait: '/assets/hair/men-crop.jpg',
+    report: '/assets/hair/men-crop.jpg',
+    hair: '/assets/hair/men-crop.jpg',
+    plan: '/assets/hair/men-crop.jpg'
+  },
+  'men-side': {
+    full: '/assets/hair/men-side.jpg',
+    portrait: '/assets/hair/men-side.jpg',
+    report: '/assets/hair/men-side.jpg',
+    hair: '/assets/hair/men-side.jpg',
+    plan: '/assets/hair/men-side.jpg'
+  },
+  'men-texture': {
+    full: '/assets/hair/men-texture.jpg',
+    portrait: '/assets/hair/men-texture.jpg',
+    report: '/assets/hair/men-texture.jpg',
+    hair: '/assets/hair/men-texture.jpg',
+    plan: '/assets/hair/men-texture.jpg'
   }
 }
 

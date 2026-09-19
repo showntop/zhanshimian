@@ -12,7 +12,7 @@
 //
 // 人像裁切：微信 aspectFill 只能居中裁，全身照放进矮框会切头。
 // anchor="top" 改为 cover + 顶对齐（先按宽铺满裁底；图比相框更扁时改按高铺满裁侧）。
-import { memo, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Image, Text, View } from '@tarojs/components'
 import {
   IMAGE_BADGE_COPY,
@@ -114,17 +114,33 @@ function SourceImage(props: SourceImageProps) {
   // 衬底只留给顶对齐自动铺满（短框裁底），显式 mode 不再铺第二层图。
   const useBackdrop = anchor === 'top' && !mode
 
+  // 记住最近一次加载的真实宽高：frameAspect 是异步实测的（SelectorQuery），
+  // 常常晚于图片 onLoad——不补判的话 fill 会永远停在默认的 width，
+  // 比框扁的图（4:3 生成图进竖框）就铺不满，下方空出一截。
+  const lastSizeRef = useRef<{ w: number; h: number } | null>(null)
+  const applyFill = useCallback(
+    (aspect?: number) => {
+      if (anchor !== 'top' || mode || !aspect) return
+      const size = lastSizeRef.current
+      if (!size) return
+      const next = size.w / size.h > aspect ? 'height' : 'width'
+      setFill((prev) => (prev === next ? prev : next))
+    },
+    [anchor, mode]
+  )
+
   const handleLoad: SourceImageBaseProps['onLoad'] = (event) => {
-    if (anchor === 'top' && !mode && frameAspect) {
-      const w = Number(event.detail.width)
-      const h = Number(event.detail.height)
-      if (w > 0 && h > 0) {
-        const next = w / h > frameAspect ? 'height' : 'width'
-        setFill((prev) => (prev === next ? prev : next))
-      }
-    }
+    const w = Number(event.detail.width)
+    const h = Number(event.detail.height)
+    if (w > 0 && h > 0) lastSizeRef.current = { w, h }
+    applyFill(frameAspect)
     onLoad?.(event)
   }
+
+  // 框比例后到：用已记住的图片尺寸补一次判定
+  useEffect(() => {
+    applyFill(frameAspect)
+  }, [applyFill, frameAspect])
 
   return (
     <View

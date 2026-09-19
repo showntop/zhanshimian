@@ -578,6 +578,20 @@ export const HAIR_COPY = {
   retakePhoto: '换张照片再试',
   // 结果页边界说明：只改发型，其余保持原样（与提示词的约束同一件事）
   resultNote: '只改了发型；五官、妆容、服装和背景保持原样',
+  // 方向卡的参考图来源说明（红线 2：角标不上屏，CTA 下保留文字来源说明）
+  referenceNote: '方向图为内置示例；效果预览基于你的照片生成',
+  // 卡面状态：用「生成没生成」区分，不用来源标识——已生成＝你自己的效果图（点了回放），
+  // 未生成＝内置参考图（点了才生成）。来源统一由 referenceNote 交代。
+  slotDone: '已生成',
+  slotTodo: '未生成',
+  // 选择态回到上次效果的入口（生成页能切回结果的回程）
+  backToResult: '回到上次效果',
+  // 结果详情：时间 / 基于哪张照片 / 方向
+  detail: '详情',
+  detailTitle: '效果详情',
+  detailTime: '生成时间',
+  detailSource: '基于的照片',
+  detailDirection: '方向',
   // 结果页下半屏的横滑：全部方向铺开，点了就换（试过的回放、没试过的直接生成）
   directionLabel: '换个方向看看',
   changePhoto: '换一张照片',

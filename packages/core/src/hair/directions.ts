@@ -29,17 +29,17 @@ export interface HairDirection {
 }
 
 /**
- * 女士方向沿用原三款（有包内参考图）。
- * 男士方向没有包内参考图：宁可出文本卡，也不拿女模特图冒充男士方向
- * （红线 2/3：内置图只经 exampleImage，不给没验证过的图配参考语义）。
+ * 两侧都有包内参考图：选方向不是盲选，先看见发型长什么样再决定。
+ * 图只经 exampleImage（variant 固定 'hair'），卡面叠弱化 + CTA 下来源说明
+ * （红线 2/3：内置图不给未经确认的参考语义，男士不拿女模特图顶替）。
  */
 export const HAIR_DIRECTIONS: readonly HairDirection[] = [
   { id: 'sharp', name: '锁骨层次发', tag: '中长 · 层次', desc: '修饰脸型线条，利落不挑人', gender: 'women', slug: 'sharp' },
   { id: 'warm', name: '空气微卷', tag: '微卷 · 蓬松', desc: '蓬松显发量，柔和日常感', gender: 'women', slug: 'warm' },
   { id: 'natural', name: '自然偏分', tag: '偏分 · 利落', desc: '干净利落，省心百搭', gender: 'women', slug: 'natural' },
-  { id: 'men-crop', name: '清爽短寸', tag: '短寸 · 精神', desc: '剪短就好打理，日常最省心', gender: 'men' },
-  { id: 'men-side', name: '侧分短碎', tag: '侧分 · 利落', desc: '露出额头更利落，正式场合也稳', gender: 'men' },
-  { id: 'men-texture', name: '纹理蓬松', tag: '纹理 · 蓬松', desc: '顶部留一点长度，看起来更蓬松', gender: 'men' }
+  { id: 'men-crop', name: '清爽短寸', tag: '短寸 · 精神', desc: '剪短就好打理，日常最省心', gender: 'men', slug: 'men-crop' },
+  { id: 'men-side', name: '侧分短碎', tag: '侧分 · 利落', desc: '露出额头更利落，正式场合也稳', gender: 'men', slug: 'men-side' },
+  { id: 'men-texture', name: '纹理蓬松', tag: '纹理 · 蓬松', desc: '顶部留一点长度，看起来更蓬松', gender: 'men', slug: 'men-texture' }
 ]
 
 /** 自定义方向的 style_id：目录里没有，方向名由用户写（≤40 字）。 */
