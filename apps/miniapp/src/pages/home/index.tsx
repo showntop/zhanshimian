@@ -35,6 +35,7 @@ import { useDailyPick } from '../../features/daily/use-daily-pick'
 import { usePageShell } from '../../hooks/use-page-visibility'
 import AppHeader from '../../components/app-header'
 import DailyPoster from '../../components/daily-poster'
+import DailyWaiting from '../../components/daily-waiting'
 import PrimaryButton from '../../components/primary-button'
 import SourceImage from '../../components/source-image'
 import ErrorState from '../../components/error-state'
@@ -225,8 +226,11 @@ export default function Home() {
 
   // 每日内容：与今日页共用同一个状态机（服务端幂等保证同一天同一条），
   // 首页只放海报（精简），点进去看完整；生成中不占首页空间。
-  const { phase, content: dailyContent, bucketName: dailyBucketName, saveCurrent } = useDailyPick()
+  const { phase, content: dailyContent, bucketName: dailyBucketName, saveCurrent, scenario } = useDailyPick()
   const dailyReady = phase === 'settling' || phase === 'content'
+  // 生成中与选品中都播过场动画：首页只在上屏后渲染海报，
+  // 这两段不给东西的话，等待期间首页这块是空的。
+  const dailyWaiting = phase === 'loading' || phase === 'waiting'
 
   // 海报角落编号用日期而非序号：序号是静态的，日期才有"每天换一张"的时间感
   const todaySeq = useMemo(() => {
@@ -382,6 +386,10 @@ export default function Home() {
                     onSave={saveCurrent}
                     onOpen={goToday}
                   />
+                </View>
+              ) : dailyWaiting ? (
+                <View className={`home__daily-waiting ${enter(1)}`}>
+                  <DailyWaiting scenario={scenario} settling={false} />
                 </View>
               ) : null}
               {/* 报告退位：不再是首页主角，但入口保留，降级为一行 */}

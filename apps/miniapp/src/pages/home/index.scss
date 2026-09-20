@@ -377,6 +377,15 @@
   // ---------- 每日内容（今天这一条）----------
   // 已改为海报式（图文同层、承载块跟随文字），样式收在 components/daily-poster/index.scss
 
+  // 等待动画与海报同区同宽：一样出血通栏，避免生成完海报时宽度跳一下
+  &__daily-waiting {
+    margin-left: -32rpx;
+    margin-right: -32rpx;
+    border-radius: 24rpx;
+    background: var(--moss-soft);
+    overflow: hidden;
+  }
+
   // 报告退位：不再是首页主角，入口降级为一行
   // 但数字是用户的"进展感"锚点：大数字 + 小后缀，左链接提权重压住平衡
   &__archive {
