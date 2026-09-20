@@ -8,10 +8,13 @@ import (
 )
 
 const (
-	// generateTotalTimeout 客户端动画硬超时对齐（方案 §2.6）。
-	generateTotalTimeout = 6 * time.Second
-	// llmTimeout 留 1s 给校验与落库。
-	llmTimeout = 5 * time.Second
+	// generateTotalTimeout 整条生成链路的上界：LLM + 校验 +（失败重试一次）+ 落库。
+	// 早期按「客户端动画 6s」倒推设成 6s，实测结构化输出在这个模型上普遍要 10s+，
+	// 结果 daily_content 全部超时落兜底（日志 latency_ms≈5000 context deadline exceeded）。
+	// 客户端等待动画是循环的、接口返回才落位，放宽不影响体验；宁可慢也不落兜底。
+	generateTotalTimeout = 48 * time.Second
+	// llmTimeout 单次调用上限（模型侧 timeout 是 120s，这里是业务侧更早的闸）。
+	llmTimeout = 20 * time.Second
 	// pickTTL 选品快照有效期。
 	pickTTL = 5 * time.Minute
 	// seenWindowDays 历史去重窗口。
