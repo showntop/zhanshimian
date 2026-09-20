@@ -6,8 +6,8 @@
   "appid": "wx911e0fbcba0b24d0",
   "libVersion": "trial",
   "setting": {
-    "es6": true,
-    "enhance": true,
+    "es6": false,
+    "enhance": false,
     "postcss": true,
     "minified": true,
     "minifyWXSS": true,
