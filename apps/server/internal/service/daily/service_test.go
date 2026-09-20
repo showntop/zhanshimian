@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -56,7 +57,6 @@ type fakeContent struct {
 	mu          sync.Mutex
 	today       map[string]domain.DailyContent
 	pool        []domain.DailyContent
-	factIDs     []string
 	contentKeys []string
 	saved       []domain.DailyContent
 }
@@ -96,10 +96,15 @@ func (f *fakeContent) FallbackPool(context.Context) ([]domain.DailyContent, erro
 	return append([]domain.DailyContent{}, f.pool...), nil
 }
 
-func (f *fakeContent) RecentFactIDs(context.Context, string, time.Time) ([]string, error) {
+// RecentContents 模拟真实仓储：新到旧、至多 limit 条。
+func (f *fakeContent) RecentContents(_ context.Context, _ string, _ time.Time, limit int) ([]domain.DailyContent, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([]string{}, f.factIDs...), nil
+	out := []domain.DailyContent{}
+	for i := len(f.saved) - 1; i >= 0 && len(out) < limit; i-- {
+		out = append(out, f.saved[i])
+	}
+	return out, nil
 }
 
 func (f *fakeContent) RecentContentKeys(context.Context, string, time.Time) ([]string, error) {
@@ -179,16 +184,18 @@ func (f *fakeCollections) CountCollections(context.Context, string) (map[string]
 }
 
 type fakePlanner struct {
-	mu      sync.Mutex
-	outputs []daily.ContentOutput
-	err     error
-	calls   int
+	mu       sync.Mutex
+	outputs  []daily.ContentOutput
+	err      error
+	calls    int
+	requests []daily.ContentRequest
 }
 
-func (f *fakePlanner) Generate(context.Context, daily.ContentRequest) (daily.ContentOutput, error) {
+func (f *fakePlanner) Generate(_ context.Context, request daily.ContentRequest) (daily.ContentOutput, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls++
+	f.requests = append(f.requests, request)
 	if f.err != nil {
 		return daily.ContentOutput{}, f.err
 	}
@@ -215,12 +222,13 @@ func fact(id, domainName, factText string, geneFit domain.GeneCondition) domain.
 	}
 }
 
-func goodOutput(refs ...int) daily.ContentOutput {
+func goodOutput() daily.ContentOutput {
 	return daily.ContentOutput{
-		Topic: "冬天的白，不止一种",
-		Lead:  "本白、米白、奶油白，上身差很多。",
-		Fit:   "你是冷调肤色，本白贴着皮肤气色往上走。",
-		Why:   "白色也有色温，先看冷暖再看明度。",
+		Topic:    "冬天的白，不止一种",
+		Lead:     "本白、米白、奶油白，上身差很多。",
+		Fit:      "你是冷调肤色，本白贴着皮肤气色往上走。",
+		Why:      "白色也有色温，先看冷暖再看明度。",
+		Category: "color",
 		Visual: daily.VisualDraft{
 			Modality: "swatch", Alt: "四种白色并排",
 			Items: []daily.VisualItem{
@@ -228,7 +236,6 @@ func goodOutput(refs ...int) daily.ContentOutput {
 				{Label: "米白", Tone: "#EFEADC", State: "drop"},
 			},
 		},
-		Refs: refs,
 	}
 }
 
@@ -260,32 +267,21 @@ func TestPrepareCacheHitWhenTodayContentExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	if !result.CacheHit || result.PickToken != "" || result.Scenario != "color" {
+	if !result.CacheHit || result.Scenario != "color" {
 		t.Fatalf("result = %#v", result)
 	}
 }
 
-func TestPrepareFiltersFactsByGeneAndSeen(t *testing.T) {
-	facts := fakeKnowledge{facts: []domain.KnowledgeFact{
-		fact("f-small", "fit", "骨架小的事实", domain.GeneCondition{"frame": {"small"}}),
-		fact("f-large", "fit", "骨架大的事实", domain.GeneCondition{"frame": {"large"}}),
-		fact("f-any", "color", "不挑人的事实", nil),
-	}}
-	// 身高 155 + 体重 45 → petite/small。
-	reader := fakeReader{grounding: daily.Grounding{HeightCM: 155, WeightKG: ptrFloat(45)}}
+func TestPrepareMissReturnsEmptyScenario(t *testing.T) {
 	content := newFakeContent(nil)
-	content.factIDs = []string{"f-any"} // 近期已推过
-	service := newService(t, reader, facts, content, &fakeRuns{}, &fakeCollections{}, &fakePlanner{})
+	service := newService(t, fakeReader{}, fakeKnowledge{}, content, &fakeRuns{}, &fakeCollections{}, &fakePlanner{})
 
 	result, err := service.Prepare(context.Background(), "user-1", "")
 	if err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
-	if result.CacheHit {
-		t.Fatalf("unexpected cache hit: %#v", result)
-	}
-	if result.Scenario == "" {
-		t.Fatalf("scenario empty: %#v", result)
+	if result.CacheHit || result.Scenario != "" || result.GenDate != "2026-09-20" {
+		t.Fatalf("result = %#v", result)
 	}
 }
 
@@ -297,22 +293,18 @@ func TestGenerateSuccessPersistsContentAndRun(t *testing.T) {
 	facts := fakeKnowledge{facts: []domain.KnowledgeFact{fact("f-1", "color", "不挑人的事实", nil)}}
 	content := newFakeContent(nil)
 	runs := &fakeRuns{}
-	planner := &fakePlanner{outputs: []daily.ContentOutput{goodOutput(1)}}
+	planner := &fakePlanner{outputs: []daily.ContentOutput{goodOutput()}}
 	service := newService(t, fakeReader{}, facts, content, runs, &fakeCollections{}, planner)
 
-	prepare, err := service.Prepare(context.Background(), "user-1", "")
-	if err != nil {
-		t.Fatalf("prepare: %v", err)
-	}
-	if prepare.CacheHit || prepare.PickToken == "" {
-		t.Fatalf("prepare = %#v", prepare)
-	}
-	result, err := service.Generate(context.Background(), "user-1", prepare.PickToken)
+	result, err := service.Generate(context.Background(), "user-1", "")
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
 	if result.Source != daily.SourceGenerated || result.Content.Topic == "" || result.Content.DedupeKey == "" {
 		t.Fatalf("result = %#v", result)
+	}
+	if result.Content.Category != "color" {
+		t.Fatalf("category = %q, want 模型自报 color", result.Content.Category)
 	}
 	if content.today["user-1|2026-09-20"].Topic != result.Content.Topic {
 		t.Fatalf("content not persisted: %#v", content.today)
@@ -322,10 +314,54 @@ func TestGenerateSuccessPersistsContentAndRun(t *testing.T) {
 	}
 }
 
+// 语境聚合：参考事实按基因过滤、历史与画像注入 prompt、请求里没有旧字段。
+func TestGenerateBuildsContextForPlanner(t *testing.T) {
+	facts := fakeKnowledge{facts: []domain.KnowledgeFact{
+		fact("f-small", "fit", "骨架小的事实", domain.GeneCondition{"frame": {"small"}}),
+		fact("f-large", "fit", "骨架大的事实", domain.GeneCondition{"frame": {"large"}}),
+		fact("f-any", "color", "不挑人的事实", nil),
+	}}
+	// 身高 155 + 体重 45 → petite/small。
+	reader := fakeReader{grounding: daily.Grounding{HeightCM: 155, WeightKG: ptrFloat(45)}}
+	content := newFakeContent(nil)
+	content.saved = append(content.saved, domain.DailyContent{
+		UserID: "user-1", GenDate: "2026-09-19", Category: "fabric", Topic: "昨天的主题", DedupeKey: "gen:2026-09-19:fabric",
+	})
+	planner := &fakePlanner{outputs: []daily.ContentOutput{goodOutput()}}
+	service := newService(t, reader, facts, content, &fakeRuns{}, &fakeCollections{}, planner)
+
+	if _, err := service.Generate(context.Background(), "user-1", "上海"); err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if len(planner.requests) != 1 {
+		t.Fatalf("planner calls = %d", len(planner.requests))
+	}
+	request := planner.requests[0]
+	if !strings.Contains(request.HistoryText, "昨天的主题") {
+		t.Fatalf("history not injected: %q", request.HistoryText)
+	}
+	if !strings.Contains(request.GeneText, "身高中等偏下") {
+		t.Fatalf("gene not injected: %q", request.GeneText)
+	}
+	if !strings.Contains(request.ContextText, "2026-09-20") {
+		t.Fatalf("context not injected: %q", request.ContextText)
+	}
+	domains := map[string]bool{}
+	for _, fact := range request.ReferenceFacts {
+		domains[fact.Fact] = true
+	}
+	if domains["骨架大的事实"] {
+		t.Fatalf("gene filter missed: %#v", request.ReferenceFacts)
+	}
+	if !domains["不挑人的事实"] {
+		t.Fatalf("neutral fact dropped: %#v", request.ReferenceFacts)
+	}
+}
+
 func TestGenerateIsIdempotentPerDay(t *testing.T) {
 	facts := fakeKnowledge{facts: []domain.KnowledgeFact{fact("f-1", "color", "不挑人的事实", nil)}}
 	content := newFakeContent(nil)
-	planner := &fakePlanner{outputs: []daily.ContentOutput{goodOutput(1)}}
+	planner := &fakePlanner{outputs: []daily.ContentOutput{goodOutput()}}
 	service := newService(t, fakeReader{}, facts, content, &fakeRuns{}, &fakeCollections{}, planner)
 
 	first, err := service.Generate(context.Background(), "user-1", "")
@@ -351,7 +387,7 @@ func TestGenerateFallsBackWhenPlannerFails(t *testing.T) {
 	planner := &fakePlanner{err: errors.New("llm down")}
 	service := newService(t, fakeReader{}, facts, content, runs, &fakeCollections{}, planner)
 
-	result, err := service.Generate(context.Background(), "user-1", "bad-token")
+	result, err := service.Generate(context.Background(), "user-1", "")
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -369,10 +405,10 @@ func TestGenerateFallsBackWhenPlannerFails(t *testing.T) {
 	}
 }
 
-func TestGenerateFallsBackWhenNoFacts(t *testing.T) {
+func TestGenerateFallsBackWhenNoPlanner(t *testing.T) {
 	content := newFakeContent([]domain.DailyContent{poolItem("pool-1", "fit", "fit.x")})
 	runs := &fakeRuns{}
-	service := newService(t, fakeReader{}, fakeKnowledge{}, content, runs, &fakeCollections{}, &fakePlanner{})
+	service := daily.New(fakeReader{}, fakeKnowledge{}, content, runs, &fakeCollections{}, fixedClock{now: testNow})
 
 	result, err := service.Generate(context.Background(), "user-1", "")
 	if err != nil {
@@ -381,7 +417,7 @@ func TestGenerateFallsBackWhenNoFacts(t *testing.T) {
 	if result.Source != daily.SourceFallback {
 		t.Fatalf("source = %s", result.Source)
 	}
-	if len(runs.runs) != 1 || runs.runs[0].Validation["reason"] != "no_facts" {
+	if len(runs.runs) != 1 || runs.runs[0].Validation["reason"] != "no_planner" {
 		t.Fatalf("runs = %#v", runs.runs)
 	}
 }
@@ -390,12 +426,12 @@ func TestGenerateRetriesOnceOnValidationFailureThenAccepts(t *testing.T) {
 	facts := fakeKnowledge{facts: []domain.KnowledgeFact{fact("f-1", "color", "不挑人的事实", nil)}}
 	content := newFakeContent(nil)
 	planner := &fakePlanner{outputs: []daily.ContentOutput{
-		{Topic: "你的颜值亮点", Lead: "导语", Fit: "适配", Why: "原理", Visual: goodOutput(1).Visual, Refs: []int{1}},
-		goodOutput(1),
+		{Topic: "你的颜值亮点", Lead: "导语", Fit: "适配", Why: "原理", Category: "color", Visual: goodOutput().Visual},
+		goodOutput(),
 	}}
 	service := newService(t, fakeReader{}, facts, content, &fakeRuns{}, &fakeCollections{}, planner)
 
-	result, err := service.Generate(context.Background(), "user-1", "token")
+	result, err := service.Generate(context.Background(), "user-1", "")
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -407,15 +443,44 @@ func TestGenerateRetriesOnceOnValidationFailureThenAccepts(t *testing.T) {
 	}
 }
 
+// 去重闸：topic 与近 14 天已推重复 → 重试仍重复 → 兜底。
+func TestGenerateFallsBackWhenTopicDuplicatesRecent(t *testing.T) {
+	facts := fakeKnowledge{facts: []domain.KnowledgeFact{fact("f-1", "color", "不挑人的事实", nil)}}
+	content := newFakeContent([]domain.DailyContent{poolItem("pool-1", "color", "color.white.tone")})
+	content.saved = append(content.saved, domain.DailyContent{
+		UserID: "user-1", GenDate: "2026-09-19", Category: "color", Topic: "冬天的白，不止一种", DedupeKey: "gen:2026-09-19:color",
+	})
+	runs := &fakeRuns{}
+	planner := &fakePlanner{outputs: []daily.ContentOutput{goodOutput(), goodOutput()}}
+	service := newService(t, fakeReader{}, facts, content, runs, &fakeCollections{}, planner)
+
+	result, err := service.Generate(context.Background(), "user-1", "")
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if result.Source != daily.SourceFallback || planner.calls != 2 {
+		t.Fatalf("source=%s calls=%d", result.Source, planner.calls)
+	}
+	foundReason := false
+	for _, run := range runs.runs {
+		if run.Outcome == "rejected" && strings.Contains(fmt.Sprint(run.Validation["problems"]), "topic_duplicate") {
+			foundReason = true
+		}
+	}
+	if !foundReason {
+		t.Fatalf("dedup rejection not recorded: %#v", runs.runs)
+	}
+}
+
 func TestGenerateFallsBackAfterSecondRejection(t *testing.T) {
 	facts := fakeKnowledge{facts: []domain.KnowledgeFact{fact("f-1", "color", "不挑人的事实", nil)}}
 	content := newFakeContent([]domain.DailyContent{poolItem("pool-1", "color", "color.white.tone")})
 	runs := &fakeRuns{}
-	bad := daily.ContentOutput{Topic: "显胖预警", Lead: "导语", Fit: "适配", Why: "原理", Refs: []int{1}}
+	bad := daily.ContentOutput{Topic: "显胖预警", Lead: "导语", Fit: "适配", Why: "原理", Category: "color"}
 	planner := &fakePlanner{outputs: []daily.ContentOutput{bad, bad}}
 	service := newService(t, fakeReader{}, facts, content, runs, &fakeCollections{}, planner)
 
-	result, err := service.Generate(context.Background(), "user-1", "token")
+	result, err := service.Generate(context.Background(), "user-1", "")
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -488,13 +553,17 @@ func TestUpdateCollectionRejectsInvalidStatus(t *testing.T) {
 	}
 }
 
-func TestCollectionStatsNormalizesSevenBuckets(t *testing.T) {
+// 手册分格要全量给键（含 general），否则客户端按格取数时会少一格。
+func TestCollectionStatsNormalizesAllBuckets(t *testing.T) {
 	service := newService(t, fakeReader{}, fakeKnowledge{}, newFakeContent(nil), &fakeRuns{}, &fakeCollections{}, &fakePlanner{})
 	stats, err := service.CollectionStats(context.Background(), "user-1")
 	if err != nil {
 		t.Fatalf("stats: %v", err)
 	}
-	if len(stats.Counts) != 7 || stats.Total != 0 {
+	if len(stats.Counts) != 8 || stats.Total != 0 {
 		t.Fatalf("stats = %#v", stats)
+	}
+	if _, ok := stats.Counts[daily.CategoryGeneral]; !ok {
+		t.Fatalf("stats missing general: %#v", stats.Counts)
 	}
 }

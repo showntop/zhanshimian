@@ -1,10 +1,14 @@
-// Package daily 每日内容：选品（规则）+ 生成（LLM，带自动校验）+ 降级（兜底池）
+// Package daily 每日内容：一次 LLM 成文（语境驱动选题）+ 自动校验 + 降级（兜底池）
 // + 收藏（内容引用 + 完整副本 + 多态素材 + 生命周期）。
 //
 // 两条铁律（方案 §1）：
 //  1. generate 永远返回 200 + 内容，source 只有 generated / fallback；
 //     降级对客户端透明，客户端没有「生成失败」分支，只有「内容来源」字段。
 //  2. 同一用户同一天只生成一次：幂等键 (user_id, gen_date)。
+//
+// 选题与成文合并为单次 LLM 调用（spec 2026-09-20-daily-llm-driven）：
+// prompt 带齐用户语境（天气/画像/近推历史/收藏信号）+ 可选参考事实，
+// category 由模型自报、事后归类；知识事实不再强制引用。
 package daily
 
 import (
@@ -47,7 +51,7 @@ type Reader interface {
 	ReadDailyGrounding(ctx context.Context, userID string) (Grounding, error)
 }
 
-// KnowledgeStore 知识事实检索：已确认、未在该用户近期推送过。
+// KnowledgeStore 知识事实检索：已确认、当季。
 type KnowledgeStore interface {
 	ListReviewedFacts(ctx context.Context, excludeIDs []string, season string) ([]domain.KnowledgeFact, error)
 }
@@ -57,7 +61,8 @@ type ContentStore interface {
 	TodayContent(ctx context.Context, userID string, genDate string) (domain.DailyContent, error)
 	ContentByID(ctx context.Context, userID string, id string) (domain.DailyContent, error)
 	FallbackPool(ctx context.Context) ([]domain.DailyContent, error)
-	RecentFactIDs(ctx context.Context, userID string, since time.Time) ([]string, error)
+	// RecentContents 近 N 天已生成的内容（新到旧）：prompt 历史 + topic 去重都靠它。
+	RecentContents(ctx context.Context, userID string, since time.Time, limit int) ([]domain.DailyContent, error)
 	RecentContentKeys(ctx context.Context, userID string, since time.Time) ([]string, error)
 	SaveContent(ctx context.Context, content domain.DailyContent) (domain.DailyContent, error)
 	// ReplaceContent 覆盖当天内容（upsert）。只给非生产调试开关用：
@@ -94,9 +99,8 @@ type WeatherProvider interface {
 	Current(ctx context.Context, city string) (Weather, error)
 }
 
-// FactPrompt 注入 prompt 的一条知识事实（序号用于事实追溯）。
-type FactPrompt struct {
-	Index    int
+// ReferenceFact 注入 prompt 的参考事实（检索增强：可用可不用，不强制引用）。
+type ReferenceFact struct {
 	Domain   string
 	Fact     string
 	Boundary string
@@ -128,26 +132,30 @@ type VisualDraft struct {
 }
 
 // ContentRequest 生成请求（不含任何厂商/模型信息，能力名在 provider 里）。
+// 语境驱动：模型自行决定讲什么，ReferenceFacts 只是可选参考。
 type ContentRequest struct {
-	Facts       []FactPrompt
-	GeneText    string
-	WeatherText string
+	// ContextText 日期/星期/季节/天气。
 	ContextText string
+	// GeneText 用户画像（中性特征词）。
+	GeneText string
+	// HistoryText 近期已推内容清单（去重主机制）。
 	HistoryText string
-	Angle       string
-	Category    string
+	// InterestText 收藏信号：用户对什么感兴趣。
+	InterestText string
+	// ReferenceFacts 检索到的参考事实（可用可不用）。
+	ReferenceFacts []ReferenceFact
 	// RetryHint 校验失败后的修正提示（只重试一次）。
 	RetryHint string
 }
 
-// ContentOutput 生成结果（未校验）。
+// ContentOutput 生成结果（未校验）。Category 由模型自报（七格或 general）。
 type ContentOutput struct {
 	Topic         string
 	Lead          string
 	Fit           string
 	Why           string
+	Category      string
 	Visual        VisualDraft
-	Refs          []int
 	ModelKey      string
 	LatencyMS     int
 	EstimatedCost *float64
@@ -158,12 +166,13 @@ type ContentPlanner interface {
 	Generate(ctx context.Context, input ContentRequest) (ContentOutput, error)
 }
 
-// PrepareResult POST /v1/daily/prepare 的返回。
+// PrepareResult POST /v1/daily/prepare 的返回（纯缓存探测）。
+// 命中时 Scenario 为当日内容的分类（信息性），未命中为空串——
+// 选题由 generate 阶段的 LLM 决定，客户端播通用过场动画。
 type PrepareResult struct {
-	GenDate   string
-	PickToken string
-	Scenario  string
-	CacheHit  bool
+	GenDate  string
+	Scenario string
+	CacheHit bool
 }
 
 // GenerateResult POST /v1/daily/generate 的返回（永远 200）。
@@ -172,7 +181,7 @@ type GenerateResult struct {
 	Content domain.DailyContent
 }
 
-// CollectionStats 手册七格计数（选品补薄格也用它）。
+// CollectionStats 手册七格计数（收藏信号也用它）。
 type CollectionStats struct {
 	Counts map[string]int
 	Total  int

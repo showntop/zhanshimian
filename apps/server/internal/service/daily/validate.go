@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/zhanshimian/server/internal/domain"
 )
 
-// 自动校验三道闸（方案 §4）：黑名单 → 事实追溯 → 结构。全部毫秒级，
+// 自动校验三道闸（方案 §4）：黑名单 → 结构 → 去重。全部毫秒级，
 // 拦截 → 带修正提示重试一次 → 仍败走兜底并留痕。
 //
 // 禁则词表与报告草稿校验共用 domain.BannedCopyPattern 这一份词源，
@@ -20,7 +21,8 @@ var dailyBanned = regexp.MustCompile(`显胖|显瘦|肥胖|整容|丑|种族|品
 var (
 	errStructure = errors.New("structure_invalid")
 	errBlacklist = errors.New("blacklist_hit")
-	errTrace     = errors.New("fact_trace_invalid")
+	errCategory  = errors.New("category_invalid")
+	errDuplicate = errors.New("topic_duplicate")
 )
 
 const (
@@ -32,7 +34,8 @@ const (
 )
 
 // validateOutput 返回问题清单（空 = 通过）。
-func validateOutput(output ContentOutput, factCount int) []error {
+// recentTopics 是近 14 天已推 topic：去重闸的第二道防线（第一道在 prompt）。
+func validateOutput(output ContentOutput, recentTopics []string) []error {
 	var problems []error
 	if err := validateStructure(output); err != nil {
 		problems = append(problems, err)
@@ -40,7 +43,10 @@ func validateOutput(output ContentOutput, factCount int) []error {
 	if err := validateBlacklist(output); err != nil {
 		problems = append(problems, err)
 	}
-	if err := validateFactTrace(output, factCount); err != nil {
+	if err := validateCategory(output); err != nil {
+		problems = append(problems, err)
+	}
+	if err := validateDuplicate(output, recentTopics); err != nil {
 		problems = append(problems, err)
 	}
 	if _, err := buildVisual(output.Visual); err != nil {
@@ -90,18 +96,40 @@ func validateBlacklist(output ContentOutput) error {
 	return nil
 }
 
-// validateFactTrace 事实追溯：模型必须标注引用的知识条目序号，
-// 序号必须落在输入集内且非空（方案 §4 第 2 闸的简化法）。
-func validateFactTrace(output ContentOutput, factCount int) error {
-	if len(output.Refs) == 0 {
-		return fmt.Errorf("%w: 未标注引用的知识条目", errTrace)
+// validateCategory 自报分类必须在七格 + general 内（手册归类的合法域）。
+func validateCategory(output ContentOutput) error {
+	for _, category := range allCategories {
+		if output.Category == category {
+			return nil
+		}
 	}
-	for _, ref := range output.Refs {
-		if ref < 1 || ref > factCount {
-			return fmt.Errorf("%w: 引用序号 %d 不在 1..%d 内", errTrace, ref, factCount)
+	return fmt.Errorf("%w: 分类 %q 不在七格与 general 内", errCategory, output.Category)
+}
+
+// validateDuplicate topic 去重闸：与近期已推 topic 规范化比对
+// （去空白与标点，防「换措辞重复」的最廉价形态）。
+func validateDuplicate(output ContentOutput, recentTopics []string) error {
+	topic := normalizeTopic(output.Topic)
+	if topic == "" {
+		return nil // 空topic由结构闸负责
+	}
+	for _, recent := range recentTopics {
+		if topic == normalizeTopic(recent) {
+			return fmt.Errorf("%w: topic 与近 14 天已推的「%s」重复", errDuplicate, recent)
 		}
 	}
 	return nil
+}
+
+// normalizeTopic 只留字母数字（汉字是字母）：空白与标点一律剥掉。
+func normalizeTopic(value string) string {
+	var b strings.Builder
+	for _, r := range value {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // buildVisual 把模型给的视觉提示落成客户端能直接画的 ContentVisual。
@@ -212,8 +240,10 @@ func retryHint(problems []error) string {
 		switch {
 		case errors.Is(problem, errBlacklist):
 			parts = append(parts, "- 出现了评判性或营销性词汇（不评分、不评判身材、不提品牌价格），请换中性表达。")
-		case errors.Is(problem, errTrace):
-			parts = append(parts, "- refs 必须是本次输入的知识条目序号（1 起），至少标注一个。")
+		case errors.Is(problem, errDuplicate):
+			parts = append(parts, "- topic 与近期已推的重复，请换一个全新的主题。")
+		case errors.Is(problem, errCategory):
+			parts = append(parts, "- category 必须是 color/fit/proportion/fabric/occasion/howto/outfit/general 之一。")
 		case errors.Is(problem, errStructure):
 			parts = append(parts, "- 结构不合法："+problem.Error()+"（字段必填、长度不超限、视觉参数完整）。")
 		default:

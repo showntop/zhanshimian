@@ -53,7 +53,7 @@ func dailyContentFixture(userID, genDate, dedupeKey string) domain.DailyContent 
 	return domain.DailyContent{
 		UserID: userID, GenDate: genDate, Category: "color",
 		Topic: "冬天的白", Lead: "导语", FitText: "适配", Why: "原理",
-		Visual: domain.ContentVisual{Modality: "swatch", Spec: map[string]any{"items": []any{}}, Alt: "色卡"},
+		Visual:  domain.ContentVisual{Modality: "swatch", Spec: map[string]any{"items": []any{}}, Alt: "色卡"},
 		FactIDs: []string{}, Source: "generated", DedupeKey: dedupeKey,
 	}
 }
@@ -251,39 +251,42 @@ func dailySeedFact(t *testing.T, store *Store, domainName, factText string, gene
 	}
 }
 
-func TestRecentFactIDsAndContentKeys(t *testing.T) {
+func TestRecentContentsAndContentKeys(t *testing.T) {
 	store := New(testutil.NewPostgres(t))
 	ctx := context.Background()
 	userID := dailyTestUser(t, store, "daily-recent")
 
-	pool := dailyPoolRow(t, store, "color.white.tone")
+	if _, err := store.SaveContent(ctx, dailyContentFixture(userID, "2026-09-19", "gen:old")); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := store.SaveContent(ctx, dailyContentFixture(userID, "2026-09-20", "gen:recent")); err != nil {
 		t.Fatal(err)
 	}
-	// 把池子的 fact 挂到用户行上：验证 unnest 展开。
-	if _, err := store.pool.Exec(ctx, `
-		UPDATE daily_content SET fact_ids = ARRAY[$2::uuid]
-		WHERE user_id=$1::uuid`, userID, pool.ID); err != nil {
-		t.Fatal(err)
-	}
 
-	factIDs, err := store.RecentFactIDs(ctx, userID, time.Now().AddDate(0, 0, -30))
+	contents, err := store.RecentContents(ctx, userID, time.Now().AddDate(0, 0, -30), 10)
 	if err != nil {
-		t.Fatalf("recent facts: %v", err)
+		t.Fatalf("recent contents: %v", err)
 	}
-	if len(factIDs) != 1 || factIDs[0] != pool.ID {
-		t.Fatalf("factIDs = %#v", factIDs)
+	if len(contents) != 2 || contents[0].DedupeKey != "gen:recent" || contents[1].DedupeKey != "gen:old" {
+		t.Fatalf("contents = %#v (want 新到旧)", contents)
+	}
+	limited, err := store.RecentContents(ctx, userID, time.Now().AddDate(0, 0, -30), 1)
+	if err != nil {
+		t.Fatalf("recent contents limited: %v", err)
+	}
+	if len(limited) != 1 || limited[0].DedupeKey != "gen:recent" {
+		t.Fatalf("limited = %#v", limited)
 	}
 	keys, err := store.RecentContentKeys(ctx, userID, time.Now().AddDate(0, 0, -30))
 	if err != nil {
 		t.Fatalf("recent keys: %v", err)
 	}
-	if len(keys) != 1 || keys[0] != "gen:recent" {
+	if len(keys) != 2 {
 		t.Fatalf("keys = %#v", keys)
 	}
 }
 
-// grounding：无资料行返回零值而不是错误（选品用中性基因继续）。
+// grounding：无资料行返回零值而不是错误（生成语境用中性基因继续）。
 func TestReadDailyGroundingWithoutProfile(t *testing.T) {
 	store := New(testutil.NewPostgres(t))
 	ctx := context.Background()

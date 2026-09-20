@@ -57,25 +57,25 @@ func (s *Store) FallbackPool(ctx context.Context) ([]domain.DailyContent, error)
 	return items, nil
 }
 
-// RecentFactIDs 近 N 天已推过的知识事实（去重用）。
-func (s *Store) RecentFactIDs(ctx context.Context, userID string, since time.Time) ([]string, error) {
-	rows, err := s.pool.Query(ctx, `
-		SELECT DISTINCT fact_id::text
-		FROM daily_content dc, unnest(dc.fact_ids) AS fact_id
-		WHERE dc.user_id=$1::uuid AND dc.created_at >= $2`, userID, since)
+// RecentContents 近 N 天已生成的内容（新到旧，至多 limit 条）：
+// prompt 历史 + topic 去重闸的数据源。
+func (s *Store) RecentContents(ctx context.Context, userID string, since time.Time, limit int) ([]domain.DailyContent, error) {
+	rows, err := s.pool.Query(ctx, dailyContentSelectSQL+`
+		WHERE user_id=$1::uuid AND created_at >= $2
+		ORDER BY created_at DESC LIMIT $3`, userID, since, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	ids := []string{}
+	items := []domain.DailyContent{}
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
+		item, err := scanDailyContentRows(rows)
+		if err != nil {
 			return nil, err
 		}
-		ids = append(ids, id)
+		items = append(items, item)
 	}
-	return ids, rows.Err()
+	return items, rows.Err()
 }
 
 // RecentContentKeys 近 N 天已推过的内容 key（兜底池去重也用它）。

@@ -11,13 +11,13 @@ import (
 	"github.com/zhanshimian/server/internal/service/daily"
 )
 
-// DailyService 是每日内容的最小依赖：两段式生成（prepare/generate）+ 收藏。
+// DailyService 是每日内容的最小依赖：缓存探测（prepare）+ 一次成文（generate）+ 收藏。
 //
 // 协议纪律：generate 永远返回 200 + 内容（source=generated/fallback），
 // 降级对客户端透明——客户端没有「生成失败」分支，只有「内容来源」字段。
 type DailyService interface {
 	Prepare(ctx context.Context, userID string, city string) (daily.PrepareResult, error)
-	Generate(ctx context.Context, userID string, pickToken string) (daily.GenerateResult, error)
+	Generate(ctx context.Context, userID string, city string) (daily.GenerateResult, error)
 	CreateCollection(ctx context.Context, userID string, contentID string, note string) (domain.DailyCollection, error)
 	ListCollections(ctx context.Context, userID string, category string, limit int) ([]domain.DailyCollection, error)
 	UpdateCollection(ctx context.Context, userID string, id string, status string, note string) (domain.DailyCollection, error)
@@ -30,10 +30,9 @@ var errDailyUnavailable = errors.New("daily service unavailable")
 // ---- DTO（与 contracts/openapi.yaml 的 Daily* schema 一一对应） ----
 
 type dailyPrepareResponse struct {
-	GenDate   string `json:"gen_date"`
-	PickToken string `json:"pick_token"`
-	Scenario  string `json:"scenario"`
-	CacheHit  bool   `json:"cache_hit"`
+	GenDate  string `json:"gen_date"`
+	Scenario string `json:"scenario"`
+	CacheHit bool   `json:"cache_hit"`
 }
 
 type dailyGenerateResponse struct {
@@ -136,10 +135,9 @@ func (a *API) prepareDaily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, http.StatusOK, dailyPrepareResponse{
-		GenDate:   result.GenDate,
-		PickToken: result.PickToken,
-		Scenario:  result.Scenario,
-		CacheHit:  result.CacheHit,
+		GenDate:  result.GenDate,
+		Scenario: result.Scenario,
+		CacheHit: result.CacheHit,
 	})
 }
 
@@ -149,7 +147,7 @@ func (a *API) generateDaily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
-		PickToken string `json:"pick_token"`
+		City string `json:"city"`
 	}
 	if r.ContentLength > 0 {
 		if err := decodeJSON(r, &input); err != nil {
@@ -157,7 +155,7 @@ func (a *API) generateDaily(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	result, err := a.daily.Generate(r.Context(), currentUser(r).ID, input.PickToken)
+	result, err := a.daily.Generate(r.Context(), currentUser(r).ID, input.City)
 	if err != nil {
 		a.writeServiceError(w, r, err)
 		return

@@ -60,50 +60,65 @@ func TestBuildVisualCompareAndDiagram(t *testing.T) {
 	}
 }
 
-func TestValidateOutputThreeGates(t *testing.T) {
-	output := goodOutputForTest(1)
-	if problems := validateOutput(output, 1); len(problems) != 0 {
+func TestValidateOutputGates(t *testing.T) {
+	recent := []string{"冬天的白，不止一种", "驼色是个陷阱"}
+	output := goodOutputForTest()
+	output.Topic = "秋天的驼色怎么选"
+	if problems := validateOutput(output, recent); len(problems) != 0 {
 		t.Fatalf("unexpected problems: %v", problems)
 	}
 
 	// 黑名单：共享词源（颜值）与每日补充词源（显胖）都要拦。
 	blacklisted := output
 	blacklisted.Topic = "你的颜值亮点"
-	if problems := validateOutput(blacklisted, 1); !hasError(problems, errBlacklist) {
+	if problems := validateOutput(blacklisted, recent); !hasError(problems, errBlacklist) {
 		t.Fatalf("shared blacklist missed: %v", problems)
 	}
 	dailyBannedHit := output
 	dailyBannedHit.Topic = "显胖预警"
-	if problems := validateOutput(dailyBannedHit, 1); !hasError(problems, errBlacklist) {
+	if problems := validateOutput(dailyBannedHit, recent); !hasError(problems, errBlacklist) {
 		t.Fatalf("daily blacklist missed: %v", problems)
 	}
 
-	// 事实追溯：引用必须落在输入集内且非空。
-	noRefs := output
-	noRefs.Refs = nil
-	if problems := validateOutput(noRefs, 1); !hasError(problems, errTrace) {
-		t.Fatalf("fact trace missed: %v", problems)
+	// 分类：七格与 general 合法，其余拦。
+	oddCategory := output
+	oddCategory.Category = "lifestyle"
+	if problems := validateOutput(oddCategory, recent); !hasError(problems, errCategory) {
+		t.Fatalf("category missed: %v", problems)
 	}
-	outOfRange := output
-	outOfRange.Refs = []int{5}
-	if problems := validateOutput(outOfRange, 1); !hasError(problems, errTrace) {
-		t.Fatalf("fact trace range missed: %v", problems)
+	general := output
+	general.Category = "general"
+	if problems := validateOutput(general, recent); len(problems) != 0 {
+		t.Fatalf("general should be valid: %v", problems)
+	}
+
+	// 去重：精确重复与去标点后重复都要拦；新 topic 放行。
+	duplicate := output
+	duplicate.Topic = "冬天的白，不止 一种"
+	if problems := validateOutput(duplicate, recent); !hasError(problems, errDuplicate) {
+		t.Fatalf("normalized duplicate missed: %v", problems)
+	}
+	exact := output
+	exact.Topic = "驼色是个陷阱"
+	if problems := validateOutput(exact, recent); !hasError(problems, errDuplicate) {
+		t.Fatalf("exact duplicate missed: %v", problems)
 	}
 
 	// 结构：长度超限与空字段。
 	toolong := output
 	toolong.Lead = string(make([]rune, 80))
-	if problems := validateOutput(toolong, 1); !hasError(problems, errStructure) {
+	if problems := validateOutput(toolong, recent); !hasError(problems, errStructure) {
 		t.Fatalf("structure length missed: %v", problems)
 	}
 }
 
-func goodOutputForTest(refs ...int) ContentOutput {
+func goodOutputForTest() ContentOutput {
 	return ContentOutput{
-		Topic: "冬天的白，不止一种",
-		Lead:  "本白、米白、奶油白，上身差很多。",
-		Fit:   "你是冷调肤色，本白贴着皮肤气色往上走。",
-		Why:   "白色也有色温，先看冷暖再看明度。",
+		Topic:    "冬天的白，不止一种",
+		Lead:     "本白、米白、奶油白，上身差很多。",
+		Fit:      "你是冷调肤色，本白贴着皮肤气色往上走。",
+		Why:      "白色也有色温，先看冷暖再看明度。",
+		Category: "color",
 		Visual: VisualDraft{
 			Modality: "swatch", Alt: "四种白色并排",
 			Items: []VisualItem{
@@ -111,15 +126,15 @@ func goodOutputForTest(refs ...int) ContentOutput {
 				{Label: "米白", Tone: "#EFEADC", State: "drop"},
 			},
 		},
-		Refs: refs,
 	}
 }
 
 func TestRetryHintTranslatesProblems(t *testing.T) {
 	hint := retryHint([]error{
 		fmt.Errorf("%w: 命中共享禁则词表", errBlacklist),
+		fmt.Errorf("%w: topic 与近 14 天已推的「%s」重复", errDuplicate, "旧主题"),
 	})
-	if hint == "" || !strings.Contains(hint, "修正") {
+	if hint == "" || !strings.Contains(hint, "修正") || !strings.Contains(hint, "全新的主题") {
 		t.Fatalf("hint = %q", hint)
 	}
 }

@@ -12,8 +12,8 @@ import (
 const CapabilityDailyContent = "daily_content"
 
 // StructuredDailyContentPlanner 走能力路由的每日内容生成器；实现
-// daily.ContentPlanner。grounding 生成：输出必须能追溯到输入的知识事实，
-// 不引入事实里没有的品牌/价格/材质。
+// daily.ContentPlanner。一次成文：模型基于用户语境自行决定今日讲什么，
+// 参考事实只是可选素材，不强制引用；分类由模型自报（七格或 general）。
 type StructuredDailyContentPlanner struct{ runtime StructuredRuntime }
 
 func NewDailyContentPlanner(runtime StructuredRuntime) *StructuredDailyContentPlanner {
@@ -22,7 +22,7 @@ func NewDailyContentPlanner(runtime StructuredRuntime) *StructuredDailyContentPl
 
 var _ daily.ContentPlanner = (*StructuredDailyContentPlanner)(nil)
 
-const dailyContentInstructions = "你是形象顾问的内容编辑。基于给定的【知识事实】为用户组装今日一条建议。规则：每个事实性断言必须来自【知识事实】，禁止引入其中没有的品牌、价格、材质或商品；语气克制、肯定式，不评价身材外貌，不打分，不制造焦虑；不用警示词；输出 JSON。"
+const dailyContentInstructions = "你是形象顾问的内容主编，每天为一位用户写一条今日穿搭建议。你自行决定今天讲什么：贴着用户的语境和兴趣，给出一条具体的、今天就能用的建议。语气克制、肯定式，不评价身材外貌，不打分，不制造焦虑，不提品牌价格。输出 JSON。"
 
 func (p *StructuredDailyContentPlanner) Generate(ctx context.Context, input daily.ContentRequest) (daily.ContentOutput, error) {
 	result, err := p.runtime.Structured(ctx, StructuredRequest{
@@ -49,7 +49,7 @@ func (p *StructuredDailyContentPlanner) Generate(ctx context.Context, input dail
 		Lead:      strings.TrimSpace(payload.Lead),
 		Fit:       strings.TrimSpace(payload.Fit),
 		Why:       strings.TrimSpace(payload.Why),
-		Refs:      payload.Refs,
+		Category:  strings.TrimSpace(payload.Category),
 		ModelKey:  result.Meta.ModelKey,
 		LatencyMS: result.Meta.LatencyMS,
 	}
@@ -83,12 +83,12 @@ func (p *StructuredDailyContentPlanner) Generate(ctx context.Context, input dail
 }
 
 type dailyContentPayload struct {
-	Topic  string                    `json:"topic"`
-	Lead   string                    `json:"lead"`
-	Fit    string                    `json:"fit"`
-	Why    string                    `json:"why"`
-	Visual dailyContentVisualPayload `json:"visual"`
-	Refs   []int                     `json:"refs"`
+	Topic    string                    `json:"topic"`
+	Lead     string                    `json:"lead"`
+	Fit      string                    `json:"fit"`
+	Why      string                    `json:"why"`
+	Category string                    `json:"category"`
+	Visual   dailyContentVisualPayload `json:"visual"`
 }
 
 type dailyContentVisualPayload struct {
@@ -121,27 +121,29 @@ func validateDailyContentPayload(data []byte) error {
 	if !aiSafeText(payload.Topic) || !aiSafeText(payload.Lead) || !aiSafeText(payload.Fit) || !aiSafeText(payload.Why) {
 		return fmt.Errorf("daily content provider output is incomplete or unsafe")
 	}
+	switch payload.Category {
+	case "color", "fit", "proportion", "fabric", "occasion", "howto", "outfit", "general":
+	default:
+		return fmt.Errorf("daily content provider output has invalid category %q", payload.Category)
+	}
 	switch payload.Visual.Modality {
 	case "swatch", "compare", "diagram":
 	default:
 		return fmt.Errorf("daily content provider output has unsupported modality")
-	}
-	if len(payload.Refs) == 0 {
-		return fmt.Errorf("daily content provider output is missing fact references")
 	}
 	return nil
 }
 
 func dailyContentSchema() map[string]any {
 	return map[string]any{"type": "object", "additionalProperties": false,
-		"required": []string{"topic", "lead", "fit", "why", "visual", "refs"},
+		"required": []string{"topic", "lead", "fit", "why", "category", "visual"},
 		"properties": map[string]any{
 			"topic": map[string]any{"type": "string", "minLength": 1, "maxLength": 24},
 			"lead":  map[string]any{"type": "string", "minLength": 1, "maxLength": 60},
 			"fit":   map[string]any{"type": "string", "minLength": 1, "maxLength": 90},
 			"why":   map[string]any{"type": "string", "minLength": 1, "maxLength": 60},
-			"refs": map[string]any{"type": "array", "minItems": 1, "maxItems": 5,
-				"items": map[string]any{"type": "integer", "minimum": 1}},
+			"category": map[string]any{"type": "string",
+				"enum": []string{"color", "fit", "proportion", "fabric", "occasion", "howto", "outfit", "general"}},
 			"visual": map[string]any{"type": "object", "additionalProperties": false,
 				"required": []string{"modality", "alt"},
 				"properties": map[string]any{
@@ -177,32 +179,33 @@ func dailyContentSideSchema() map[string]any {
 	}
 }
 
-// dailyContentPrompt 知识条目逐条注入（方案 §2.4 的 prompt 骨架）。
+// dailyContentPrompt 语境注入：模型自己决定讲什么，参考事实可选。
 func dailyContentPrompt(input daily.ContentRequest) string {
-	parts := []string{"【知识事实】"}
-	for _, fact := range input.Facts {
-		line := fmt.Sprintf("  %d. %s", fact.Index, fact.Fact)
-		if fact.Boundary != "" {
-			line += fmt.Sprintf("（边界：%s；domain: %s）", fact.Boundary, fact.Domain)
-		}
-		parts = append(parts, line)
+	parts := []string{}
+	if input.ContextText != "" {
+		parts = append(parts, "【今日语境】"+input.ContextText)
 	}
 	if input.GeneText != "" {
-		parts = append(parts, "【用户特征】"+input.GeneText)
+		parts = append(parts, "【用户特征】"+input.GeneText+"。适配说明要贴这个特征。")
 	}
-	if input.ContextText != "" {
-		parts = append(parts, input.ContextText)
+	if input.InterestText != "" {
+		parts = append(parts, "【用户兴趣】"+input.InterestText+"。可以贴，但不必迎合。")
 	}
 	if input.HistoryText != "" {
-		parts = append(parts, "【历史摘要】"+input.HistoryText)
+		parts = append(parts, "【近期已推】"+input.HistoryText)
 	}
-	if input.Angle != "" {
-		parts = append(parts, "【选题角度】"+input.Angle)
+	if len(input.ReferenceFacts) > 0 {
+		lines := make([]string, 0, len(input.ReferenceFacts))
+		for _, fact := range input.ReferenceFacts {
+			line := "  - " + fact.Fact
+			if fact.Boundary != "" {
+				line += "（边界：" + fact.Boundary + "）"
+			}
+			lines = append(lines, line)
+		}
+		parts = append(parts, "【参考观点】以下是可以参考的专业事实，可用可不用，观点要自己消化：\n"+strings.Join(lines, "\n"))
 	}
-	if input.Category != "" {
-		parts = append(parts, fmt.Sprintf("这条内容归入手册的「%s」格，内容要围绕知识事实展开。", input.Category))
-	}
-	parts = append(parts, "【输出】topic（≤12字，杂志式选题，不个性化）、lead（≤40字导语）、fit（≤60字，结合用户特征给出适配说明）、why（≤40字，一句原理）、refs（引用的知识条目序号，至少 1 个）、visual（swatch/compare/diagram 之一，给出可程序化绘制的参数）。")
+	parts = append(parts, "【输出】一条完整的今日建议：topic（≤12字，杂志式选题）、lead（≤40字导语）、fit（≤60字，结合用户特征的适配说明）、why（≤40字，一句原理）、category（color/fit/proportion/fabric/occasion/howto/outfit/general 之一，你判断这条内容归哪格）、visual（swatch/compare/diagram 之一，给出可程序化绘制的参数）。今天必须是一个新主题。")
 	if input.RetryHint != "" {
 		parts = append(parts, "【修正提示】"+input.RetryHint)
 	}

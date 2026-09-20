@@ -18,18 +18,17 @@ TOKEN="$(token)"
 
 fail() { echo "daily e2e FAILED: $1" >&2; exit 1; }
 
-# ① prepare：返回 gen_date / scenario / 一次性 pick_token。
+# ① prepare：缓存探测，返回 gen_date / cache_hit（未命中 scenario 为空串）。
 prepare="$(curl -fsS -X POST "$api_base/v1/daily/prepare" \
   -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{}')"
-echo "$prepare" | python3 -c 'import json,sys;d=json.load(sys.stdin)["data"];assert d["gen_date"] and d["scenario"]' \
+echo "$prepare" | python3 -c 'import json,sys;d=json.load(sys.stdin)["data"];assert d["gen_date"] and "scenario" in d' \
   || fail "prepare shape"
 cache_hit="$(echo "$prepare" | python3 -c 'import json,sys;print(json.load(sys.stdin)["data"]["cache_hit"])')"
-pick_token="$(echo "$prepare" | python3 -c 'import json,sys;print(json.load(sys.stdin)["data"]["pick_token"])')"
 
 # ② generate：永远 200，source ∈ {generated, fallback}，字段完整。
 gen="$(curl -fsS -X POST "$api_base/v1/daily/generate" \
   -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d "{\"pick_token\":\"$pick_token\"}")"
+  -d '{}')"
 summary="$(echo "$gen" | python3 -c '
 import json,sys
 d = json.load(sys.stdin)["data"]
@@ -47,7 +46,7 @@ content_id="$(echo "$summary" | cut -d' ' -f2)"
 
 # ③ 幂等：再 generate 一次，返回同一条（(user_id, gen_date) 唯一）。
 gen2="$(curl -fsS -X POST "$api_base/v1/daily/generate" \
-  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"pick_token":""}')"
+  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{}')"
 echo "$gen2" | python3 -c "
 import json,sys
 d = json.load(sys.stdin)['data']
@@ -83,8 +82,8 @@ stats="$(curl -fsS "$api_base/v1/daily/collection/stats" -H "Authorization: Bear
 echo "$stats" | python3 -c '
 import json,sys
 d = json.load(sys.stdin)["data"]
-assert set(d["counts"]) == {"color","fit","proportion","fabric","occasion","howto","outfit"}
-assert d["total"] >= 1
+assert set(d["counts"]) == {"color","fit","proportion","fabric","occasion","howto","outfit","general"}
+assert d["total"] == sum(d["counts"].values()), d["counts"]
 ' || fail "stats shape: $stats"
 
 patched="$(curl -fsS -X PATCH "$api_base/v1/daily/collection/$col_id" \

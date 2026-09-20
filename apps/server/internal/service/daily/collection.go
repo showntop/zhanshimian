@@ -81,7 +81,8 @@ func (s *Service) DeleteCollection(ctx context.Context, userID string, id string
 	return s.collections.DeleteCollection(ctx, userID, id)
 }
 
-// CollectionStats 手册七格计数（选品补薄格也用它）。
+// CollectionStats 手册分格计数。遍历全部分格（含 general）而非直接透传
+// SQL 结果：counts 是给客户端的契约，缺键会让前端 Record 少一格。
 func (s *Service) CollectionStats(ctx context.Context, userID string) (CollectionStats, error) {
 	counts, err := s.collections.CountCollections(ctx, userID)
 	if err != nil {
