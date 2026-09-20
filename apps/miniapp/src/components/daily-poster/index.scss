@@ -50,6 +50,7 @@
   }
 
   // 负 inset 让它比文字块大一圈，同时跟随文字高度
+  // 深底上的深块容易"闷"：顶部内高光 + 1rpx 亮描边把卡片从底板上"托"出来
   &__plate {
     position: absolute;
     left: -8%;
@@ -58,9 +59,11 @@
     bottom: -24rpx;
     border-radius: 18rpx;
     box-shadow:
-      0 4rpx 10rpx rgba(45, 58, 35, 0.06),
-      0 18rpx 36rpx rgba(45, 58, 35, 0.12),
-      0 40rpx 64rpx rgba(45, 58, 35, 0.08);
+      inset 0 1rpx 0 rgba(238, 240, 236, 0.1),
+      inset 0 0 0 1rpx rgba(238, 240, 236, 0.08),
+      0 4rpx 10rpx rgba(45, 58, 35, 0.08),
+      0 18rpx 36rpx rgba(45, 58, 35, 0.16),
+      0 40rpx 64rpx rgba(45, 58, 35, 0.1);
   }
 
   &__text {
@@ -71,9 +74,10 @@
   // 文字色跟承载块走，不跟底板走 —— fabric 类是"深块压浅底"
   &__text--light {
     --dp-tink: #eef0ec;
-    --dp-tink-soft: rgba(238, 240, 236, 0.8);
+    --dp-tink-soft: rgba(238, 240, 236, 0.84);
     --dp-tcta-bg: #eef0ec;
     --dp-tcta-fg: #26302a;
+    --dp-tline: rgba(238, 240, 236, 0.4);
   }
 
   &__text--dark {
@@ -81,6 +85,7 @@
     --dp-tink-soft: #565c55;
     --dp-tcta-bg: #33402d;
     --dp-tcta-fg: #eef0ec;
+    --dp-tline: rgba(28, 31, 28, 0.35);
   }
 
   &__title {
@@ -89,10 +94,10 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
     color: var(--dp-tink);
-    font-size: 40rpx;
-    line-height: 1.2;
+    font-size: 46rpx;
+    line-height: 1.18;
     font-weight: 800;
-    letter-spacing: -1.4rpx;
+    letter-spacing: -1.6rpx;
   }
 
   // 两行：一行会截出"一个缎…"这种半句词，比多占 30rpx 难看得多
@@ -101,35 +106,39 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    margin-top: 8rpx;
+    margin-top: 10rpx;
     color: var(--dp-tink-soft);
     font-size: 21rpx;
-    line-height: 1.5;
+    line-height: 1.55;
   }
 
   &__acts {
     display: flex;
     align-items: center;
-    margin-top: 14rpx;
+    margin-top: 20rpx;
   }
 
   &__cta {
-    padding: 10rpx 24rpx;
+    padding: 14rpx 30rpx;
     border-radius: 999rpx;
     background: var(--dp-tcta-bg);
+    box-shadow: 0 6rpx 16rpx rgba(18, 22, 16, 0.22);
   }
 
   &__cta-text {
     color: var(--dp-tcta-fg);
-    font-size: 24rpx;
+    font-size: 26rpx;
     font-weight: 700;
   }
 
   &__link {
-    margin-left: 18rpx;
-    color: var(--dp-tink-soft);
-    font-size: 21rpx;
-    font-weight: 600;
+    margin-left: 20rpx;
+    color: var(--dp-tink);
+    font-size: 22rpx;
+    font-weight: 650;
+    text-decoration: underline;
+    text-underline-offset: 6rpx;
+    text-decoration-color: var(--dp-tline);
   }
 
   // ---------- 角落编号与竖排标 ----------
@@ -150,9 +159,9 @@
     top: 18rpx;
     z-index: 9;
     color: var(--dp-mark);
-    font-size: 17rpx;
-    font-weight: 700;
-    letter-spacing: 3rpx;
+    font-size: 20rpx;
+    font-weight: 750;
+    letter-spacing: 5rpx;
     writing-mode: vertical-rl;
   }
 }

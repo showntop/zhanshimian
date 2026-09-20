@@ -92,16 +92,35 @@
   }
 
   &__cmp-block {
-    height: 96rpx;
-    border-radius: 8rpx;
+    position: relative;
+    height: 104rpx;
+    border-radius: 12rpx;
+    overflow: hidden;
     box-shadow:
-      inset 0 0 0 1rpx rgba(255, 255, 255, 0.14),
-      0 8rpx 18rpx rgba(45, 58, 35, 0.16);
+      inset 0 0 0 1rpx rgba(255, 255, 255, 0.18),
+      inset 0 -18rpx 28rpx rgba(18, 22, 16, 0.22),
+      inset 0 10rpx 18rpx rgba(255, 255, 255, 0.08),
+      0 8rpx 18rpx rgba(45, 58, 35, 0.18);
 
-    // 有光泽的一侧叠一层斜向高光；静止，不做动画
+    // 所有对比块都带一层斜向光：纯色块有"材质"而不是"填色"
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        118deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.18) 44%,
+        rgba(255, 255, 255, 0.04) 62%,
+        rgba(255, 255, 255, 0) 100%
+      );
+      pointer-events: none;
+    }
+
+    // 有光泽的一侧光带更亮更窄，与另一侧拉开材质差；静止，不做动画
     // （sheen 的动效由承载层负责，这里只做材质区分）
-    &--layered {
-      background-image: linear-gradient(
+    &--layered::after {
+      background: linear-gradient(
         118deg,
         rgba(255, 255, 255, 0) 0%,
         rgba(255, 255, 255, 0.42) 46%,

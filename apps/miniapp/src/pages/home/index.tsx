@@ -387,9 +387,10 @@ export default function Home() {
               {/* 报告退位：不再是首页主角，但入口保留，降级为一行 */}
               <View className="home__archive" onClick={goReport}>
                 <Text className="home__archive-text">{HOME_COPY.viewReport}</Text>
-                <Text className="home__archive-meta">
-                  {findingsCount}{HOME_COPY.findingsSuffix}
-                </Text>
+                <View className="home__archive-meta">
+                  <Text className="home__archive-num">{findingsCount}</Text>
+                  <Text className="home__archive-suffix">{HOME_COPY.findingsSuffix}</Text>
+                </View>
               </View>
             </View>
           )}

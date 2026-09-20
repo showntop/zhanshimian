@@ -55,6 +55,13 @@
       margin: 0 0 14rpx;
       font-size: 32rpx;
     }
+
+    // 首页的规则线比全局版更有"笔触"：更粗、渐变淡出收尾，避免过于几何的点缀感
+    .section-rule {
+      width: 72rpx;
+      height: 6rpx;
+      background: linear-gradient(90deg, var(--moss) 0%, var(--moss) 52%, rgba(90, 125, 74, 0) 100%);
+    }
   }
 
   // ---------- hero 主卡（每页至多一个视觉锚点） ----------
@@ -371,6 +378,7 @@
   // 已改为海报式（图文同层、承载块跟随文字），样式收在 components/daily-poster/index.scss
 
   // 报告退位：不再是首页主角，入口降级为一行
+  // 但数字是用户的"进展感"锚点：大数字 + 小后缀，左链接提权重压住平衡
   &__archive {
     display: flex;
     align-items: baseline;
@@ -380,13 +388,26 @@
   }
 
   &__archive-text {
-    font-size: 24rpx;
-    font-weight: 600;
-    color: var(--ink-2);
+    font-size: 26rpx;
+    font-weight: 700;
+    color: var(--ink);
   }
 
   &__archive-meta {
-    font-size: 22rpx;
+    display: flex;
+    align-items: baseline;
+    gap: 6rpx;
+  }
+
+  &__archive-num {
+    color: var(--moss-deep);
+    font-size: 34rpx;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__archive-suffix {
+    font-size: 21rpx;
     color: var(--ink-3);
   }
 
