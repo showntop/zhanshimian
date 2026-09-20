@@ -1,0 +1,228 @@
+// 动画播放器的容器与各形态样式。
+//
+// 硬约束（AGENTS）：一律 rpx，禁裸 px；尺寸与配色全部走 CSS 变量
+// （由 forms.tsx 注入）——这样 gene 色板可以在渲染时替换，不需要改组件。
+// prefers-reduced-motion 下变换归零，元素保持可见。
+
+.dm {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dm__layer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dm__shape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(var(--dm-dx, 0), var(--dm-dy, 0)) scale(var(--dm-scale, 1));
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  &.is-overshoot {
+    --dm-scale: 1.04;
+  }
+
+  &.is-lock {
+    --dm-scale: 1;
+  }
+}
+
+.dm__label {
+  position: absolute;
+  right: 0;
+  bottom: 14rpx;
+  left: 0;
+  font-size: 22rpx;
+  letter-spacing: 4rpx;
+  color: rgba(63, 70, 60, 0.55);
+  text-align: center;
+}
+
+// 无脚本时的静态兜底
+.dm__pulse {
+  width: 120rpx;
+  height: 120rpx;
+  border: 4rpx solid rgba(63, 70, 60, 0.3);
+  border-radius: 50%;
+}
+
+// ---------- 上下两块（搭配 / 比例共用：上/下长度比本身就讲比例） ----------
+.dm__blocks {
+  display: flex;
+  flex-direction: column;
+  width: 210rpx;
+  height: 400rpx;
+}
+
+.dm__block {
+  width: 100%;
+
+  &--top {
+    height: var(--dm-top);
+    background: var(--dm-c1);
+    border-radius: 12rpx 12rpx 4rpx 4rpx;
+  }
+
+  &--bottom {
+    height: var(--dm-bottom);
+    background: var(--dm-c2);
+    border-radius: 4rpx 4rpx 12rpx 12rpx;
+  }
+}
+
+// 腰线：两块之间那道缝就是比例本身
+.dm__waist {
+  width: 100%;
+  height: 4rpx;
+  background: rgba(63, 70, 60, 0.22);
+}
+
+// ---------- 色条（颜色） ----------
+.dm__swatch {
+  display: flex;
+  align-items: flex-end;
+  gap: 16rpx;
+  height: 360rpx;
+  filter: brightness(var(--dm-lift, 1));
+}
+
+.dm__bar {
+  width: 72rpx;
+  background: var(--dm-c);
+  border-radius: 10rpx;
+
+  &--0 {
+    height: 270rpx;
+  }
+
+  &--1 {
+    height: 350rpx;
+  }
+
+  &--2 {
+    height: 210rpx;
+  }
+}
+
+// ---------- 廓形（版型）：肩 / 腰 / 摆 三段剖面 ----------
+.dm__silhouette {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10rpx;
+  width: 260rpx;
+}
+
+.dm__band {
+  background: var(--dm-c1);
+  border-radius: 14rpx;
+
+  &--shoulder {
+    width: var(--dm-shoulder);
+    height: 90rpx;
+  }
+
+  &--waist {
+    width: var(--dm-waist);
+    height: 100rpx;
+    opacity: 0.85;
+  }
+
+  &--hem {
+    width: var(--dm-hem);
+    height: 130rpx;
+  }
+}
+
+// ---------- 布纹（面料） ----------
+.dm__texture {
+  position: relative;
+  width: 300rpx;
+  height: 340rpx;
+}
+
+.dm__thread {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 8rpx;
+  background: var(--dm-c1);
+  border-radius: 4rpx;
+  transform: translateX(var(--dm-x, 0));
+  top: var(--dm-top);
+}
+
+// ---------- 场景（场合） ----------
+.dm__scene {
+  position: relative;
+  width: 320rpx;
+  height: 320rpx;
+  overflow: hidden;
+  background: var(--dm-bg);
+  border-radius: 20rpx;
+  filter: brightness(var(--dm-light, 0.85));
+}
+
+.dm__scene-mark {
+  position: absolute;
+  top: 56rpx;
+  left: var(--dm-left);
+  width: 90rpx;
+  height: 210rpx;
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 12rpx;
+}
+
+// ---------- 折叠（技巧） ----------
+.dm__fold {
+  position: relative;
+  width: 220rpx;
+  height: 340rpx;
+}
+
+.dm__sleeve {
+  position: absolute;
+  top: 40rpx;
+  left: 0;
+  width: 100%;
+  height: 260rpx;
+  background: var(--dm-c2);
+  border-radius: 16rpx;
+}
+
+.dm__crease {
+  position: absolute;
+  right: -10rpx;
+  left: -10rpx;
+  height: 16rpx;
+  background: var(--dm-c1);
+  border-radius: 8rpx;
+  transform: rotate(var(--dm-tilt, 0deg));
+  top: var(--dm-top);
+}
+
+// 减动效：变换归零，元素保持可见（AGENTS 动效规约）
+@media (prefers-reduced-motion: reduce) {
+  .dm__shape {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .dm__layer--g1,
+  .dm__layer--g2 {
+    opacity: 0 !important;
+  }
+}

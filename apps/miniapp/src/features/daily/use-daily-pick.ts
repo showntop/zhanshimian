@@ -19,14 +19,16 @@ import {
   type CollectionCategory,
   type ContentVisual,
   type ContentType,
+  type MotionPresentation,
   type TodayContext,
 } from '@zsm/core'
 import { peripherals } from '../../app/api/peripherals'
 import { addSave, readSaves, syncPendingSaves, type DailySave } from './saves'
 
 
-/** generate 返回后动画落位的时长（等待动画是循环的，时长只管落位节奏） */
-const SETTLE_MS = 1200
+// 收敛动画的时长由服务端脚本决定（tempo 档位 + 戏剧停顿），这里只是兜底：
+// 万一播放器没回调（脚本异常 / 页面被挂起），也不能永远停在收敛态不进内容。
+const SETTLE_FALLBACK_MS = 6000
 
 export type DailyPhase = 'loading' | 'waiting' | 'settling' | 'content' | 'offline'
 
@@ -54,6 +56,12 @@ export interface DailyPickState {
   content: DailyContentView | null
   bucketName: string
   loading: boolean
+  /** 巡游脚本（prepare 下发，等待期播） */
+  roamScript: MotionPresentation | null
+  /** 收敛 + 揭晓脚本（generate 下发，内容到位后播） */
+  settleScript: MotionPresentation | null
+  /** 收敛播完 → 揭晓海报（由播放器回调） */
+  reveal: () => void
   reloadSaves: () => void
   saveCurrent: () => void
 }
@@ -88,6 +96,13 @@ function toView(generate: {
     dedupeKey: generate.content.dedupe_key,
     source: generate.source === 'generated' ? 'generated' : 'fallback',
   }
+}
+
+/** 契约类型是生成的，这里只做形状校验，让播放器与生成代码解耦 */
+function scriptOf(value: unknown): MotionPresentation | null {
+  if (!value || typeof value !== 'object') return null
+  const script = value as MotionPresentation
+  return Array.isArray(script.stages) ? script : null
 }
 
 /** 当日内容缓存：offline / 重进时直接呈现（防闪屏，不清空已渲染内容） */
@@ -127,6 +142,8 @@ export function useDailyPick(): DailyPickState {
   const [phase, setPhase] = useState<DailyPhase>('loading')
   const [scenario, setScenario] = useState('fallback')
   const [content, setContent] = useState<DailyContentView | null>(null)
+  const [roamScript, setRoamScript] = useState<MotionPresentation | null>(null)
+  const [settleScript, setSettleScript] = useState<MotionPresentation | null>(null)
   const mounted = useRef(true)
 
   useEffect(() => {
@@ -140,10 +157,14 @@ export function useDailyPick(): DailyPickState {
     setContent(view)
     writeCachedContent(view)
     setPhase('settling')
-    // 动画落位 1.2s 后进入内容态（计时器在卸载后不再 setState）
     setTimeout(() => {
-      if (mounted.current) setPhase('content')
-    }, SETTLE_MS)
+      if (mounted.current) setPhase((current) => (current === 'settling' ? 'content' : current))
+    }, SETTLE_FALLBACK_MS)
+  }, [])
+
+  // 收敛动画播完 → 揭晓海报。由播放器回调，时长不再写死在客户端。
+  const reveal = useCallback(() => {
+    if (mounted.current) setPhase('content')
   }, [])
 
   const run = useCallback(async () => {
@@ -163,18 +184,20 @@ export function useDailyPick(): DailyPickState {
         schedule: '',
       })
       if (prepare.cache_hit) {
-        // 当天已生成：直接拉内容，不播等待动画。
+        // 当天已生成：不播巡游，直接进收敛（重进也要有揭晓感，只是更快）。
         const result = await peripherals.dailyGenerate()
         if (!mounted.current) return
+        setSettleScript(scriptOf(result.presentation))
         settle(toView(result))
         return
       }
-      // 未命中：选题在 generate 的 LLM 调用里，播通用过场动画等它返回。
-      setScenario('fallback')
+      // 未命中：播巡游脚本等 generate 返回（选题在 LLM 调用里，等待期不知道讲什么）。
+      setRoamScript(scriptOf(prepare.presentation))
       setPhase('waiting')
       // generate 永远 200：fallback 只是内容来源不同，不是失败分支。
       const result = await peripherals.dailyGenerate()
       if (!mounted.current) return
+      setSettleScript(scriptOf(result.presentation))
       settle(toView(result))
     } catch {
       // 网络错误：读本地缓存，无缓存给静默文案（有下一步动作）。
@@ -232,7 +255,20 @@ export function useDailyPick(): DailyPickState {
   const loading = phase === 'loading'
   const bucketName = content ? dailyBucketName(content.asset) : ''
 
-  return { ctx, saves, phase, scenario, content, bucketName, loading, reloadSaves, saveCurrent }
+  return {
+    ctx,
+    saves,
+    phase,
+    scenario,
+    content,
+    bucketName,
+    loading,
+    roamScript,
+    settleScript,
+    reveal,
+    reloadSaves,
+    saveCurrent,
+  }
 }
 
 // context 拉取保留给需要天气的页面（今日页顶部语境），失败静默。
