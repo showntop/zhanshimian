@@ -353,10 +353,22 @@ export const HOME_COPY = {
 // 池子不够时宁可不推，也不用「塞衣角」这类通用条目凑数。
 export const DAILY_COPY = {
   eyebrow: '今天这一条',
-  // 等待动画：巡游的文案由服务端随脚本下发（「在看颜色」这类，改文案不用发版）；
+  // 等待动画：巡游的文案优先用服务端随脚本下发的那份（改文案不用发版）；
   // 收敛这两句是过程状态，与具体分类无关，所以留在客户端。
   motionSettling: '在为你挑',
   motionLocked: '就是这套',
+  // 巡游内置主题：巡游是通用内容，不该等网络才有——prepare 没回来时（首屏
+  // loading）也要立刻有东西可播，否则等待期会退成「一个圆圈」，像卡住了。
+  // 服务端脚本到达后覆盖这份；form 名要与 daily-motion/forms.tsx 的注册表对上。
+  motionRoamThemes: [
+    { form: 'swatch_bars', label: '在看颜色' },
+    { form: 'silhouette_shape', label: '在看版型' },
+    { form: 'ratio_blocks', label: '在看比例' },
+    { form: 'texture_lines', label: '在看面料' },
+    { form: 'scene_panel', label: '在看场合' },
+    { form: 'fold_lines', label: '在看穿法' },
+    { form: 'outfit_blocks', label: '在看搭配' },
+  ],
   handbookTitle: '我的手册',
   handbookEntry: '我的手册',
   handbookEntryDesc: '收下的每一条，都在这里',

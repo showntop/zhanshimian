@@ -18,6 +18,7 @@ import {
   roamThemes,
   type ConvergeStep,
   type MotionPresentation,
+  type RoamTheme,
 } from '@zsm/core'
 import { formOf, resolveAxisValue, variantCountsOf, type FormSpec } from './forms'
 import './index.scss'
@@ -57,7 +58,17 @@ export default function DailyMotion({
   const settled = useRef(false)
 
   // ---------- 巡游：等待期把几个方向都过一遍 ----------
-  const themes = useMemo(() => roamThemes(roamStage), [roamStage])
+  // 巡游是通用内容，不该等网络：prepare 没回来（首屏 loading）也要立刻有东西可播，
+  // 否则等待期会退成一个圆圈，看起来像卡住。服务端脚本到了就覆盖内置主题。
+  const themes = useMemo<RoamTheme[]>(() => {
+    const fromServer = roamThemes(roamStage)
+    if (fromServer.length > 0) return fromServer
+    return DAILY_COPY.motionRoamThemes.map((theme) => ({
+      theme: theme.form,
+      form: theme.form,
+      label: theme.label,
+    }))
+  }, [roamStage])
   const perTheme = roamPerThemeMS(roamStage)
 
   useEffect(() => {
@@ -132,15 +143,7 @@ export default function DailyMotion({
   )
 
   if (phase === 'waiting') {
-    if (themes.length === 0) {
-      // 无脚本：静态兜底（不空屏，也不假装"在生成"）
-      return (
-        <View className="dm">
-          <View className="dm__pulse" />
-          <Text className="dm__label">{DAILY_COPY.eyebrow}</Text>
-        </View>
-      )
-    }
+    // 内置主题兜底后 themes 不会为空；真为空时 formOf 也会回落到通用形态。
     const theme = themes[themeIndex % themes.length]
     const spec = formOf(theme?.form)
     return (

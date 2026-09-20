@@ -51,14 +51,6 @@
   text-align: center;
 }
 
-// 无脚本时的静态兜底
-.dm__pulse {
-  width: 120rpx;
-  height: 120rpx;
-  border: 4rpx solid rgba(63, 70, 60, 0.3);
-  border-radius: 50%;
-}
-
 // ---------- 上下两块（搭配 / 比例共用：上/下长度比本身就讲比例） ----------
 .dm__blocks {
   display: flex;
