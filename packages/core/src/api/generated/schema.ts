@@ -527,8 +527,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 每日内容选品
-         * @description 规则选品（知识检索 + 基因匹配 + 历史去重 + 补薄格），返回等待动画场景与一次性 pickToken（5 分钟有效，服务端暂存选品快照）。当天已生成时 cache_hit=true、 pick_token 为空，客户端直接拉内容不播等待动画。
+         * 每日内容缓存探测
+         * @description 纯缓存探测（一次 DB 读）：当天已生成时 cache_hit=true、scenario 为当日分类 （客户端直接拉内容不播等待动画）；未命中 cache_hit=false、scenario 为空串， 选题由 generate 阶段的 LLM 决定，客户端播通用过场动画。
          */
         post: operations["prepareDaily"];
         delete?: never;
@@ -548,7 +548,7 @@ export interface paths {
         put?: never;
         /**
          * 生成今日内容
-         * @description 凭 prepare 返回的 pickToken 生成今日内容。永远返回 200 与内容： source=generated 表示 AI 生成（grounding，逐条可追溯到知识事实）， source=fallback 表示兜底池内容（降级对客户端透明，结构完全一致）。 同一用户同一天幂等：重复调用返回当天已生成的那条。
+         * @description 单次 LLM 调用完成选题与成文（语境驱动：天气/画像/近推历史/收藏信号 + 可选参考事实）。永远返回 200 与内容：source=generated 表示 AI 生成， source=fallback 表示兜底池内容（降级对客户端透明，结构完全一致）。 同一用户同一天幂等：重复调用返回当天已生成的那条。
          */
         post: operations["generateDaily"];
         delete?: never;
@@ -589,8 +589,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 手册七格计数
-         * @description 七个分类的条数（客户端徽标与服务端选品补薄格共用）。
+         * 手册分格计数
+         * @description 全部分格（七格 + general）的条数，客户端徽标用它展示。
          */
         get: operations["getDailyCollectionStats"];
         put?: never;
@@ -1458,13 +1458,8 @@ export interface components {
         DailyPrepare: {
             /** Format: date */
             gen_date: string;
-            /** @description 一次性选品令牌；cache_hit=true 时为空串 */
-            pick_token: string;
-            /**
-             * @description 等待动画场景；无可选品时为 fallback
-             * @enum {string}
-             */
-            scenario: "color" | "fit" | "proportion" | "fabric" | "occasion" | "howto" | "outfit" | "fallback";
+            /** @description cache_hit=true 时为当日内容分类（信息性）；未命中为空串 */
+            scenario: string;
             cache_hit: boolean;
         };
         DailyGenerateResult: {
@@ -1501,9 +1496,9 @@ export interface components {
             dedupe_key: string;
         };
         /** @enum {string} */
-        DailyContentType: "color" | "silhouette" | "proportion" | "fabric" | "item" | "occasion" | "howto";
+        DailyContentType: "color" | "silhouette" | "proportion" | "fabric" | "item" | "occasion" | "howto" | "general";
         /** @enum {string} */
-        CollectionCategory: "color" | "fit" | "proportion" | "fabric" | "occasion" | "howto" | "outfit";
+        CollectionCategory: "color" | "fit" | "proportion" | "fabric" | "occasion" | "howto" | "outfit" | "general";
         /** @enum {string} */
         CollectionStatus: "saved" | "tried" | "kept";
         ContentSnapshot: {
@@ -3525,7 +3520,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 选品结果 */
+            /** @description 缓存探测结果 */
             200: {
                 headers: {
                     "X-Request-ID": components["headers"]["XRequestId"];
@@ -3549,11 +3544,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
                 "application/json": {
-                    /** @description prepare 返回的一次性选品令牌；过期/缺失时服务端按当前条件重建选品 */
-                    pick_token: string;
+                    /** @description 天气语境的城市（选填，缺省用服务端默认城市） */
+                    city?: string;
                 };
             };
         };
