@@ -114,11 +114,18 @@ func (s *Service) Prepare(ctx context.Context, userID string, city string) (Prep
 	result := PrepareResult{GenDate: genDate}
 
 	// ① 幂等：当天已生成 → 客户端直接拉内容，不播动画。
-	if content, err := s.content.TodayContent(ctx, userID, genDate); err == nil {
-		result.CacheHit = true
-		result.Scenario = content.Category
-		return result, nil
-	} else if err != nil && !isNotFound(err) {
+	// 调试开关下跳过：让每次进首页都走完整选品 + 生成。
+	if !s.forceRegen {
+		if content, err := s.content.TodayContent(ctx, userID, genDate); err == nil {
+			result.CacheHit = true
+			result.Scenario = content.Category
+			return result, nil
+		} else if err != nil && !isNotFound(err) {
+			// DB 异常不算致命：继续选品，失败会在 generate 里落到兜底。
+			result.Scenario = ScenarioFallback
+			return result, nil
+		}
+	} else if _, err := s.content.TodayContent(ctx, userID, genDate); err != nil && !isNotFound(err) {
 		// DB 异常不算致命：继续选品，失败会在 generate 里落到兜底。
 		result.Scenario = ScenarioFallback
 		return result, nil
@@ -138,7 +145,13 @@ func (s *Service) Prepare(ctx context.Context, userID string, city string) (Prep
 // selectFacts 规则选品：已确认事实 × 基因匹配 × 季节 − 近期已推，
 // 权重 = 补最薄的那一格；同分按稳定哈希排序（同一天结果固定，不随机）。
 func (s *Service) selectFacts(ctx context.Context, userID string, genDate string, city string) pickSnapshot {
-	snapshot := pickSnapshot{UserID: userID, GenDate: genDate, Angle: s.angleFor(userID, genDate)}
+	// 调试开关：给选品种子加一次性 nonce —— 否则「同一天固定」的稳定哈希
+	// 会让每次重生成都选到同一批事实，等于没重生成。
+	nonce := ""
+	if s.forceRegen {
+		nonce = strconv.FormatInt(s.clock.Now().UnixNano(), 10)
+	}
+	snapshot := pickSnapshot{UserID: userID, GenDate: genDate, Angle: s.angleFor(userID, genDate+nonce)}
 	snapshot.Weather = s.currentWeather(ctx, city)
 	snapshot.ContextText = contextText(genDate, snapshot.Weather)
 	snapshot.GeneText = ""
@@ -152,8 +165,12 @@ func (s *Service) selectFacts(ctx context.Context, userID string, genDate string
 	snapshot.GeneText = geneText(gene)
 
 	// 近期已推的事实与已收的内容：30 天内不重复。
+	// 调试开关下放开事实去重：否则调试几次后候选被自己推过的记录吃光。
 	since := s.clock.Now().AddDate(0, 0, -seenWindowDays)
 	seenFacts, _ := s.content.RecentFactIDs(ctx, userID, since)
+	if s.forceRegen {
+		seenFacts = nil
+	}
 	seenKeys, _ := s.content.RecentContentKeys(ctx, userID, since)
 	snapshot.HistoryText = historyText(seenKeys)
 
@@ -180,7 +197,7 @@ func (s *Service) selectFacts(ctx context.Context, userID string, genDate string
 	// 权重：格子里内容越少越优先（补最薄的格），再加一个稳定的日内抖动，
 	// 保证「同一天固定、跨天会换」。
 	thinnest := thinnestCount(buckets)
-	seed := genDate + "|" + userID
+	seed := genDate + "|" + userID + nonce
 	type scored struct {
 		fact  domain.KnowledgeFact
 		score float64

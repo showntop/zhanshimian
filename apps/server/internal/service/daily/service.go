@@ -35,6 +35,9 @@ type Service struct {
 	clock       Clock
 	picks       *pickStore
 	zone        *time.Location
+	// forceRegen 调试开关（DAILY_FORCE_REGEN，非生产）：跳过当日幂等，
+	// 每次都实时重选事实 + 重生成 + 覆盖当天记录。
+	forceRegen bool
 }
 
 // New 组装每日内容服务。planner/weather 可后装（未装时生成直接走兜底）。
@@ -56,6 +59,12 @@ func (s *Service) WithWeather(weather WeatherProvider) *Service {
 	return s
 }
 
+// WithForceRegen 打开调试实时重生成（仅非生产环境接线）。
+func (s *Service) WithForceRegen(enabled bool) *Service {
+	s.forceRegen = enabled
+	return s
+}
+
 // today 生成日期一律按 Asia/Shanghai：跨零点时用 UTC 会把「今天」算成前一天。
 func (s *Service) today() string {
 	now := s.clock.Now()
@@ -71,8 +80,11 @@ func (s *Service) Generate(ctx context.Context, userID string, pickToken string)
 	genDate := s.today()
 
 	// ① 幂等：当天已生成过就直接返回（(user_id, gen_date) 唯一约束是硬保证）。
-	if content, err := s.content.TodayContent(ctx, userID, genDate); err == nil {
-		return GenerateResult{Source: content.Source, Content: content}, nil
+	// 调试开关下跳过：每次都真的重生成一遍。
+	if !s.forceRegen {
+		if content, err := s.content.TodayContent(ctx, userID, genDate); err == nil {
+			return GenerateResult{Source: content.Source, Content: content}, nil
+		}
 	}
 
 	runCtx, cancel := context.WithTimeout(ctx, generateTotalTimeout)
@@ -108,8 +120,14 @@ func (s *Service) Generate(ctx context.Context, userID string, pickToken string)
 	}
 
 	// ④ 落库并返回（同一天第二次调用会命中幂等分支）。
+	// 调试开关下覆盖当天记录：否则 upsert 被唯一约束挡住，调试永远只看得到第一条。
 	content := buildContent(userID, genDate, snapshot, output)
-	saved, err := s.content.SaveContent(ctx, content)
+	saved, err := func() (domain.DailyContent, error) {
+		if s.forceRegen {
+			return s.content.ReplaceContent(ctx, content)
+		}
+		return s.content.SaveContent(ctx, content)
+	}()
 	if err != nil {
 		// 并发写撞唯一约束：读回已生成的那条，不把它当失败。
 		if existing, readErr := s.content.TodayContent(ctx, userID, genDate); readErr == nil {

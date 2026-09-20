@@ -60,6 +60,9 @@ type ContentStore interface {
 	RecentFactIDs(ctx context.Context, userID string, since time.Time) ([]string, error)
 	RecentContentKeys(ctx context.Context, userID string, since time.Time) ([]string, error)
 	SaveContent(ctx context.Context, content domain.DailyContent) (domain.DailyContent, error)
+	// ReplaceContent 覆盖当天内容（upsert）。只给非生产调试开关用：
+	// 正常链路必须保持「同一天只生成一次」的幂等语义。
+	ReplaceContent(ctx context.Context, content domain.DailyContent) (domain.DailyContent, error)
 }
 
 // RunStore 生成审计（评估与回溯）。

@@ -148,7 +148,8 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	// planner 未配置或失败时在 service 内落到兜底池，客户端永远拿到内容。
 	dailySvc := daily.New(store, store, store, store, store, daily.NewClock()).
 		WithPlanner(providerai.NewDailyContentPlanner(structuredRuntimeAdapter{ai.Runtime})).
-		WithWeather(dailyWeatherAdapter{inner: weather})
+		WithWeather(dailyWeatherAdapter{inner: weather}).
+		WithForceRegen(cfg.DailyForceRegen)
 	wardrobeSvc := wardrobe.New(store, store).WithMediaSigner(mediaSigner).WithMediaChecker(store)
 	advisorSvc := advisor.New(store, store, providerai.NewAdvisorChat(structuredRuntimeAdapter{ai.Runtime})).WithUsageGate(store)
 	diagnosticSvc := diagnostic.New(store, store, providerai.NewDiagnostic(structuredRuntimeAdapter{ai.Runtime}),

@@ -134,6 +134,38 @@ func (s *Store) SaveContent(ctx context.Context, content domain.DailyContent) (d
 	return existing, nil
 }
 
+// ReplaceContent 覆盖当天内容（upsert）：调试开关 DAILY_FORCE_REGEN 专用，
+// 让同一天可以反复重生成并看到新内容。正常链路走 SaveContent（DO NOTHING）。
+func (s *Store) ReplaceContent(ctx context.Context, content domain.DailyContent) (domain.DailyContent, error) {
+	visual, err := json.Marshal(content.Visual)
+	if err != nil {
+		return content, err
+	}
+	if content.Visual.Spec == nil {
+		visual = []byte(`{}`)
+	}
+	var id string
+	var createdAt time.Time
+	err = s.pool.QueryRow(ctx, `
+		INSERT INTO daily_content(user_id, gen_date, category, topic, lead, fit_text, why, visual, fact_ids, source, model_key, dedupe_key)
+		VALUES (NULLIF($1,'')::uuid, $2::date, $3, $4, $5, $6, $7, $8, $9::uuid[], $10, $11, $12)
+		ON CONFLICT (user_id, gen_date) WHERE user_id IS NOT NULL DO UPDATE SET
+			category=EXCLUDED.category, topic=EXCLUDED.topic, lead=EXCLUDED.lead,
+			fit_text=EXCLUDED.fit_text, why=EXCLUDED.why, visual=EXCLUDED.visual,
+			fact_ids=EXCLUDED.fact_ids, source=EXCLUDED.source,
+			model_key=EXCLUDED.model_key, dedupe_key=EXCLUDED.dedupe_key
+		RETURNING id::text, created_at`,
+		content.UserID, content.GenDate, content.Category, content.Topic, content.Lead, content.FitText,
+		content.Why, visual, normalizeIDs(content.FactIDs), content.Source, content.ModelKey, content.DedupeKey,
+	).Scan(&id, &createdAt)
+	if err != nil {
+		return content, mapNotFound(err)
+	}
+	content.ID = id
+	content.CreatedAt = createdAt
+	return content, nil
+}
+
 func (s *Store) scanDailyContent(row pgx.Row) (domain.DailyContent, error) {
 	content, err := scanDailyContentRows(row)
 	if err != nil {

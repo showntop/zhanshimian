@@ -122,6 +122,18 @@ func (f *fakeContent) SaveContent(_ context.Context, content domain.DailyContent
 	return content, nil
 }
 
+func (f *fakeContent) ReplaceContent(_ context.Context, content domain.DailyContent) (domain.DailyContent, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if content.ID == "" {
+		content.ID = fmt.Sprintf("id-%d", len(f.saved)+1)
+	}
+	// 覆盖当天记录（调试开关语义）
+	f.today[content.UserID+"|"+content.GenDate] = content
+	f.saved = append(f.saved, content)
+	return content, nil
+}
+
 type fakeRuns struct {
 	mu   sync.Mutex
 	runs []domain.GenerationRun
