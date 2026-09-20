@@ -1,16 +1,15 @@
-// 每日内容两段式状态机（方案 §3.1）。
+// 每日内容状态机。
 //
-//   loading   进入页面，调 prepare
-//   waiting   prepare 返回 scenario → 播对应主题等待动画；同时调 generate
+//   loading   进入页面，调 prepare（缓存探测）
+//   waiting   未命中 → 播通用等待动画；同时调 generate（单次 LLM 选题+成文）
 //   settling  generate 返回 → 动画落位（1.2s）→ 海报呈现
 //   content   海报呈现
 //   offline   网络错误 → 读本地缓存；无缓存也保持静默文案（服务端本身不会空屏）
 //
-// 客户端只依赖两个契约：scenario 枚举决定播哪套；settle 时机由 generate
-// 返回触发（动画实现载体不锁死）。generate 永远 200——客户端没有
-// 「生成失败」分支，只有 source（generated / fallback）字段。
-//
-// 选品逻辑已移到服务端：本 hook 不再在本地选品，只负责状态机与收藏写穿。
+// 客户端只依赖两个契约：cache_hit 决定是否播动画；settle 时机由 generate
+// 返回触发。generate 永远 200——客户端没有「生成失败」分支，只有
+// source（generated / fallback）字段。选题在服务端的 LLM 调用里完成，
+// 客户端不再持有 pick_token。
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
@@ -26,7 +25,7 @@ import { peripherals } from '../../app/api/peripherals'
 import { addSave, readSaves, syncPendingSaves, type DailySave } from './saves'
 
 
-/** generate 返回后动画落位的时长（与服务端 6s 硬超时同一文档约定） */
+/** generate 返回后动画落位的时长（等待动画是循环的，时长只管落位节奏） */
 const SETTLE_MS = 1200
 
 export type DailyPhase = 'loading' | 'waiting' | 'settling' | 'content' | 'offline'
@@ -50,7 +49,7 @@ export interface DailyPickState {
   ctx: TodayContext | null
   saves: DailySave[]
   phase: DailyPhase
-  /** 等待动画场景（prepare.scenario） */
+  /** 等待动画场景（通用过场；cache_hit 后重进不播） */
   scenario: string
   content: DailyContentView | null
   bucketName: string
@@ -165,15 +164,16 @@ export function useDailyPick(): DailyPickState {
       })
       if (prepare.cache_hit) {
         // 当天已生成：直接拉内容，不播等待动画。
-        const result = await peripherals.dailyGenerate('')
+        const result = await peripherals.dailyGenerate()
         if (!mounted.current) return
         settle(toView(result))
         return
       }
-      setScenario(prepare.scenario || 'fallback')
+      // 未命中：选题在 generate 的 LLM 调用里，播通用过场动画等它返回。
+      setScenario('fallback')
       setPhase('waiting')
       // generate 永远 200：fallback 只是内容来源不同，不是失败分支。
-      const result = await peripherals.dailyGenerate(prepare.pick_token)
+      const result = await peripherals.dailyGenerate()
       if (!mounted.current) return
       settle(toView(result))
     } catch {

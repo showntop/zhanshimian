@@ -1,4 +1,5 @@
-// 每日内容选品。
+// 每日内容池的筛选与分类推导（选题本身由服务端 generate 的 LLM 完成，
+// 客户端不参与决定今天讲什么）。
 //
 // 输入只有两类：形象基因（稳定）+ 今日语境（每日变）。
 // 这里不做任何与「用户当天穿什么」有关的推断——那是臆想的来源。
@@ -81,6 +82,7 @@ const CATEGORY_BY_TYPE: Record<ContentType, CollectionCategory> = {
   item: 'outfit',
   occasion: 'occasion',
   howto: 'howto',
+  general: 'general',
 }
 
 export function categoryOfType(type: ContentType): CollectionCategory {
@@ -89,7 +91,7 @@ export function categoryOfType(type: ContentType): CollectionCategory {
 
 /** 手册各格当前条数，缺省补 0 */
 export function emptyBuckets(): Record<CollectionCategory, number> {
-  return { color: 0, fit: 0, proportion: 0, fabric: 0, occasion: 0, howto: 0, outfit: 0 }
+  return { color: 0, fit: 0, proportion: 0, fabric: 0, occasion: 0, howto: 0, outfit: 0, general: 0 }
 }
 
 export function countBuckets(categories: CollectionCategory[]): Record<CollectionCategory, number> {

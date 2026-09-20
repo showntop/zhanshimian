@@ -383,6 +383,7 @@ export const DAILY_COPY = {
     occasion: '场合',
     howto: '技巧',
     outfit: '搭配',
+    general: '综合',
   },
   typeNames: {
     color: '颜色',
@@ -392,6 +393,7 @@ export const DAILY_COPY = {
     item: '单品',
     occasion: '场合',
     howto: '技巧',
+    general: '综合',
   },
 } as const
 

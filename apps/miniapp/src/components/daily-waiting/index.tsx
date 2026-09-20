@@ -1,9 +1,9 @@
-// 每日内容的等待动画（方案 §3.1：scenario 枚举决定播哪套，settle 由
-// generate 返回触发——动画实现载体不锁死，这里用 CSS 序列形态，
-// 零图片、零外部依赖，规避 WebP 渲染空白与包体限制）。
+// 每日内容的等待动画（settle 由 generate 返回触发——动画实现载体不锁死，
+// 这里用 CSS 序列形态，零图片、零外部依赖，规避 WebP 渲染空白与包体限制）。
 //
-// 场景只覆盖部分主题：未覆盖场景回落 fallback（方案 §6 的风险对策）。
-// prefers-reduced-motion 时动画归零（AGENTS 动效规约）。
+// 选题在服务端的 LLM 调用里决定，等待期不知道内容主题：正常播通用
+// 过场（fallback 主题的 pulse）。scenario 仍接受主题枚举，缓存命中后
+// 重进的场景不再进入等待态。prefers-reduced-motion 时动画归零（AGENTS 动效规约）。
 
 import { Text, View } from '@tarojs/components'
 import { DAILY_COPY } from '@zsm/core'

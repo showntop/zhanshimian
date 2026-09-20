@@ -45,6 +45,7 @@ export type ContentType =
   | 'item'       // 单品 / 趋势
   | 'occasion'   // 场合
   | 'howto'      // 动作教程
+  | 'general'    // 综合：归不进七格的内容（服务端自报分类的兜底格）
 
 export type Modality =
   | 'swatch'    // 色卡 / 色板（程序化，零成本）
@@ -62,7 +63,7 @@ export type Modality =
 // 位置数据化是为了：将来单件素材到位后，只改数据不改组件。
 
 // ---------- 生效条件 ----------
-// 选品时用于过滤。条件不匹配的内容当天不发。
+// 内容池筛选时用于过滤。条件不匹配的内容当天不发。
 
 export interface WeatherBand {
   minTemp?: number
@@ -103,6 +104,7 @@ export type CollectionCategory =
   | 'occasion'   // 场合：面试、约会穿什么
   | 'howto'      // 技巧：卷袖、塞衣角这类动作
   | 'outfit'     // 搭配：完整的一身
+  | 'general'    // 综合：归不进七格的内容
 
 /**
  * 一条建议的生命周期：收下 → 试过 → 留下了。
@@ -149,7 +151,7 @@ export interface DailyContent {
   reviewed: boolean
 }
 
-// ---------- 选品输入 ----------
+// ---------- 内容池筛选输入 ----------
 // TodayContext 已存在于服务端（date/city/condition/temperature/day_type/schedule），此处只取所需。
 
 export interface DailyPickInput {
@@ -160,11 +162,11 @@ export interface DailyPickInput {
   season: Season
   /** 该用户已收过的 dedupeKey */
   seen: string[]
-  /** 手册各格现有条数，用于优先补最薄的那一格 */
+  /** 手册各格现有条数，越厚说明用户越关心这一格 */
   bucketCount: Record<CollectionCategory, number>
 }
 
-// ---------- 选品结果 ----------
+// ---------- 内容池筛选结果 ----------
 
 export interface DailyPick {
   content: DailyContent

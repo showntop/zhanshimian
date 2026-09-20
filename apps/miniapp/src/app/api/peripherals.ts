@@ -121,13 +121,13 @@ export const peripherals = {
       .then(dataOrThrow),
 
   // ---------- 每日内容 ----------
-  /** 选品：规则毫秒级；返回等待动画场景与一次性 pickToken（5 分钟有效）。 */
+  /** 缓存探测：命中则直接拉内容不播等待动画；未命中 scenario 为空。 */
   dailyPrepare: (input: { city?: string } = {}): Promise<DailyPrepare> =>
     client.POST('/v1/daily/prepare', { body: input }).then(dataOrThrow),
 
-  /** 生成：永远 200；source=generated|fallback，降级对客户端透明。 */
-  dailyGenerate: (pickToken: string): Promise<DailyGenerateResult> =>
-    client.POST('/v1/daily/generate', { body: { pick_token: pickToken } }).then(dataOrThrow),
+  /** 生成（单次 LLM 选题+成文）：永远 200；source=generated|fallback，降级对客户端透明。 */
+  dailyGenerate: (city?: string): Promise<DailyGenerateResult> =>
+    client.POST('/v1/daily/generate', { body: { city } }).then(dataOrThrow),
 
   /** 收下：服务端固化副本，幂等键 (user_id, content_key)。 */
   createDailyCollection: (input: { content_id: string; note?: string }): Promise<DailyCollection> =>

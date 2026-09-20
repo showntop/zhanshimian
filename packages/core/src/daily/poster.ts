@@ -100,6 +100,15 @@ export const SHELL_BY_TYPE: Record<ContentType, PosterShell> = {
     stage: { left: '6%', top: '10%', width: '88%', height: '27%' },
     text: { left: '11%', width: '56%' },
   },
+  // 综合：归不进七格的内容，用不带色相倾向的石墨底，避免暗示某一格。
+  general: {
+    base: 'linear-gradient(158deg,#3B3D42 0%,#31333A 55%,#26282D 100%)',
+    tone: 'light',
+    vmark: 'GENERAL',
+    plate: { top: '44%', rotate: 2, bg: '#1B1D21' },
+    stage: { left: '6%', top: '10%', width: '88%', height: '27%' },
+    text: { left: '10%', width: '58%' },
+  },
 }
 
 export function shellFor(type: ContentType): PosterShell {
