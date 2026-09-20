@@ -49,6 +49,8 @@ tags:
   description: 3D 形象 Lite（环绕展示）
 - name: Today
   description: 今日造型
+- name: Daily
+  description: 每日内容（两段式生成 + 收藏手册）
 - name: Shares
   description: 分享快照
 - name: Wardrobe
@@ -1202,6 +1204,287 @@ paths:
           "$ref": "#/components/responses/Unauthorized"
         '404':
           "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+  "/v1/daily/prepare":
+    post:
+      operationId: prepareDaily
+      summary: 每日内容选品
+      description: >-
+        规则选品（知识检索 + 基因匹配 + 历史去重 + 补薄格），返回等待动画场景与一次性
+        pickToken（5 分钟有效，服务端暂存选品快照）。当天已生成时 cache_hit=true、
+        pick_token 为空，客户端直接拉内容不播等待动画。
+      tags:
+      - Daily
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                city:
+                  type: string
+                  description: 覆盖城市（选填）
+      responses:
+        '200':
+          description: 选品结果
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/Envelope"
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/DailyPrepare"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+  "/v1/daily/generate":
+    post:
+      operationId: generateDaily
+      summary: 生成今日内容
+      description: >-
+        凭 prepare 返回的 pickToken 生成今日内容。永远返回 200 与内容：
+        source=generated 表示 AI 生成（grounding，逐条可追溯到知识事实），
+        source=fallback 表示兜底池内容（降级对客户端透明，结构完全一致）。
+        同一用户同一天幂等：重复调用返回当天已生成的那条。
+      tags:
+      - Daily
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - pick_token
+              properties:
+                pick_token:
+                  type: string
+                  description: prepare 返回的一次性选品令牌；过期/缺失时服务端按当前条件重建选品
+      responses:
+        '200':
+          description: 今日内容（generated 或 fallback）
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/Envelope"
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/DailyGenerateResult"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+  "/v1/daily/collection":
+    get:
+      operationId: listDailyCollection
+      summary: 我的手册
+      description: 收下的内容按保存时间倒序；category 过滤某一格，缺省返回全部。
+      tags:
+      - Daily
+      parameters:
+      - name: category
+        in: query
+        required: false
+        schema:
+          "$ref": "#/components/schemas/CollectionCategory"
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      responses:
+        '200':
+          description: 收藏列表
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/Envelope"
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        "$ref": "#/components/schemas/DailyCollection"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+    post:
+      operationId: createDailyCollection
+      summary: 收下今日内容
+      description: >-
+        固化内容副本（服务端按 content_id 取回，不信任客户端文案）与素材引用，
+        幂等键 (user_id, content_key)：重复收下返回已存在的那条。
+      tags:
+      - Daily
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - content_id
+              properties:
+                content_id:
+                  type: string
+                  format: uuid
+                note:
+                  type: string
+                  maxLength: 200
+      responses:
+        '201':
+          description: 已收下（重复收下返回既有条目）
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/Envelope"
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/DailyCollection"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+  "/v1/daily/collection/stats":
+    get:
+      operationId: getDailyCollectionStats
+      summary: 手册七格计数
+      description: 七个分类的条数（客户端徽标与服务端选品补薄格共用）。
+      tags:
+      - Daily
+      responses:
+        '200':
+          description: 分类计数
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/Envelope"
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/DailyCollectionStats"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+  "/v1/daily/collection/{id}":
+    patch:
+      operationId: updateDailyCollection
+      summary: 推进生命周期或改备注
+      description: status 走 saved→tried→kept；note 覆盖用户备注。字段缺省表示不修改。
+      tags:
+      - Daily
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: 收藏条目 ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  "$ref": "#/components/schemas/CollectionStatus"
+                note:
+                  type: string
+                  maxLength: 200
+      responses:
+        '200':
+          description: 更新后的收藏
+          headers:
+            X-Request-ID:
+              "$ref": "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                allOf:
+                - "$ref": "#/components/schemas/Envelope"
+                - type: object
+                  required:
+                  - data
+                  properties:
+                    data:
+                      "$ref": "#/components/schemas/DailyCollection"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+    delete:
+      operationId: deleteDailyCollection
+      summary: 移出手册
+      description: 幂等：已删/不存在同样返回 204。
+      tags:
+      - Daily
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: 收藏条目 ID
+        schema:
+          type: string
+      responses:
+        '204':
+          description: 已移出
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
         '500':
           "$ref": "#/components/responses/InternalError"
   "/v1/shares":
@@ -3401,6 +3684,307 @@ components:
         schedule:
           type: string
           description: 日程识别结果
+    DailyPrepare:
+      type: object
+      additionalProperties: false
+      required:
+      - gen_date
+      - pick_token
+      - scenario
+      - cache_hit
+      properties:
+        gen_date:
+          type: string
+          format: date
+        pick_token:
+          type: string
+          description: 一次性选品令牌；cache_hit=true 时为空串
+        scenario:
+          type: string
+          enum:
+          - color
+          - fit
+          - proportion
+          - fabric
+          - occasion
+          - howto
+          - outfit
+          - fallback
+          description: 等待动画场景；无可选品时为 fallback
+        cache_hit:
+          type: boolean
+    DailyGenerateResult:
+      type: object
+      additionalProperties: false
+      required:
+      - source
+      - content
+      properties:
+        source:
+          type: string
+          enum:
+          - generated
+          - fallback
+          description: generated=AI 基于知识事实生成；fallback=兜底池内容（结构完全一致）
+        content:
+          "$ref": "#/components/schemas/DailyContent"
+    DailyContentVisual:
+      type: object
+      additionalProperties: false
+      required:
+      - modality
+      - spec
+      - alt
+      properties:
+        modality:
+          type: string
+          enum:
+          - swatch
+          - compare
+          - diagram
+          - photo
+          - video
+          - generated
+          - poster
+        spec:
+          type: object
+          additionalProperties: true
+          description: 程序化视觉的绘制参数；由客户端窄化解析，解析不出降级 alt
+        alt:
+          type: string
+          description: 无障碍/无图时的文字兜底
+    DailyContent:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - type
+      - topic
+      - lead
+      - fit_text
+      - why
+      - visual
+      - asset
+      - dedupe_key
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          "$ref": "#/components/schemas/DailyContentType"
+        topic:
+          type: string
+          description: 选题（杂志式标题，通用内容，不个性化）
+        lead:
+          type: string
+        fit_text:
+          type: string
+          description: 适配说明：唯一被个性化的部分，已按该用户形象基因渲染
+        why:
+          type: string
+        visual:
+          "$ref": "#/components/schemas/DailyContentVisual"
+        asset:
+          "$ref": "#/components/schemas/CollectionCategory"
+        dedupe_key:
+          type: string
+          description: 内容去重键；收藏的 content_key
+    DailyContentType:
+      type: string
+      enum:
+      - color
+      - silhouette
+      - proportion
+      - fabric
+      - item
+      - occasion
+      - howto
+    CollectionCategory:
+      type: string
+      enum:
+      - color
+      - fit
+      - proportion
+      - fabric
+      - occasion
+      - howto
+      - outfit
+    CollectionStatus:
+      type: string
+      enum:
+      - saved
+      - tried
+      - kept
+    ContentSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - type
+      - topic
+      - lead
+      - fitText
+      - why
+      - visual
+      - category
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          "$ref": "#/components/schemas/DailyContentType"
+        topic:
+          type: string
+        lead:
+          type: string
+        fitText:
+          type: string
+          description: 收下那一刻已渲染的适配说明（内容池迭代不影响）
+        why:
+          type: string
+        visual:
+          "$ref": "#/components/schemas/DailyContentVisual"
+        category:
+          "$ref": "#/components/schemas/CollectionCategory"
+    CollectionAsset:
+      type: object
+      additionalProperties: false
+      required:
+      - kind
+      properties:
+        kind:
+          type: string
+          enum:
+          - colors
+          - media
+          - wardrobe_item
+          - wardrobe_outfit
+          - plan
+          - product
+        colors:
+          type: array
+          items:
+            type: string
+          description: kind=colors 时的色值列表
+        media_id:
+          type: string
+        role:
+          type: string
+          enum:
+          - cover
+          - figure
+          - video
+        item_id:
+          type: string
+        outfit_id:
+          type: string
+        plan_id:
+          type: string
+        source:
+          type: string
+        ref:
+          type: string
+    SavedContext:
+      type: object
+      additionalProperties: false
+      properties:
+        temperature:
+          type: integer
+        condition:
+          type: string
+        dayType:
+          type: string
+        season:
+          type: string
+        city:
+          type: string
+        schedule:
+          type: string
+    DailyCollection:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - content_id
+      - content_key
+      - category
+      - status
+      - note
+      - title
+      - summary
+      - content_snapshot
+      - assets
+      - context
+      - saved_at
+      - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        content_id:
+          type: string
+          format: uuid
+        content_key:
+          type: string
+        category:
+          "$ref": "#/components/schemas/CollectionCategory"
+        status:
+          "$ref": "#/components/schemas/CollectionStatus"
+        note:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        content_snapshot:
+          "$ref": "#/components/schemas/ContentSnapshot"
+        assets:
+          type: array
+          items:
+            "$ref": "#/components/schemas/CollectionAsset"
+        context:
+          "$ref": "#/components/schemas/SavedContext"
+        saved_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    DailyCollectionStats:
+      type: object
+      additionalProperties: false
+      required:
+      - counts
+      - total
+      properties:
+        counts:
+          type: object
+          additionalProperties: false
+          required:
+          - color
+          - fit
+          - proportion
+          - fabric
+          - occasion
+          - howto
+          - outfit
+          properties:
+            color:
+              type: integer
+            fit:
+              type: integer
+            proportion:
+              type: integer
+            fabric:
+              type: integer
+            occasion:
+              type: integer
+            howto:
+              type: integer
+            outfit:
+              type: integer
+        total:
+          type: integer
     TodayPlan:
       type: object
       additionalProperties: false

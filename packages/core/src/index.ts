@@ -63,6 +63,13 @@ export type {
   TodayContext,
   TodayPlan,
   TodayPlanAccepted,
+  DailyPrepare,
+  DailyGenerateResult,
+  DailyContentDTO,
+  DailyContentVisual,
+  DailyContentType,
+  DailyCollection,
+  DailyCollectionStats,
   Share,
   ShareView,
   WardrobeItem,
@@ -124,7 +131,7 @@ export {
   type DisplayProgressOptions
 } from './hooks/useDisplayProgress.ts'
 export { APP_NAME, APP_SLOGAN, DEFAULT_NICKNAME, ERROR_COPY, EMPTY_COPY, FEEDBACK_WORDS, FEEDBACK_ACK_COPY, feedbackAcknowledgement, GENERATION_FEEDBACK_TAGS, EXECUTION_FEEDBACK_TAGS, FEEDBACK_SCREEN_COPY, HOME_COPY, HOME_TITLE, PRIVACY_NOTE, PROFILE_SETUP_COPY, ME_COPY, REPORT_COPY, reportCategoryLabel, SCENES, analysisStageText, ANALYSIS_FAIL_COPY, ASSESSMENT_COPY, ASSESSMENT_STAGE_COPY, assessmentStageText, PLANNING_COPY, PLAN_STAGE_COPY, planStageText, PLANS_COPY, planSlotLabel, SCENE_BRIEF_COPY, sceneIncompleteText, PLAN_DETAIL_COPY, CHECKLIST_COPY, WARDROBE_COPY, greetingByHour, greetingForNow, IMAGE_BADGE_COPY, LAB_COPY, PRIVACY_SECTION_TITLE, SOURCE_IMAGE_COPY, CAPTURE_COPY, captureSelectedText, captureFillMissingText, ANALYSIS_STAGE_COPY, OUTFIT_COPY, PURCHASE_COPY, HAIR_COPY, ADVISOR_COPY, BILLING_COPY, FINDING_TONE_COPY, TASK_DONE_COPY, taskDoneText, DAILY_COPY, dailyBucketName, dailyTypeName, type SceneCopy, type SceneBriefScene, type FeedbackAcknowledgementCode } from './copy/zh.ts'
-export * from './daily'
+export * from './daily/index.ts'
 
 export {
   EVENT_NAME_PATTERN,

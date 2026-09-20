@@ -1,25 +1,23 @@
 // 我的手册：收下的内容按资产库分组沉淀。
 //
-// 这里的价值不在「数了多少条」，而在它是结构化的：色卡 / 版型库 / 配色库 / 面料库 / 搭配，
-// 每一条都能回看、能对照着买衣服。数字断了是损失，内容攒着是财富。
+// 数据源：GET /v1/daily/collection（读服务端固化的副本快照，不再反查本地
+// 内容池）。拉取失败 → 显示本地缓存并标注「离线」——手册可看，只是新不到。
 //
 // 放 life 分包：手册是低频查看的资产页，不占主包体积（今日页才是每日必访）。
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import {
   DAILY_COPY,
-  MOCK_CONTENTS,
-  MOCK_GENE_DEFAULT,
   dailyBucketName,
   dailyTypeName,
   type CollectionCategory,
-  type DailyContent,
-  type StyleGene,
+  type ContentVisual,
 } from '@zsm/core'
-import { usePageShell } from '../../../../hooks/use-page-visibility'
+import { peripherals } from '../../../../app/api/peripherals'
 import { readSaves, removeSave, type DailySave } from '../../../../features/daily/saves'
+import { usePageShell } from '../../../../hooks/use-page-visibility'
 import AppHeader from '../../../../components/app-header'
 import DailyVisual from '../../../../components/daily-visual'
 import './index.scss'
@@ -34,36 +32,102 @@ const BUCKET_ORDER: CollectionCategory[] = [
   'outfit',
 ]
 
-// 服务端 StyleGene 就绪后改为读取用户自己的形象基因
-const GENE: StyleGene = MOCK_GENE_DEFAULT
+/** 手册条目视图：服务端副本快照（真源）或本地缓存（离线降级）共用 */
+interface HandbookItem {
+  key: string
+  category: CollectionCategory
+  type: string
+  topic: string
+  fitText: string
+  visual: ContentVisual
+}
 
-const CONTENT_BY_KEY = new Map<string, DailyContent>(MOCK_CONTENTS.map((c) => [c.dedupeKey, c]))
+function fromCollection(item: {
+  id: string
+  content_key: string
+  category: string
+  content_snapshot: {
+    type: string
+    topic: string
+    fitText: string
+    visual: { modality: string; spec: Record<string, unknown> | null; alt: string }
+  } | null
+}): HandbookItem | null {
+  const snapshot = item.content_snapshot
+  if (!snapshot || !snapshot.visual) return null
+  return {
+    key: item.content_key,
+    category: item.category as CollectionCategory,
+    type: snapshot.type,
+    topic: snapshot.topic,
+    fitText: snapshot.fitText,
+    visual: snapshot.visual as unknown as ContentVisual,
+  }
+}
+
+function fromLocalSave(save: DailySave): HandbookItem | null {
+  if (!save.snapshot || !save.snapshot.visual) return null
+  return {
+    key: save.key,
+    category: save.category,
+    type: save.snapshot.type,
+    topic: save.snapshot.topic,
+    fitText: save.snapshot.fitText,
+    visual: save.snapshot.visual,
+  }
+}
 
 export default function Handbook() {
-  const [saves, setSaves] = useState<DailySave[]>(() => readSaves())
+  const [items, setItems] = useState<HandbookItem[]>([])
+  const [offline, setOffline] = useState(false)
+  const [loading, setLoading] = useState(true)
   const { pageClass, enter } = usePageShell(true, '', 'handbook')
 
+  const load = useCallback(async () => {
+    try {
+      const collections = await peripherals.listDailyCollection()
+      setItems(
+        collections
+          .map(fromCollection)
+          .filter((item): item is HandbookItem => item !== null),
+      )
+      setOffline(false)
+    } catch {
+      // 手册拉取失败 → 本地缓存兜底并标注「离线」（方案 §3.3）
+      setItems(
+        readSaves()
+          .map(fromLocalSave)
+          .filter((item): item is HandbookItem => item !== null),
+      )
+      setOffline(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   useDidShow(() => {
-    setSaves(readSaves())
+    void load()
   })
 
   const groups = useMemo(() => {
-    const map = new Map<CollectionCategory, DailySave[]>()
+    const map = new Map<CollectionCategory, HandbookItem[]>()
     for (const bucket of BUCKET_ORDER) map.set(bucket, [])
-    for (const save of saves) {
-      const list = map.get(save.category)
-      if (list) list.push(save)
+    for (const item of items) {
+      const list = map.get(item.category)
+      if (list) list.push(item)
       // 未知 bucket 直接丢弃，不建隐式分组
     }
     return BUCKET_ORDER.map((bucket) => ({
       bucket,
       name: dailyBucketName(bucket),
       items: map.get(bucket) ?? [],
-    })).filter((g) => g.items.length > 0)
-  }, [saves])
+    })).filter((group) => group.items.length > 0)
+  }, [items])
 
-  const onRemove = (key: string) => {
-    setSaves(removeSave(key))
+  const onRemove = (item: HandbookItem) => {
+    // 本地立即移出 + 服务端尽力删除（幂等 204），失败下次进入对账
+    setItems((prev) => prev.filter((prevItem) => prevItem.key !== item.key))
+    removeSave(item.key)
     Taro.showToast({ title: '已移出手册', icon: 'none' })
   }
 
@@ -77,10 +141,12 @@ export default function Handbook() {
       <View className="hb">
         <View className={`hb__head ${enter()}`}>
           <Text className="hb__title">{DAILY_COPY.handbookTitle}</Text>
-          <Text className="hb__count">已收 {saves.length} 条</Text>
+          <Text className="hb__count">
+            {offline ? '离线缓存' : `已收 ${items.length} 条`}
+          </Text>
         </View>
 
-        {groups.length === 0 ? (
+        {loading ? null : groups.length === 0 ? (
           <View className="hb__empty">
             <Text className="hb__empty-title">{DAILY_COPY.handbookEmptyTitle}</Text>
             <Text className="hb__empty-body">{DAILY_COPY.handbookEmptyBody}</Text>
@@ -95,25 +161,21 @@ export default function Handbook() {
                 <Text className="hb__group-name">{group.name}</Text>
                 <Text className="hb__group-n">{group.items.length}</Text>
               </View>
-              {group.items.map((save) => {
-                const content = CONTENT_BY_KEY.get(save.key)
-                if (!content) return null
-                return (
-                  <View key={save.key} className="hb__item">
-                    <View className="hb__item-visual">
-                      <DailyVisual visual={content.visual} />
-                    </View>
-                    <View className="hb__item-copy">
-                      <Text className="hb__item-type">{dailyTypeName(content.type)}</Text>
-                      <Text className="hb__item-topic">{content.topic}</Text>
-                      <Text className="hb__item-fit">{content.fit(GENE)}</Text>
-                    </View>
-                    <View className="hb__item-remove" onClick={() => onRemove(save.key)}>
-                      <Text className="hb__item-remove-text">移出</Text>
-                    </View>
+              {group.items.map((item) => (
+                <View key={item.key} className="hb__item">
+                  <View className="hb__item-visual">
+                    <DailyVisual visual={item.visual} />
                   </View>
-                )
-              })}
+                  <View className="hb__item-copy">
+                    <Text className="hb__item-type">{dailyTypeName(item.type)}</Text>
+                    <Text className="hb__item-topic">{item.topic}</Text>
+                    <Text className="hb__item-fit">{item.fitText}</Text>
+                  </View>
+                  <View className="hb__item-remove" onClick={() => onRemove(item)}>
+                    <Text className="hb__item-remove-text">移出</Text>
+                  </View>
+                </View>
+              ))}
             </View>
           ))
         )}

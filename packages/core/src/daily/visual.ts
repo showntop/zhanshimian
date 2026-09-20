@@ -11,7 +11,7 @@
 // spec 在契约里是 Record<string, unknown>（服务端可扩展），这里做窄化解析：
 // 解析不出来就返回 null，由组件降级，绝不猜。
 
-import type { ContentVisual } from './types'
+import type { ContentVisual } from './types.ts'
 
 // ---------- swatch：色卡 ----------
 

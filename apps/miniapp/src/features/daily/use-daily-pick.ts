@@ -1,116 +1,254 @@
-// 每日内容选品的共用逻辑：首页卡片与今日页走同一份，避免两处各算各的。
+// 每日内容两段式状态机（方案 §3.1）。
 //
-// 语境来自服务端 TodayContext（真实天气）；取不到时用兜底语境继续给内容——
-// 内容不该因为一个天气接口失败就整页空掉。
+//   loading   进入页面，调 prepare
+//   waiting   prepare 返回 scenario → 播对应主题等待动画；同时调 generate
+//   settling  generate 返回 → 动画落位（1.2s）→ 海报呈现
+//   content   海报呈现
+//   offline   网络错误 → 读本地缓存；无缓存也保持静默文案（服务端本身不会空屏）
+//
+// 客户端只依赖两个契约：scenario 枚举决定播哪套；settle 时机由 generate
+// 返回触发（动画实现载体不锁死）。generate 永远 200——客户端没有
+// 「生成失败」分支，只有 source（generated / fallback）字段。
+//
+// 选品逻辑已移到服务端：本 hook 不再在本地选品，只负责状态机与收藏写穿。
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import {
   DAILY_COPY,
-  MOCK_CONTENTS,
-  MOCK_GENE_DEFAULT,
-  countBuckets,
   dailyBucketName,
-  pickDaily,
-  type DailyPick,
-  type DayType,
-  type Season,
-  type StyleGene,
+  type CollectionCategory,
+  type ContentVisual,
+  type ContentType,
   type TodayContext,
 } from '@zsm/core'
 import { peripherals } from '../../app/api/peripherals'
-import { addSave, readSaves, seenKeys, type DailySave } from './saves'
+import { addSave, readSaves, syncPendingSaves, type DailySave } from './saves'
 
-// TODO(服务端 StyleGene 接口就绪后替换)：暂用预设，真实应读用户自己的形象基因
-const GENE: StyleGene = MOCK_GENE_DEFAULT
 
-function normalizeDayType(value: string): DayType {
-  if (value === 'weekend' || value.includes('周末')) return 'weekend'
-  if (value === 'holiday' || value.includes('节') || value.includes('假')) return 'holiday'
-  return 'weekday'
-}
+/** generate 返回后动画落位的时长（与服务端 6s 硬超时同一文档约定） */
+const SETTLE_MS = 1200
 
-function seasonOf(date: string): Season {
-  const month = Number(date.slice(5, 7))
-  if (month >= 3 && month <= 5) return 'spring'
-  if (month >= 6 && month <= 8) return 'summer'
-  if (month >= 9 && month <= 11) return 'autumn'
-  return 'winter'
-}
+export type DailyPhase = 'loading' | 'waiting' | 'settling' | 'content' | 'offline'
 
-function fallbackContext(): TodayContext {
-  const now = new Date()
-  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  return { date, city: '', condition: '多云', temperature: 18, day_type: 'weekday', schedule: '' }
+/** 服务端内容的小程序视图：fit 已在服务端渲染成 fit_text */
+export interface DailyContentView {
+  id: string
+  type: ContentType
+  topic: string
+  lead: string
+  fitText: string
+  why: string
+  visual: ContentVisual
+  asset: CollectionCategory
+  dedupeKey: string
+  /** generated=AI 基于知识事实生成；fallback=今日精选 */
+  source: 'generated' | 'fallback'
 }
 
 export interface DailyPickState {
-  ctx: TodayContext
+  ctx: TodayContext | null
   saves: DailySave[]
-  loading: boolean
-  pick: DailyPick | null
+  phase: DailyPhase
+  /** 等待动画场景（prepare.scenario） */
+  scenario: string
+  content: DailyContentView | null
   bucketName: string
+  loading: boolean
   reloadSaves: () => void
   saveCurrent: () => void
 }
 
-export function useDailyPick(): DailyPickState {
-  const [context, setContext] = useState<TodayContext | null>(null)
-  const [saves, setSaves] = useState<DailySave[]>(() => readSaves())
-  const [loading, setLoading] = useState(true)
+function toView(generate: {
+  source: string
+  content: {
+    id: string
+    type: string
+    topic: string
+    lead: string
+    fit_text: string
+    why: string
+    visual: { modality: string; spec: Record<string, unknown> | null; alt: string }
+    asset: string
+    dedupe_key: string
+  }
+}): DailyContentView {
+  return {
+    id: generate.content.id,
+    type: generate.content.type as ContentType,
+    topic: generate.content.topic,
+    lead: generate.content.lead,
+    fitText: generate.content.fit_text,
+    why: generate.content.why,
+    visual: {
+      modality: generate.content.visual.modality as ContentVisual['modality'],
+      spec: generate.content.visual.spec ?? {},
+      alt: generate.content.visual.alt,
+    },
+    asset: generate.content.asset as CollectionCategory,
+    dedupeKey: generate.content.dedupe_key,
+    source: generate.source === 'generated' ? 'generated' : 'fallback',
+  }
+}
 
-  const loadContext = useCallback(async () => {
-    setLoading(true)
-    const ctx = await peripherals.getTodayContext().catch(() => null)
-    setContext(ctx)
-    setLoading(false)
-  }, [])
+/** 当日内容缓存：offline / 重进时直接呈现（防闪屏，不清空已渲染内容） */
+interface CachedDaily {
+  date: string
+  content: DailyContentView
+}
+
+function readCachedContent(): DailyContentView | null {
+  try {
+    const info = Taro.getStorageSync('zsm_daily_today')
+    if (info && typeof info === 'object') {
+      const cached = info as CachedDaily
+      const today = new Date()
+      const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+      if (cached.date === date && cached.content && cached.content.topic) return cached.content
+    }
+  } catch {
+    // 缓存不可用：走静默文案
+  }
+  return null
+}
+
+function writeCachedContent(content: DailyContentView): void {
+  try {
+    const now = new Date()
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    Taro.setStorageSync('zsm_daily_today', { date, content } satisfies CachedDaily)
+  } catch {
+    // 同上：缓存可丢
+  }
+}
+
+export function useDailyPick(): DailyPickState {
+  const [ctx, setCtx] = useState<TodayContext | null>(null)
+  const [saves, setSaves] = useState<DailySave[]>(() => readSaves())
+  const [phase, setPhase] = useState<DailyPhase>('loading')
+  const [scenario, setScenario] = useState('fallback')
+  const [content, setContent] = useState<DailyContentView | null>(null)
+  const mounted = useRef(true)
 
   useEffect(() => {
-    void loadContext()
-  }, [loadContext])
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
+  const settle = useCallback((view: DailyContentView) => {
+    setContent(view)
+    writeCachedContent(view)
+    setPhase('settling')
+    // 动画落位 1.2s 后进入内容态（计时器在卸载后不再 setState）
+    setTimeout(() => {
+      if (mounted.current) setPhase('content')
+    }, SETTLE_MS)
+  }, [])
+
+  const run = useCallback(async () => {
+    if (!mounted.current) return
+    setPhase('loading')
+    // 离线缓存先顶上（恢复后重放的入口在 syncPendingSaves）。
+    const cached = readCachedContent()
+    try {
+      const prepare = await peripherals.dailyPrepare()
+      if (!mounted.current) return
+      setCtx({
+        date: prepare.gen_date,
+        city: '',
+        condition: '',
+        temperature: 0,
+        day_type: '',
+        schedule: '',
+      })
+      if (prepare.cache_hit) {
+        // 当天已生成：直接拉内容，不播等待动画。
+        const result = await peripherals.dailyGenerate('')
+        if (!mounted.current) return
+        settle(toView(result))
+        return
+      }
+      setScenario(prepare.scenario || 'fallback')
+      setPhase('waiting')
+      // generate 永远 200：fallback 只是内容来源不同，不是失败分支。
+      const result = await peripherals.dailyGenerate(prepare.pick_token)
+      if (!mounted.current) return
+      settle(toView(result))
+    } catch {
+      // 网络错误：读本地缓存，无缓存给静默文案（有下一步动作）。
+      if (!mounted.current) return
+      if (cached) {
+        setContent(cached)
+      }
+      setPhase('offline')
+    }
+  }, [settle])
+
+  useEffect(() => {
+    void run()
+    // 离线遗留的收藏在恢复后重放（服务端按 content_key 幂等，重放安全）。
+    void syncPendingSaves()
+    return () => {
+      mounted.current = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const reloadSaves = useCallback(() => {
     setSaves(readSaves())
   }, [])
 
-  const ctx = context ?? fallbackContext()
-
-  const pick = pickDaily(MOCK_CONTENTS, {
-    gene: GENE,
-    temperature: ctx.temperature,
-    condition: ctx.condition,
-    dayType: normalizeDayType(ctx.day_type),
-    season: seasonOf(ctx.date),
-    seen: seenKeys(saves),
-    bucketCount: countBuckets(saves.map((s) => s.category)),
-  })
-
-  const bucketName = pick ? dailyBucketName(pick.content.asset) : ''
+  const contentKey = content?.dedupeKey ?? ''
+  const saved = saves.some((save) => save.key === contentKey)
 
   const saveCurrent = useCallback(() => {
-    if (!pick) return
-    // 副本：fitText 已按该用户基因渲染，内容池后续迭代不影响这条
+    if (!content || saved) return
+    // 副本：fitText 已由服务端按该用户基因渲染，先本地留底再写穿服务端。
     const next = addSave({
-      key: pick.content.dedupeKey,
-      category: pick.content.asset,
+      key: content.dedupeKey,
+      contentId: content.id,
+      category: content.asset,
       savedAt: new Date().toISOString(),
       status: 'saved',
       note: '',
+      pendingSync: true,
       snapshot: {
-        id: pick.content.id,
-        type: pick.content.type,
-        topic: pick.content.topic,
-        lead: pick.content.lead,
-        fitText: pick.fitText,
-        why: pick.content.why,
-        visual: pick.content.visual,
-        category: pick.content.asset,
+        id: content.id,
+        type: content.type,
+        topic: content.topic,
+        lead: content.lead,
+        fitText: content.fitText,
+        why: content.why,
+        visual: content.visual,
+        category: content.asset,
       },
     })
     setSaves(next)
-    Taro.showToast({ title: `${DAILY_COPY.savedToastPrefix}${bucketName}`, icon: 'none' })
-  }, [pick, bucketName])
+    Taro.showToast({ title: `${DAILY_COPY.savedToastPrefix}${dailyBucketName(content.asset)}`, icon: 'none' })
+  }, [content, saved])
 
-  return { ctx, saves, loading, pick, bucketName, reloadSaves, saveCurrent }
+  const loading = phase === 'loading'
+  const bucketName = content ? dailyBucketName(content.asset) : ''
+
+  return { ctx, saves, phase, scenario, content, bucketName, loading, reloadSaves, saveCurrent }
+}
+
+// context 拉取保留给需要天气的页面（今日页顶部语境），失败静默。
+export function useTodayContext(): TodayContext | null {
+  const [ctx, setCtx] = useState<TodayContext | null>(null)
+  useEffect(() => {
+    let alive = true
+    peripherals
+      .getTodayContext()
+      .then((value) => {
+        if (alive) setCtx(value)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+  return ctx
 }

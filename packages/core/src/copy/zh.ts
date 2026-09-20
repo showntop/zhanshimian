@@ -361,6 +361,14 @@ export const DAILY_COPY = {
   // 分类在手册里呈现，toast 补一句「已收进 · 颜色」。
   saveAction: '收下',
   savedToastPrefix: '已收进 · ',
+  // 已收下后按钮置为已完成态（今日页）
+  savedPrefix: '已收进 · ',
+  // 兜底内容的角标：内容来源不同（服务端 source=fallback），不写「AI 生成」
+  fallbackBadge: '今日精选',
+  // 离线：本地有缓存就直接呈现；无缓存给静默文案 + 下一步动作
+  offlineTitle: '今天的内容还没取到',
+  offlineBody: '网络恢复后重新进入，或先看看收下的手册。',
+  retryAction: '重新加载 ›',
   emptyTitle: '今天没有可推的内容',
   emptyBody: '内容池在当前条件下没有合适的条目。宁可不推，也不凑数。',
   handbookEmptyTitle: '手册还是空的',

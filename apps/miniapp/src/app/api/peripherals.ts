@@ -8,6 +8,12 @@ import type {
   CreateBodyPresentationRequest,
   BillingOrder,
   BillingSummary,
+  CollectionCategory,
+  CollectionStatus,
+  DailyCollection,
+  DailyCollectionStats,
+  DailyGenerateResult,
+  DailyPrepare,
   Diagnosis,
   HairPreview,
   HairPreviewAccepted,
@@ -113,6 +119,36 @@ export const peripherals = {
     client
       .POST('/v1/today/plans/{id}/feedback', { params: { path: { id } }, body: { feedback } })
       .then(dataOrThrow),
+
+  // ---------- 每日内容 ----------
+  /** 选品：规则毫秒级；返回等待动画场景与一次性 pickToken（5 分钟有效）。 */
+  dailyPrepare: (input: { city?: string } = {}): Promise<DailyPrepare> =>
+    client.POST('/v1/daily/prepare', { body: input }).then(dataOrThrow),
+
+  /** 生成：永远 200；source=generated|fallback，降级对客户端透明。 */
+  dailyGenerate: (pickToken: string): Promise<DailyGenerateResult> =>
+    client.POST('/v1/daily/generate', { body: { pick_token: pickToken } }).then(dataOrThrow),
+
+  /** 收下：服务端固化副本，幂等键 (user_id, content_key)。 */
+  createDailyCollection: (input: { content_id: string; note?: string }): Promise<DailyCollection> =>
+    client.POST('/v1/daily/collection', { body: input }).then(dataOrThrow),
+
+  listDailyCollection: (category?: CollectionCategory, limit?: number): Promise<DailyCollection[]> =>
+    client
+      .GET('/v1/daily/collection', { params: { query: { category, limit } } })
+      .then(dataOrThrow),
+
+  getDailyCollectionStats: (): Promise<DailyCollectionStats> =>
+    client.GET('/v1/daily/collection/stats').then(dataOrThrow),
+
+  /** 生命周期推进：saved → tried → kept。 */
+  updateDailyCollection: (id: string, patch: { status?: CollectionStatus; note?: string }): Promise<DailyCollection> =>
+    client.PATCH('/v1/daily/collection/{id}', { params: { path: { id } }, body: patch }).then(dataOrThrow),
+
+  /** 移出手册：幂等，不存在同样 204。 */
+  deleteDailyCollection: async (id: string): Promise<void> => {
+    await client.DELETE('/v1/daily/collection/{id}', { params: { path: { id } } })
+  },
 
   // ---------- 分享 ----------
   createShare: (input: {

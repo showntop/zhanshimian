@@ -10,7 +10,7 @@ import type {
   DailyPick,
   DailyPickInput,
   StyleGene,
-} from './types'
+} from './types.ts'
 
 /** 基因条件是否命中；未声明该维度表示不挑人 */
 function geneHit(gene: StyleGene, c: DailyContent): boolean {

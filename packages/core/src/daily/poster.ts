@@ -18,7 +18,7 @@
 //   【收口】plate.top + 承载块高度 ≤ 100%，否则溢出到下方区块。
 //     按目前文案量（标题 2 行 + 钩子 2 行 + 按钮）承载块约需 55%。
 
-import type { ContentType } from './types'
+import type { ContentType } from './types.ts'
 
 export type PosterTone = 'light' | 'dark'
 

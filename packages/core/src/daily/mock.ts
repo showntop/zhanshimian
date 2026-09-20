@@ -17,7 +17,7 @@
 // 全部 reviewed: false。原理取自通行的形象知识，句式与结构可保证，
 // 但「是否真的适用于这类人」必须由形象顾问逐条确认后才能进生产池。
 
-import type { DailyContent, StyleGene } from './types'
+import type { DailyContent, StyleGene } from './types.ts'
 
 // 开发期素材通道。
 //

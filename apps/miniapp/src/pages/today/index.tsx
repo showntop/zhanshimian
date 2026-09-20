@@ -2,11 +2,11 @@
 //
 // 美学参照：Aesop / COS 的编辑式极简。
 //   一个画面一个主角（视觉），其余全部降权：小字 meta、细线分隔、文字链次级动作。
-//   不用色块当容器（曾出现的 moss-soft 底个性化块、浅绿手册卡已全部取消）。
-//   编号是小而对齐的序列标记，不是压在标题后的大字残影。
 //
-// 上一版的「色彩场」已废弃：低饱和品牌色做不出可见的氛围，只会让画面发白，
-// 还占掉本该给视觉的空间。背景回到干净底色，让内容视觉自己当主角。
+// 状态机（方案 §3.1）：loading → waiting（按 scenario 播等待动画）→ settling
+// （generate 返回，动画落位 1.2s）→ content；cacheHit 直接进 content；
+// 网络错误 → offline 读本地缓存。generate 永远 200，没有「生成失败」分支，
+// fallback 内容只是角标写「今日精选」。
 //
 // 重模式不在这里并列：它是「看看我穿这样」这个 action 的结果，跳 life 分包的今日造型页。
 
@@ -15,9 +15,10 @@ import Taro, { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import { DAILY_COPY, dailyTypeName } from '@zsm/core'
 import { usePageShell } from '../../hooks/use-page-visibility'
-import { useDailyPick } from '../../features/daily/use-daily-pick'
+import { useDailyPick, useTodayContext } from '../../features/daily/use-daily-pick'
 import AppHeader from '../../components/app-header'
 import DailyVisual from '../../components/daily-visual'
+import DailyWaiting from '../../components/daily-waiting'
 import Skeleton from '../../components/skeleton'
 import './index.scss'
 
@@ -25,7 +26,10 @@ const TODAY_PLAN_PATH = '/packages/life/pages/today/index'
 const HANDBOOK_PATH = '/packages/life/pages/handbook/index'
 
 export default function Today() {
-  const { ctx, saves, loading, pick, bucketName, reloadSaves, saveCurrent } = useDailyPick()
+  const {
+    saves, phase, scenario, content, bucketName, loading, reloadSaves, saveCurrent,
+  } = useDailyPick()
+  const ctx = useTodayContext()
   const { pageClass } = usePageShell(true, '', 'today')
 
   // 从手册返回时同步一次：那边可以移出，回来要看到最新状态
@@ -42,6 +46,8 @@ export default function Today() {
   }, [])
 
   const seq = String(saves.length + 1).padStart(2, '0')
+  const saved = Boolean(content && saves.some((save) => save.key === content.dedupeKey))
+  const isFallback = content?.source === 'fallback'
 
   return (
     <View className={pageClass}>
@@ -50,41 +56,49 @@ export default function Today() {
         <Skeleton rows={4} />
       ) : (
         <View className="today">
-          <View className="today__ctx">
-            <Text className="today__ctx-main">
-              {ctx.date.slice(5).replace('-', '月')}日 · {ctx.temperature}° {ctx.condition}
-            </Text>
-            {ctx.city !== '' ? <Text className="today__ctx-city">{ctx.city}</Text> : null}
-          </View>
-
-          {pick ? (
-            <View
-              className={`today__visual ${
-                pick.content.visual.modality === 'poster' ? 'today__visual--tall' : ''
-              }`}
-            >
-              <DailyVisual visual={pick.content.visual} />
+          {ctx && ctx.temperature !== 0 ? (
+            <View className="today__ctx">
+              <Text className="today__ctx-main">
+                {ctx.date.slice(5).replace('-', '月')}日 · {ctx.temperature}° {ctx.condition}
+              </Text>
+              {ctx.city !== '' ? <Text className="today__ctx-city">{ctx.city}</Text> : null}
             </View>
           ) : null}
 
-          {pick ? (
+          {(phase === 'waiting' || phase === 'settling') && !content ? (
+            <DailyWaiting scenario={scenario} settling={phase === 'settling'} />
+          ) : null}
+
+          {content ? (
+            <View
+              className={`today__visual ${
+                content.visual.modality === 'poster' ? 'today__visual--tall' : ''
+              }`}
+            >
+              <DailyVisual visual={content.visual} />
+            </View>
+          ) : null}
+
+          {content ? (
             <View className="today__body">
               <Text className="today__meta">
-                {dailyTypeName(pick.content.type)} · 第 {seq} 条
+                {isFallback ? DAILY_COPY.fallbackBadge : dailyTypeName(content.type)} · 第 {seq} 条
               </Text>
-              <Text className="today__title">{pick.content.topic}</Text>
-              <Text className="today__lead">{pick.content.lead}</Text>
+              <Text className="today__title">{content.topic}</Text>
+              <Text className="today__lead">{content.lead}</Text>
 
               <View className="today__rule" />
 
               <View className="today__fit">
-                <Text className="today__fit-text">{pick.fitText}</Text>
+                <Text className="today__fit-text">{content.fitText}</Text>
               </View>
 
-              <Text className="today__why">{pick.content.why}</Text>
+              <Text className="today__why">{content.why}</Text>
 
               <View className="today__cta" onClick={saveCurrent}>
-                <Text className="today__cta-text">{DAILY_COPY.saveAction}{bucketName}</Text>
+                <Text className="today__cta-text">
+                  {saved ? `${DAILY_COPY.savedPrefix}${bucketName}` : `${DAILY_COPY.saveAction}${bucketName}`}
+                </Text>
               </View>
               <Text className="today__link" onClick={goPlan}>{DAILY_COPY.seeItAction}</Text>
 
@@ -94,14 +108,24 @@ export default function Today() {
                 <Text className="today__handbook-go">{saves.length} ›</Text>
               </View>
             </View>
-          ) : (
+          ) : null}
+
+          {phase === 'offline' && !content ? (
             <View className="today__empty">
-              <Text className="today__empty-title">{DAILY_COPY.emptyTitle}</Text>
-              <Text className="today__empty-body">{DAILY_COPY.emptyBody}</Text>
+              <Text className="today__empty-title">{DAILY_COPY.offlineTitle}</Text>
+              <Text className="today__empty-body">{DAILY_COPY.offlineBody}</Text>
+              <View className="today__empty-cta" onClick={() => void runRetry()}>
+                <Text className="today__empty-cta-text">{DAILY_COPY.retryAction}</Text>
+              </View>
             </View>
-          )}
+          ) : null}
         </View>
       )}
     </View>
   )
+}
+
+/** offline 空态的下一步动作：重新进入页面即重跑状态机 */
+function runRetry(): void {
+  void Taro.reLaunch({ url: '/pages/today/index' })
 }

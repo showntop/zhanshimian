@@ -29,6 +29,7 @@ type API struct {
 	execution       executionService
 	feedback        feedbackService
 	today           TodayService
+	daily           DailyService
 	wardrobe        WardrobeService
 	advisor         AdvisorService
 	diagnostic      DiagnosticService
@@ -67,6 +68,7 @@ type Dependencies struct {
 	Execution  executionService
 	Feedback   feedbackService
 	Today      TodayService
+	Daily      DailyService
 	Wardrobe   WardrobeService
 	Advisor    AdvisorService
 	Diagnostic DiagnosticService

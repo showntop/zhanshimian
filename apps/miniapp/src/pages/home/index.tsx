@@ -223,8 +223,10 @@ export default function Home() {
   const featured = planSet ? [...planSet.variants].sort((a, b) => a.slot - b.slot)[0] : undefined
   const findingsCount = (report?.findings ?? []).length
 
-  // 每日内容：与今日页共用同一份选品，首页只放海报（精简），点进去看完整
-  const { pick: dailyPick, bucketName: dailyBucketName, saveCurrent } = useDailyPick()
+  // 每日内容：与今日页共用同一个状态机（服务端幂等保证同一天同一条），
+  // 首页只放海报（精简），点进去看完整；生成中不占首页空间。
+  const { phase, content: dailyContent, bucketName: dailyBucketName, saveCurrent } = useDailyPick()
+  const dailyReady = phase === 'settling' || phase === 'content'
 
   // 海报角落编号用日期而非序号：序号是静态的，日期才有"每天换一张"的时间感
   const todaySeq = useMemo(() => {
@@ -368,13 +370,13 @@ export default function Home() {
             </View>
           ) : (
             <View>
-              {dailyPick ? (
+              {dailyReady && dailyContent ? (
                 <View className={enter(1)}>
                   <DailyPoster
-                    type={dailyPick.content.type}
-                    visual={dailyPick.content.visual}
-                    topic={dailyPick.content.topic}
-                    fitText={dailyPick.fitText}
+                    type={dailyContent.type}
+                    visual={dailyContent.visual}
+                    topic={dailyContent.topic}
+                    fitText={dailyContent.fitText}
                     seq={todaySeq}
                     saveLabel={DAILY_COPY.saveAction}
                     onSave={saveCurrent}

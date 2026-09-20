@@ -159,4 +159,15 @@
     line-height: 1.75;
     color: var(--ink-3);
   }
+
+  // 离线空态的下一步动作（文字链，非按钮）
+  &__empty-cta {
+    margin-top: 10rpx;
+  }
+
+  &__empty-cta-text {
+    font-size: 26rpx;
+    font-weight: 700;
+    color: var(--ink-2);
+  }
 }

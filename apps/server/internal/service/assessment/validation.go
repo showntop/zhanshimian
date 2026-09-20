@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,7 +31,9 @@ var (
 	ErrEvidenceMissing = errors.New("evidence_missing")
 	ErrDraftInvalid    = errors.New("report_draft_invalid")
 
-	copyPolicyBanned = regexp.MustCompile(`颜值|身材分|评分|百分位|缺陷严重|诊断|疾病|族裔|性格`)
+	// copyPolicyBanned 指向全服务端唯一的词源（domain.BannedCopyPattern）：
+	// 报告草稿校验与每日内容生成校验共用，两处不分裂。
+	copyPolicyBanned = domain.BannedCopyPattern
 )
 
 type ValidationError struct {
