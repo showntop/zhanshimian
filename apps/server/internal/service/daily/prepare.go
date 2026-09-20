@@ -48,13 +48,10 @@ func (s *Service) Prepare(ctx context.Context, userID string, city string) (Prep
 		result.Scenario = content.Category
 		return result, nil
 	}
-	if !isNotFound(err) {
-		// DB 异常不算致命：generate 里自然会落到兜底。
-		return result, nil
-	}
+	// 未命中、以及 DB 异常，都照给巡游脚本：巡游与内容、与 DB 都无关，
+	// 漏掉这一支客户端就只能播内置兜底（也就会看到那个圆圈）。
+	// DB 异常本身不算致命——generate 里自然会落到兜底。
 	_ = city // 保留参数位：天气改在 generate 阶段按同一城市查询
-	// 未命中 → 播巡游：选题在 generate 的 LLM 里，等待期不知道今天讲什么，
-	// 所以把几个方向都过一遍（语义上是「顾问在权衡」）。
 	roam := roamPresentation()
 	result.Presentation = &roam
 	return result, nil
