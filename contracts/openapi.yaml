@@ -3698,6 +3698,9 @@ components:
           description: cache_hit=true 时为当日内容分类（信息性）；未命中为空串
         cache_hit:
           type: boolean
+        presentation:
+          "$ref": "#/components/schemas/DailyPresentation"
+          description: 等待期（roam）脚本；未命中时才需要播
     DailyGenerateResult:
       type: object
       additionalProperties: false
@@ -3713,6 +3716,94 @@ components:
           description: generated=AI 基于知识事实生成；fallback=兜底池内容（结构完全一致）
         content:
           "$ref": "#/components/schemas/DailyContent"
+        presentation:
+          "$ref": "#/components/schemas/DailyPresentation"
+          description: 收敛 + 揭晓（settle/reveal）脚本；定格的那一套就是 content 本身
+
+    # ---------- 动画表演脚本 ----------
+    # 设计纪律：客户端只是播放器。它按 stage.kind 在能力注册表里找渲染器，
+    # 不认识的 kind 一律回落兜底形态（不崩、不空屏）——这样新增一种动画
+    # 只需注册一个 kind，播放器与页面都不用改。
+    # 语义决策（讲什么、哪套是答案）在服务端；视觉空间（有几个变体、长什么样）
+    # 在客户端的 form 里。两边靠 target/counter 的语义值对接。
+    DailyPresentation:
+      type: object
+      additionalProperties: false
+      required:
+      - version
+      - stages
+      properties:
+        version:
+          type: integer
+          description: 脚本协议版本；客户端遇到不认识的版本按无脚本处理
+        stages:
+          type: array
+          description: 按数组顺序播放
+          items:
+            "$ref": "#/components/schemas/DailyStage"
+    DailyStage:
+      type: object
+      additionalProperties: false
+      required:
+      - phase
+      - kind
+      properties:
+        phase:
+          type: string
+          enum:
+          - roam
+          - settle
+          - reveal
+          description: roam=等待期（可循环）；settle=内容到位后；reveal=揭晓
+        kind:
+          type: string
+          description: 能力名（roam_tour / converge / sweep / develop …）
+        form:
+          type: string
+          description: >-
+            converge 用：形态渲染器名（outfit_blocks / ratio_blocks /
+            swatch_bars / silhouette_shape …）。变体空间由它自己定义。
+        params:
+          type: object
+          additionalProperties: true
+          description: kind 与 form 自己解释的参数，服务端不校验语义
+        asset:
+          "$ref": "#/components/schemas/DailyMotionAsset"
+        duration_ms:
+          type: integer
+          description: 本阶段时长（roam 用；settle 的时长由 params.tempo 决定）
+        repeat:
+          type: integer
+          description: 循环次数；0 或省略表示无限循环直到被打断
+        label:
+          type: string
+          description: 本阶段配的短文案（如「在看颜色」），由服务端给，客户端不写死
+    DailyMotionAsset:
+      type: object
+      additionalProperties: false
+      required:
+      - url
+      - kind
+      properties:
+        url:
+          type: string
+          description: >-
+            远程素材地址（https）。主包只有几十 KB 余量且首页是 tab 页不能进分包，
+            所以序列帧 / Lottie 只能走 CDN；客户端在它就绪前用 CSS 形态顶上。
+        kind:
+          type: string
+          enum:
+          - lottie
+          - sprite
+          - still
+        frames:
+          type: integer
+        fps:
+          type: integer
+        w:
+          type: integer
+        h:
+          type: integer
     DailyContentVisual:
       type: object
       additionalProperties: false

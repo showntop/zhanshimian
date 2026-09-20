@@ -53,6 +53,10 @@ func (s *Service) Prepare(ctx context.Context, userID string, city string) (Prep
 		return result, nil
 	}
 	_ = city // 保留参数位：天气改在 generate 阶段按同一城市查询
+	// 未命中 → 播巡游：选题在 generate 的 LLM 里，等待期不知道今天讲什么，
+	// 所以把几个方向都过一遍（语义上是「顾问在权衡」）。
+	roam := roamPresentation()
+	result.Presentation = &roam
 	return result, nil
 }
 

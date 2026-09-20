@@ -1461,6 +1461,8 @@ export interface components {
             /** @description cache_hit=true 时为当日内容分类（信息性）；未命中为空串 */
             scenario: string;
             cache_hit: boolean;
+            /** @description 等待期（roam）脚本；未命中时才需要播 */
+            presentation?: components["schemas"]["DailyPresentation"];
         };
         DailyGenerateResult: {
             /**
@@ -1469,6 +1471,46 @@ export interface components {
              */
             source: "generated" | "fallback";
             content: components["schemas"]["DailyContent"];
+            /** @description 收敛 + 揭晓（settle/reveal）脚本；定格的那一套就是 content 本身 */
+            presentation?: components["schemas"]["DailyPresentation"];
+        };
+        DailyPresentation: {
+            /** @description 脚本协议版本；客户端遇到不认识的版本按无脚本处理 */
+            version: number;
+            /** @description 按数组顺序播放 */
+            stages: components["schemas"]["DailyStage"][];
+        };
+        DailyStage: {
+            /**
+             * @description roam=等待期（可循环）；settle=内容到位后；reveal=揭晓
+             * @enum {string}
+             */
+            phase: "roam" | "settle" | "reveal";
+            /** @description 能力名（roam_tour / converge / sweep / develop …） */
+            kind: string;
+            /** @description converge 用：形态渲染器名（outfit_blocks / ratio_blocks / swatch_bars / silhouette_shape …）。变体空间由它自己定义。 */
+            form?: string;
+            /** @description kind 与 form 自己解释的参数，服务端不校验语义 */
+            params?: {
+                [key: string]: unknown;
+            };
+            asset?: components["schemas"]["DailyMotionAsset"];
+            /** @description 本阶段时长（roam 用；settle 的时长由 params.tempo 决定） */
+            duration_ms?: number;
+            /** @description 循环次数；0 或省略表示无限循环直到被打断 */
+            repeat?: number;
+            /** @description 本阶段配的短文案（如「在看颜色」），由服务端给，客户端不写死 */
+            label?: string;
+        };
+        DailyMotionAsset: {
+            /** @description 远程素材地址（https）。主包只有几十 KB 余量且首页是 tab 页不能进分包， 所以序列帧 / Lottie 只能走 CDN；客户端在它就绪前用 CSS 形态顶上。 */
+            url: string;
+            /** @enum {string} */
+            kind: "lottie" | "sprite" | "still";
+            frames?: number;
+            fps?: number;
+            w?: number;
+            h?: number;
         };
         DailyContentVisual: {
             /** @enum {string} */

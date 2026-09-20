@@ -30,14 +30,16 @@ var errDailyUnavailable = errors.New("daily service unavailable")
 // ---- DTO（与 contracts/openapi.yaml 的 Daily* schema 一一对应） ----
 
 type dailyPrepareResponse struct {
-	GenDate  string `json:"gen_date"`
-	Scenario string `json:"scenario"`
-	CacheHit bool   `json:"cache_hit"`
+	GenDate      string              `json:"gen_date"`
+	Scenario     string              `json:"scenario"`
+	CacheHit     bool                `json:"cache_hit"`
+	Presentation *daily.Presentation `json:"presentation,omitempty"`
 }
 
 type dailyGenerateResponse struct {
-	Source  string          `json:"source"`
-	Content dailyContentDTO `json:"content"`
+	Source       string              `json:"source"`
+	Content      dailyContentDTO     `json:"content"`
+	Presentation *daily.Presentation `json:"presentation,omitempty"`
 }
 
 type dailyContentDTO struct {
@@ -135,9 +137,10 @@ func (a *API) prepareDaily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, http.StatusOK, dailyPrepareResponse{
-		GenDate:  result.GenDate,
-		Scenario: result.Scenario,
-		CacheHit: result.CacheHit,
+		GenDate:      result.GenDate,
+		Scenario:     result.Scenario,
+		CacheHit:     result.CacheHit,
+		Presentation: result.Presentation,
 	})
 }
 
@@ -161,8 +164,9 @@ func (a *API) generateDaily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, http.StatusOK, dailyGenerateResponse{
-		Source:  result.Source,
-		Content: toDailyContentDTO(result.Content),
+		Source:       result.Source,
+		Content:      toDailyContentDTO(result.Content),
+		Presentation: result.Presentation,
 	})
 }
 

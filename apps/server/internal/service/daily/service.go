@@ -86,8 +86,18 @@ func (s *Service) today() string {
 // Generate 生成今日内容：永远返回内容（generated 或 fallback），
 // 真正的错误（鉴权、DB 不可用）才返回 error。
 // 选题与成文是同一次 LLM 调用：语境在 buildContext 里聚齐。
-func (s *Service) Generate(ctx context.Context, userID string, city string) (GenerateResult, error) {
+func (s *Service) Generate(ctx context.Context, userID string, city string) (result GenerateResult, err error) {
 	genDate := s.today()
+	started := time.Now()
+	// 收敛脚本由「内容 + 本次实际耗时」反推，所有返回路径（含兜底）都要带上，
+	// 所以放在 defer 里统一补——漏掉兜底分支就会出现「内容有了但没动画」。
+	defer func() {
+		if err != nil || result.Content.ID == "" || result.Presentation != nil {
+			return
+		}
+		presentation := settlePresentation(result.Content, int(time.Since(started).Milliseconds()))
+		result.Presentation = &presentation
+	}()
 
 	// ① 幂等：当天已生成过就直接返回（(user_id, gen_date) 唯一约束是硬保证）。
 	// 调试开关下跳过：每次都真的重生成一遍。

@@ -353,6 +353,10 @@ export const HOME_COPY = {
 // 池子不够时宁可不推，也不用「塞衣角」这类通用条目凑数。
 export const DAILY_COPY = {
   eyebrow: '今天这一条',
+  // 等待动画：巡游的文案由服务端随脚本下发（「在看颜色」这类，改文案不用发版）；
+  // 收敛这两句是过程状态，与具体分类无关，所以留在客户端。
+  motionSettling: '在为你挑',
+  motionLocked: '就是这套',
   handbookTitle: '我的手册',
   handbookEntry: '我的手册',
   handbookEntryDesc: '收下的每一条，都在这里',

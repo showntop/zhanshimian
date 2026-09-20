@@ -173,12 +173,18 @@ type PrepareResult struct {
 	GenDate  string
 	Scenario string
 	CacheHit bool
+	// Presentation 等待期（roam）脚本，与用户无关、可缓存。
+	// 命中当天内容时为 nil——缓存命中不播等待动画。
+	Presentation *Presentation
 }
 
 // GenerateResult POST /v1/daily/generate 的返回（永远 200）。
 type GenerateResult struct {
 	Source  string
 	Content domain.DailyContent
+	// Presentation 收敛 + 揭晓脚本。定格的那一套就是 Content 本身，
+	// 所以脚本由内容反推，不是随机编排。
+	Presentation *Presentation
 }
 
 // CollectionStats 手册七格计数（收藏信号也用它）。
