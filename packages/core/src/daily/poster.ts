@@ -43,71 +43,83 @@ export interface PosterShell {
   text: { left: string; width: string }
 }
 
+// 09-21 重排：八类 = 八个杂志版面，不再是"同一版面换八张皮"。
+// 三条变化轴（都在硬约束内）：明暗对半（四浅四深，页面不再闷）、
+// 构图镜像（文字块/画框左右换位）、画框宽窄（通栏 / 收窄 / 偏置）。
+// 不变的（家族基因）：承载块负 inset + 拱角 + 旋转、幽灵竖排标、衬线编号。
 export const SHELL_BY_TYPE: Record<ContentType, PosterShell> = {
+  // 配色：米色纸底 = 实体色卡本。色票在纸上比在深底上更可信（配色类是高频类型，
+  // 它翻浅色是"页面不闷"的最大杠杆）
   color: {
-    base: 'linear-gradient(155deg,#3A3F38 0%,#2B302A 55%,#22261F 100%)',
-    tone: 'light',
+    base: 'linear-gradient(158deg,#F0EDE2 0%,#E8E4D4 55%,#DDD8C4 100%)',
+    tone: 'dark',
     vmark: 'COLOR',
-    plate: { top: '44%', rotate: -3, bg: '#161A15' },
+    plate: { top: '44%', rotate: -3, bg: '#1B1F19', tone: 'light' },
     stage: { left: '6%', top: '10%', width: '88%', height: '27%' },
     text: { left: '11%', width: '58%' },
   },
+  // 轮廓：燕麦暖灰纸 + 整版右倾（画框与文字块都靠右，唯一右重版面）
   silhouette: {
-    base: 'linear-gradient(155deg,#38452F 0%,#42503A 55%,#2C3826 100%)',
-    tone: 'light',
+    base: 'linear-gradient(156deg,#D8D2C2 0%,#CDC6B4 55%,#C0B8A4 100%)',
+    tone: 'dark',
     vmark: 'SILHOUETTE',
-    plate: { top: '44%', rotate: 2, bg: '#1C2517' },
-    stage: { left: '6%', top: '10%', width: '88%', height: '27%' },
-    text: { left: '10%', width: '58%' },
+    plate: { top: '46%', rotate: 2, bg: '#333B2C', tone: 'light' },
+    stage: { left: '26%', top: '10%', width: '68%', height: '26%' },
+    text: { left: '34%', width: '58%' },
   },
+  // 比例：冷调青蓝（全表唯一冷色），左文右图的镜像版面
   proportion: {
-    base: 'linear-gradient(160deg,#1F3A3E 0%,#28484D 55%,#17302F 100%)',
+    base: 'linear-gradient(162deg,#2C4A50 0%,#264247 55%,#1B3438 100%)',
     tone: 'light',
     vmark: 'PROPORTION',
-    plate: { top: '44%', rotate: -3, bg: '#0D2124' },
-    stage: { left: '6%', top: '10%', width: '88%', height: '27%' },
-    text: { left: '30%', width: '58%' },
+    plate: { top: '44%', rotate: 2, bg: '#102528' },
+    stage: { left: '42%', top: '10%', width: '52%', height: '27%' },
+    text: { left: '8%', width: '46%' },
   },
+  // 材质：浅灰绿 + 右文左图（与比例互为镜像，一冷一暖）
   fabric: {
     base: 'linear-gradient(158deg,#DCDCCF 0%,#CFD2C2 55%,#C6CABA 100%)',
     tone: 'dark',
     vmark: 'FABRIC',
-    plate: { top: '44%', rotate: -2, bg: '#33402D', tone: 'light' },
-    stage: { left: '6%', top: '10%', width: '88%', height: '27%' },
-    text: { left: '11%', width: '58%' },
+    plate: { top: '46%', rotate: -2, bg: '#33402D', tone: 'light' },
+    stage: { left: '6%', top: '10%', width: '56%', height: '26%' },
+    text: { left: '38%', width: '56%' },
   },
+  // 场合：暖石墨（不带绿相，与深绿系拉开），画框收窄居中
   occasion: {
-    base: 'linear-gradient(155deg,#333B34 0%,#3E4740 55%,#2A322B 100%)',
+    base: 'linear-gradient(155deg,#4A463F 0%,#403C36 55%,#333029 100%)',
     tone: 'light',
     vmark: 'OCCASION',
-    plate: { top: '44%', rotate: 2, bg: '#181E1A' },
-    stage: { left: '6%', top: '10%', width: '88%', height: '27%' },
-    text: { left: '10%', width: '58%' },
+    plate: { top: '46%', rotate: 2, bg: '#211E1A' },
+    stage: { left: '12%', top: '10%', width: '76%', height: '27%' },
+    text: { left: '10%', width: '56%' },
   },
+  // 技巧：中绿提亮（曾是闷的元凶之一），画框微收、文字微进
   howto: {
-    base: 'linear-gradient(160deg,#2F4436 0%,#3A5342 55%,#26382C 100%)',
+    base: 'linear-gradient(160deg,#42604A 0%,#3A5342 55%,#2C4033 100%)',
     tone: 'light',
     vmark: 'HOW-TO',
     plate: { top: '44%', rotate: -2, bg: '#17241B' },
-    stage: { left: '6%', top: '10%', width: '88%', height: '27%' },
-    text: { left: '10%', width: '56%' },
+    stage: { left: '10%', top: '10%', width: '84%', height: '27%' },
+    text: { left: '12%', width: '60%' },
   },
+  // 单品：全表最亮的暖米白 + 浅承载块（浅压浅，靠投影分层），画框居中收窄
   item: {
-    base: 'linear-gradient(160deg,#D2D7CA 0%,#C4CBBB 100%)',
+    base: 'linear-gradient(160deg,#E9E5D8 0%,#DFDACB 100%)',
     tone: 'dark',
     vmark: 'ITEM',
-    plate: { top: '44%', rotate: -2, bg: '#F4F5F0', tone: 'dark' },
-    stage: { left: '6%', top: '10%', width: '88%', height: '27%' },
+    plate: { top: '46%', rotate: -2, bg: '#F7F5EE', tone: 'dark' },
+    stage: { left: '18%', top: '9%', width: '64%', height: '28%' },
     text: { left: '11%', width: '56%' },
   },
-  // 综合：归不进七格的内容，用不带色相倾向的石墨底，避免暗示某一格。
+  // 综合：蓝石墨，文字块右缩进是它的签名（归不进七格的内容，用不带色相倾向的底）
   general: {
-    base: 'linear-gradient(158deg,#3B3D42 0%,#31333A 55%,#26282D 100%)',
+    base: 'linear-gradient(158deg,#45484F 0%,#3A3D44 55%,#2E3136 100%)',
     tone: 'light',
     vmark: 'GENERAL',
-    plate: { top: '44%', rotate: 2, bg: '#1B1D21' },
-    stage: { left: '6%', top: '10%', width: '88%', height: '27%' },
-    text: { left: '10%', width: '58%' },
+    plate: { top: '44%', rotate: 2, bg: '#1F2126' },
+    stage: { left: '6%', top: '10%', width: '88%', height: '26%' },
+    text: { left: '30%', width: '58%' },
   },
 }
 

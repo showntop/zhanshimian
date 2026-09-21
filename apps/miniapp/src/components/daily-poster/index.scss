@@ -29,6 +29,18 @@
     top: 0;
     right: 0;
     bottom: 0;
+
+    // 双向柔光"着色"：左上打光、右下压暗（与首页 hero 同一套光）。
+    // 底板渐变色按内容类型走 inline style，光是类型无关的大气层，叠在 ::after 上
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(120% 90% at 12% -10%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 52%),
+        radial-gradient(85% 70% at 108% 112%, rgba(10, 14, 9, 0.28) 0%, rgba(10, 14, 9, 0) 60%);
+      pointer-events: none;
+    }
   }
 
   // 视觉画框：内容图形画在里面。位置尺寸由 shell.stage 给
@@ -49,21 +61,36 @@
     min-height: 180rpx;
   }
 
-  // 负 inset 让它比文字块大一圈，同时跟随文字高度
+  // 负 inset 让它比文字块大一圈，同时跟随文字高度。
+  // 非平衡破格：左 inset 加大到 -20%（多数类型下承载块左缘出血到海报边），
+  // 右上 96rpx 大拱角（与首页工具卡/hero 拱形同源）——配合 shell 的 ±2~3°
+  // 旋转，矩形闷块变成"撕下来贴上的一页"。
   // 深底上的深块容易"闷"：顶部内高光 + 1rpx 亮描边把卡片从底板上"托"出来
   &__plate {
     position: absolute;
-    left: -8%;
-    right: -14%;
+    left: -20%;
+    right: -8%;
     top: -24rpx;
     bottom: -24rpx;
-    border-radius: 18rpx;
+    border-radius: 18rpx 96rpx 18rpx 18rpx;
+    overflow: hidden;
     box-shadow:
       inset 0 1rpx 0 rgba(238, 240, 236, 0.1),
       inset 0 0 0 1rpx rgba(238, 240, 236, 0.08),
       0 4rpx 10rpx rgba(45, 58, 35, 0.08),
       0 18rpx 36rpx rgba(45, 58, 35, 0.16),
       0 40rpx 64rpx rgba(45, 58, 35, 0.1);
+
+    // 承载块自己的微光：与底板同向（左上亮、右下暗），两层光叠加出体积
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(140% 100% at 10% -20%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 50%),
+        radial-gradient(90% 80% at 110% 120%, rgba(8, 10, 7, 0.22) 0%, rgba(8, 10, 7, 0) 58%);
+      pointer-events: none;
+    }
   }
 
   &__text {
@@ -142,26 +169,32 @@
   }
 
   // ---------- 角落编号与竖排标 ----------
+  // 编号换衬线：与首页页眉的巨号日期同一编辑式语言（全站数字注脚收敛到 serif）
   &__seq {
     position: absolute;
     left: 24rpx;
     top: 20rpx;
     z-index: 9;
     color: var(--dp-mark);
-    font-size: 19rpx;
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 24rpx;
     font-weight: 700;
-    letter-spacing: 2rpx;
+    letter-spacing: 1rpx;
   }
 
+  // 竖排标从"小字标签"升格为出血幽灵字：60rpx 低透明，顶部越界被裁——
+  // 装饰要么大胆到成为构图，要么删掉；不上不下的 20rpx 小字只是噪音
   &__vmark {
     position: absolute;
-    right: 20rpx;
-    top: 18rpx;
+    right: 4rpx;
+    top: -16rpx;
     z-index: 9;
     color: var(--dp-mark);
-    font-size: 20rpx;
-    font-weight: 750;
-    letter-spacing: 5rpx;
+    font-size: 60rpx;
+    font-weight: 800;
+    letter-spacing: 8rpx;
+    line-height: 1;
+    opacity: 0.16;
     writing-mode: vertical-rl;
   }
 }

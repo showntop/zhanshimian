@@ -81,12 +81,22 @@ function isActive(operation: HomeBootstrap['active_operations'][number]): boolea
   return IN_FLIGHT.has(operation.status)
 }
 
-/** 今日语境日期（问候区的时间锚点，非装饰） */
-function todayLabel(): string {
-  const d = new Date()
-  const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()] ?? ''
-  return `${d.getMonth() + 1}月${d.getDate()}日 · 周${week}`
+/** 星期锚点（问候区右上角小注；月/日由巨号日期承担，不再重复） */
+function weekLabel(): string {
+  const week = ['日', '一', '二', '三', '四', '五', '六'][new Date().getDay()] ?? ''
+  return `周${week}`
 }
+
+// 报告入口的比例节奏条：宽度刻意不规则（编辑式排版的"破"），
+// 首段实、末段陶土橘破色、中段安静，条数 = 可提升点数（3~6，schema 上下界内）
+const ARCHIVE_BAR_SEGMENTS = [
+  { key: 'a', width: 88 },
+  { key: 'b', width: 36 },
+  { key: 'c', width: 64 },
+  { key: 'd', width: 28 },
+  { key: 'e', width: 52 },
+  { key: 'f', width: 44 },
+] as const
 
 const SceneTile = memo(function SceneTile({ scene }: { scene: SceneCopy }) {
   return (
@@ -292,11 +302,18 @@ export default function Home() {
           <View className={`home__greeting ${enter()}`}>
             <View className="home__greeting-top">
               <Text className="home__greeting-kicker">{APP_SLOGAN}</Text>
-              <Text className="home__greeting-date">{todayLabel()}</Text>
+              <Text className="home__greeting-week">{weekLabel()}</Text>
             </View>
-            <Text className="home__greeting-title display">
-              {hasReport ? `${greetingForNow()}，${HOME_COPY.returningTitle}` : HOME_TITLE}
-            </Text>
+            <View className="home__greeting-anchor">
+              <Text className="home__greeting-date serif">
+                {todaySeq.slice(0, 2)}
+                <Text className="home__greeting-dot">.</Text>
+                {todaySeq.slice(3)}
+              </Text>
+              <Text className="home__greeting-title display">
+                {hasReport ? `${greetingForNow()}，${HOME_COPY.returningTitle}` : HOME_TITLE}
+              </Text>
+            </View>
           </View>
 
           {!hasReport ? (
@@ -380,7 +397,7 @@ export default function Home() {
                   className="home__hero-img"
                   media={todayPlan.media}
                   anchor="top"
-                  frameAspect={200 / 260}
+                  frameAspect={232 / 344}
                 />
               </View>
             </View>
@@ -413,11 +430,30 @@ export default function Home() {
                   <DailyMotion presentation={roamScript} phase="waiting" palette={dailyPalette} />
                 </View>
               ) : null}
-              {/* 报告退位：不再是首页主角，但入口保留，降级为一行 */}
-              <View className="home__archive" onClick={goReport}>
+              {/* 报告退位：不再是首页主角，但入口保留，降级为一行。
+                  数字用不规则比例条做"进展感"隐喻——比孤立大数字更编辑式 */}
+              <View className="home__archive pressable" onClick={goReport}>
                 <Text className="home__archive-text">{HOME_COPY.viewReport}</Text>
                 <View className="home__archive-meta">
-                  <Text className="home__archive-num">{findingsCount}</Text>
+                  {findingsCount > 0 ? (
+                    <View className="home__archive-bars">
+                      {ARCHIVE_BAR_SEGMENTS.slice(
+                        0,
+                        Math.min(findingsCount, ARCHIVE_BAR_SEGMENTS.length),
+                      ).map((segment, position) => (
+                        <View
+                          key={segment.key}
+                          className={
+                            `home__archive-bar` +
+                            `${position === 0 ? ' home__archive-bar--lead' : ''}` +
+                            `${position === Math.min(findingsCount, ARCHIVE_BAR_SEGMENTS.length) - 1 ? ' home__archive-bar--tail' : ''}`
+                          }
+                          style={{ width: `${segment.width}rpx` }}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                  <Text className="home__archive-num serif">{findingsCount}</Text>
                   <Text className="home__archive-suffix">{HOME_COPY.findingsSuffix}</Text>
                 </View>
               </View>

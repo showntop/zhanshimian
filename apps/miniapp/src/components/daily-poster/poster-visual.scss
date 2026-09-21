@@ -25,9 +25,12 @@
   }
 
   // ---------- 色卡 ----------
+  // 票根式排布：票收窄（宽度 60%），奇偶上下错位 22rpx——
+  // 两张等高并排的宽色块像货架/占位符，错位窄票才是"从色卡本上撕下来的"
   &__swatch {
     display: flex;
     align-items: flex-end;
+    justify-content: center;
     height: 100%;
   }
 
@@ -38,26 +41,49 @@
     align-items: center;
     justify-content: flex-end;
     height: 100%;
+
+    &:nth-child(odd) {
+      padding-bottom: 22rpx;
+    }
   }
 
-  // 适合的两格更高并有描边，不适合的降透明度 —— 差别靠形态，不靠文字
+  // 适合的两格更高并有描边，不适合的降透明度并微倾 —— 差别靠形态，不靠文字。
+  // 色块改拱形色票（顶边满圆）：与首页 hero 照片窗、工具卡大拱角同一形状语言；
+  // 顶部柔光让纯色票有"材质"而不是"填色"
   &__sw-chip {
-    width: 84%;
-    height: 58%;
-    border-radius: 8rpx;
+    position: relative;
+    width: 60%;
+    height: 70%;
+    border-radius: 999rpx 999rpx 10rpx 10rpx;
+    overflow: hidden;
     box-shadow:
       inset 0 0 0 1rpx rgba(255, 255, 255, 0.14),
       0 6rpx 14rpx rgba(45, 58, 35, 0.14);
 
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        168deg,
+        rgba(255, 255, 255, 0.22) 0%,
+        rgba(255, 255, 255, 0.04) 34%,
+        rgba(255, 255, 255, 0) 58%,
+        rgba(10, 14, 9, 0.12) 100%
+      );
+      pointer-events: none;
+    }
+
     &.is-pick {
-      height: 80%;
+      height: 92%;
       box-shadow:
         inset 0 0 0 3rpx rgba(238, 240, 236, 0.46),
         0 8rpx 18rpx rgba(45, 58, 35, 0.2);
     }
 
     &.is-drop {
-      opacity: 0.46;
+      opacity: 0.42;
+      transform: rotate(4deg);
     }
   }
 
@@ -68,6 +94,8 @@
     white-space: nowrap;
 
     &.is-pick {
+      padding-bottom: 3rpx;
+      border-bottom: 2rpx solid var(--pv-accent);
       color: var(--pv-ink-on);
       font-weight: 700;
     }
