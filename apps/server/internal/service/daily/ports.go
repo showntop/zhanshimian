@@ -148,7 +148,7 @@ type ContentRequest struct {
 	RetryHint string
 }
 
-// ContentOutput 生成结果（未校验）。Category 由模型自报（七格或 general）。
+// ContentOutput 生成结果（未校验）。Category 由模型自报（手册各格或 general）。
 type ContentOutput struct {
 	Topic         string
 	Lead          string
@@ -187,7 +187,7 @@ type GenerateResult struct {
 	Presentation *Presentation
 }
 
-// CollectionStats 手册七格计数（收藏信号也用它）。
+// CollectionStats 手册全部分格计数（收藏信号也用它）。
 type CollectionStats struct {
 	Counts map[string]int
 	Total  int

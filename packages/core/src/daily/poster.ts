@@ -47,6 +47,9 @@ export interface PosterShell {
 // 三条变化轴（都在硬约束内）：明暗对半（四浅四深，页面不再闷）、
 // 构图镜像（文字块/画框左右换位）、画框宽窄（通栏 / 收窄 / 偏置）。
 // 不变的（家族基因）：承载块负 inset + 拱角 + 旋转、幽灵竖排标、衬线编号。
+// 同日分格扩充：hair（浅暖灰燕麦）、makeup（浅陶土）、accessory（深橄榄灰）
+// 三个版面沿用同一套轴——浅色继续给「纸上的东西」（发型/妆容是贴身主题，
+// 落纸更可信），深橄榄灰给配饰（器物感）。
 export const SHELL_BY_TYPE: Record<ContentType, PosterShell> = {
   // 配色：米色纸底 = 实体色卡本。色票在纸上比在深底上更可信（配色类是高频类型，
   // 它翻浅色是"页面不闷"的最大杠杆）
@@ -112,7 +115,7 @@ export const SHELL_BY_TYPE: Record<ContentType, PosterShell> = {
     stage: { left: '18%', top: '9%', width: '64%', height: '28%' },
     text: { left: '11%', width: '56%' },
   },
-  // 综合：蓝石墨，文字块右缩进是它的签名（归不进七格的内容，用不带色相倾向的底）
+  // 综合：蓝石墨，文字块右缩进是它的签名（归不进其余各格的内容，用不带色相倾向的底）
   general: {
     base: 'linear-gradient(158deg,#45484F 0%,#3A3D44 55%,#2E3136 100%)',
     tone: 'light',
@@ -120,6 +123,33 @@ export const SHELL_BY_TYPE: Record<ContentType, PosterShell> = {
     plate: { top: '44%', rotate: 2, bg: '#1F2126' },
     stage: { left: '6%', top: '10%', width: '88%', height: '26%' },
     text: { left: '30%', width: '58%' },
+  },
+  // 发型：浅暖灰燕麦（贴身主题落纸更可信），画框右收窄、文字块靠左——与面料互为镜像
+  hair: {
+    base: 'linear-gradient(157deg,#E2DAC6 0%,#D6CCB4 55%,#C9BEA2 100%)',
+    tone: 'dark',
+    vmark: 'HAIR',
+    plate: { top: '45%', rotate: 3, bg: '#2A2E24', tone: 'light' },
+    stage: { left: '34%', top: '10%', width: '58%', height: '26%' },
+    text: { left: '10%', width: '56%' },
+  },
+  // 妆容：浅陶土（家族里唯一的陶土色相），画框居中收窄、文字块微进
+  makeup: {
+    base: 'linear-gradient(160deg,#E9D8C6 0%,#DEC7B0 55%,#D2B99F 100%)',
+    tone: 'dark',
+    vmark: 'MAKEUP',
+    plate: { top: '45%', rotate: -2, bg: '#3A2E24', tone: 'light' },
+    stage: { left: '16%', top: '10%', width: '68%', height: '26%' },
+    text: { left: '14%', width: '58%' },
+  },
+  // 配饰：深橄榄灰（器物感），画框偏左收窄、文字块靠右——与发型互为镜像
+  accessory: {
+    base: 'linear-gradient(157deg,#424A3E 0%,#38402F 55%,#2C3226 100%)',
+    tone: 'light',
+    vmark: 'ACCESSORY',
+    plate: { top: '46%', rotate: 2, bg: '#1D2118' },
+    stage: { left: '8%', top: '10%', width: '56%', height: '26%' },
+    text: { left: '36%', width: '56%' },
   },
 }
 

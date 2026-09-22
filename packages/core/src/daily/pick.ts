@@ -82,6 +82,9 @@ const CATEGORY_BY_TYPE: Record<ContentType, CollectionCategory> = {
   item: 'outfit',
   occasion: 'occasion',
   howto: 'howto',
+  hair: 'hair',
+  makeup: 'makeup',
+  accessory: 'accessory',
   general: 'general',
 }
 
@@ -91,7 +94,7 @@ export function categoryOfType(type: ContentType): CollectionCategory {
 
 /** 手册各格当前条数，缺省补 0 */
 export function emptyBuckets(): Record<CollectionCategory, number> {
-  return { color: 0, fit: 0, proportion: 0, fabric: 0, occasion: 0, howto: 0, outfit: 0, general: 0 }
+  return { color: 0, fit: 0, proportion: 0, fabric: 0, occasion: 0, howto: 0, outfit: 0, hair: 0, makeup: 0, accessory: 0, general: 0 }
 }
 
 export function countBuckets(categories: CollectionCategory[]): Record<CollectionCategory, number> {

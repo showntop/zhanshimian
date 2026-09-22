@@ -12,8 +12,8 @@ import (
 const CapabilityDailyContent = "daily_content"
 
 // StructuredDailyContentPlanner 走能力路由的每日内容生成器；实现
-// daily.ContentPlanner。一次成文：模型基于用户语境自行决定今日讲什么，
-// 参考事实只是可选素材，不强制引用；分类由模型自报（七格或 general）。
+// daily.ContentPlanner。一次成文：模型基于用户语境自行决定今天讲什么，
+// 参考事实只是可选素材，不强制引用；分类由模型自报（手册各格或 general）。
 type StructuredDailyContentPlanner struct{ runtime StructuredRuntime }
 
 func NewDailyContentPlanner(runtime StructuredRuntime) *StructuredDailyContentPlanner {
@@ -22,7 +22,7 @@ func NewDailyContentPlanner(runtime StructuredRuntime) *StructuredDailyContentPl
 
 var _ daily.ContentPlanner = (*StructuredDailyContentPlanner)(nil)
 
-const dailyContentInstructions = "你是形象顾问的内容主编，每天为一位用户写一条今日穿搭建议。你自行决定今天讲什么：贴着用户的语境和兴趣，给出一条具体的、今天就能用的建议。语气克制、肯定式，不评价身材外貌，不打分，不制造焦虑，不提品牌价格。输出 JSON。"
+const dailyContentInstructions = "你是形象顾问的内容主编，每天为一位用户写一条今日形象建议——穿搭、发型、妆容、配饰都可能，由你判断今天哪个角度最有话说。给出一条具体的、今天就能用的建议。语气克制、肯定式，不评价身材外貌，不打分，不制造焦虑，不提品牌价格。输出 JSON。"
 
 func (p *StructuredDailyContentPlanner) Generate(ctx context.Context, input daily.ContentRequest) (daily.ContentOutput, error) {
 	result, err := p.runtime.Structured(ctx, StructuredRequest{
@@ -122,7 +122,7 @@ func validateDailyContentPayload(data []byte) error {
 		return fmt.Errorf("daily content provider output is incomplete or unsafe")
 	}
 	switch payload.Category {
-	case "color", "fit", "proportion", "fabric", "occasion", "howto", "outfit", "general":
+	case "color", "fit", "proportion", "fabric", "occasion", "howto", "outfit", "hair", "makeup", "accessory", "general":
 	default:
 		return fmt.Errorf("daily content provider output has invalid category %q", payload.Category)
 	}
@@ -143,7 +143,7 @@ func dailyContentSchema() map[string]any {
 			"fit":   map[string]any{"type": "string", "minLength": 1, "maxLength": 90},
 			"why":   map[string]any{"type": "string", "minLength": 1, "maxLength": 60},
 			"category": map[string]any{"type": "string",
-				"enum": []string{"color", "fit", "proportion", "fabric", "occasion", "howto", "outfit", "general"}},
+				"enum": []string{"color", "fit", "proportion", "fabric", "occasion", "howto", "outfit", "hair", "makeup", "accessory", "general"}},
 			"visual": map[string]any{"type": "object", "additionalProperties": false,
 				"required": []string{"modality", "alt"},
 				"properties": map[string]any{
@@ -205,7 +205,7 @@ func dailyContentPrompt(input daily.ContentRequest) string {
 		}
 		parts = append(parts, "【参考观点】以下是可以参考的专业事实，可用可不用，观点要自己消化：\n"+strings.Join(lines, "\n"))
 	}
-	parts = append(parts, "【输出】一条完整的今日建议：topic（≤12字，杂志式选题）、lead（≤40字导语）、fit（≤60字，结合用户特征的适配说明）、why（≤40字，一句原理）、category（color/fit/proportion/fabric/occasion/howto/outfit/general 之一，你判断这条内容归哪格）、visual（swatch/compare/diagram 之一，给出可程序化绘制的参数）。今天必须是一个新主题。")
+	parts = append(parts, "【输出】一条完整的今日建议：topic（≤12字，杂志式选题）、lead（≤40字导语）、fit（≤60字，结合用户特征的适配说明）、why（≤40字，一句原理）、category（按内容主体归格：color/fit/proportion/fabric/occasion/howto/outfit 讲穿着，hair=发型方向、makeup=妆容要点、accessory=鞋包首饰的选法与呼应，确实跨格才用 general）、visual（swatch/compare/diagram 之一，给出可程序化绘制的参数）。今天必须是一个新主题，也不必总停在穿着上——发型、妆容、配饰同样是今天的候选角度。")
 	if input.RetryHint != "" {
 		parts = append(parts, "【修正提示】"+input.RetryHint)
 	}

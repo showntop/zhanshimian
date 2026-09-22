@@ -68,6 +68,12 @@ type CollectionAsset =
 | `occasion` | 场合 | 面试、约会穿什么 |
 | `howto` | 技巧 | 卷袖、塞衣角这类动作 |
 | `outfit` | 搭配 | 完整的一身 |
+| `hair` | 发型 | 发型方向（2026-09-21 扩充） |
+| `makeup` | 妆容 | 妆容要点（2026-09-21 扩充） |
+| `accessory` | 配饰 | 鞋包首饰的选法与呼应（2026-09-21 扩充） |
+| `general` | 综合 | 归不进其余各格的内容 |
+
+**判归规则：按内容的决策变量归格，不按目的。** 选什么（颜色/版型/面料/发型/妆容/配饰）、怎么组合（搭配/比例）、何时何地（场合）、怎么做（技巧）。主体是头发就归发型——即使目的是修脸型；脸上用的颜色归妆容——衣服颜色靠近脸的归颜色；包「选什么体量」归配饰——「背在哪」归比例。
 
 **分类默认由内容类型推导**，少数特例才手工覆盖——逐条手工分配必出错。
 
@@ -81,6 +87,7 @@ type CollectionAsset =
 ```ts
 export type CollectionCategory =
   | 'color' | 'fit' | 'proportion' | 'fabric' | 'occasion' | 'howto' | 'outfit'
+  | 'hair' | 'makeup' | 'accessory' | 'general'
 
 export type CollectionStatus = 'saved' | 'tried' | 'kept'
 

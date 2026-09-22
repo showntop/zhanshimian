@@ -45,7 +45,10 @@ export type ContentType =
   | 'item'       // 单品 / 趋势
   | 'occasion'   // 场合
   | 'howto'      // 动作教程
-  | 'general'    // 综合：归不进七格的内容（服务端自报分类的兜底格）
+  | 'hair'       // 发型方向（2026-09-21 分格扩充，三条主线补齐）
+  | 'makeup'     // 妆容要点
+  | 'accessory'  // 鞋包首饰
+  | 'general'    // 综合：归不进其余各格的内容（服务端自报分类的兜底格）
 
 export type Modality =
   | 'swatch'    // 色卡 / 色板（程序化，零成本）
@@ -95,6 +98,8 @@ export interface GeneCondition {
 //
 // 分类默认由内容类型推导（见 pick.ts），少数特例才手工覆盖 ——
 // 逐条手工分配必出错（曾把讲材质的「全黑并不自动显瘦」归到了配色库）。
+// 归格按内容的决策变量：选什么（hair/makeup/accessory vs 颜色/版型/面料）、
+// 怎么组合（搭配/比例）、何时何地（场合）、怎么做（技巧）。
 
 export type CollectionCategory =
   | 'color'      // 颜色：适合你的颜色、怎么配色
@@ -104,7 +109,10 @@ export type CollectionCategory =
   | 'occasion'   // 场合：面试、约会穿什么
   | 'howto'      // 技巧：卷袖、塞衣角这类动作
   | 'outfit'     // 搭配：完整的一身
-  | 'general'    // 综合：归不进七格的内容
+  | 'hair'       // 发型：发型方向（2026-09-21 扩充；主体是头发就归这，即使目的是修脸型）
+  | 'makeup'     // 妆容：妆容要点（脸上用的颜色归这，衣服颜色靠近脸的归颜色）
+  | 'accessory'  // 配饰：鞋包首饰的选法与呼应（选什么归这，落点/重心归比例）
+  | 'general'    // 综合：归不进其余各格的内容
 
 /**
  * 一条建议的生命周期：收下 → 试过 → 留下了。

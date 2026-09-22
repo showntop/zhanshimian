@@ -3757,7 +3757,11 @@ components:
           description: roam=等待期（可循环）；settle=内容到位后；reveal=揭晓
         kind:
           type: string
-          description: 能力名（roam_tour / converge / sweep / develop …）
+          description: >-
+            能力名（sketch_tour / frames / roam_tour / converge / sweep /
+            develop …）。sketch_tour=巡游主题逐笔画出（params.themes）；
+            frames=序列帧揭晓（params.urls + interval_ms + hold_ms，逐帧播完
+            定格再揭晓海报）。
         form:
           type: string
           description: >-
@@ -3875,6 +3879,9 @@ components:
       - item
       - occasion
       - howto
+      - hair
+      - makeup
+      - accessory
       - general
     CollectionCategory:
       type: string
@@ -3886,6 +3893,9 @@ components:
       - occasion
       - howto
       - outfit
+      - hair
+      - makeup
+      - accessory
       - general
     CollectionStatus:
       type: string

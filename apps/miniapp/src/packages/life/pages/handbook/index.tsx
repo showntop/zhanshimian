@@ -22,7 +22,7 @@ import AppHeader from '../../../../components/app-header'
 import DailyVisual from '../../../../components/daily-visual'
 import './index.scss'
 
-// 与服务端 allCategories 同序（含 general）；general 是归不进七格的综合内容，排最后。
+// 与服务端 allCategories 同序（含 general）；general 是归不进其余各格的综合内容，排最后。
 const BUCKET_ORDER: CollectionCategory[] = [
   'color',
   'fit',
@@ -31,6 +31,9 @@ const BUCKET_ORDER: CollectionCategory[] = [
   'occasion',
   'howto',
   'outfit',
+  'hair',
+  'makeup',
+  'accessory',
   'general',
 ]
 

@@ -92,6 +92,21 @@ func TestValidateOutputGates(t *testing.T) {
 		t.Fatalf("general should be valid: %v", problems)
 	}
 
+	// 新格（hair/makeup/accessory）与七格同级：自报合法，归类域随手册一起扩。
+	expanded := map[string]string{
+		"hair":      "分界线决定视觉重心",
+		"makeup":    "妆容只放一个重点",
+		"accessory": "鞋与下装的颜色连续",
+	}
+	for category, topic := range expanded {
+		expandedOutput := output
+		expandedOutput.Topic = topic
+		expandedOutput.Category = category
+		if problems := validateOutput(expandedOutput, recent); len(problems) != 0 {
+			t.Fatalf("%s should be valid: %v", category, problems)
+		}
+	}
+
 	// 去重：精确重复与去标点后重复都要拦；新 topic 放行。
 	duplicate := output
 	duplicate.Topic = "冬天的白，不止 一种"

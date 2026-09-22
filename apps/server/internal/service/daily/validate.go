@@ -96,14 +96,15 @@ func validateBlacklist(output ContentOutput) error {
 	return nil
 }
 
-// validateCategory 自报分类必须在七格 + general 内（手册归类的合法域）。
+// validateCategory 自报分类必须在手册各格内（七格 + 发型/妆容/配饰 + general，
+// 与 allCategories 同源）。
 func validateCategory(output ContentOutput) error {
 	for _, category := range allCategories {
 		if output.Category == category {
 			return nil
 		}
 	}
-	return fmt.Errorf("%w: 分类 %q 不在七格与 general 内", errCategory, output.Category)
+	return fmt.Errorf("%w: 分类 %q 不在手册分格内", errCategory, output.Category)
 }
 
 // validateDuplicate topic 去重闸：与近期已推 topic 规范化比对
@@ -243,7 +244,7 @@ func retryHint(problems []error) string {
 		case errors.Is(problem, errDuplicate):
 			parts = append(parts, "- topic 与近期已推的重复，请换一个全新的主题。")
 		case errors.Is(problem, errCategory):
-			parts = append(parts, "- category 必须是 color/fit/proportion/fabric/occasion/howto/outfit/general 之一。")
+			parts = append(parts, "- category 必须是 color/fit/proportion/fabric/occasion/howto/outfit/hair/makeup/accessory/general 之一。")
 		case errors.Is(problem, errStructure):
 			parts = append(parts, "- 结构不合法："+problem.Error()+"（字段必填、长度不超限、视觉参数完整）。")
 		default:

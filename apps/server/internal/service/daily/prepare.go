@@ -192,6 +192,9 @@ var categoryLabels = map[string]string{
 	"occasion":   "场合",
 	"howto":      "技巧",
 	"outfit":     "搭配",
+	"hair":       "发型",
+	"makeup":     "妆容",
+	"accessory":  "配饰",
 	"general":    "综合",
 }
 

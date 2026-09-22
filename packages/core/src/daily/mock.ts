@@ -583,6 +583,73 @@ export const MOCK_CONTENTS: DailyContent[] = [
     source: 'editorial',
     reviewed: false,
   },
+
+  // ---------------- 发型 / 妆容 / 配饰（2026-09-21 分格扩充） ----------------
+  {
+    id: 'h-parting-weight',
+    type: 'hair',
+    topic: '分界线决定视觉重心',
+    lead: '换发型不必先动剪刀，先动分界线。',
+    fit: () => '中分与侧分改变的是脸上的视觉重心：从现在的分界线往侧边移一指，重心就跟着走，成本最低、反悔最快。',
+    why: '分界线是最便宜的发型改动，它决定视线先落在哪。',
+    visual: {
+      modality: 'compare',
+      spec: {
+        left: { label: '中分 · 居中', tone: '#8A8F83' },
+        right: { label: '侧分 · 偏移', tone: '#8E9A83', layered: true },
+        marker: '分界线',
+      },
+      alt: '中分与侧分的对比，侧分把视觉重心带离正中',
+    },
+    asset: 'hair',
+    dedupeKey: 'hair.parting.weight',
+    source: 'editorial',
+    reviewed: false,
+  },
+  {
+    id: 'm-one-accent',
+    type: 'makeup',
+    topic: '妆容只放一个重点',
+    lead: '眼妆和唇色，今天选一处。',
+    fit: () => '先定今天的主角：眼妆加重时唇色收中性，唇色加重时眼妆收干净——两处都重会互相抢。',
+    why: '一个焦点才成立，两个强点会互相抵消。',
+    visual: {
+      modality: 'swatch',
+      spec: {
+        items: [
+          { tone: '#8E9A83', label: '主角 · 加重', state: 'pick' },
+          { tone: '#C9CFD4', label: '另一处 · 收住' },
+          { tone: '#5A6156', label: '底妆 · 贴肤' },
+        ],
+      },
+      alt: '妆容配比：一处主角加重，其余收住',
+    },
+    asset: 'makeup',
+    dedupeKey: 'makeup.one.accent',
+    source: 'editorial',
+    reviewed: false,
+  },
+  {
+    id: 'a-shoe-continuity',
+    type: 'accessory',
+    topic: '鞋与下装的颜色连续',
+    lead: '视线落地不断线，比例就顺了。',
+    fit: () => '鞋的颜色往裤色或裙色上靠，是全身最省力的一种连续；鞋色一跳，整身的配色逻辑要重新排。',
+    why: '鞋是全身唯一承重的单品，它的颜色决定视线怎么落地。',
+    visual: {
+      modality: 'compare',
+      spec: {
+        left: { label: '鞋与下装同色', tone: '#8E9A83' },
+        right: { label: '鞋色跳开', tone: '#5A6156' },
+        marker: '落地点',
+      },
+      alt: '鞋与下装同色延续和鞋色跳开的对比',
+    },
+    asset: 'accessory',
+    dedupeKey: 'accessory.shoe.continuity',
+    source: 'editorial',
+    reviewed: false,
+  },
 ]
 
 /** 默认演示基因：服务端 StyleGene 接口就绪前，客户端用它渲染 */

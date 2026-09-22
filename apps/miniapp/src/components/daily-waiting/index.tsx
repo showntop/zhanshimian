@@ -24,6 +24,9 @@ const SCENE_LABELS: Record<string, string> = {
   occasion: '场合',
   howto: '技巧',
   outfit: '搭配',
+  hair: '发型',
+  makeup: '妆容',
+  accessory: '配饰',
   fallback: DAILY_COPY.eyebrow,
 }
 
@@ -54,7 +57,8 @@ export default function DailyWaiting({ scenario, settling = false }: DailyWaitin
         </View>
       ) : null}
 
-      {theme === 'fallback' || theme === 'occasion' || theme === 'howto' || theme === 'outfit' ? (
+      {theme === 'fallback' || theme === 'occasion' || theme === 'howto' || theme === 'outfit' ||
+       theme === 'hair' || theme === 'makeup' || theme === 'accessory' ? (
         <View className="dw-wait__pulse">
           <View className="dw-wait__pulse-ring" />
           <View className="dw-wait__pulse-dot" />

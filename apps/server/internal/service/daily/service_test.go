@@ -553,17 +553,22 @@ func TestUpdateCollectionRejectsInvalidStatus(t *testing.T) {
 	}
 }
 
-// 手册分格要全量给键（含 general），否则客户端按格取数时会少一格。
+// 手册分格要全量给键（含 general 与扩充分格），否则客户端按格取数时会少一格。
 func TestCollectionStatsNormalizesAllBuckets(t *testing.T) {
 	service := newService(t, fakeReader{}, fakeKnowledge{}, newFakeContent(nil), &fakeRuns{}, &fakeCollections{}, &fakePlanner{})
 	stats, err := service.CollectionStats(context.Background(), "user-1")
 	if err != nil {
 		t.Fatalf("stats: %v", err)
 	}
-	if len(stats.Counts) != 8 || stats.Total != 0 {
+	if len(stats.Counts) != 11 || stats.Total != 0 {
 		t.Fatalf("stats = %#v", stats)
 	}
 	if _, ok := stats.Counts[daily.CategoryGeneral]; !ok {
 		t.Fatalf("stats missing general: %#v", stats.Counts)
+	}
+	for _, category := range []string{"hair", "makeup", "accessory"} {
+		if _, ok := stats.Counts[category]; !ok {
+			t.Fatalf("stats missing %s: %#v", category, stats.Counts)
+		}
 	}
 }

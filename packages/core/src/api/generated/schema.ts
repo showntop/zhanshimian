@@ -1486,7 +1486,7 @@ export interface components {
              * @enum {string}
              */
             phase: "roam" | "settle" | "reveal";
-            /** @description 能力名（roam_tour / converge / sweep / develop …） */
+            /** @description 能力名（sketch_tour / frames / roam_tour / converge / sweep / develop …）。sketch_tour=巡游主题逐笔画出（params.themes）； frames=序列帧揭晓（params.urls + interval_ms + hold_ms，逐帧播完 定格再揭晓海报）。 */
             kind: string;
             /** @description converge 用：形态渲染器名（outfit_blocks / ratio_blocks / swatch_bars / silhouette_shape …）。变体空间由它自己定义。 */
             form?: string;
@@ -1538,9 +1538,9 @@ export interface components {
             dedupe_key: string;
         };
         /** @enum {string} */
-        DailyContentType: "color" | "silhouette" | "proportion" | "fabric" | "item" | "occasion" | "howto" | "general";
+        DailyContentType: "color" | "silhouette" | "proportion" | "fabric" | "item" | "occasion" | "howto" | "hair" | "makeup" | "accessory" | "general";
         /** @enum {string} */
-        CollectionCategory: "color" | "fit" | "proportion" | "fabric" | "occasion" | "howto" | "outfit" | "general";
+        CollectionCategory: "color" | "fit" | "proportion" | "fabric" | "occasion" | "howto" | "outfit" | "hair" | "makeup" | "accessory" | "general";
         /** @enum {string} */
         CollectionStatus: "saved" | "tried" | "kept";
         ContentSnapshot: {
