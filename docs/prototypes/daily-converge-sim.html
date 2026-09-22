@@ -59,6 +59,39 @@ h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
   transition:opacity .2s var(--ease)}
 .cv{position:absolute;inset:0}
 
+/* ---------- 质感：素材到位前的观感近似 ----------
+   没有素材时几何块是纯色扁平的，观感差一个量级。这里用内阴影做出体积、
+   用噪点做出材质，至少能判断「有质感之后是什么水平」。 */
+.stage.tex [class*="dm__"]:not([class*="layer"]):not([class*="waist"]) {
+  box-shadow:
+    inset 0 3px 10px rgba(255, 255, 255, 0.34),
+    inset 0 -12px 22px rgba(40, 48, 36, 0.20),
+    0 14px 28px rgba(45, 58, 35, 0.18);
+}
+.grain{position:absolute;inset:0;z-index:5;pointer-events:none;opacity:0;
+  mix-blend-mode:multiply;transition:opacity .3s var(--ease);
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.5'/></svg>")}
+.stage.tex .grain{opacity:.17}
+
+/* 真实素材帧：ASSETS 里填了 URL 才走这一路（object-fit 保证不变形） */
+.shot{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:0;transition:opacity .8s var(--ease)}
+.shot.on{opacity:1}
+/* ---------- 快切剪辑 ----------
+   每个镜头短、切换带统一方向的推进，靠「帧率 = 信息率」制造节奏：
+   开场快到看不清（混乱），逐渐慢到能辨认（收敛），最后停住。 */
+.cut-layer{position:absolute;inset:0;opacity:0;transform:translateX(7%) scale(1.05);
+  transition:opacity .16s var(--ease), transform .30s var(--ease)}
+.cut-layer.on{opacity:1;transform:none}
+.cut-layer img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* 单张素材靠缓慢漂移制造流动感：省掉多帧，观感却更"在呼吸" */
+.shot.drift{object-fit:cover;animation:kenburns 7s ease-in-out infinite alternate}
+@keyframes kenburns{
+  from{transform:scale(1.06) translate(-1.6%,-1.2%)}
+  to{transform:scale(1.13) translate(1.6%,1.4%)}
+}
+
 /* 海报 */
 .poster{position:absolute;inset:0;z-index:9;opacity:0;pointer-events:none;
   background:linear-gradient(158deg,#3B3D42 0%,#31333A 55%,#26282D 100%)}
@@ -119,6 +152,7 @@ button.ghost{background:#fff;color:var(--moss-deep)}
       <div class="dcard">
         <div class="stage" id="stage">
           <div class="blob b1"></div><div class="blob b2"></div>
+          <div class="grain" id="grain"></div>
           <div class="layer layer--g2" id="g2"></div>
           <div class="layer layer--g1" id="g1"></div>
           <div class="layer layer--main" id="main"></div>
@@ -140,8 +174,8 @@ button.ghost{background:#fff;color:var(--moss-deep)}
     <div class="panel">
       <h2>播放</h2>
       <div class="row">
-        <button id="play">▶ 播一遍收敛</button>
-        <button class="ghost" id="roam">巡游 8s 后自动收敛</button>
+        <button id="play">▶ 完整流程（巡游 → 收敛 → 揭晓）</button>
+        <button class="ghost" id="roam">只播收敛（几何形态）</button>
       </div>
       <div class="row">
         <label>收敛方案</label>
@@ -197,6 +231,22 @@ button.ghost{background:#fff;color:var(--moss-deep)}
           <option value="gloss">光泽扫过</option>
           <option value="develop">显影（渐清晰）</option>
         </select>
+      </div>
+      <div class="row">
+        <label>剪辑</label>
+        <select id="edit">
+          <option value="cut" selected>快切（短镜头推进）</option>
+          <option value="drift">漂移（缓慢流动）</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>素材</label>
+        <select id="assetMode">
+          <option value="geo">几何（无素材 · 现状）</option>
+          <option value="tex">几何 + 质感（体积 / 噪点）</option>
+          <option value="shot">真实素材帧（填 ASSETS）</option>
+        </select>
+        <span class="val" id="assetNote"></span>
       </div>
       <div class="row">
         <label class="chk"><input type="checkbox" id="over" checked> 过冲回弹</label>
@@ -306,6 +356,78 @@ const KINDS = {
   }
 };
 
+/* ============ 素材 ============
+   填上 URL 就走真实素材帧；留空则回落几何形态——所以素材没到位时原型照样能跑。
+   规格：750×520 PNG，单张 < 60KB，走 CDN（小程序主包只剩几十 KB，塞不下）。
+   颜色 / 比例 / 搭配刻意不做素材：它们要接 gene 色板、随内容变，做成图就写死了。 */
+// 三种填法都支持，按"最少素材"排序：
+//   1) 单张图    fabric: 'https://…/fabric.png'          → 缓慢漂移（Ken Burns）
+//   2) 数组      fabric: ['…1.png','…2.png']             → 多帧 cross-fade 循环
+//   3) 雪碧图    fabric: {url:'…sheet.png', cols:2, rows:2, index:0}
+//                                                        → 一张图切帧，零额外请求
+// 留空则回落几何形态：素材没到位时原型照样能跑。
+const ASSETS = {
+  // 四宫格一张切 2×2：0 面料 / 1 场合 / 2 穿法 / 3 版型
+  fabric:   { url: './assets/roam-sheet.png', cols: 2, rows: 2, index: 0 },
+  occasion: { url: './assets/roam-sheet.png', cols: 2, rows: 2, index: 1 },
+  howto:    { url: './assets/roam-sheet.png', cols: 2, rows: 2, index: 2 },
+  fit:      { url: './assets/roam-sheet.png', cols: 2, rows: 2, index: 3 },
+  // 想换成独立图就改成：fabric: './assets/roam-fabric.jpg',
+};
+
+function shotMarkup(url, extra) {
+  return '<img class="shot on ' + (extra || '') + '" src="' + url + '">'
+}
+
+/** 雪碧图：一张图切成等分网格，按 index 取其中一格 */
+function spriteStyle(entry) {
+  const cols = entry.cols || 1
+  const rows = entry.rows || 1
+  const x = (entry.index || 0) % cols
+  const y = Math.floor((entry.index || 0) / cols) % rows
+  // 宽度按列数放大，高度 auto 保持素材原比例——否则 4:3 的素材塞进 1.44:1 的
+  // 卡片会被横向拉伸变形；宁可上下多裁一点，也不能把布料和廓形拉歪。
+  return (
+    'background-image:url(' + entry.url + ');' +
+    'background-size:' + cols * 100 + '% auto;' +
+    'background-position:' + (cols > 1 ? (x / (cols - 1)) * 100 : 0) + '% ' +
+    (rows > 1 ? (y / (rows - 1)) * 100 : 0) + '%;'
+  )
+}
+
+function paintFrames(host, entry, index) {
+  // 单张：显示一次 + 缓慢漂移，靠 CSS 制造流动感（省掉 2/3 的素材量）
+  if (typeof entry === 'string' && entry) {
+    const key = 's|' + entry
+    if (host.dataset.frames !== key) {
+      host.innerHTML = shotMarkup(entry, 'drift')
+      host.dataset.frames = key
+    }
+    return
+  }
+  // 雪碧图：一格一帧
+  if (entry && entry.url) {
+    const key = 'p|' + entry.url + '|' + (entry.index || 0)
+    if (host.dataset.frames !== key) {
+      host.innerHTML = '<div class="shot on" style="' + spriteStyle(entry) + '"></div>'
+      host.dataset.frames = key
+    }
+    return
+  }
+  // 数组：多帧 cross-fade
+  const frames = Array.isArray(entry) ? entry : []
+  if (frames.length) {
+    const key = frames.join('|')
+    if (host.dataset.frames !== key) {
+      host.innerHTML = frames.map((url, i) => shotMarkup(url, i === 0 ? '' : '')).join('')
+      host.dataset.frames = key
+    }
+    const shots = Array.from(host.querySelectorAll('.shot'))
+    const active = index % shots.length
+    shots.forEach((img, i) => img.classList.toggle('on', i === active))
+  }
+}
+
 /* ============ 通用工具 ============ */
 // 自适应节奏：等得越久，揭晓越隆重（默认「常规」≈ 3.4s + 停顿）
 // 延长不靠单纯放慢间隔 —— 靠三个有戏的节奏点：制动回响 / 最后犹豫 / 定格蓄力。
@@ -316,7 +438,7 @@ const PRESETS = {
 };
 const state = {kind:'outfit', strat:'fused', preset:'mid',
   steps:16, iv0:95, iv1:330, curve:2, over:true, rm:false, reveal:'gloss',
-  theatrical:true};
+  theatrical:true, assetMode:'shot'};
 let timers=[];
 const clearTimers=()=>{timers.forEach(clearTimeout);timers=[]};
 const later=(fn,ms)=>{const id=setTimeout(fn,ms);timers.push(id)};
@@ -329,6 +451,52 @@ function sample(axis,targetIdx,amp){
   const spread=Math.max(1,Math.round((n-1)*amp));
   return Math.max(0,Math.min(n-1,targetIdx+Math.round((Math.random()*2-1)*spread)));
 }
+// 巡游每主题停留（演示用，真实节奏由服务端脚本的 per_ms 下发 = 4000）
+const ROAM_PER = 700
+// 快切：单镜头时长。低于 120ms 就成闪烁了，250ms 上下是短视频的舒适区
+const CUT_PER = 250
+
+// 快切用的是独立图（每主题一张）；四宫格适合"漂移"，不适合高频切换
+const ASSETS_IND = {
+  outfit: './assets/look-1.jpg',
+  proportion: './assets/look-2.jpg',
+  fabric: './assets/roam-fabric.jpg',
+  occasion: './assets/roam-occasion.jpg',
+  howto: './assets/roam-howto.png',
+  fit: './assets/roam-fit.png',
+}
+
+// 成衣平铺：巡游与收敛共用同一批。收敛时多套快切 → 减速 → 定格到建议那套；
+// 只有 1 张时不会切换（第 2 张到位即自动生效）。
+const LOOKS = [
+  './assets/look-1.jpg', // 通勤一身（作候选项）
+  './assets/look-2.jpg', // 上短下长（定格目标：建议就是它）
+]
+
+/** 收敛也吃素材：定格哪一套由轴的语义决定——上装落在 cropped（上短下长）就用第 2 张 */
+function convergeMarkup(k, indices) {
+  if (state.assetMode === 'shot' && k === KINDS.outfit && LOOKS.length > 1) {
+    const url = indices[0] === 0 ? LOOKS[1] : LOOKS[0]
+    return '<img class="shot on" src="' + url + '">'
+  }
+  return htmlOf(k, indices)
+}
+
+/** 硬切会廉价：新镜头从右侧推进 + 160ms 交叉溶解，旧镜头延时移除 */
+function cut(host, html) {
+  const layer = document.createElement('div')
+  layer.className = 'cut-layer'
+  layer.innerHTML = html
+  host.appendChild(layer)
+  requestAnimationFrame(() => requestAnimationFrame(() => layer.classList.add('on')))
+  Array.from(host.querySelectorAll('.cut-layer'))
+    .filter((node) => node !== layer)
+    .forEach((old) => {
+      old.classList.remove('on')
+      setTimeout(() => old.remove(), 320)
+    })
+}
+
 function resetCard(){
   clearTimers();
   poster.classList.remove('on','dev');
@@ -537,7 +705,7 @@ function stratFused(done){
         const d=layers[i], isT=(i===2);
         const drift=amp*46*(isT?.4:1);
         const dx=(Math.random()*2-1)*drift, dy=(Math.random()*2-1)*drift*.6;
-        d.innerHTML=htmlOf(k,c);
+        d.innerHTML=convergeMarkup(k,c);
         d.style.transform='translate('+dx.toFixed(1)+'px,'+dy.toFixed(1)+'px)';
         d.style.filter='blur('+(isT?amp*14:(6+amp*16)).toFixed(1)+'px)';
         d.style.opacity=(isT?(.45+.55*(1-amp)):(.55*amp)).toFixed(2);
@@ -618,11 +786,23 @@ function playRoam(){
     later(()=>{
       const k=KINDS[kind];
       g1.innerHTML='';g2.innerHTML='';g1.style.opacity=0;g2.style.opacity=0;
-      main.innerHTML='<div class="sl">'+htmlOf(k,k.target)+'</div>';
+      const asset = state.assetMode==='shot' ? (ASSETS[kind]||'') : '';
+      if (asset){
+        paintFrames(main, asset, 0);
+        // 只有数组（多帧）才需要轮播；单张靠漂移、雪碧图取一格即可
+        if (Array.isArray(asset) && asset.length>1){
+          asset.forEach((_, f)=>{
+            if (f>0) later(()=>paintFrames(main, asset, f), f*(ROAM_PER/asset.length));
+          });
+        }
+      } else {
+        main.dataset.frames='';
+        main.innerHTML='<div class="sl">'+htmlOf(k,k.target)+'</div>';
+      }
       cap.textContent='在看'+k.label;
-    }, i*1150);
+    }, i*ROAM_PER);
   });
-  later(()=>{state.kind='outfit';el('kind').value='outfit';sync();play();}, order.length*1150);
+  later(()=>{state.kind='outfit';el('kind').value='outfit';sync();play();}, order.length*ROAM_PER);
 }
 
 /* ============ 面板 ============ */
@@ -643,6 +823,22 @@ function sync(){
   const base=state.steps*(state.iv0+state.iv1)/2/1000;
   const est=(base + (state.theatrical?1.10:0.47)).toFixed(1);
   el('waitedV').textContent='收敛 ≈'+est+'s ＋揭晓 0.8s';
+}
+
+el('edit').value = state.edit
+el('edit').onchange = e=>{ state.edit = e.target.value; playRoam() }
+
+el('assetMode').value = state.assetMode
+el('assetMode').onchange = e=>{
+  state.assetMode = e.target.value
+  stage.classList.toggle('tex', state.assetMode!=='geo')
+  const filled = Object.values(ASSETS).filter(v =>
+    typeof v === 'string' ? v.length>0 : !!(v && (v.url || v.length))).length
+  el('assetNote').textContent = state.assetMode==='shot'
+    ? (LOOKS.length > 1 ? '巡游 + 收敛都用素材' : '素材用于巡游；收敛需第 2 套穿搭才生效')
+    : (state.assetMode==='tex' ? '仍是几何，只加了体积与噪点' : '')
+  void filled
+  play()
 }
 
 const ss=el('strat');
@@ -675,9 +871,16 @@ el('reveal').onchange=e=>{state.reveal=e.target.value;sync();play();};
 el('over').onchange=e=>{state.over=e.target.checked;sync();};
 el('theatrical').onchange=e=>{state.theatrical=e.target.checked;sync();play();};
 el('rm').onchange=e=>{state.rm=e.target.checked;sync();play();};
-el('play').onclick=play; el('roam').onclick=playRoam;
+// 主按钮跑完整流程：素材只用在巡游段，收敛段要随轴变形（上装变短、腰线移动），
+// 静态素材图做不了，所以收敛仍是几何 / 未来的 SVG 剪影。
+el('play').onclick=playRoam; el('roam').onclick=play;
 
-sync(); play();
+sync();
+stage.classList.toggle('tex', state.assetMode!=='geo');
+el('assetNote').textContent = state.assetMode==='shot'
+  ? (LOOKS.length > 1 ? '巡游 + 收敛都用素材' : '素材用于巡游；收敛需第 2 套穿搭才生效')
+  : (state.assetMode==='tex' ? '仍是几何，只加了体积与噪点' : '');
+playRoam();
 </script>
 </body>
 </html>

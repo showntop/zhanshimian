@@ -59,8 +59,9 @@ func TestTempoGrowsWithElapsed(t *testing.T) {
 
 func TestSettleRevealKindDependsOnElapsed(t *testing.T) {
 	content := domain.DailyContent{ID: "c1", Category: "outfit"}
-	quick := settlePresentation(content, 2000)
-	long := settlePresentation(content, 30000)
+	// 空 assetBase：无素材时退回 CSS 形态收敛，这一支的行为保持不变。
+	quick := settlePresentation(content, 2000, "")
+	long := settlePresentation(content, 30000, "")
 	revealOf := func(p Presentation) string {
 		for _, stage := range p.Stages {
 			if stage.Phase == "reveal" {
@@ -79,7 +80,7 @@ func TestSettleRevealKindDependsOnElapsed(t *testing.T) {
 
 func TestSettleCarriesAxesDimsTempoAndBrakes(t *testing.T) {
 	content := domain.DailyContent{ID: "c1", Category: "color"}
-	p := settlePresentation(content, 8000)
+	p := settlePresentation(content, 8000, "")
 	if len(p.Stages) != 2 {
 		t.Fatalf("stages = %d, want 2 (settle + reveal)", len(p.Stages))
 	}
@@ -94,20 +95,60 @@ func TestSettleCarriesAxesDimsTempoAndBrakes(t *testing.T) {
 	}
 }
 
+func TestSettleFramesWhenAssetBaseConfigured(t *testing.T) {
+	content := domain.DailyContent{ID: "c1", Category: "outfit"}
+	p := settlePresentation(content, 8000, "https://api.example.com")
+	if len(p.Stages) != 1 {
+		t.Fatalf("stages = %d, want 1 (frames)", len(p.Stages))
+	}
+	stage := p.Stages[0]
+	if stage.Phase != "settle" || stage.Kind != "frames" {
+		t.Fatalf("stage = %+v", stage)
+	}
+	urls, ok := stage.Params["urls"].([]string)
+	if !ok || len(urls) != revealFramesCount {
+		t.Fatalf("urls = %v", stage.Params["urls"])
+	}
+	if urls[0] != "https://api.example.com/assets/daily/reveal/f_01.jpg" {
+		t.Fatalf("urls[0] = %q", urls[0])
+	}
+	if urls[len(urls)-1] != "https://api.example.com/assets/daily/reveal/f_17.jpg" {
+		t.Fatalf("last url = %q", urls[len(urls)-1])
+	}
+	if got := stage.Params["interval_ms"]; got != revealFrameMS {
+		t.Fatalf("interval_ms = %v", got)
+	}
+	if got := stage.Params["hold_ms"]; got != revealHoldMS {
+		t.Fatalf("hold_ms = %v", got)
+	}
+	if stage.DurationMS != revealFramesCount*revealFrameMS+revealHoldMS {
+		t.Fatalf("duration = %d", stage.DurationMS)
+	}
+}
+
 func TestRoamCoversEveryTheme(t *testing.T) {
 	p := roamPresentation()
-	if len(p.Stages) != 1 || p.Stages[0].Kind != "roam_tour" {
+	if len(p.Stages) != 1 || p.Stages[0].Kind != "sketch_tour" {
 		t.Fatalf("roam = %+v", p.Stages)
 	}
 	themes, ok := p.Stages[0].Params["themes"].([]map[string]any)
-	// general 是「归不进七格」的兜底格，没有自己的视觉语言，巡游不单列它。
-	want := len(allCategories) - 1
-	if !ok || len(themes) != want {
-		t.Fatalf("themes = %v, want %d", p.Stages[0].Params["themes"], want)
+	// 巡游只收录「有画法的分类」：七个经典分类。hair/makeup/accessory 与
+	// general（兜底格）暂无自己的视觉语言，硬列会出现标签与画面不符。
+	// 这里用显式清单而不是 allCategories 派生——分类集合会生长，巡游跟着
+	// 混进没画法的格就是这次测试红的原因。
+	if !ok || len(themes) != 7 {
+		t.Fatalf("themes = %v, want 7", p.Stages[0].Params["themes"])
 	}
+	seen := map[string]bool{}
 	for _, theme := range themes {
-		if theme["form"] == "" || theme["label"] == "" {
-			t.Fatalf("theme missing form/label: %v", theme)
+		if theme["form"] == "" || theme["label"] == "" || theme["theme"] == "" {
+			t.Fatalf("theme missing theme/form/label: %v", theme)
+		}
+		seen[theme["theme"].(string)] = true
+	}
+	for _, key := range []string{"color", "fit", "proportion", "fabric", "occasion", "howto", "outfit"} {
+		if !seen[key] {
+			t.Fatalf("roam missing theme %q", key)
 		}
 	}
 }

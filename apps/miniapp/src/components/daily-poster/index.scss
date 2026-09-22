@@ -16,6 +16,9 @@
   // 通栏：抵消页面内容区左右留白。出血是海报的基本语言
   margin-left: -32rpx;
   margin-right: -32rpx;
+  // 揭晓衔接：序列帧定格后海报浮现（opacity + 微位移，品牌缓动）。
+  // 从定格帧到编辑风海报是一次材质切换，淡入是唯一不撒谎的过渡。
+  animation: dailyPosterIn 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 
   --dp-mark: rgba(238, 240, 236, 0.62);
 
@@ -196,5 +199,23 @@
     line-height: 1;
     opacity: 0.16;
     writing-mode: vertical-rl;
+  }
+}
+
+@keyframes dailyPosterIn {
+  from {
+    opacity: 0;
+    transform: translateY(12rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .daily-poster {
+    animation: none;
   }
 }

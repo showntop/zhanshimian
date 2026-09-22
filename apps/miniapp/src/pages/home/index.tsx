@@ -422,12 +422,18 @@ export default function Home() {
                     presentation={settleScript}
                     phase="settling"
                     palette={dailyPalette}
+                    seq={todaySeq}
                     onSettled={reveal}
                   />
                 </View>
               ) : dailyWaiting ? (
                 <View className={`home__daily-waiting ${enter(1)}`}>
-                  <DailyMotion presentation={roamScript} phase="waiting" palette={dailyPalette} />
+                  <DailyMotion
+                    presentation={roamScript}
+                    phase="waiting"
+                    palette={dailyPalette}
+                    seq={todaySeq}
+                  />
                 </View>
               ) : null}
               {/* 报告退位：不再是首页主角，但入口保留，降级为一行。

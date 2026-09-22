@@ -149,6 +149,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	dailySvc := daily.New(store, store, store, store, store, daily.NewClock()).
 		WithPlanner(providerai.NewDailyContentPlanner(structuredRuntimeAdapter{ai.Runtime})).
 		WithWeather(dailyWeatherAdapter{inner: weather}).
+		WithAssetBase(cfg.PublicBaseURL).
 		WithForceRegen(cfg.DailyForceRegen)
 	wardrobeSvc := wardrobe.New(store, store).WithMediaSigner(mediaSigner).WithMediaChecker(store)
 	advisorSvc := advisor.New(store, store, providerai.NewAdvisorChat(structuredRuntimeAdapter{ai.Runtime})).WithUsageGate(store)

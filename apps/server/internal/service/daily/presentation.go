@@ -1,6 +1,7 @@
 package daily
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/zhanshimian/server/internal/domain"
@@ -51,6 +52,10 @@ type Presentation struct {
 // 「等待期不知道今天讲什么」本是技术限制（选题在 generate 的 LLM 调用里），
 // 这里把它转成产品语义——顾问在几个方向里权衡。巡游因此与用户无关、
 // 可按 version 长期缓存，运营改顺序/文案都不需要发版。
+//
+// kind=sketch_tour：客户端把每个分类的形状当场「画」出来（canvas 草图，
+// 零素材、可循环、可中断）。theme 字段就是分类 id，草图按它选画法；
+// form 保留给旧客户端（CSS 形态兜底渲染）。
 func roamPresentation() Presentation {
 	themes := []struct {
 		theme string
@@ -73,7 +78,7 @@ func roamPresentation() Presentation {
 		Version: presentationVersion,
 		Stages: []Stage{{
 			Phase:      "roam",
-			Kind:       "roam_tour",
+			Kind:       "sketch_tour",
 			Params:     map[string]any{"themes": items, "per_ms": roamThemeMS},
 			DurationMS: roamThemeMS * len(themes),
 		}},
@@ -216,10 +221,50 @@ func tempoFor(elapsedMS int) map[string]any {
 	}
 }
 
+// ---------- 序列帧揭晓 ----------
+//
+// 帧来自 assets/daily/reveal/（reveal.mp4 抽帧 17 张，线稿→成形→定格），
+// 走既有 /assets/ 静态路由。放服务端而不是小程序包内：主包余量装不下，
+// 换素材只改文件与这里，不用发版。
+const (
+	revealFramesCount = 17
+	revealFrameMS     = 108 // 17 帧 ≈ 1.84s，原型调参
+	revealHoldMS      = 320 // 定格停一拍再揭晓，「定住」要有分量
+)
+
+func revealFrameURLs(assetBase string) []string {
+	if assetBase == "" {
+		return nil
+	}
+	urls := make([]string, 0, revealFramesCount)
+	for i := 1; i <= revealFramesCount; i++ {
+		urls = append(urls, fmt.Sprintf("%s/assets/daily/reveal/f_%02d.jpg", assetBase, i))
+	}
+	return urls
+}
+
 // settlePresentation 内容到位后的收敛 + 揭晓。
 //
 // elapsedMS 是本次生成实际耗时——服务端自己知道，客户端不必上报。
-func settlePresentation(content domain.DailyContent, elapsedMS int) Presentation {
+// assetBase 是素材基地址（PUBLIC_BASE_URL）：有它就发序列帧揭晓
+// （线稿→成形→定格，客户端逐帧播完定格再上海报）；没有则退回
+// CSS 形态收敛——素材缺席不该把动画整个拿掉。
+func settlePresentation(content domain.DailyContent, elapsedMS int, assetBase string) Presentation {
+	if urls := revealFrameURLs(assetBase); len(urls) > 0 {
+		return Presentation{
+			Version: presentationVersion,
+			Stages: []Stage{{
+				Phase: "settle",
+				Kind:  "frames",
+				Params: map[string]any{
+					"urls":        urls,
+					"interval_ms": revealFrameMS,
+					"hold_ms":     revealHoldMS,
+				},
+				DurationMS: revealFramesCount*revealFrameMS + revealHoldMS,
+			}},
+		}
+	}
 	axes := axesOf(content)
 	brakes := make([]float64, 0, len(axes))
 	for _, axis := range axes {

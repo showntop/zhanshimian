@@ -24,15 +24,16 @@ const (
 	ScenarioFallback = "fallback"
 )
 
-// CategoryGeneral 归不进七格的综合内容（LLM 自报 + 手册分格都用它）。
+// CategoryGeneral 归不进其余各格的综合内容（LLM 自报 + 手册分格都用它）。
 const CategoryGeneral = "general"
 
-// allCategories 手册的全部分格（方案 §6）：七格 + general。
+// allCategories 手册的全部分格：方案 §6 的七格 + 2026-09-21 扩充的
+// 发型/妆容/配饰（补齐形象顾问的三条主线）+ general。
 //
 // 一个集合同时供三处使用——手册计数/过滤、LLM 自报分类的合法取值、
 // 收藏兴趣分布。分开定义就会出现「统计不认 general、列表却收得到」这类
 // 半边漏，所以这里刻意只留一份。
-var allCategories = []string{"color", "fit", "proportion", "fabric", "occasion", "howto", "outfit", CategoryGeneral}
+var allCategories = []string{"color", "fit", "proportion", "fabric", "occasion", "howto", "outfit", "hair", "makeup", "accessory", CategoryGeneral}
 
 type Service struct {
 	reader      Reader
@@ -44,6 +45,9 @@ type Service struct {
 	weather     WeatherProvider
 	clock       Clock
 	zone        *time.Location
+	// assetBase 素材基地址（PUBLIC_BASE_URL）：序列帧等静态素材的 URL 前缀。
+	// 空串 = 不下发帧脚本，收敛退回 CSS 形态（素材缺席不能拿掉全部动画）。
+	assetBase string
 	// forceRegen 调试开关（DAILY_FORCE_REGEN，非生产）：跳过当日幂等，
 	// 每次都实时重生成 + 覆盖当天记录。
 	forceRegen bool
@@ -65,6 +69,12 @@ func (s *Service) WithPlanner(planner ContentPlanner) *Service {
 
 func (s *Service) WithWeather(weather WeatherProvider) *Service {
 	s.weather = weather
+	return s
+}
+
+// WithAssetBase 配置静态素材基地址（PUBLIC_BASE_URL）：序列帧揭晓依赖它。
+func (s *Service) WithAssetBase(base string) *Service {
+	s.assetBase = base
 	return s
 }
 
@@ -95,7 +105,7 @@ func (s *Service) Generate(ctx context.Context, userID string, city string) (res
 		if err != nil || result.Content.ID == "" || result.Presentation != nil {
 			return
 		}
-		presentation := settlePresentation(result.Content, int(time.Since(started).Milliseconds()))
+		presentation := settlePresentation(result.Content, int(time.Since(started).Milliseconds()), s.assetBase)
 		result.Presentation = &presentation
 	}()
 

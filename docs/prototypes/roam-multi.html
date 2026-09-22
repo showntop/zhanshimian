@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>巡游 · 机制驱动 vs 顺序播放</title>
+<style>
+  :root{
+    --ease:cubic-bezier(.2,.8,.2,1);
+    --c1:#8E9A83; --c2:#E8E4DC; --c3:#3F463C; --c4:#C0A080;
+  }
+  *{box-sizing:border-box}
+  body{background:#E8E4DC;font-family:system-ui,-apple-system,PingFang SC;margin:0;padding:24px;
+       display:flex;flex-direction:column;align-items:center;gap:16px;color:#3F463C}
+  body.rm *{animation-play-state:paused !important}
+
+  .card{width:750px;height:560px;position:relative;overflow:hidden;border-radius:18px;
+        background:#E8E4DC;box-shadow:0 10px 48px rgba(0,0,0,.14)}
+  .base{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;will-change:transform,filter}
+  .veil{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.38) 0%,rgba(0,0,0,.05) 34%,rgba(0,0,0,0) 52%);z-index:8}
+  .cap{position:absolute;left:32px;bottom:26px;color:#fff;font-size:22px;letter-spacing:.12em;
+       text-shadow:0 1px 12px rgba(0,0,0,.5);z-index:10;transition:opacity .3s var(--ease)}
+  .tag{position:absolute;right:26px;top:22px;padding:6px 15px;border-radius:999px;font-size:13px;
+       letter-spacing:.1em;background:rgba(255,255,255,.92);color:#3F463C;z-index:10}
+
+  /* 叠加层：动画模式下用「擦除」切换（界面语言），不用淡入淡出（视频转场语言） */
+  .ov{position:absolute;inset:0;opacity:0;visibility:hidden;z-index:6;
+      transition:opacity .2s var(--ease), visibility .2s var(--ease)}
+  .ov.on{opacity:1;visibility:visible}
+  body.anim .ov.on.wipe{animation:wipe .44s var(--ease)}
+  @keyframes wipe{from{clip-path:inset(0 0 0 100%)}to{clip-path:inset(0 0 0 0)}}
+
+  /* 颜色 */
+  .sw{position:absolute;left:0;right:0;bottom:0;height:170px;display:flex;align-items:flex-end;
+      gap:10px;padding:0 46px 0;filter:drop-shadow(0 -2px 12px rgba(0,0,0,.18))}
+  .sw i{flex:1;border-radius:7px 7px 0 0;height:64px;transform-origin:bottom;
+        animation:swell 5.2s var(--ease) infinite}
+  .sw i:nth-child(1){background:var(--c1);animation-delay:0s}
+  .sw i:nth-child(2){background:var(--c2);height:48px;animation-delay:.65s}
+  .sw i:nth-child(3){background:var(--c3);height:78px;animation-delay:1.3s}
+  .sw i:nth-child(4){background:var(--c4);height:56px;animation-delay:1.95s}
+  @keyframes swell{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.3)}}
+  .ctint{position:absolute;inset:0;mix-blend-mode:soft-light;opacity:.34;
+         background:linear-gradient(150deg,var(--c1),transparent 62%);
+         animation:ctint 5.2s var(--ease) infinite}
+  @keyframes ctint{0%,100%{opacity:.22}50%{opacity:.46}}
+
+  /* 比例 */
+  .blk{position:absolute;left:0;right:0}
+  .blkT{top:0;height:38%;background:linear-gradient(rgba(232,228,220,.24),rgba(232,228,220,.05));
+        animation:bt 6.4s var(--ease) infinite}
+  .blkB{bottom:0;height:62%;background:linear-gradient(rgba(63,70,60,.05),rgba(63,70,60,.26));
+        animation:bb 6.4s var(--ease) infinite}
+  @keyframes bt{0%,100%{height:38%}50%{height:47%}}
+  @keyframes bb{0%,100%{height:62%}50%{height:53%}}
+  .waist{position:absolute;left:0;right:0;top:38%;height:2px;
+         background:linear-gradient(90deg,rgba(255,255,255,0),#fff 12%,#fff 88%,rgba(255,255,255,0));
+         box-shadow:0 0 16px rgba(255,255,255,.75);animation:wz 6.4s var(--ease) infinite}
+  @keyframes wz{0%,100%{top:38%}50%{top:47%}}
+  .waist::before{content:'';position:absolute;left:46px;top:-7px;width:14px;height:14px;
+                 border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg)}
+  .waist::after{content:'';position:absolute;right:46px;top:-7px;width:14px;height:14px;
+                border-right:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(45deg)}
+  .rule{position:absolute;left:0;right:0;height:1px;background:repeating-linear-gradient(90deg,
+        rgba(255,255,255,.5) 0 10px,transparent 10px 26px);opacity:.5}
+  .rule.r1{top:20%}.rule.r2{top:62%}
+
+  /* 版型 */
+  .sil{position:absolute;left:50%;top:48px;transform:translateX(-50%);width:240px;height:482px;
+       filter:drop-shadow(0 0 10px rgba(255,255,255,.35))}
+  .sil svg{position:absolute;inset:0;width:100%;height:100%;opacity:0;
+           animation:silf 8.4s var(--ease) infinite}
+  .sil svg:nth-child(1){animation-delay:0s}
+  .sil svg:nth-child(2){animation-delay:2.8s}
+  .sil svg:nth-child(3){animation-delay:5.6s}
+  @keyframes silf{0%,26%{opacity:.92}34%,100%{opacity:0}}
+
+  /* 面料 */
+  .fabimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;will-change:transform,filter}
+  .fold{position:absolute;inset:-20%;mix-blend-mode:overlay;opacity:.34;
+        background:repeating-linear-gradient(104deg,rgba(255,255,255,.14) 0 7px,rgba(0,0,0,.14) 7px 17px),
+                   repeating-linear-gradient(97deg,rgba(255,255,255,.10) 0 11px,rgba(0,0,0,.10) 11px 27px);
+        animation:fold 7s linear infinite}
+  @keyframes fold{0%{transform:translateX(0) skewX(0)}50%{transform:translateX(-26px) skewX(.7deg)}100%{transform:translateX(0) skewX(0)}}
+
+  /* 场合 */
+  .tint{position:absolute;inset:0;mix-blend-mode:soft-light;animation:tint 9s var(--ease) infinite}
+  @keyframes tint{
+    0%  {background:linear-gradient(155deg,#FFD7A0 0%,#FFB173 55%,#E79A6A 100%);opacity:.62}
+    45% {background:linear-gradient(155deg,#F4EFE6 0%,#DFD8CC 60%,#CFC7BA 100%);opacity:.34}
+    100%{background:linear-gradient(155deg,#A9C2DA 0%,#7E9BB8 60%,#5E7C99 100%);opacity:.66}}
+  .glow{position:absolute;left:-25%;top:-14%;width:62%;height:58%;border-radius:50%;
+        background:radial-gradient(circle,rgba(255,255,255,.55),rgba(255,255,255,0) 68%);
+        animation:glow 9s var(--ease) infinite}
+  @keyframes glow{0%{transform:translate(0,0)}50%{transform:translate(105%,38%)}100%{transform:translate(0,0)}}
+
+  /* 技巧（待素材） */
+  .ring{position:absolute;width:104px;height:104px;border:2px solid rgba(255,255,255,.95);
+        border-radius:50%;box-shadow:0 0 0 7px rgba(255,255,255,.16);animation:ring 3.2s var(--ease) infinite}
+  @keyframes ring{0%,100%{transform:scale(1);opacity:.95}50%{transform:scale(1.14);opacity:.55}}
+  .arrow{position:absolute;color:#fff;font-size:28px;animation:arw 3.2s var(--ease) infinite;
+         text-shadow:0 2px 10px rgba(0,0,0,.55)}
+  @keyframes arw{0%,100%{transform:translate(0,0)}50%{transform:translate(14px,-9px)}}
+  .pin{position:absolute;width:8px;height:8px;border-radius:50%;background:#fff;
+       box-shadow:0 0 0 5px rgba(255,255,255,.2)}
+
+  .ctl{display:flex;gap:14px;align-items:center;font-size:14px;flex-wrap:wrap;justify-content:center}
+  .hud{font-variant-numeric:tabular-nums;opacity:.7}
+  button,select{padding:7px 14px;border-radius:9px;border:1px solid #3F463C;background:transparent;
+                color:#3F463C;cursor:pointer;font-size:14px}
+  label{display:inline-flex;gap:6px;align-items:center}
+  input[type=range]{width:150px}
+</style>
+</head>
+<body>
+  <div class="card">
+    <img class="base" id="base" src="assets/frames-roam/f_01.jpg" alt="">
+
+    <div class="ov" data-k="color"><div class="ctint"></div><div class="sw"><i></i><i></i><i></i><i></i></div></div>
+    <div class="ov" data-k="ratio">
+      <div class="blk blkT"></div><div class="blk blkB"></div>
+      <div class="rule r1"></div><div class="rule r2"></div><div class="waist"></div>
+    </div>
+    <div class="ov" data-k="fit"><div class="sil">
+      <svg viewBox="0 0 240 482"><path d="M72 46 L168 46 L190 62 L202 176 L198 436 L42 436 L38 176 L50 62 Z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round" opacity=".95"/></svg>
+      <svg viewBox="0 0 240 482"><path d="M70 44 L170 44 L192 62 L202 172 L152 232 L206 330 L212 448 L28 448 L34 330 L88 232 L38 172 L48 62 Z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round" opacity=".95"/></svg>
+      <svg viewBox="0 0 240 482"><path d="M82 44 L158 44 L176 60 L182 168 L214 452 L26 452 L58 168 L64 60 Z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round" opacity=".95"/></svg>
+    </div></div>
+    <div class="ov" data-k="fabric">
+      <img class="fabimg" id="fimg" src="assets/frames-fabric/f_01.jpg" alt=""><div class="fold"></div>
+    </div>
+    <div class="ov" data-k="occasion"><div class="tint"></div><div class="glow"></div></div>
+    <div class="ov" data-k="howto">
+      <div class="ring" style="left:36%;top:44%"></div>
+      <div class="arrow" style="left:51%;top:50%">↻</div>
+      <div class="pin" style="left:44%;top:39%"></div>
+    </div>
+    <div class="ov" data-k="outfit"></div>
+
+    <div class="veil"></div>
+    <div class="tag" id="tag">搭配</div>
+    <div class="cap" id="cap">在看搭配</div>
+  </div>
+
+  <div class="ctl">
+    <select id="mode">
+      <option value="anim" selected>动画模式（状态池 + 滚轮切换）</option>
+      <option value="video">视频模式（按时间顺序播）</option>
+    </select>
+    <select id="kind">
+      <option value="color">颜色</option><option value="fit">版型</option>
+      <option value="ratio">比例</option><option value="fabric">面料</option>
+      <option value="occasion">场合</option><option value="outfit">搭配</option>
+      <option value="howto">技巧（待素材）</option>
+    </select>
+    <button id="play">暂停</button>
+    <label><input type="checkbox" id="tour" checked> 自动轮播</label>
+    <label>每帧 <input type="range" id="sp" min="200" max="900" step="50" value="600"> <span class="hud" id="spv">600ms</span></label>
+    <label>分类停留 <input type="range" id="dw" min="1500" max="6000" step="500" value="3000"> <span class="hud" id="dwv">3.0s</span></label>
+    <label><input type="checkbox" id="rm"> 减动效</label>
+  </div>
+  <div class="ctl hud"><span id="hud">—</span></div>
+
+<script>
+  // 状态池：从 20 帧里挑出的 8 个「互相差异最大」的状态（顺序播有大量近乎静止的帧）
+  const POOL = [1, 2, 5, 8, 12, 14, 17, 19];
+  const N = 20, M = 12;
+  const META = {
+    color:['颜色','在看颜色'], fit:['版型','在看版型'], ratio:['比例','在看比例'],
+    fabric:['面料','在看面料'], occasion:['场合','在看场合'], outfit:['搭配','在看搭配'],
+    howto:['技巧','在看穿法']
+  };
+  const roam = [], pool = [], fab = [];
+  const url = (d, n) => 'assets/frames-' + d + '/f_' + String(n).padStart(2, '0') + '.jpg';
+  for (let i = 1; i <= N; i++) { const im = new Image(); im.src = url('roam', i); roam.push(im); }
+  POOL.forEach(n => { const im = new Image(); im.src = url('roam', n); pool.push(im); });
+  for (let i = 1; i <= M; i++) { const im = new Image(); im.src = url('fabric', i); fab.push(im); }
+
+  const base = document.getElementById('base'), fimg = document.getElementById('fimg');
+  const cap = document.getElementById('cap'), tag = document.getElementById('tag'), hud = document.getElementById('hud');
+  const ovs = [...document.querySelectorAll('.ov')];
+  const modeSel = document.getElementById('mode'), kindSel = document.getElementById('kind');
+  const tour = document.getElementById('tour'), sp = document.getElementById('sp'), spv = document.getElementById('spv');
+  const dw = document.getElementById('dw'), dwv = document.getElementById('dwv');
+  const btn = document.getElementById('play'), rm = document.getElementById('rm');
+
+  const order = ['color','fit','ratio','fabric','occasion','outfit'];
+  let mode = 'anim', i = 0, pi = 0, fi = 0, oi = 0, ms = 600, dwell = 3000, playing = true, kindTimer = null;
+
+  // 滚轮式切换：新帧从下方带位移+模糊滑入，模拟滚轮滚过一格
+  function reel(img, urlStr) {
+    img.style.transition = 'none';
+    img.style.transform = 'translateY(58px)';
+    img.style.filter = 'blur(9px)';
+    img.src = urlStr;
+    void img.offsetWidth;
+    img.style.transition = 'transform .26s var(--ease), filter .26s var(--ease)';
+    img.style.transform = 'translateY(0)';
+    img.style.filter = 'blur(0px)';
+  }
+  function plain(img, urlStr) { img.style.transition = 'none'; img.style.transform = 'none'; img.style.filter = 'none'; img.src = urlStr; }
+
+  function setKind(k) {
+    kindSel.value = k;
+    ovs.forEach(o => {
+      const on = o.dataset.k === k;
+      o.classList.toggle('on', on);
+      o.classList.remove('wipe');
+      if (on && mode === 'anim') { void o.offsetWidth; o.classList.add('wipe'); }
+    });
+    tag.textContent = META[k][0];
+    cap.style.opacity = 0;
+    setTimeout(() => { cap.textContent = META[k][1]; cap.style.opacity = 1; }, 150);
+  }
+
+  function step() {
+    if (mode === 'anim') {
+      pi = (pi + 1) % pool.length;
+      fi = (fi + 3) % M;                       // 面料也跳跃，不连续推进
+      reel(base, pool[pi].src);
+      reel(fimg, fab[fi].src);
+      hud.textContent = '状态 ' + (pi + 1) + '/' + pool.length + '（帧 f' + String(POOL[pi]).padStart(2,'0') + '）';
+    } else {
+      i = (i + 1) % N;
+      fi = (fi + 1) % M;
+      plain(base, roam[i].src);
+      plain(fimg, fab[fi].src);
+      hud.textContent = '帧 ' + (i + 1) + '/' + N + '（顺序播放）';
+    }
+  }
+  function loopFrames() { if (playing) step(); setTimeout(loopFrames, ms); }
+  function scheduleTour() {
+    clearTimeout(kindTimer);
+    if (!tour.checked) return;
+    kindTimer = setTimeout(() => { oi = (oi + 1) % order.length; setKind(order[oi]); scheduleTour(); }, dwell);
+  }
+
+  modeSel.onchange = e => {
+    mode = e.target.value;
+    document.body.classList.toggle('anim', mode === 'anim');
+    plain(base, base.src); plain(fimg, fimg.src);
+    setKind(kindSel.value);
+  };
+  kindSel.onchange = e => { setKind(e.target.value); tour.checked = false; scheduleTour(); };
+  tour.onchange = () => { if (tour.checked) setKind(order[oi]); scheduleTour(); };
+  btn.onclick = () => { playing = !playing; btn.textContent = playing ? '暂停' : '播放'; };
+  sp.oninput = () => { ms = +sp.value; spv.textContent = ms + 'ms'; };
+  dw.oninput = () => { dwell = +dw.value; dwv.textContent = (dwell / 1000).toFixed(1) + 's'; scheduleTour(); };
+  rm.onchange = () => document.body.classList.toggle('rm', rm.checked);
+
+  document.body.classList.add('anim');
+  setKind(order[oi]); loopFrames(); scheduleTour();
+</script>
+</body>
+</html>

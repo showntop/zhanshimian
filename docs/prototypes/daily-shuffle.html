@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>等待方式 · 候选洗牌（真·换位）</title>
+<style>
+  :root{--ease:cubic-bezier(.2,.8,.2,1);}
+  *{box-sizing:border-box}
+  body{background:#E8E4DC;font-family:system-ui,-apple-system,PingFang SC;margin:0;padding:24px;
+       display:flex;flex-direction:column;align-items:center;gap:14px;color:#3F463C}
+  body.rm *{animation:none !important;transition:none !important}
+
+  .card-wrap{width:750px;height:560px;position:relative;overflow:hidden;border-radius:18px;
+        background:linear-gradient(160deg,#F4F1EB 0%,#E5E0D7 100%);
+        box-shadow:0 10px 48px rgba(0,0,0,.13);display:flex}
+
+  /* ---------- 左：人物 ---------- */
+  .fig{width:300px;height:100%;position:relative;display:flex;align-items:center;justify-content:center}
+  .fig svg{width:224px;height:466px}
+  .body-line{fill:none;stroke:#2E2E2E;stroke-width:2.1;stroke-linejoin:round;stroke-linecap:round}
+  .head{fill:#FFF;stroke:#2E2E2E;stroke-width:2.1}
+  .gar{fill:#FFF;stroke:#2E2E2E;stroke-width:2.1;stroke-linejoin:round;
+       transition:fill .34s var(--ease)}
+  .gar.lit{fill:var(--c,#D9D0C1)}
+  .waist{stroke:#8E9A83;stroke-width:2.2;opacity:0;transition:opacity .3s var(--ease)}
+  .waist.on{opacity:.95}
+
+  /* ---------- 右：候选池 ---------- */
+  .pool{flex:1;position:relative;display:flex;flex-direction:column;padding:40px 30px 34px}
+  .dim-label{font-size:13px;letter-spacing:.2em;color:#8A9083;margin-bottom:6px;height:18px}
+  .grid{flex:1;position:relative}          /* 卡片绝对定位，位置由 JS 算 */
+
+  .cand{position:absolute;left:0;top:0;border-radius:15px;background:#FFF;
+        border:1.5px solid #DED8CD;overflow:hidden;
+        transition:transform .2s var(--ease), box-shadow .35s var(--ease), border-color .35s var(--ease);
+        will-change:transform}
+  .cand .inner{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+        border-radius:13px;overflow:hidden;
+        transition:transform .34s var(--ease), opacity .34s var(--ease), filter .34s var(--ease)}
+  .cand .inner svg{width:60%;height:78%}
+  .cand.pick{border-color:#8E9A83;box-shadow:0 14px 34px rgba(142,154,131,.32);z-index:5}
+  .cand.pick .inner{transform:scale(1.12)}
+  .cand.rest .inner{transform:scale(.9);opacity:.32;filter:saturate(.55)}
+  .cand.rest{border-color:#E4DFD6}
+
+  .chips{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;min-height:26px}
+  .chip{padding:5px 12px;border-radius:999px;background:#FFF;border:1px solid #DED8CD;
+        font-size:11px;letter-spacing:.1em;color:#6B7364;opacity:0;transform:translateY(6px);
+        transition:opacity .3s var(--ease), transform .3s var(--ease)}
+  .chip.on{opacity:1;transform:none}
+
+  .caption{position:absolute;left:34px;bottom:26px;z-index:9}
+  .caption .c1{font-size:23px;letter-spacing:.13em;color:#3F463C;transition:opacity .24s var(--ease)}
+  .caption .c2{margin-top:7px;font-size:11px;letter-spacing:.15em;color:#8A9083}
+  .badge{position:absolute;right:28px;top:22px;padding:6px 14px;border-radius:999px;font-size:12px;
+         letter-spacing:.12em;background:rgba(255,255,255,.9);color:#3F463C;z-index:9}
+  .sheen{position:absolute;inset:0;pointer-events:none;opacity:0;z-index:8;
+         background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.5) 50%,transparent 62%)}
+  .go .sheen{animation:sheen .6s var(--ease) 4.5s forwards}
+  @keyframes sheen{0%{opacity:0;transform:translateX(-40%)}45%{opacity:.85}100%{opacity:0;transform:translateX(40%)}}
+
+  .ctl{display:flex;gap:14px;align-items:center;font-size:14px;flex-wrap:wrap;justify-content:center}
+  button,select{padding:7px 15px;border-radius:9px;border:1px solid #3F463C;background:transparent;
+                color:#3F463C;cursor:pointer;font-size:14px}
+  label{display:inline-flex;gap:6px;align-items:center}
+  .hud{opacity:.65;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+  <div class="card-wrap" id="card">
+    <!-- 左：人物 -->
+    <div class="fig">
+      <svg viewBox="0 0 200 480">
+        <ellipse class="head" cx="100" cy="46" rx="25" ry="31"/>
+        <path class="body-line" d="M94 74 L94 96 M106 74 L106 96"/>
+        <path class="body-line" d="M78 100 L70 200 L66 250"/>
+        <path class="body-line" d="M122 100 L130 200 L134 250"/>
+        <path class="gar" id="gTop" d=""/>
+        <path class="gar" id="gBot" d=""/>
+        <path class="body-line" id="legs" d="M88 430 L88 462 M112 430 L112 462"/>
+        <line class="waist" id="waist" x1="58" y1="200" x2="142" y2="200"/>
+      </svg>
+    </div>
+
+    <!-- 右：候选池 -->
+    <div class="pool">
+      <div class="dim-label" id="dimLabel">在选颜色</div>
+      <div class="grid" id="grid"></div>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="badge" id="badge">颜色</div>
+    <div class="caption">
+      <div class="c1" id="c1">今天穿什么</div>
+      <div class="c2">正在为你搭配</div>
+    </div>
+    <div class="sheen"></div>
+  </div>
+
+  <div class="ctl">
+    <button id="replay">重播</button>
+    <label>起始间隔 <input type="range" id="sp" min="50" max="180" step="10" value="70">
+      <span class="hud" id="spv">70ms</span></label>
+    <label>减速 <input type="range" id="dr" min="1.1" max="1.7" step="0.05" value="1.35">
+      <span class="hud" id="drv">1.35×</span></label>
+    <label><input type="checkbox" id="auto" checked> 循环</label>
+    <label><input type="checkbox" id="rm"> 减动效</label>
+    <span class="hud" id="hud"></span>
+  </div>
+
+<script>
+/* ---------- 候选数据 ---------- */
+const TOPS = {
+  knit:  {name:'针织', d:'M76 100 L124 100 L128 150 L126 206 L74 206 L72 150 Z'},
+  shirt: {name:'衬衫', d:'M72 98 L128 98 L134 156 L132 218 L68 218 L66 156 Z'},
+  blazer:{name:'西装', d:'M70 96 L130 96 L138 162 L136 252 L64 252 L62 162 Z'},
+  vest:  {name:'背心', d:'M78 102 L122 102 L124 146 L122 192 L78 192 L76 146 Z'},
+};
+const BOTS = {
+  wide:    {name:'阔腿裤', d:'M74 205 L126 205 L134 300 L152 432 L110 432 L100 300 L90 432 L48 432 L66 300 Z'},
+  straight:{name:'直筒裤', d:'M76 205 L124 205 L130 300 L133 432 L108 432 L100 300 L92 432 L67 432 L70 300 Z'},
+  slim:    {name:'紧身裤', d:'M78 205 L122 205 L126 300 L125 432 L104 432 L100 300 L96 432 L75 432 L74 300 Z'},
+  aLine:   {name:'A字裙', d:'M78 205 L122 205 L148 334 L52 334 Z'},
+};
+const COLORS = [
+  {name:'燕麦', hex:'#D9D0C1'}, {name:'砖红', hex:'#B4553C'}, {name:'墨绿', hex:'#3F5340'},
+  {name:'藏蓝', hex:'#2F3E56'}, {name:'浅灰', hex:'#C6C4BE'}, {name:'驼色', hex:'#B08B5E'},
+];
+const WAISTS = [{name:'高腰',y:192},{name:'中腰',y:210},{name:'低腰',y:226}];
+
+/* 本轮「内容」给出的答案（真实实现由服务端下发） */
+const TARGET = { color:1, bottom:'wide', top:'knit', waist:0 };
+
+const DIMS = [
+  { key:'color', label:'在选颜色', badge:'颜色', target:TARGET.color,
+    items: COLORS.map(c=>({kind:'swatch', name:c.name, hex:c.hex})),
+    apply(it){ gTop.style.setProperty('--c',it.hex); gBot.style.setProperty('--c',it.hex);
+               gTop.classList.add('lit'); gBot.classList.add('lit'); },
+    chip(it){ return '配色 · '+it.name; } },
+
+  { key:'bottom', label:'在选下装', badge:'下装', target:Object.keys(BOTS).indexOf(TARGET.bottom),
+    items: Object.keys(BOTS).map(k=>({kind:'shape', name:BOTS[k].name, d:BOTS[k].d})),
+    apply(it){ gBot.setAttribute('d', it.d); waist.classList.add('on'); },
+    chip(it){ return '下装 · '+it.name; } },
+
+  { key:'top', label:'在选上装', badge:'上装', target:Object.keys(TOPS).indexOf(TARGET.top),
+    items: Object.keys(TOPS).map(k=>({kind:'shape', name:TOPS[k].name, d:TOPS[k].d})),
+    apply(it){ gTop.setAttribute('d', it.d); },
+    chip(it){ return '上装 · '+it.name; } },
+
+  { key:'waist', label:'在调比例', badge:'比例', target:TARGET.waist,
+    items: WAISTS.map(w=>({kind:'rule', name:w.name, y:w.y})),
+    apply(it){ waist.setAttribute('y1',it.y); waist.setAttribute('y2',it.y); waist.classList.add('on'); },
+    chip(it){ return '比例 · '+it.name; } },
+];
+
+/* ---------- DOM ---------- */
+const card=document.getElementById('card'), grid=document.getElementById('grid');
+const dimLabel=document.getElementById('dimLabel'), chips=document.getElementById('chips');
+const c1=document.getElementById('c1'), badge=document.getElementById('badge');
+const gTop=document.getElementById('gTop'), gBot=document.getElementById('gBot'), waist=document.getElementById('waist');
+const sp=document.getElementById('sp'), dr=document.getElementById('dr');
+const auto=document.getElementById('auto'), rm=document.getElementById('rm');
+
+let timers=[]; const clear=()=>{timers.forEach(clearTimeout);timers=[];};
+const later=(fn,ms)=>timers.push(setTimeout(fn,ms));
+function setText(t){ c1.style.opacity=0; later(()=>{c1.textContent=t;c1.style.opacity=1;},130); }
+
+function innerHTML(it){
+  if(it.kind==='swatch') return '<div class="inner" style="background:'+it.hex+'"></div>';
+  if(it.kind==='shape')  return '<div class="inner"><svg viewBox="0 0 200 480"><path d="'+it.d+
+                                '" fill="none" stroke="#2E2E2E" stroke-width="3.4" stroke-linejoin="round"/></svg></div>';
+  if(it.kind==='rule')   return '<div class="inner"><svg viewBox="0 0 200 480"><line x1="30" y1="'+it.y+
+                                '" x2="170" y2="'+it.y+'" stroke="#8E9A83" stroke-width="6"/>'+
+                                '<path d="M100 110 L100 430" fill="none" stroke="#2E2E2E" stroke-width="3" opacity=".55"/></svg></div>';
+  return '';
+}
+
+/* 卡片布局：按数量自适应列数，永远排满不留空 */
+const CW=104, CH=124, GAP=16;
+let cards=[], pos=[], order=[];
+
+function buildGrid(items){
+  grid.innerHTML='';
+  const n=items.length;
+  const cols = n<=3 ? n : (n===4 ? 2 : 3);
+  const rows = Math.ceil(n/cols);
+  const gw = cols*CW + (cols-1)*GAP, gh = rows*CH + (rows-1)*GAP;
+  const W = grid.clientWidth || 380, H = grid.clientHeight || 300;
+  pos=[];
+  for(let i=0;i<n;i++){
+    pos.push([ Math.round((W-gw)/2 + (i%cols)*(CW+GAP)),
+               Math.round((H-gh)/2 + Math.floor(i/cols)*(CH+GAP)) ]);
+  }
+  cards = items.map(it=>{
+    const d=document.createElement('div');
+    d.className='cand'; d.style.width=CW+'px'; d.style.height=CH+'px';
+    d.innerHTML=innerHTML(it);
+    grid.appendChild(d); return d;
+  });
+  order=[...Array(n).keys()];
+  render(0);
+}
+
+function render(rot){
+  cards.forEach((c,i)=>{
+    const p=pos[order[i]];
+    const r=(rot && rot[i]) ? rot[i] : 0;
+    c.style.transform='translate('+p[0]+'px,'+p[1]+'px) rotate('+r+'deg)';
+  });
+}
+
+/* ---------- 洗牌：整体换位 + 随机旋转，减速，最后聚焦 ---------- */
+function shuffle(dim, done){
+  const n=cards.length, decay=+dr.value;
+  let d=+sp.value, steps=0;
+  const step=()=>{
+    // 打乱顺序 = 卡片互相换位（真洗牌）
+    for(let i=n-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
+    render(cards.map(()=>(Math.random()*2-1)*7));
+    steps++; d=Math.round(d*decay);
+    if(d>=330 || steps>16){
+      // 归位 + 聚焦
+      order=[...Array(n).keys()]; render(0);
+      later(()=>{
+        cards.forEach((c,i)=>{
+          c.classList.toggle('pick', i===dim.target);
+          c.classList.toggle('rest', i!==dim.target);
+        });
+        later(()=>{ dim.apply(dim.items[dim.target]); },170);
+        later(done, 430);
+      }, 180);
+      return;
+    }
+    later(step, d);
+  };
+  step();
+}
+
+function run(){
+  clear();
+  card.classList.remove('go'); void card.offsetWidth; card.classList.add('go');
+  gTop.classList.remove('lit'); gBot.classList.remove('lit');
+  gTop.setAttribute('d', TOPS.shirt.d);      // 先给白模，颜色阶段才看得出变化
+  gBot.setAttribute('d', BOTS.straight.d);
+  waist.classList.remove('on');
+  chips.innerHTML=''; setText('今天穿什么');
+
+  let t=0;
+  DIMS.forEach((dim,di)=>{
+    later(()=>{
+      badge.textContent=dim.badge; dimLabel.textContent=dim.label;
+      buildGrid(dim.items);
+      shuffle(dim, ()=>{
+        const c=document.createElement('div');
+        c.className='chip'; c.textContent=dim.chip(dim.items[dim.target]);
+        chips.appendChild(c); later(()=>c.classList.add('on'),20);
+        if(di===DIMS.length-1) later(()=>setText('今天这一身'),240);
+      });
+    }, t);
+    t += 1300;
+  });
+}
+
+/* ---------- 控制 ---------- */
+document.getElementById('replay').onclick=run;
+sp.oninput=()=>{document.getElementById('spv').textContent=sp.value+'ms'; updHud();};
+dr.oninput=()=>{document.getElementById('drv').textContent=(+dr.value).toFixed(2)+'×'; updHud();};
+rm.onchange=()=>document.body.classList.toggle('rm', rm.checked);
+function updHud(){
+  let d=+sp.value, tot=0, n=0;
+  while(d<330 && n<16){ tot+=d; d=Math.round(d*(+dr.value)); n++; }
+  const per=(tot+180+430+170)/1000;
+  document.getElementById('hud').textContent='每维度 ≈'+per.toFixed(1)+'s（'+n+' 次换位）· 一轮 ≈'+(per*4+1.0).toFixed(1)+'s';
+}
+updHud();
+let iv=setInterval(()=>{ if(auto.checked) run(); }, 6400);
+card.addEventListener('mouseenter',()=>clearInterval(iv));
+card.addEventListener('mouseleave',()=>{clearInterval(iv);iv=setInterval(()=>{if(auto.checked)run();},6400);});
+run();
+</script>
+</body>
+</html>

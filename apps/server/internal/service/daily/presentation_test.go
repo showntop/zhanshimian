@@ -22,8 +22,8 @@ func TestPrepareShipsRoamScriptOnMiss(t *testing.T) {
 	if result.Presentation == nil || len(result.Presentation.Stages) == 0 {
 		t.Fatal("未命中时必须下发巡游脚本")
 	}
-	if result.Presentation.Stages[0].Kind != "roam_tour" {
-		t.Fatalf("stage kind = %q, want roam_tour", result.Presentation.Stages[0].Kind)
+	if result.Presentation.Stages[0].Kind != "sketch_tour" {
+		t.Fatalf("stage kind = %q, want sketch_tour", result.Presentation.Stages[0].Kind)
 	}
 }
 

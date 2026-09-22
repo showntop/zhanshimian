@@ -7,6 +7,7 @@ import {
   planDuration,
   roamThemes,
   roamPerThemeMS,
+  readFramesParams,
 } from '../src/daily/motion.ts'
 
 // form 的视觉空间：调度器不认识它，只从外部拿 counts 与 resolve。
@@ -117,4 +118,31 @@ test('巡游主题解析与兜底', () => {
   assert.equal(themes[0].label, '在看颜色')
   assert.deepEqual(roamThemes(undefined), [])
   assert.equal(roamPerThemeMS(undefined), 4000)
+})
+
+test('序列帧参数：正常解析 + 缺字段防御 + 空值返回 null', () => {
+  const stage = {
+    phase: 'settle',
+    kind: 'frames',
+    params: {
+      urls: ['https://x/f_01.jpg', 'https://x/f_02.jpg', '', 42],
+      interval_ms: 108,
+      hold_ms: 320,
+    },
+  }
+  const frames = readFramesParams(stage)
+  assert.equal(frames.urls.length, 2)
+  assert.equal(frames.intervalMS, 108)
+  assert.equal(frames.holdMS, 320)
+
+  // interval/hold 缺失或非法 → 原型调参的默认值
+  const defaulted = readFramesParams({ phase: 'settle', kind: 'frames', params: { urls: ['a'] } })
+  assert.equal(defaulted.intervalMS, 108)
+  assert.equal(defaulted.holdMS, 320)
+
+  // urls 缺失 / 非数组 / 全空：返回 null，播放器据此直接揭晓
+  assert.equal(readFramesParams(undefined), null)
+  assert.equal(readFramesParams({ phase: 'settle', kind: 'frames', params: {} }), null)
+  assert.equal(readFramesParams({ phase: 'settle', kind: 'frames', params: { urls: [] } }), null)
+  assert.equal(readFramesParams({ phase: 'settle', kind: 'frames', params: { urls: 'nope' } }), null)
 })

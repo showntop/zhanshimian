@@ -72,6 +72,40 @@ export function roamPerThemeMS(stage: MotionStage | undefined, fallback = 4000):
   return typeof value === 'number' && value > 0 ? value : fallback
 }
 
+// ---------- 序列帧揭晓 ----------
+
+export interface FramesParams {
+  /** 逐帧切换的图片地址（已按播放顺序排好） */
+  urls: string[]
+  /** 每帧停留（ms） */
+  intervalMS: number
+  /** 末帧定格后再停一拍才揭晓海报（ms）——「定住」要有分量 */
+  holdMS: number
+}
+
+const DEFAULT_FRAME_INTERVAL_MS = 108
+const DEFAULT_FRAME_HOLD_MS = 320
+
+/**
+ * 帧序列参数；解析不出（kind 不对 / urls 缺失）返回 null，
+ * 播放器据此立即揭晓海报——素材问题不能变成黑屏。
+ */
+export function readFramesParams(stage: MotionStage | undefined): FramesParams | null {
+  const params = stage?.params
+  if (!params) return null
+  const urls = Array.isArray(params.urls)
+    ? (params.urls as unknown[]).filter((url): url is string => typeof url === 'string' && url !== '')
+    : []
+  if (urls.length === 0) return null
+  const interval = params.interval_ms
+  const hold = params.hold_ms
+  return {
+    urls,
+    intervalMS: typeof interval === 'number' && interval > 0 ? interval : DEFAULT_FRAME_INTERVAL_MS,
+    holdMS: typeof hold === 'number' && hold >= 0 ? hold : DEFAULT_FRAME_HOLD_MS,
+  }
+}
+
 // ---------- 收敛 ----------
 
 export interface ConvergeAxis {
