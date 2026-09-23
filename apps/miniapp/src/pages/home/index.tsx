@@ -344,35 +344,11 @@ export default function Home() {
   // 素材基地址以脚本下发为准（服务端可独立换源），本地常量只是开发覆盖
   const dressBase = dressLock?.assets.base || dressEnv.base
   const dressAssets = useDressAssets(dressBase, dressPredict || Boolean(dressLock))
-  const dressOnWaiting = dressPredict && dressAssets.ready
+  // 预载中（pending）也走洗牌——停在它的静态前奏态。此前用 sketch 巡游顶位，
+  // 素材就绪后硬切成洗牌，开头会先窜一小段线稿。只有真失败才回落旧线。
+  const dressOnWaiting = dressPredict && !dressAssets.failed
   const dressOnSettling = Boolean(dressLockTarget) && dressAssets.ready
-
-  // TEMP 诊断（定位「换装洗牌不上场」用，确认后删除）：记录渲染分支时间线
-  const dressDiagStart = useRef(Date.now())
-  const dressDiagLog = useRef<string[]>([])
-  const dressDiagBranch = !dailyReady
-    ? dailySettling
-      ? dressOnSettling
-        ? 'dressSettle'
-        : 'oldSettle'
-      : dailyWaiting
-        ? dressOnWaiting
-          ? 'dressWait'
-          : 'oldWait'
-        : 'none'
-    : 'poster'
-  useEffect(() => {
-    const at = ((Date.now() - dressDiagStart.current) / 1000).toFixed(1)
-    const line = `${at}s ${phase}→${dressDiagBranch} ready=${dressAssets.ready ? 1 : 0} failed=${dressAssets.failed ? 1 : 0} pred=${dressPredict ? 1 : 0} lock=${dressLock ? 'y' : 'n'} roam=${dressRoamVariant || '-'}`
-    const log = dressDiagLog.current
-    if (log[log.length - 1] === line) return
-    log.push(line)
-    if (phase === 'content' && log.length > 1) {
-      const lines = log.slice(-9)
-      dressDiagLog.current = []
-      Taro.showModal({ title: 'dress 时间线', content: lines.join('\n'), showCancel: false })
-    }
-  }, [phase, dressDiagBranch, dressAssets.ready, dressAssets.failed, dressPredict, dressLock, dressRoamVariant])
+  const dressHold = !dressAssets.ready
 
   // 海报角落编号用日期而非序号：序号是静态的，日期才有"每天换一张"的时间感
   const todaySeq = useMemo(() => {
@@ -562,6 +538,7 @@ export default function Home() {
                   {dressOnWaiting ? (
                     <DressShuffle
                       settling={false}
+                      hold={dressHold}
                       assetBase={dressBase}
                       hairAvailable={dressAssets.hairReady}
                       colorLocked={dressEnv.colorLocked}

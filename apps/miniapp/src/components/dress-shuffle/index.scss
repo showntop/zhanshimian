@@ -19,15 +19,17 @@
   position: relative;
 }
 
+// 镜框：原型 262×486 对瘦人物（宽高比 0.35）左右各空 53rpx，像「框大人小」。
+// 收窄到 216×500（top 30、顶圆角 108）后，人物四周留白 20~26rpx，像一面立镜。
 .ds__arch {
   position: absolute;
   left: 50%;
-  top: 36rpx;
+  top: 30rpx;
   transform: translateX(-50%);
-  width: 262rpx;
-  height: 486rpx;
+  width: 216rpx;
+  height: 500rpx;
   border: 2rpx solid rgba(63, 70, 60, 0.22);
-  border-radius: 131rpx 131rpx 14rpx 14rpx;
+  border-radius: 108rpx 108rpx 14rpx 14rpx;
   background: linear-gradient(170deg, #fbf9f4 0%, #efece3 100%);
 }
 
@@ -41,11 +43,53 @@
   z-index: 2;
 }
 
-// 彩色人物图：白底走 multiply 融进壁龛；换色 = filter（透明底不受影响）
+// 摆身舞台：常驻微摆（sway）+ 上身一次性摆身（pop）；原型 transform-origin:168 505
+.ds__figstage {
+  position: absolute;
+  inset: 0;
+  transform-origin: 168rpx 520rpx;
+  animation: ds-sway 3.8s ease-in-out infinite;
+}
+.ds__figstage--pop {
+  animation: ds-pop 0.5s cubic-bezier(0.2, 1.1, 0.3, 1);
+}
+@keyframes ds-sway {
+  0%,
+  100% {
+    transform: rotate(0.45deg);
+  }
+  50% {
+    transform: rotate(-0.5deg);
+  }
+}
+@keyframes ds-pop {
+  0% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-1.6deg);
+  }
+  60% {
+    transform: rotate(0.9deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+// 彩色人物图：白底走 multiply 融进壁龛；换色 = filter（透明底不受影响）。
+// 对位解算（8 张 look / 4 张发型素材构图统一：人物宽/图宽 0.252、高/图高 0.951、
+// 中心 x 0.487）：
+//   原型「图铺 750 宽 + focus 48%」→ 人物 189×533，上下溢出拱门、左右各空 36。
+//   这里按镜框内边距反解：目标人物高 500-2×20=460 → 图高 460/0.951≈484、
+//   图宽 484×1500/1120≈648；水平让人物中心对镜框中心（168）→ 图左 = 168-0.487×648 ≈ -147；
+//   垂直让人物顶落在镜框顶+20（50）→ 图顶 = 50-0.0214×484 ≈ 40。
 .ds__figure {
-  width: 750rpx;
-  height: 560rpx;
-  margin-left: -199rpx;
+  position: absolute;
+  left: -147rpx;
+  top: 40rpx;
+  width: 648rpx;
+  height: 484rpx;
   mix-blend-mode: multiply;
   transition: filter 0.38s ease-out;
 }
@@ -87,7 +131,7 @@
   text-shadow: 0 0 8rpx #f5f2ec;
 }
 
-// 盖章「今日」
+// 盖章「今日」：在揭晓面板右下（原型 .stamp 是 .reveal 的子元素）
 .ds__stamp {
   position: absolute;
   right: 34rpx;
@@ -103,8 +147,64 @@
   font-size: 24rpx;
   letter-spacing: 0.18em;
   writing-mode: vertical-rl;
-  background: rgba(40, 51, 31, 0.4);
   animation: ds-stamp 0.5s cubic-bezier(0.2, 1.1, 0.3, 1) both;
+}
+.ds__stamp::after {
+  content: '';
+  position: absolute;
+  left: 8rpx;
+  right: 8rpx;
+  top: 8rpx;
+  bottom: 8rpx;
+  border: 2rpx solid rgba(240, 225, 215, 0.5);
+  border-radius: 6rpx;
+}
+
+// ---------- 揭晓：右栏变海报（原型 .reveal） ----------
+.ds__reveal {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 414rpx;
+  z-index: 14;
+  transform: translateX(102%);
+  transition: transform 0.55s cubic-bezier(0.2, 1, 0.3, 1);
+  background: linear-gradient(155deg, #3b4a2e 0%, #28331f 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 36rpx 40rpx;
+}
+.ds__reveal--on {
+  transform: none;
+}
+.ds__reveal-ghost {
+  position: absolute;
+  right: 18rpx;
+  top: 24rpx;
+  writing-mode: vertical-rl;
+  font-size: 13rpx;
+  letter-spacing: 0.5em;
+  color: rgba(242, 239, 231, 0.28);
+}
+.ds__reveal-title {
+  font-size: 27rpx;
+  letter-spacing: 0.12em;
+  color: #f2efe7;
+}
+.ds__reveal-sub {
+  margin-top: 10rpx;
+  font-size: 12rpx;
+  letter-spacing: 0.16em;
+  color: rgba(242, 239, 231, 0.72);
+}
+.ds__reveal-chips {
+  display: flex;
+  gap: 9rpx;
+  flex-wrap: wrap;
+  margin-top: 16rpx;
+  padding-right: 90rpx;
 }
 @keyframes ds-stamp {
   0% {
@@ -174,6 +274,23 @@
 }
 .ds__cand--rest {
   opacity: 0.32;
+}
+// 静态前奏的骨架卡位：素材未就绪时占位（不切旧巡游，避免风格跳变）
+.ds__cand--idle {
+  opacity: 1;
+  background: #fff;
+  border-color: #e6e1d7;
+  box-shadow: none;
+}
+.ds__cand--idle::after {
+  content: '';
+  position: absolute;
+  left: 14rpx;
+  right: 14rpx;
+  top: 14rpx;
+  bottom: 34rpx;
+  border-radius: 9rpx;
+  background: #f1ede4;
 }
 .ds__cand-inner {
   width: 100%;
@@ -263,14 +380,22 @@
   color: #6b7364;
 }
 
+.ds__chip--dark {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #f2efe7;
+}
+
 // prefers-reduced-motion 归零（AGENTS 动效规约）：动画停帧、元素保持可见。
-// 洗牌状态机本身的减动效降级（四张 target 卡直出 + 盖章）由组件 reduced 分支承担。
+// 洗牌状态机本身的减动效降级（四张 target 卡直出 + 揭晓面板直接就位）由组件 reduced 分支承担。
 @media (prefers-reduced-motion: reduce) {
   .ds__figure,
+  .ds__figstage,
   .ds__cand,
   .ds__fly,
   .ds__ring,
-  .ds__stamp {
+  .ds__stamp,
+  .ds__reveal {
     animation: none !important;
     transition: none !important;
   }

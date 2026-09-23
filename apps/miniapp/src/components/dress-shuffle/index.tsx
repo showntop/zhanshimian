@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Image, Text, View } from '@tarojs/components'
+import { DAILY_COPY } from '@zsm/core'
 import {
   buildRunDims,
   COLORS,
@@ -45,6 +46,14 @@ const FLY_MS = 460
 const FLY_MS_ACCEL = 260
 const SETTLE_HOLD_MS = 1100
 
+// 收敛结束 → 揭晓的时序（原型 daily-dressup-asset.html 的 run() 尾部）：
+// caption 先变「今天这一身」，820ms 后面板从右滑入，再 340ms 盖章。
+const CAPTION_SETTLE_MS = 200
+const REVEAL_IN_MS = 820
+const STAMP_DELAY_MS = 340
+/** 面板停留（原型停在面板上；我们随后交棒给内容海报，留足看清的时间） */
+const REVEAL_HOLD_MS = 1600
+
 interface FigureState {
   look: number
   color: number
@@ -63,6 +72,8 @@ export interface DressShuffleProps {
   settling: boolean
   /** 素材基地址（M4 接 CDN；本地传 '' 走相对路径） */
   assetBase?: string
+  /** 素材未就绪：停在洗牌自己的静态前奏（壁龛 + 骨架卡位），不洗牌、不顶旧巡游 */
+  hold?: boolean
   /** 发型素材就绪（use-dress-assets 懒加载结果）；false 时发型维度不入池 */
   hairAvailable?: boolean
   /** 端不支持 CSS filter（M1 渲染探测）→ 换色维度锁基准砖红（spec §4） */
@@ -85,6 +96,7 @@ export default function DressShuffle({
   target: targetProp,
   settling,
   assetBase = '',
+  hold = false,
   hairAvailable = true,
   colorLocked = false,
   reduced = false,
@@ -97,6 +109,11 @@ export default function DressShuffle({
   const [fly, setFly] = useState<{ item: ShuffleItem; dim: DimKey; from: [number, number]; go: boolean } | null>(null)
   const [ring, setRing] = useState<[number, number] | null>(null)
   const [stamp, setStamp] = useState(false)
+  /** 揭晓面板滑入（原型：右栏变海报，人物保持亮着） */
+  const [revealed, setRevealed] = useState(false)
+  /** 上身时的一次性摆身（pop），与常驻 sway 叠加 */
+  const [pop, setPop] = useState(false)
+  const [caption, setCaption] = useState<string>(DAILY_COPY.dressCaptionIdle)
   const [round, setRound] = useState(0)
   const settledRef = useRef(false)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -144,6 +161,12 @@ export default function DressShuffle({
     ]
   }
 
+    /** 静态前奏的骨架卡位（4 张 2×2，与 poolPos 的排布同款） */
+  const idlePos = (idleIdx: number): [number, number] => [
+    Math.round((390 - (2 * 104 + 16)) / 2 + (idleIdx % 2) * 120),
+    Math.round((300 - (2 * 124 + 16)) / 2 + Math.floor(idleIdx / 2) * 140),
+  ]
+
   // ---------- 单维度洗牌驱动 ----------
   const runDim = (dim: RunDim, accel: boolean, done: () => void) => {
     const base = accel ? 30 : 70
@@ -190,6 +213,9 @@ export default function DressShuffle({
       setFly(null)
       applyItem(dim, item)
       setRing(FLY[dim.key])
+      // 上身带一下摆身（原型 .figstage.pop）：让「穿上了」有分量
+      setPop(true)
+      later(() => setPop(false), 520)
       later(() => setRing(null), 620)
       setChips((chips) => [...chips, `${CHIP_LABEL[dim.key]}${item.name}`])
       later(done, accel ? 140 : 300)
@@ -223,9 +249,11 @@ export default function DressShuffle({
 
   // 循环轮：每轮随机 target，跑完稍歇进下一轮
   useEffect(() => {
-    if (settling || reduced) return
+    if (settling || reduced || hold) return
     setChips([])
     setStamp(false)
+    setRevealed(false)
+    setCaption(DAILY_COPY.dressCaptionIdle)
     setFigure({ ...INITIAL_FIGURE })
     const t = randomTarget()
     if (colorLockRef.current) t.color = 1 // 端不支持 filter：锁基准砖红（spec §4）
@@ -248,11 +276,14 @@ export default function DressShuffle({
     clearTimers()
     let t = targetRef.current ?? randomTarget()
     if (colorLockRef.current) t = { ...t, color: 1 } // 锁基准砖红（spec §4）
+    setRevealed(false)
     if (reduced) {
-      // 减动效：直接呈现最终搭配，稍候揭晓
+      // 减动效：直接呈现最终搭配，稍候揭晓（面板滑入也归零，直接出现在位）
       setFigure({ look: t.look, color: t.color, waist: t.waist, hair: t.look === 0 ? t.hair : null })
       setChips([])
+      setCaption(DAILY_COPY.dressCaptionSettled)
       later(() => {
+        setRevealed(true)
         setStamp(true)
         later(() => {
           if (!settledRef.current) {
@@ -264,16 +295,22 @@ export default function DressShuffle({
       return () => clearTimers()
     }
     setChips([])
+    setCaption(DAILY_COPY.dressCaptionIdle)
     setFigure({ look: t.look, color: 1, waist: null, hair: null })
     const dims = buildRunDims(t, { order: ['look', 'color', 'waist', 'hair'], hairAvailable: hairAvailRef.current })
     runRound(dims, 0, true, () => {
-      setStamp(true)
+      // 原型序列：caption 先落「今天这一身」→ 面板滑入 → 盖章 → 停留后交棒
+      later(() => setCaption(DAILY_COPY.dressCaptionSettled), CAPTION_SETTLE_MS)
       later(() => {
-        if (!settledRef.current) {
-          settledRef.current = true
-          onSettled?.()
-        }
-      }, SETTLE_HOLD_MS)
+        setRevealed(true)
+        later(() => setStamp(true), STAMP_DELAY_MS)
+        later(() => {
+          if (!settledRef.current) {
+            settledRef.current = true
+            onSettled?.()
+          }
+        }, Math.max(REVEAL_HOLD_MS, SETTLE_HOLD_MS))
+      }, REVEAL_IN_MS)
     })
     return () => clearTimers()
   }, [settling, reduced, onSettled])
@@ -285,27 +322,28 @@ export default function DressShuffle({
   const figureSrc = hairKey ? asset(`outfit-${hairKey}.png`) : asset(`${look.key}.png`)
   // 端不支持 filter（colorLocked）：人物保持基准砖红，洗牌照常（spec §4）
   const figureFilter = !colorLocked && color.filter !== 'none' ? color.filter : undefined
-  const figureMargin = Math.round(-414 * 0.48)
 
   return (
     <View className="ds">
       <View className="ds__fig">
         <View className="ds__arch" />
         <View className="ds__clip">
-          <Image
-            className="ds__figure"
-            src={figureSrc}
-            style={{
-              marginLeft: `${figureMargin}rpx`,
-              ...(figureFilter ? { filter: figureFilter } : {}),
-            }}
-          />
+          {/* figstage：常驻微摆（sway）+ 上身一次性摆身（pop）。人物对位在 SCSS 里
+              按拱门内边距解算（原型 750 宽 + focus48% 会让人物上下溢出拱门） */}
+          <View className={`ds__figstage${pop ? ' ds__figstage--pop' : ''}`}>
+            {hold ? null : (
+              <Image
+                className="ds__figure"
+                src={figureSrc}
+                style={figureFilter ? { filter: figureFilter } : undefined}
+              />
+            )}
+            {figure.waist != null ? <View className="ds__waist" style={{ top: `${figure.waist}%` }} /> : null}
+          </View>
         </View>
-        {figure.waist != null ? <View className="ds__waist" style={{ top: `${figure.waist}%` }} /> : null}
-        {stamp ? <View className="ds__stamp">今日</View> : null}
         <View className="ds__caption">
-          <View className="ds__caption-main">今天穿什么</View>
-          <View className="ds__caption-sub">正在为你搭配</View>
+          <View className="ds__caption-main">{caption}</View>
+          <View className="ds__caption-sub">{DAILY_COPY.dressCaptionSub}</View>
         </View>
       </View>
 
@@ -315,8 +353,17 @@ export default function DressShuffle({
           <Text className="ds__badge">{head.badge}</Text>
         </View>
         <View className="ds__grid">
-          {pool
-            ? pool.items.map((it, i) => {
+          {hold
+            ? // 静态前奏：只占位不洗牌（素材未就绪，切回旧巡游会风格跳变）
+              [0, 1, 2, 3].map((i) => (
+                <View
+                  key={`idle-${i}`}
+                  className="ds__cand ds__cand--idle"
+                  style={{ transform: `translate(${idlePos(i)[0]}rpx,${idlePos(i)[1]}rpx)` }}
+                />
+              ))
+            : pool
+              ? pool.items.map((it, i) => {
                 const pos = poolPos(pool.dim, i)
                 const picked = pool.picked
                 const cls =
@@ -344,10 +391,10 @@ export default function DressShuffle({
                       )}
                     </View>
                     <View className="ds__tag">{it.name}</View>
-                  </View>
-                )
-              })
-            : null}
+                    </View>
+                  )
+                })
+              : null}
         </View>
         <View className="ds__chips">
           {chips.map((c, i) => (
@@ -356,6 +403,21 @@ export default function DressShuffle({
             </Text>
           ))}
         </View>
+      </View>
+
+      {/* 揭晓：右栏变海报（原型 .reveal），人物保持亮着；盖章在面板内 */}
+      <View className={`ds__reveal${revealed ? ' ds__reveal--on' : ''}`}>
+        <Text className="ds__reveal-ghost">{DAILY_COPY.dressRevealGhost}</Text>
+        <View className="ds__reveal-title">{DAILY_COPY.dressRevealTitle}</View>
+        <View className="ds__reveal-sub">{DAILY_COPY.dressRevealSub}</View>
+        <View className="ds__reveal-chips">
+          {chips.map((c) => (
+            <Text key={`r-${c}`} className="ds__chip ds__chip--dark">
+              {c}
+            </Text>
+          ))}
+        </View>
+        {stamp ? <View className="ds__stamp">{DAILY_COPY.dressStamp}</View> : null}
       </View>
 
       {fly ? (
