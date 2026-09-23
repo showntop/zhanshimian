@@ -539,9 +539,14 @@ export default function Home() {
                     )}
                   </View>
                   {dailyReady && dailyContent && dressOnSettling ? (
-                    <View className="home__daily-entry pressable" onClick={goToday}>
-                      <Text className="home__daily-entry-label">{DAILY_COPY.dressContentLabel}</Text>
-                      <Text className="home__daily-entry-topic">{dailyContent.topic}</Text>
+                    // 洗牌停下后的视线引导：面板落定 → 这条淡入（延迟 300ms）
+                    <View className="home__daily-entry home__daily-entry--in pressable" onClick={goToday}>
+                      <View className="home__daily-entry-copy">
+                        <Text className="home__daily-entry-label">
+                          {DAILY_COPY.dressContentLabel} · {dailyContent.topic}
+                        </Text>
+                        <Text className="home__daily-entry-hint">{DAILY_COPY.dressContentHint}</Text>
+                      </View>
                       <Text className="home__daily-entry-link">{DAILY_COPY.dressContentLink}</Text>
                     </View>
                   ) : null}

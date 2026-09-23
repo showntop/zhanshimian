@@ -459,34 +459,52 @@ $clay: #c4693b;
     height: 560rpx;
   }
 
-  // 洗牌落地保留时，内容海报退到卡片下方的一行入口（主入口仍在今日页）
+  // 洗牌落地保留时，内容海报退到卡片下方的引导条（主入口仍在今日页）。
+  // 有边界 + 副提示 + 箭头，比单纯一行更像「下一步」；面板落定后淡入。
   &__daily-entry {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 16rpx;
-    margin-top: 20rpx;
-    padding: 12rpx 6rpx;
+    margin-top: 24rpx;
+    padding: 20rpx 24rpx;
+    border: 2rpx solid var(--line, rgba(63, 70, 60, 0.14));
+    border-radius: 18rpx;
+    background: var(--paper, #fff);
+  }
+
+  &__daily-entry--in {
+    animation: home-entry-in 0.42s ease-out 0.3s both;
+  }
+
+  &__daily-entry-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 6rpx;
+    min-width: 0;
   }
 
   &__daily-entry-label {
     font-size: 26rpx;
     font-weight: 700;
     color: var(--ink);
-  }
-
-  &__daily-entry-topic {
-    flex: 1;
-    font-size: 24rpx;
-    color: var(--ink-2);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 460rpx;
+  }
+
+  &__daily-entry-hint {
+    font-size: 22rpx;
+    color: var(--ink-3);
   }
 
   &__daily-entry-link {
-    font-size: 24rpx;
-    font-weight: 600;
+    flex-shrink: 0;
+    font-size: 25rpx;
+    font-weight: 700;
     color: var(--moss);
+    animation: home-entry-nudge 2.6s ease-in-out 1s infinite;
   }
 
   // 报告退位：不再是首页主角，入口降级为一行
@@ -1018,6 +1036,28 @@ $clay: #c4693b;
   }
 }
 
+@keyframes home-entry-in {
+  from {
+    opacity: 0;
+    transform: translateY(10rpx);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// 箭头轻推：视线引导，幅度刻意很小（不做“跳来跳去”的召唤）
+@keyframes home-entry-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(6rpx);
+  }
+}
+
 @keyframes home-badge-live {
   0%,
   100% {
@@ -1032,5 +1072,13 @@ $clay: #c4693b;
 @media (prefers-reduced-motion: reduce) {
   .home__tool-badge--live {
     animation: none;
+  }
+
+  // 引导条必须可见：只停动画，不做位移/透明
+  .home__daily-entry--in,
+  .home__daily-entry-link {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
