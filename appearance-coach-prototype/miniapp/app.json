@@ -22,7 +22,8 @@
   "window": {
     "navigationStyle": "custom",
     "backgroundColor": "#f8f5f0",
-    "backgroundTextStyle": "dark"
+    "backgroundTextStyle": "dark",
+    "navigationBarTextStyle": "black"
   },
   "tabBar": {
     "color": "#555a55",

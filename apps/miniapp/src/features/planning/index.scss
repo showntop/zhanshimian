@@ -1,0 +1,1301 @@
+// 方案集三屏（方案 tab / 方案详情 / 场合 Brief）。
+// 页面外壳（.page 内边距、AppHeader）归 pages/*，这里只管内容。
+// 决策台页的硬锁：页面高度恒等于视口（tab 页 webview 本就不含 tabBar），
+// overflow 吞掉一切纸面预算误差——页面物理上不可滚动。这是根本保证，
+// 预算/实测收缩只负责排版好看（不让说明行被裁）。底部呼吸用 .safe-bottom
+// 规范（inset + 20rpx），不用 .page--tab 默认的 48rpx 大垫。
+.page--deck {
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 20rpx);
+}
+
+// 想让这一屏「整体往下挪」不要在这里加 padding-top：页面定高 100vh +
+// 内容顶部对齐，fitStageToViewport 会把上方多出来的高度 1:1 从卡高里扣回去
+// （底部那行原地不动，只是照片变小）。真正可调的是底部预留：
+// PlansDeck 的 PAGE_BOTTOM_PX 与 STAGE_BUDGET_BASE 里的底垫项，
+// 二者一起调小，卡才有空间往下长，说明行（重新生成）才会真的更贴屏底。
+
+// ---------- 方案 tab ----------
+// planning 整屏等待（受理后到方案发布前）的外壳；内容在 .plan-progress
+.planning-screen {
+  display: flex;
+  flex-direction: column;
+}
+
+// 规划进度视图：照片锚 + 三步指示 + 服务端真实进度。
+// 拱形相框沿用分析进度页的视觉语言（暖绿渐变），微光呼吸用盒影脉冲——
+// 安静地"活着"，不转圈不闪屏；快照未到时进度条留空、步骤全灰。
+.plan-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22rpx;
+  padding: 80rpx 32rpx 120rpx;
+
+  &__arch {
+    position: relative;
+    width: 600rpx;
+    height: 620rpx;
+    border-radius: 300rpx 300rpx 40rpx 40rpx;
+    background: linear-gradient(180deg, var(--moss-soft) 0%, var(--cream) 58%, var(--moss-soft) 100%);
+    border: 1rpx solid var(--line);
+    overflow: hidden;
+    animation: plan-progress-breathe 2.8s ease-in-out infinite;
+  }
+
+  &__photo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  &__placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__placeholder-text {
+    font-size: 24rpx;
+    color: var(--ink-2);
+  }
+
+  &__stage {
+    margin-top: 10rpx;
+    font-size: 34rpx;
+    font-weight: 700;
+    color: var(--ink);
+    text-align: center;
+  }
+
+  &__retrying {
+    margin-top: -10rpx;
+    font-size: 24rpx;
+    color: var(--moss);
+  }
+
+  &__steps {
+    display: flex;
+    align-items: flex-start;
+    gap: 48rpx;
+    margin-top: 6rpx;
+  }
+
+  &__step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10rpx;
+
+    &-label {
+      font-size: 22rpx;
+      color: var(--ink-2);
+    }
+  }
+
+  &__dot {
+    width: 14rpx;
+    height: 14rpx;
+    border-radius: 50%;
+    background: var(--line);
+  }
+
+  &__step--done {
+    .plan-progress__dot {
+      background: var(--moss);
+    }
+
+    .plan-progress__step-label {
+      color: var(--ink);
+    }
+  }
+
+  &__step--active {
+    .plan-progress__dot {
+      background: var(--moss);
+      animation: plan-progress-dot 1.6s ease-in-out infinite;
+    }
+
+    .plan-progress__step-label {
+      color: var(--ink);
+      font-weight: 600;
+    }
+  }
+
+  &__bar {
+    width: 520rpx;
+    height: 12rpx;
+    border-radius: 999rpx;
+    background: var(--moss-soft);
+    border: 1rpx solid var(--line);
+    overflow: hidden;
+  }
+
+  &__bar-fill {
+    height: 100%;
+    border-radius: 999rpx;
+    background: var(--moss);
+    transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  &__percent {
+    margin-top: -12rpx;
+    font-size: 24rpx;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__eta {
+    font-size: 24rpx;
+    color: var(--ink-2);
+  }
+}
+
+@keyframes plan-progress-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(88, 115, 68, 0.16);
+  }
+
+  50% {
+    box-shadow: 0 0 0 26rpx rgba(88, 115, 68, 0);
+  }
+}
+
+@keyframes plan-progress-dot {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.5);
+  }
+}
+
+// 方案选择页（旧线视觉恢复）：场景胶囊 tab + 满宽对比 hero + 细节卡 +
+// 吸底毛玻璃选择坞（收益词 / 三选一 / 差异 chips / CTA / 来源说明）。
+.plans {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  // 卡堆决策台没有悬浮坞了：控制组/说明都是文档流，只留呼吸底垫
+  padding-bottom: 24rpx;
+
+  &__tabs {
+    display: flex;
+    white-space: nowrap;
+    width: 100%;
+    gap: 12rpx;
+  }
+
+  &__tab {
+    display: inline-flex;
+    align-items: center;
+    padding: 12rpx 28rpx;
+    border-radius: 999rpx;
+    font-size: 24rpx;
+    color: var(--ink-2);
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+    margin-right: 12rpx;
+
+    &:last-child {
+      margin-right: 0;
+    }
+
+    &--active {
+      background: var(--moss-soft);
+      border-color: var(--moss);
+      color: var(--moss);
+      font-weight: 600;
+    }
+  }
+
+  // tab 内「· 制作中」：受理在途的场景标记，弱化一档不抢 tab 本身
+  &__tab-pending {
+    margin-left: 4rpx;
+    font-size: 20rpx;
+    color: var(--ink-3);
+  }
+
+  // 顶部全局提示：在途受理定位不到具体场景时（跨会话），告知不静默
+  &__inflight-banner {
+    font-size: 22rpx;
+    color: var(--moss);
+    padding: 0 8rpx;
+  }
+
+  // 坞内「重新设计 / 更新形象方案」链接：居中弱动作，不与主 CTA 同级
+  &__redesign {
+    align-self: center;
+    font-size: 24rpx;
+  }
+
+  // 场景空态：已建档但该场合无方案时，保留 tab 结构只替换内容区，
+  // 引导生成该场合方案（而不是错误地让用户重新建档）
+  &__scene-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16rpx;
+    padding: 96rpx 48rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    border: 1rpx dashed var(--line);
+    text-align: center;
+
+    // 生成中变体：反「空态卡片」语言 —— 无圆角、左右出血、只有上下实线，
+    // 像一张钉在工作台上的纸样，而不是一个等待容器
+    &--atelier {
+      align-items: stretch;
+      gap: 20rpx;
+      padding: 40rpx 0 36rpx;
+      border: none;
+      border-top: 1rpx solid rgba(32, 35, 32, 0.18);
+      border-bottom: 1rpx solid rgba(32, 35, 32, 0.18);
+      border-radius: 0;
+      background: linear-gradient(180deg, #f4f5f2 0%, #eef0ec 100%);
+      text-align: left;
+      // 出血：巨大宋体数字压到右边界被裁，是印刷出血而非溢出
+      overflow: hidden;
+    }
+
+    &-title {
+      font-size: 34rpx;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    &-desc {
+      font-size: 26rpx;
+      line-height: 1.6;
+      color: var(--ink-2);
+    }
+
+    .primary-button {
+      margin-top: 16rpx;
+      min-width: 320rpx;
+    }
+
+    // 生成中视图：居中呈现，不套 info 卡的排版
+    .plans__generating {
+      margin-top: 0;
+      justify-content: center;
+    }
+  }
+
+  &__hero {
+    &-frame {
+      position: relative;
+      // 高度跟随照片比例（内联 px）：满宽完整展示，无侧边区无裁切。
+      // 封顶视口剩余高度，防极端竖图
+      min-height: 320rpx;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--moss-soft);
+      border: 1rpx solid var(--line);
+      // 切换方案时整帧交叉淡入（key 重挂载触发）
+      animation: plans-frame-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+
+    &-fade {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      // 底部渐变（旧线 120rpx）：满屏图与页面底色柔和衔接；
+      // 信息卡不再上叠 hero，不需要更高的遮罩
+      height: 120rpx;
+      background: linear-gradient(180deg, rgba(244, 245, 242, 0) 0%, var(--bg) 100%);
+      pointer-events: none;
+    }
+
+    // 渲染未就绪的相框内状态（生成中 spinner / 失败重试）：
+    // 去状态块自身的底色，居中浮在相框的苔绿浅底上
+    &-state {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40rpx;
+
+      .render-state {
+        align-items: center;
+        background: transparent;
+        text-align: center;
+      }
+    }
+
+    // 未就绪单图（原本照片）的来源标签：与详情页对比标签一套深色 pill
+    &-current-label {
+      position: absolute;
+      top: 16rpx;
+      left: 16rpx;
+      z-index: 5;
+      padding: 4rpx 14rpx;
+      border-radius: 999rpx;
+      background: rgba(30, 35, 29, 0.55);
+      color: #ffffff;
+      font-size: 20rpx;
+    }
+
+    // 渲染未就绪的状态 pill：压在原本照片底部居中，单行
+    &-state-pill {
+      position: absolute;
+      left: 50%;
+      bottom: 48rpx;
+      z-index: 5;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10rpx;
+      max-width: 86%;
+      padding: 10rpx 24rpx;
+      border-radius: 999rpx;
+      background: var(--scrim);
+      white-space: nowrap;
+    }
+
+    &-state-spin {
+      width: 22rpx;
+      height: 22rpx;
+    }
+
+    &-state-text {
+      font-size: 22rpx;
+      color: #ffffff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    // SourceImage 填满对比层（cmp 内层不再认旧 .example-image 类）；
+    // 满宽照片（widthFix）：内层图高度自然、顶部锚定，
+    // 超高时超出部分从底部裁掉（头部完整）
+    .plans__hero-frame .plans__hero-img {
+      width: 100%;
+      height: 100%;
+      border-radius: 0;
+    }
+
+    .plans__hero-frame .plans__hero-img .source-image__img {
+      height: auto;
+    }
+
+    // 角标移到右上，避开底部悬浮坞
+    .plans__hero-frame .plans__hero-img .example-badge {
+      top: 16rpx;
+      right: 16rpx;
+      bottom: auto;
+    }
+  }
+
+  // 收益词胶囊（悬浮坞内顶行，居中）：直接回答「选这套能获得什么」
+  &__outcome {
+    align-self: center;
+    display: flex;
+    align-items: center;
+    gap: 10rpx;
+    padding: 8rpx 22rpx;
+    border-radius: 999rpx;
+    background: transparent;
+    border: 1rpx solid rgba(88, 115, 68, 0.45);
+    box-shadow: none;
+    max-width: 100%;
+
+    &-tag {
+      font-size: 21rpx;
+      font-weight: 650;
+      color: var(--moss);
+      white-space: nowrap;
+
+      & + & {
+        padding-left: 10rpx;
+        border-left: 1rpx solid rgba(88, 115, 68, 0.28);
+      }
+    }
+  }
+
+  // 细节卡（第 2 屏起）：正常文档流跟随 hero。
+  // 负边距上叠是「信息卡压 hero 底边」改版的做法——渲染未就绪没有 hero 时，
+  // 卡片会被拉上去叠住场景 tab（9.16 事故），回旧线不再负边距
+  &__info {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+    margin: 0 20rpx;
+    padding: 28rpx 30rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface-strong);
+    border: 1rpx solid var(--line);
+    box-shadow: 0 12rpx 32rpx rgba(31, 34, 30, 0.1);
+  }
+
+  &__name {
+    font-size: 30rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__summary {
+    font-size: 26rpx;
+    font-weight: 600;
+    color: var(--moss);
+  }
+
+  &__why {
+    font-size: 26rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+
+    &--open {
+      -webkit-line-clamp: unset;
+      display: block;
+    }
+  }
+
+  &__why-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+  }
+
+  &__why-toggle {
+    align-self: flex-start;
+    font-size: 22rpx;
+    font-weight: 600;
+    color: var(--moss);
+  }
+
+  // 变化点 chip：与别的方案比较时的差异速览
+  &__diffs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10rpx;
+  }
+
+  &__diff {
+    padding: 6rpx 18rpx;
+    border-radius: 999rpx;
+    background: var(--moss-soft);
+    color: var(--moss-pressed);
+    font-size: 21rpx;
+    font-weight: 600;
+  }
+
+  &__generating {
+    display: flex;
+    align-items: center;
+    gap: 14rpx;
+    margin-top: 8rpx;
+
+    &-spin {
+      width: 26rpx;
+      height: 26rpx;
+    }
+
+    &-text {
+      font-size: 22rpx;
+      color: var(--moss);
+    }
+  }
+
+  // ---------- 生成中「纸样台」 ----------
+  // 创意方向：裁缝纸样 / 版型车间 —— 反圆润、反居中、反均匀留白。
+  // 不使用居中卡片 + 渐变光斑那套（那是 AI 味的来源），改用印刷/工程制图的语法。
+  //
+  // 色彩：墨绿 #39492E（品牌）× 锈铜 #C4622D（针脚/别针）× 蓝墨 #2C3E6B（工程刻度）。
+  // 三种色相互相不和谐，但同属「纸样/车间」材质语言，撞而不脏；不用警示红（红线 1）。
+  // 字体：巨号宋体撞全局无衬线；拉丁数字用等宽 + 大字距，像工程图注记。
+  // 数字规律（全部取自产品自身）：
+  //   三套方案 → 3：出血水印数字、三条版型条、所有倾角恒为 3deg 的倍数（3/6/24）；
+  //   1–2 分钟 → 三行各约 40s，因此填充周期 2.4s = 3×0.8s，条与条错峰 0.8s；
+  //   8pt 体系 → 刻度周期 8rpx 与 24rpx（1:3），针脚 10rpx 实 / 24rpx 循环。
+  &__atelier {
+    position: relative;
+    // 负空间刻意失衡：上 64 / 下 0（紧），左内缩 72（给尺子），右侧 0（出血）
+    padding: 64rpx 0 0 72rpx;
+
+    // 竖向裁缝尺：两条不同周期的刻度叠加，1:3 韵律但不对称
+    &-gauge {
+      position: absolute;
+      left: 22rpx;
+      top: 56rpx;
+      bottom: 12rpx;
+      width: 30rpx;
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 12rpx;
+        background: repeating-linear-gradient(
+          180deg,
+          rgba(32, 35, 32, 0.5) 0 2rpx,
+          rgba(32, 35, 32, 0) 2rpx 24rpx
+        );
+      }
+
+      &::after {
+        content: '';
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 8rpx;
+        background: repeating-linear-gradient(
+          180deg,
+          rgba(44, 62, 107, 0.45) 0 1rpx,
+          rgba(44, 62, 107, 0) 1rpx 8rpx
+        );
+      }
+    }
+
+    // 尺上编号：等宽拉丁，位置刻意不均（16% / 52% / 86%）
+    &-no {
+      position: absolute;
+      left: 0;
+      font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+      font-size: 17rpx;
+      letter-spacing: 1rpx;
+      color: rgba(32, 35, 32, 0.42);
+      transform: rotate(-3deg);
+
+      &--1 {
+        top: 16%;
+      }
+
+      &--2 {
+        top: 52%;
+        color: rgba(196, 98, 45, 0.6);
+      }
+
+      &--3 {
+        top: 86%;
+      }
+    }
+
+    // 出血水印：宋体「3」，压出右边界被裁（.plans__scene-empty--atelier 的 overflow 负责裁切）
+    &-numeral {
+      position: absolute;
+      right: -46rpx;
+      top: -18rpx;
+      font-family: 'Songti SC', 'STSong', 'SimSun', serif;
+      font-size: 300rpx;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -14rpx;
+      color: rgba(57, 73, 46, 0.1);
+      transform: rotate(-6deg);
+    }
+
+    // 别针：锈铜细线 + 针头圆点，倾角 24deg（3×8），轻微摆动如走针
+    &-needle {
+      position: absolute;
+      right: 108rpx;
+      top: 40rpx;
+      width: 2rpx;
+      height: 104rpx;
+      background: #c4622d;
+      transform-origin: top center;
+      animation: plans-atelier-needle 0.8s ease-in-out infinite alternate;
+
+      &::after {
+        content: '';
+        position: absolute;
+        left: -5rpx;
+        top: -8rpx;
+        width: 12rpx;
+        height: 12rpx;
+        border-radius: 50%;
+        background: #c4622d;
+      }
+    }
+
+    &-slots {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 30rpx;
+    }
+
+    // 版型条：右端参差（100% / 72% / 63%），起始缩进也不同 → 负空间不对称。
+    // 方角（2rpx），不用品牌圆角
+    &-slot {
+      position: relative;
+      height: 58rpx;
+      border-radius: 2rpx;
+      background: var(--cream);
+      border: 1rpx solid rgba(32, 35, 32, 0.14);
+      overflow: hidden;
+
+      &--1 {
+        width: 100%;
+      }
+
+      &--2 {
+        width: 72%;
+
+        .plans__atelier-fill {
+          background: #c4622d;
+          animation-delay: 0.8s;
+        }
+      }
+
+      &--3 {
+        width: 45%;
+        margin-left: 18%;
+
+        .plans__atelier-fill {
+          background: #2c3e6b;
+          animation-delay: 1.6s;
+        }
+
+        .plans__atelier-stitch {
+          animation-delay: 0.16s;
+        }
+      }
+    }
+
+    // 填充：一条条被「裁出来」又回退重缝，周期 2.4s，三条错峰 0.8s
+    &-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+      transform-origin: left center;
+      transform: scaleX(0);
+      opacity: 0.92;
+      background: var(--moss-deep);
+      animation: plans-atelier-fill 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+    }
+
+    // 针脚：锈铜虚线向右走针，10rpx 实 / 24rpx 循环（transform 位移，GPU 合成）
+    &-stitch {
+      position: absolute;
+      left: 0;
+      right: -24rpx;
+      top: 14rpx;
+      height: 2rpx;
+      background: repeating-linear-gradient(
+        90deg,
+        rgba(196, 98, 45, 0.85) 0 10rpx,
+        rgba(196, 98, 45, 0) 10rpx 24rpx
+      );
+      animation: plans-atelier-stitch 0.8s linear infinite;
+    }
+
+    &-foot {
+      display: flex;
+      align-items: flex-start;
+      gap: 16rpx;
+      padding: 0 24rpx 0 72rpx;
+    }
+
+    // 引导竖线：倾角 3deg
+    &-rule {
+      flex: none;
+      width: 2rpx;
+      height: 78rpx;
+      background: var(--moss);
+      opacity: 0.45;
+      transform: rotate(3deg);
+    }
+
+    &-text {
+      flex: 1;
+      font-size: 26rpx;
+      line-height: 1.7;
+      color: var(--ink);
+    }
+  }
+
+  // 选择面板卡（紧凑横排）：左侧三张 3:4 缩略图，右侧方案名 + chips。
+  // 高度约为竖排的一半，空间让位给 hero
+  &__chooser {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 20rpx;
+    padding: 18rpx 20rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface-strong);
+    border: 1rpx solid var(--line);
+    box-shadow: 0 8rpx 24rpx rgba(31, 34, 30, 0.08);
+
+    &-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10rpx;
+    }
+  }
+
+  // 缩略图簇：固定 3:4 小卡（aspectFit 全照），苔绿浅底
+  // 推荐角标叠缩略图左上角；选中态描边 + 微放大
+  &__choices {
+    flex-shrink: 0;
+    display: flex;
+    gap: 10rpx;
+  }
+
+  &__choice {
+    width: 104rpx;
+    display: flex;
+    flex-direction: column;
+    opacity: 0.55;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+
+    &--active {
+      opacity: 1;
+      transform: scale(1.03);
+
+      .plans__choice-thumb {
+        border-color: var(--moss);
+        box-shadow: 0 4rpx 12rpx rgba(88, 115, 68, 0.25);
+      }
+    }
+
+    &-thumb {
+      position: relative;
+      width: 104rpx;
+      height: 140rpx;
+      border-radius: 12rpx;
+      overflow: hidden;
+      background: var(--moss-soft);
+      border: 3rpx solid transparent;
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
+      // 渲染在途的缩略图：小 spinner 居中
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      // 「风格参考」角标：图内底部通栏小条，单行不换行（小图上不再溢出）
+      .example-badge {
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        padding: 3rpx 0 4rpx;
+        border-radius: 0;
+        background: rgba(30, 35, 29, 0.55);
+        font-size: 15rpx;
+        line-height: 1.3;
+        text-align: center;
+        white-space: nowrap;
+      }
+    }
+
+    &-img {
+      width: 100%;
+      height: 100%;
+    }
+
+    &-spin {
+      flex: none;
+    }
+
+    // 失败/暂不可用占位：缩略图不留白洞（重试在 hero 相框的状态区）
+    &-state {
+      font-size: 18rpx;
+      line-height: 1.4;
+      color: var(--ink-3);
+      text-align: center;
+    }
+
+    &-badge {
+      position: absolute;
+      top: 5rpx;
+      left: 5rpx;
+      z-index: 2;
+      padding: 1rpx 8rpx;
+      border-radius: 999rpx;
+      background: var(--moss);
+      color: #ffffff;
+      font-size: 16rpx;
+      font-weight: 650;
+    }
+  }
+
+  // 悬浮选择坞：收益词 + 三选一 + CTA 收进毛玻璃坞，浮在照片底部
+  // 上方不占文档流——照片有多高就展示多高，选择要素常驻第一屏。
+  // 坞做薄（去掉缩略图名字行、收紧间距），把高度让给照片。
+  // tab 页视口已在原生 tabBar 之上；再加 safe-area 会和 tabBar 叠出一段空。
+  &__dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+    padding: 14rpx var(--page-gutter) 10rpx;
+    background: var(--dock);
+
+    // 坞内选择面板卡去边框阴影，与毛玻璃底融合
+    .plans__chooser {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      padding: 0;
+    }
+  }
+
+  &__hint {
+    position: absolute;
+    left: 50%;
+    bottom: 148rpx;
+    z-index: 6;
+    transform: translateX(-50%);
+    padding: 8rpx 20rpx;
+    border-radius: 999rpx;
+    background: var(--scrim);
+    color: #ffffff;
+    font-size: 22rpx;
+    white-space: nowrap;
+    animation: plans-frame-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  &__cta-note {
+    text-align: center;
+    font-size: 24rpx;
+    color: var(--ink-3);
+  }
+
+  // 冷调试验：CTA 回纯色苔绿，去掉亮绿渐变光晕
+  &__dock .primary-button--solid {
+    background: var(--moss);
+    box-shadow: var(--shadow-primary-button);
+  }
+}
+
+// 方案切换交叉淡入
+@keyframes plans-frame-in {
+  from {
+    opacity: 0.35;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+// ---------- 纸样台动效 ----------
+// 走针：别针在 3deg 与 -21deg 之间摆（幅度是 3 的倍数）
+@keyframes plans-atelier-needle {
+  from {
+    transform: rotate(18deg);
+  }
+
+  to {
+    transform: rotate(30deg);
+  }
+}
+
+// 裁制：版型条被裁出来 → 停一拍 → 回退重缝（2.4s = 3×0.8s）
+@keyframes plans-atelier-fill {
+  0% {
+    transform: scaleX(0);
+  }
+
+  45% {
+    transform: scaleX(1);
+  }
+
+  72% {
+    transform: scaleX(1);
+  }
+
+  100% {
+    transform: scaleX(0);
+  }
+}
+
+// 针脚走线：位移一个完整循环（24rpx），无缝
+@keyframes plans-atelier-stitch {
+  from {
+    transform: translateX(-24rpx);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plans__atelier-needle,
+  .plans__atelier-fill,
+  .plans__atelier-stitch {
+    animation: none;
+  }
+}
+
+// ---------- 方案详情 ----------
+// 旧线（recovery/ui-0911）全屏沉浸视觉：照片铺满整屏，内容板从底部奶油渐变
+// 融进画面；步骤列表比旧线长（全量），收进板内 ScrollView。
+// 加载中/错误态的浅色整屏盖层（本页外壳是黑底沉浸页，状态组件不压照片）。
+.pd-plain {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  padding: 40rpx var(--page-gutter) 0;
+  background: var(--bg);
+}
+
+// 满屏沉浸的关键：hero 用 sticky 而不是 fixed——sticky 在文档流里，
+// 橡皮筋/滚动惯性时整页一起动，板底之外只可能是页面底色；
+// fixed 永远钉在视口上，板子被带上去就从板底漏出另一截照片（1.0.5 的教训）。
+// 滚动全程 hero 钉在视口顶（sticky 行程 = 板高 - 38vh = 可滚区间），
+// 内容板从 hero 底部 38vh 处叠上来——满屏照片 + 视差 + 不漏底，三者兼得。
+.pd {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 100vh;
+
+  &__hero {
+    position: absolute;
+    inset: 0;
+
+    &-frame {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--ink);
+
+      .cmp {
+        border-radius: 0;
+        background: var(--ink);
+      }
+
+      // 对比标签在导航下方、不压底部内容板；
+      // 深色半透小 pill（与「风格参考」角标一套语言）：
+      // 亮背景照片上白字 text-shadow 根本看不清
+      .cmp__label {
+        top: calc(var(--pd-nav) + 12rpx);
+        bottom: auto;
+        padding: 4rpx 14rpx;
+        border-radius: 999rpx;
+        background: rgba(30, 35, 29, 0.55);
+        color: #ffffff;
+        font-size: 20rpx;
+        text-shadow: none;
+      }
+
+      // SourceImage 填满对比层，去自身圆角（外层统一裁切）
+      .pd__hero-img {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+      }
+
+      // 生成图角标在导航下方右侧、对比标签下一行——同钉一排会重合（9.16 事故）
+      .pd__hero-img .example-badge {
+        top: calc(var(--pd-nav) + 64rpx);
+        right: 24rpx;
+        bottom: auto;
+      }
+    }
+
+    &-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    &-empty-text {
+      font-size: 26rpx;
+      color: rgba(244, 245, 242, 0.72);
+    }
+  }
+
+  // 底部内容板：140rpx 透明渐起步，照片从这里融进奶油底。
+  // 负边距上叠 hero 底部 38vh（hero 满屏在文档流，见 .pd 的 sticky 注释）：
+  // 首屏满屏照片，上滑整板盖过照片，全量步骤随页面滚动展开——不嵌板内
+  // ScrollView：微信 ScrollView 在只有 max-height 的父级里拿不到确定高度，
+  // 会塌成 0（步骤不可见、上滑/切分类全没反应）。
+  // min-height 与上叠量凑满一屏：数据少、板身短时板底也必须到达屏底
+  &__board {
+    position: relative;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+    margin-top: -38vh;
+    min-height: 38vh;
+    // 底部 padding 给吸底 CTA 玻璃条（pd__cta-bar）让位，板尾内容不被盖
+    padding: 140rpx var(--page-gutter) calc(160rpx + env(safe-area-inset-bottom));
+    background: linear-gradient(
+      180deg,
+      rgba(244, 245, 242, 0) 0%,
+      rgba(244, 245, 242, 0.45) 120rpx,
+      rgba(244, 245, 242, 0.9) 260rpx,
+      var(--bg) 400rpx
+    );
+  }
+
+  &__render-state {
+    width: 100%;
+  }
+
+  &__hint {
+    align-self: center;
+    font-size: 20rpx;
+    color: var(--ink-3);
+  }
+
+  &__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 20rpx;
+  }
+
+  &__series {
+    flex-shrink: 0;
+    font-size: 30rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__tabs {
+    display: flex;
+    justify-content: flex-end;
+    gap: 28rpx;
+  }
+
+  &__tab {
+    padding: 4rpx 0;
+    font-size: 24rpx;
+    color: var(--ink-3);
+
+    &--active {
+      color: var(--ink);
+      font-weight: 600;
+      box-shadow: inset 0 -3rpx 0 var(--moss);
+    }
+  }
+
+  // 步骤区：全量列表在板的文档流里，随页面上滑展开
+  &__steps {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+  }
+
+  &__desc {
+    font-size: 26rpx;
+    line-height: 1.65;
+    color: var(--ink-2);
+  }
+
+  &__why {
+    font-size: 25rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+    padding: 16rpx 20rpx;
+    border-radius: var(--radius-md);
+    background: var(--moss-soft);
+  }
+
+  &__step {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+    padding: 20rpx;
+    border-radius: var(--radius-md);
+    border: 1rpx solid var(--line);
+    background: var(--surface-strong);
+  }
+
+  &__step-head {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+  }
+
+  &__step-action {
+    flex: none;
+    padding: 2rpx 14rpx;
+    border-radius: var(--radius-pill);
+    font-size: 20rpx;
+    background: var(--moss-soft);
+    color: var(--moss-deep);
+  }
+
+  &__step-action--keep {
+    background: var(--cream);
+    color: var(--ink-2);
+  }
+
+  &__step-title {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  &__step-summary {
+    font-size: 25rpx;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  &__step-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx 24rpx;
+    padding-top: 8rpx;
+  }
+
+  &__step-detail {
+    display: flex;
+    align-items: baseline;
+    gap: 8rpx;
+  }
+
+  &__step-detail-label {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__step-detail-value {
+    font-size: 24rpx;
+    color: var(--ink);
+  }
+
+  &__empty-step {
+    font-size: 25rpx;
+    color: var(--ink-3);
+  }
+
+  &__foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10rpx;
+    padding-top: 4rpx;
+  }
+
+  // 吸底 CTA 玻璃条：与方案 tab 的选择坞同一语言（dock-glass 提供
+  // 毛玻璃底、顶部发丝线、投影），首屏即可选，不用滚到底
+  &__cta-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    padding: 16rpx var(--page-gutter) calc(12rpx + env(safe-area-inset-bottom));
+  }
+
+  &__feedback-entry {
+    font-size: 25rpx;
+    color: var(--ink-2);
+    text-decoration: underline;
+  }
+
+  &__bound-note {
+    font-size: 22rpx;
+    text-align: center;
+    color: var(--ink-3);
+  }
+}
+
+// ---------- 场合 Brief ----------
+.scene-brief {
+  display: flex;
+  flex-direction: column;
+  gap: 28rpx;
+
+  &--loading {
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
+  }
+
+  &__intro {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+    padding: 0 8rpx;
+  }
+
+  &__intro-head {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+  }
+
+  &__title {
+    font-size: 40rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__badge {
+    padding: 4rpx 16rpx;
+    border-radius: var(--radius-pill);
+    background: var(--moss-soft);
+    color: var(--moss-deep);
+    font-size: 20rpx;
+  }
+
+  &__lede {
+    font-size: 26rpx;
+    line-height: 1.65;
+    color: var(--ink-2);
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+  }
+
+  &__field-label {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  // 点过「生成」但这一题没选：标出来——禁用按钮本身不说为什么不能用
+  &__field--missing {
+    padding-left: 20rpx;
+    border-left: 4rpx solid var(--moss);
+
+    .scene-brief__field-label {
+      color: var(--moss-deep);
+    }
+  }
+
+  &__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx;
+  }
+
+  &__foot {
+    padding-top: 8rpx;
+  }
+}

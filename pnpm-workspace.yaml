@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+  - packages/*
+  # apps/mobile 仍消费已删除的旧 core 面,按设计文档"手机端不作为首轮交付阻塞项"
+  # 排除出工作区递归命令(typecheck/lint/build),迁移到质量核心 API 面后恢复。
+  - '!apps/mobile'
+# apps/server 为 Go 工程（无 package.json），pnpm 会自动跳过

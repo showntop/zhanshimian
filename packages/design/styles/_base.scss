@@ -1,0 +1,473 @@
+// @zsm/design 小程序语义样式 —— 全部 rpx（designWidth: 750），禁止裸 px。
+// 依赖 dist/tokens.wxss 提供的 page 级 CSS 变量；类语义参照原型 app.wxss，
+// 但取值一律换新 token（§4.2 品牌值）。
+// 自定义组件需 styleIsolation: 'apply-shared' 才能吃到这些类。
+//
+// 分层体系（重设计）：
+//   .card          raised —— 白底 + 发丝描边 + 柔投影（常规内容）
+//   .card--quiet   柔底 —— moss-soft 底、无描边（次级入口/分组）
+//   .card--hero    hero —— moss-deep 底 + cream 文字（每页至多一个，视觉锚点）
+// 圆角纪律：交互件一律 pill；容器卡 lg；hero 卡 xl。
+
+// 对齐原型 app.wxss：微信组件默认 content-box，不加这个卡片宽高会被 padding 撑破。
+page,
+view,
+text,
+image,
+button,
+scroll-view,
+swiper,
+swiper-item {
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+}
+
+button::after {
+  border: 0;
+}
+
+// ---------- 页面骨架 ----------
+// 顶距由 AppHeader 占位撑开（真机胶囊高度），这里不再写死 200rpx。
+.page {
+  min-height: 100vh;
+  padding: 0 var(--page-gutter) calc(env(safe-area-inset-bottom) + 48rpx);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.page--tab {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 48rpx);
+}
+
+// 锁高一屏的页面（穿搭诊断 / 购买判断的空态）：外壳自身锁死视口并纵排，
+// 内容容器 flex:1 吃掉「视口 − 导航占位」的全部余量——高度不再由 JS 计算，
+// 底部安全区只在容器那一处用 env() 垫一次（两处都垫 = 底部一大段空白）。
+// 结果态需要滚动，页面去掉这个类即可。
+.page--lock {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.safe-bottom {
+  height: calc(env(safe-area-inset-bottom) + 20rpx);
+}
+
+.surface {
+  background: var(--surface);
+  border: 1rpx solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.hairline {
+  height: 1rpx;
+  background: var(--line);
+}
+
+// ---------- 卡片分层 ----------
+.card {
+  background: var(--surface-strong);
+  border: 1rpx solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.card--quiet {
+  background: var(--moss-soft);
+  border-radius: var(--radius-lg);
+}
+
+.card--hero {
+  background: var(--moss-deep);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-hero-card);
+  color: var(--cream);
+
+  .title,
+  .section-title,
+  .lede {
+    color: var(--cream);
+  }
+
+  .muted,
+  .eyebrow {
+    color: var(--cream-muted);
+  }
+}
+
+// ---------- 三档容器 + 照片 hero（视觉宪法） ----------
+// 内容卡 = .card；浮层卡 = .layer-float；照片信息层 = .layer-on-photo
+.layer-float {
+  background: var(--glass);
+  border: 1rpx solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(24rpx);
+}
+
+.layer-on-photo {
+  background: var(--glass-on-photo);
+  color: var(--on-photo);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-annotation);
+}
+
+.dock-glass {
+  background: var(--dock);
+  border-top: 1rpx solid var(--line);
+  box-shadow: var(--shadow-sheet);
+  backdrop-filter: blur(24rpx);
+}
+
+.photo-hero {
+  position: relative;
+  overflow: hidden;
+  background: var(--moss-soft);
+}
+
+.photo-hero--bleed {
+  margin-left: calc(-1 * var(--page-gutter));
+  margin-right: calc(-1 * var(--page-gutter));
+}
+
+.photo-hero--hinge {
+  margin-bottom: -72rpx;
+}
+
+.photo-scrim {
+  background: var(--scrim);
+}
+
+// ---------- 排版 ----------
+// 第 2 轮：产品 UI 默认无衬线；`.serif` 仅留给极少数品牌标题（每屏至多一处）。
+.serif {
+  font-family: 'Songti SC', 'STSong', serif;
+}
+
+.display {
+  font-size: 38rpx;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -0.5rpx;
+  color: var(--ink);
+}
+
+.title {
+  margin: 18rpx 0;
+  font-size: 50rpx;
+  line-height: 1.26;
+  font-weight: 700;
+  letter-spacing: -0.5rpx;
+  color: var(--ink);
+}
+
+.section-title {
+  margin: 40rpx 0 20rpx;
+  color: var(--ink);
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+// 分区规则线：section-title 下方的短横线
+.section-rule {
+  width: 48rpx;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background: var(--moss);
+  margin: 0 0 22rpx;
+}
+
+.eyebrow {
+  color: var(--ink-2);
+  font-size: 24rpx;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.lede {
+  color: var(--ink-2);
+  font-size: 28rpx;
+  line-height: 1.65;
+}
+
+.muted {
+  color: var(--ink-3);
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+// ---------- chip / pill ----------
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.pill {
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid var(--line);
+  background: var(--surface-strong);
+  color: var(--ink-2);
+  font-size: 24rpx;
+  line-height: 1.5;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+// 统一选中规范：柔绿底 + moss 描边（与 Pill 组件一致，唯一 active 语义）
+.pill.active,
+.pill--active {
+  background: var(--moss-soft);
+  border-color: var(--moss);
+  color: var(--moss);
+  font-weight: 600;
+}
+
+.text-link {
+  color: var(--moss);
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.section-head {
+  display: flex;
+  flex-direction: column;
+  padding: 0 5rpx;
+
+  .section-title {
+    margin: 0 0 14rpx;
+    font-size: 32rpx;
+  }
+}
+
+// ---------- 微交互 ----------
+.pressable {
+  transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.pressable:active {
+  transform: scale(0.985);
+  opacity: 0.88;
+}
+
+// ---------- 统一 spinner（全局唯一定义，各处复用） ----------
+.spinner {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 999rpx;
+  border: 3rpx solid var(--moss-soft);
+  border-top-color: var(--moss);
+  animation: zsm-spin 0.9s linear infinite;
+}
+
+.spinner--on-deep {
+  border-color: rgba(238, 240, 236, 0.32);
+  border-top-color: var(--cream);
+}
+
+@keyframes zsm-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ---------- 骨架屏 ----------
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(69, 78, 64, 0.08);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.35);
+  transform: translateX(-100%);
+  animation: shimmer 1.3s infinite;
+}
+
+// ---------- 示例标识（数据真实性契约的 UI 落点） ----------
+// 任何非用户本人的内置/AI 示例图必须叠加；父容器需 position: relative。
+// 标识必须显式（红线 2 + AI 生成内容标识办法），但样式收敛为磨砂半透明
+// 小 chip——实心深底 pill 像膏药，更小更透才融得进照片。
+.example-badge {
+  position: absolute;
+  right: 12rpx;
+  bottom: 12rpx;
+  z-index: 2;
+  padding: 3rpx 12rpx;
+  border-radius: 999rpx;
+  background: rgba(30, 35, 29, 0.36);
+  backdrop-filter: blur(12rpx);
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 18rpx;
+  line-height: 1.5;
+}
+
+.example-badge.badge-left {
+  right: auto;
+  left: 12rpx;
+}
+
+// 示例图弱化：模糊 + 降饱和，与本人生成结果拉开视觉区分度；
+// scale 放大由父容器 overflow: hidden 裁掉模糊边缘。
+.example-soft {
+  -webkit-filter: blur(4px) saturate(0.8);
+  filter: blur(4px) saturate(0.8);
+  // 不用 transform：原生 image 的祖先/自身带 transform 时，微信切 tab 会重绘闪一下。
+  width: 110%;
+  height: 110%;
+  margin: -5%;
+}
+
+// ---------- 入场动效 ----------
+.fade-up {
+  animation: fade-up 0.52s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.fade-up.delay-1 {
+  animation-delay: 0.08s;
+}
+
+.fade-up.delay-2 {
+  animation-delay: 0.16s;
+}
+
+.fade-up.delay-3 {
+  animation-delay: 0.24s;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(22rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// 入场只播一次：切 tab / 回页时微信会重播 CSS animation，both + from 透明
+// 会把已渲染图片再藏 0.52s。page--settled 由 usePageClass 在首次入场后加上。
+.page--settled .fade-up,
+.page--settled .fade-up.delay-1,
+.page--settled .fade-up.delay-2,
+.page--settled .fade-up.delay-3 {
+  animation: none !important;
+  animation-name: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+// 成功落位（checkPop 250ms）
+.check-pop {
+  animation: check-pop 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes check-pop {
+  0% {
+    transform: scale(0.95);
+  }
+  55% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+// 拱形内扫描光带（scan 2000ms，受父级 overflow 约束）
+.scan-sweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -20%;
+  height: 28%;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(111, 143, 89, 0) 0%,
+    rgba(111, 143, 89, 0.22) 50%,
+    rgba(111, 143, 89, 0) 100%
+  );
+  box-shadow: 0 0 18px 5px rgba(111, 143, 89, 0.24);
+  animation: scan-sweep 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+@keyframes scan-sweep {
+  from {
+    transform: translateY(0);
+    opacity: 0.2;
+  }
+  12% {
+    opacity: 0.85;
+  }
+  to {
+    transform: translateY(420%);
+    opacity: 0.15;
+  }
+}
+
+// ---------- 呼吸辉光（hero 卡，4s 循环；参数对齐 motion.ts haloGlow） ----------
+.halo {
+  animation: halo-breathe 4s ease-in-out infinite;
+}
+
+@keyframes halo-breathe {
+  0%,
+  100% {
+    box-shadow: var(--shadow-hero-card);
+  }
+
+  50% {
+    box-shadow: 0 20rpx 56rpx 16rpx rgba(88, 115, 68, 0.18), var(--shadow-hero-card);
+  }
+}
+
+// ---------- reduced motion 全部归零（不许删动画，压时长） ----------
+// !important 兜底：类级 animation 简写（.spinner/.halo 等）特异性高于元素选择器。
+// 页面隐藏时暂停无限动效，回页按当前状态继续，不重播完整叙事
+.page--hidden .halo,
+.page--hidden .spinner,
+.page--hidden .scan-sweep,
+.page--hidden .skeleton::after,
+.page--hidden [class*='--live'],
+.page--hidden [class*='shimmer'] {
+  animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  page,
+  page view,
+  page text,
+  page image,
+  page button,
+  page scroll-view,
+  page swiper,
+  page swiper-item,
+  page .skeleton::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

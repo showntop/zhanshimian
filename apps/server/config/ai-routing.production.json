@@ -1,0 +1,317 @@
+{
+  "models": {
+    "aliyun/kimi-k3": {
+      "vendor": "aliyun",
+      "protocol": "openai_chat_completions",
+      "model": "kimi-k3",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "api_key_env": "ALIYUN_API_KEY",
+      "structured_mode": "json_object",
+      "parameters": {
+        "enable_thinking": false
+      },
+      "timeout_seconds": 240,
+      "input_cost_per_million": 20,
+      "output_cost_per_million": 100,
+      "max_input_images": 3,
+      "supports_multiple_reference_images": true,
+      "identity_comparison": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
+    },
+    "aliyun/qwen3.7-plus": {
+      "vendor": "aliyun",
+      "protocol": "openai_chat_completions",
+      "model": "qwen3.7-plus",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "api_key_env": "ALIYUN_API_KEY",
+      "structured_mode": "json_object",
+      "parameters": {
+        "enable_thinking": false,
+        "temperature": 0
+      },
+      "timeout_seconds": 120,
+      "input_cost_per_million": 2,
+      "output_cost_per_million": 8,
+      "max_input_images": 3,
+      "supports_multiple_reference_images": true,
+      "identity_comparison": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
+    },
+    "aliyun/qwen3.7-flash": {
+      "vendor": "aliyun",
+      "protocol": "openai_chat_completions",
+      "model": "qwen3.7-flash",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "api_key_env": "ALIYUN_API_KEY",
+      "structured_mode": "json_object",
+      "parameters": {
+        "enable_thinking": false,
+        "temperature": 0
+      },
+      "timeout_seconds": 120,
+      "input_cost_per_million": 0.2,
+      "output_cost_per_million": 0.8,
+      "max_input_images": 3,
+      "supports_multiple_reference_images": true,
+      "identity_comparison": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
+    },
+    "aliyun/qwen3.8-flash": {
+      "vendor": "aliyun",
+      "protocol": "openai_chat_completions",
+      "model": "qwen3.8-flash",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "api_key_env": "ALIYUN_API_KEY",
+      "structured_mode": "json_object",
+      "parameters": {
+        "enable_thinking": false,
+        "temperature": 0
+      },
+      "timeout_seconds": 120,
+      "input_cost_per_million": 0.2,
+      "output_cost_per_million": 0.8,
+      "max_input_images": 3,
+      "supports_multiple_reference_images": true,
+      "identity_comparison": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
+    },
+    "aliyun/wan2.7-image-pro": {
+      "vendor": "aliyun",
+      "protocol": "dashscope_wan",
+      "model": "wan2.7-image-pro",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      "api_key_env": "ALIYUN_API_KEY",
+      "timeout_seconds": 180,
+      "output_image_cost": 0.5,
+      "max_input_images": 2,
+      "supports_multiple_reference_images": true,
+      "identity_preservation": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
+    },
+    "aliyun/qwen-image-edit-plus": {
+      "vendor": "aliyun",
+      "protocol": "dashscope_wan",
+      "model": "qwen-image-edit-plus",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      "api_key_env": "ALIYUN_API_KEY",
+      "parameters": {
+        "size": "1024*1536"
+      },
+      "timeout_seconds": 180,
+      "output_image_cost": 0.3,
+      "max_input_images": 2,
+      "supports_multiple_reference_images": true,
+      "identity_preservation": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
+    },
+    "aliyun/qwen-image-edit-plus-hair": {
+      "vendor": "aliyun",
+      "protocol": "dashscope_wan",
+      "model": "qwen-image-edit-plus",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      "api_key_env": "ALIYUN_API_KEY",
+      "parameters": {
+        "size": "1536*1152"
+      },
+      "timeout_seconds": 180,
+      "output_image_cost": 0.3,
+      "max_input_images": 2,
+      "supports_multiple_reference_images": true,
+      "identity_preservation": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
+    },
+    "aliyun/qwen-image-3.0": {
+      "vendor": "aliyun",
+      "protocol": "dashscope_wan",
+      "model": "qwen-image-3.0",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      "api_key_env": "ALIYUN_API_KEY",
+      "parameters": {
+        "size": "1024*1536"
+      },
+      "timeout_seconds": 180,
+      "output_image_cost": 0.3,
+      "max_input_images": 2,
+      "supports_multiple_reference_images": true,
+      "identity_preservation": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
+    },
+    "aliyun/qwen-image-3.0-hair": {
+      "vendor": "aliyun",
+      "protocol": "dashscope_wan",
+      "model": "qwen-image-3.0",
+      "base_url": "https://${BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      "api_key_env": "ALIYUN_API_KEY",
+      "parameters": {
+        "size": "1536*1152"
+      },
+      "timeout_seconds": 180,
+      "output_image_cost": 0.3,
+      "max_input_images": 2,
+      "supports_multiple_reference_images": true,
+      "identity_preservation": true,
+      "output_mime_types": [
+        "image/jpeg"
+      ],
+      "data_retention": "zero"
+    },
+    "siliconflow/kwai-kolors-kolors": {
+      "vendor": "siliconflow",
+      "protocol": "siliconflow_image_edit",
+      "model": "Kwai-Kolors/Kolors",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "api_key_env": "SILICONFLOW_API_KEY",
+      "parameters": {
+        "image_size": "1024x768"
+      },
+      "timeout_seconds": 180,
+      "output_image_cost": 0,
+      "max_input_images": 1,
+      "supports_multiple_reference_images": false,
+      "output_mime_types": [
+        "image/jpeg",
+        "image/png"
+      ]
+    },
+    "siliconflow/qwen-image-edit": {
+      "vendor": "siliconflow",
+      "protocol": "siliconflow_image_edit",
+      "model": "Qwen/Qwen-Image-Edit",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "api_key_env": "SILICONFLOW_API_KEY",
+      "parameters": {
+        "image_size": "1472x1140"
+      },
+      "timeout_seconds": 180,
+      "output_image_cost": 0.29,
+      "max_input_images": 1,
+      "supports_multiple_reference_images": false,
+      "output_mime_types": [
+        "image/jpeg",
+        "image/png"
+      ]
+    },
+    "demo/body-orbit": {
+      "vendor": "demo",
+      "protocol": "demo_orbit",
+      "model": "body-orbit",
+      "base_url": "https://127.0.0.1/demo-orbit",
+      "api_key_env": "AI_TEST_PRIMARY_KEY",
+      "timeout_seconds": 30    }
+  },
+  "routes": {
+    "appearance_analysis": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.8-flash",
+      "max_cost_cny": 0.6,
+      "max_input_images": 3
+    },
+    "photo_quality_check": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.8-flash",
+      "max_cost_cny": 0.6,
+      "max_input_images": 3
+    },
+    "photo_identity_consistency": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.8-flash",
+      "max_cost_cny": 0.6,
+      "max_input_images": 3
+    },
+    "report_evidence_verification": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.8-flash",
+      "max_cost_cny": 0.6,
+      "max_input_images": 3
+    },
+    "photo_check": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.8-flash",
+      "max_cost_cny": 0.6
+    },
+    "outfit_diagnosis": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.8-flash"
+    },
+    "purchase_diagnosis": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.8-flash"
+    },
+    "advisor_chat": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.8-flash"
+    },
+    "today_plan": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.8-flash"
+    },
+    "hair_edit": {
+      "policy": "quality_first",
+      "primary": "siliconflow/kwai-kolors-kolors",
+      "fallbacks": [
+        "aliyun/qwen-image-3.0-hair",
+        "aliyun/qwen-image-edit-plus-hair"
+      ],
+      "max_cost_cny": 0.6
+    },
+    "makeup_edit": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen-image-edit-plus",
+      "max_cost_cny": 0.6
+    },
+    "full_look_generation": {
+      "policy": "balanced",
+      "primary": "aliyun/qwen-image-edit-plus",
+      "max_cost_cny": 0.6
+    },
+    "render_quality_evaluation": {
+      "policy": "balanced",
+      "primary": "aliyun/qwen3.8-flash",
+      "max_switches": 1,
+      "max_cost_cny": 0.6
+    },
+    "plan_set_generation": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.8-flash",
+      "max_cost_cny": 0.6
+    },
+    "plan_grounding_verification": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.8-flash",
+      "max_cost_cny": 0.6
+    },
+    "body_orbit": {
+      "policy": "quality_first",
+      "primary": "demo/body-orbit"    }
+  },
+  "release": {
+    "previous_version": "quality-core-r1",
+    "candidate_version": "quality-core-r2",
+    "candidate_percent": 5,
+    "bucket_salt": "quality-core-2026-09-12"
+  }
+}

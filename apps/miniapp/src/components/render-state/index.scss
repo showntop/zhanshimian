@@ -1,0 +1,41 @@
+.render-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10rpx;
+  padding: 20rpx 24rpx;
+  border-radius: var(--radius-md);
+  background: var(--moss-soft);
+
+  &__text {
+    font-size: 25rpx;
+    color: var(--ink-2);
+  }
+
+  &__note {
+    font-size: 22rpx;
+    line-height: 1.6;
+    color: var(--ink-3);
+  }
+
+  &__spin {
+    width: 28rpx;
+    height: 28rpx;
+  }
+
+  &__retry {
+    padding: 6rpx 0;
+    font-size: 25rpx;
+    font-weight: 600;
+    color: var(--moss);
+    text-decoration: underline;
+  }
+
+  &--failed {
+    background: var(--cream);
+  }
+
+  &--unavailable {
+    background: var(--cream);
+  }
+}

@@ -1,0 +1,218 @@
+{
+  "schema_version": "assessment-golden.v1",
+  "cases": [
+    {
+      "id": "pass-evidence",
+      "identity_id": "synthetic-001",
+      "authorized": true,
+      "split": "development",
+      "input": {
+        "face": "fixture://face",
+        "side": "fixture://side",
+        "body": "fixture://body"
+      },
+      "expected": {
+        "photo_roles_valid": true,
+        "identity_consistent": true,
+        "allowed_observations": ["上衣肩线低于自然肩点"],
+        "forbidden_observations": ["身材评分"],
+        "minimum_supported_findings": 3,
+        "outcome": "publish"
+      },
+      "provider": {
+        "draft": {
+          "impression_tags": ["利落", "干净"],
+          "priority_title": "先整理额前碎发",
+          "priority_copy": "额前碎发落到眉毛上方，先固定发根再整体定形。",
+          "findings": [
+            {
+              "key": "f1",
+              "category": "hair",
+              "label": "额前碎发",
+              "visible_observation": "额前碎发落到眉毛上方，上衣肩线低于自然肩点",
+              "recommendation": "向后梳理并用少量发蜡固定发根",
+              "priority": 1,
+              "position": 1,
+              "source_role": "face",
+              "anchor": { "x": 0.1, "y": 0.1, "w": 0.2, "h": 0.3 },
+              "confidence": 0.98
+            },
+            {
+              "key": "f2",
+              "category": "outfit",
+              "label": "肩线偏塌",
+              "visible_observation": "上衣肩线低于自然肩点，袖口堆积",
+              "recommendation": "换成合肩线或有垫肩的上装",
+              "priority": 2,
+              "position": 2,
+              "source_role": "body",
+              "anchor": { "x": 0.3, "y": 0.3, "w": 0.4, "h": 0.2 },
+              "confidence": 0.97
+            },
+            {
+              "key": "f3",
+              "category": "color",
+              "label": "整体色偏灰",
+              "visible_observation": "上装与背景同为灰色系，轮廓被弱化",
+              "recommendation": "用一件亮色内搭拉开层次",
+              "priority": 3,
+              "position": 3,
+              "source_role": "side",
+              "anchor": { "x": 0.6, "y": 0.5, "w": 0.3, "h": 0.3 },
+              "confidence": 0.96
+            }
+          ]
+        },
+        "evidence": {
+          "findings": [
+            { "key": "f1", "supported": true, "confidence": 0.98, "reason_code": "" },
+            { "key": "f2", "supported": true, "confidence": 0.97, "reason_code": "" },
+            { "key": "f3", "supported": true, "confidence": 0.96, "reason_code": "" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "reject-sensitive",
+      "identity_id": "synthetic-002",
+      "authorized": true,
+      "split": "development",
+      "input": {
+        "face": "fixture://face",
+        "side": "fixture://side",
+        "body": "fixture://body"
+      },
+      "expected": {
+        "photo_roles_valid": true,
+        "identity_consistent": true,
+        "allowed_observations": [],
+        "forbidden_observations": ["身材评分"],
+        "minimum_supported_findings": 3,
+        "outcome": "reject"
+      },
+      "provider": {
+        "draft": {
+          "impression_tags": ["利落"],
+          "priority_title": "先整理额前碎发",
+          "priority_copy": "额前碎发落到眉毛上方，先固定发根。",
+          "findings": [
+            {
+              "key": "f1",
+              "category": "hair",
+              "label": "额前碎发",
+              "visible_observation": "额前碎发落到眉毛上方",
+              "recommendation": "向后梳理并固定",
+              "priority": 1,
+              "position": 1,
+              "source_role": "face",
+              "anchor": { "x": 0.1, "y": 0.1, "w": 0.2, "h": 0.3 },
+              "confidence": 0.97
+            },
+            {
+              "key": "f2",
+              "category": "outfit",
+              "label": "版型偏松",
+              "visible_observation": "上衣腰线不贴身， 身材评分 80",
+              "recommendation": "换成收腰版型",
+              "priority": 2,
+              "position": 2,
+              "source_role": "body",
+              "anchor": { "x": 0.3, "y": 0.3, "w": 0.4, "h": 0.2 },
+              "confidence": 0.96
+            },
+            {
+              "key": "f3",
+              "category": "color",
+              "label": "整体色偏灰",
+              "visible_observation": "上装与背景同为灰色系",
+              "recommendation": "用亮色内搭拉开层次",
+              "priority": 3,
+              "position": 3,
+              "source_role": "side",
+              "anchor": { "x": 0.6, "y": 0.5, "w": 0.3, "h": 0.3 },
+              "confidence": 0.96
+            }
+          ]
+        },
+        "evidence": {
+          "findings": [
+            { "key": "f1", "supported": true, "confidence": 0.97, "reason_code": "" },
+            { "key": "f2", "supported": true, "confidence": 0.96, "reason_code": "" },
+            { "key": "f3", "supported": true, "confidence": 0.96, "reason_code": "" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "retry-insufficient-evidence",
+      "identity_id": "synthetic-003",
+      "authorized": true,
+      "split": "validation",
+      "input": {
+        "face": "fixture://face",
+        "side": "fixture://side",
+        "body": "fixture://body"
+      },
+      "expected": {
+        "photo_roles_valid": true,
+        "identity_consistent": true,
+        "allowed_observations": ["上衣肩线低于自然肩点"],
+        "forbidden_observations": ["身材评分"],
+        "minimum_supported_findings": 3,
+        "outcome": "retry"
+      },
+      "provider": {
+        "draft": {
+          "impression_tags": ["干净"],
+          "priority_title": "先整理额前碎发",
+          "priority_copy": "额前碎发落到眉毛上方，先固定发根。",
+          "findings": [
+            {
+              "key": "f1",
+              "category": "hair",
+              "label": "额前碎发",
+              "visible_observation": "额前碎发落到眉毛上方，上衣肩线低于自然肩点",
+              "recommendation": "向后梳理并固定",
+              "priority": 1,
+              "position": 1,
+              "source_role": "face",
+              "anchor": { "x": 0.1, "y": 0.1, "w": 0.2, "h": 0.3 },
+              "confidence": 0.98
+            },
+            {
+              "key": "f2",
+              "category": "outfit",
+              "label": "肩线偏塌",
+              "visible_observation": "上衣肩线低于自然肩点",
+              "recommendation": "换成合肩线的上装",
+              "priority": 2,
+              "position": 2,
+              "source_role": "body",
+              "anchor": { "x": 0.3, "y": 0.3, "w": 0.4, "h": 0.2 },
+              "confidence": 0.97
+            },
+            {
+              "key": "f3",
+              "category": "makeup",
+              "label": "唇色偏淡",
+              "visible_observation": "正脸照片里唇色与肤色对比不足",
+              "recommendation": "选一支与肤色相近的豆沙色",
+              "priority": 3,
+              "position": 3,
+              "source_role": "face",
+              "anchor": { "x": 0.35, "y": 0.55, "w": 0.15, "h": 0.1 },
+              "confidence": 0.96
+            }
+          ]
+        },
+        "evidence": {
+          "findings": [
+            { "key": "f1", "supported": true, "confidence": 0.98, "reason_code": "" },
+            { "key": "f2", "supported": true, "confidence": 0.97, "reason_code": "" },
+            { "key": "f3", "supported": false, "confidence": 0.9, "reason_code": "observation_not_visible" }
+          ]
+        }
+      }
+    }
+  ]
+}

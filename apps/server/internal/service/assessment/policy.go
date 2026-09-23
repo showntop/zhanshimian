@@ -1,0 +1,159 @@
+package assessment
+
+import (
+	"github.com/zhanshimian/server/internal/domain"
+	"github.com/zhanshimian/server/internal/provider/ai"
+)
+
+const (
+	StagePhotoTechnicalCheck = "photo.technical_check"
+	StagePhotoContentCheck   = "photo.content_check"
+	StagePhotoIdentityCheck  = "photo.identity_check"
+	StageReportGenerating    = "report.generating"
+	StageEvidenceVerifying   = "report.evidence_check"
+	StageReportPublishing    = "report.publishing"
+
+	codePhotoIdentityUncertain     = "photo_identity_uncertain"
+	codeReportEvidenceInsufficient = "report_evidence_insufficient"
+	codePhotoContentRejected       = "photo_content_rejected"
+	codeQualityPolicyUnsupported   = "quality_policy_unsupported"
+)
+
+type Policy struct{}
+
+type PublicFailure struct {
+	Code      string
+	Message   string
+	Retryable bool
+}
+
+func (e *PublicFailure) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Message != "" {
+		return e.Message
+	}
+	return e.Code
+}
+
+func NewPublicFailure(code, message string, retryable bool) *PublicFailure {
+	return &PublicFailure{Code: code, Message: message, Retryable: retryable}
+}
+
+var publicFailures = map[string]PublicFailure{
+	codePhotoIdentityUncertain: {
+		Code: codePhotoIdentityUncertain, Message: "照片差异较大，请重新拍摄确认", Retryable: false,
+	},
+	codeReportEvidenceInsufficient: {
+		Code: codeReportEvidenceInsufficient, Message: "这次未能形成可靠报告，请重新拍摄后再试", Retryable: true,
+	},
+	codePhotoContentRejected: {
+		Code: codePhotoContentRejected, Message: "照片不符合拍摄要求，请按提示重新拍摄", Retryable: false,
+	},
+	codeQualityPolicyUnsupported: {
+		Code: codeQualityPolicyUnsupported, Message: "这次未能形成可靠报告，请重新拍摄后再试", Retryable: false,
+	},
+}
+
+var evidenceConfidenceByPolicy = map[string]float64{
+	QualityPolicyVersion: 0.95,
+}
+
+var identityConfidenceByPolicy = map[string]float64{
+	QualityPolicyVersion: 0.92,
+}
+
+func LookupPublicFailure(code string) (PublicFailure, bool) {
+	if failure, ok := publicFailures[code]; ok {
+		return failure, true
+	}
+	if message, ok := photoPublicMessage[code]; ok {
+		return PublicFailure{Code: code, Message: message, Retryable: false}, true
+	}
+	return PublicFailure{}, false
+}
+
+// classifyTaskFailure 把内部失败码翻译成对客户端公开的安抚文案与重试标记,
+// 让 publicFailures / photoPublicMessage 目录成为唯一事实来源。目录未收录的
+// code 一律保守:不可重试 + 通用文案,不泄露内部细节(厂商、模型、堆栈)。
+func classifyTaskFailure(class domain.ErrorClass, code string) (message string, retryable bool) {
+	if failure, ok := LookupPublicFailure(code); ok {
+		return failure.Message, failure.Retryable
+	}
+	if class == domain.ErrorQualityRejected {
+		return "这次未能形成可靠报告，请重新拍摄后再试", false
+	}
+	if class == domain.ErrorTransient || class == domain.ErrorThrottled {
+		// 瞬时故障重试耗尽（如 AI 通道故障）：照片本身没问题，应给「重新发起」而非「重新拍摄」。
+		return "分析暂时未完成，请稍后重试", true
+	}
+	return "分析暂时未完成，请稍后重试", false
+}
+
+func (Policy) EvidenceThreshold(policyVersion string) (float64, error) {
+	threshold, ok := evidenceConfidenceByPolicy[policyVersion]
+	if !ok {
+		return 0, catalogFailure(codeQualityPolicyUnsupported)
+	}
+	return threshold, nil
+}
+
+func (Policy) IdentityThreshold(policyVersion string) (float64, error) {
+	threshold, ok := identityConfidenceByPolicy[policyVersion]
+	if !ok {
+		return 0, catalogFailure(codeQualityPolicyUnsupported)
+	}
+	return threshold, nil
+}
+
+func (Policy) AcceptContent(content ai.PhotoQualityResult) error {
+	if len(content.Photos) == 0 {
+		return catalogFailure(codePhotoContentRejected)
+	}
+	for _, photo := range content.Photos {
+		if photo.Decision != "pass" {
+			return catalogFailure(codePhotoContentRejected)
+		}
+	}
+	return nil
+}
+
+func (p Policy) AcceptIdentity(identity ai.IdentityResult, policyVersion string) error {
+	threshold, err := p.IdentityThreshold(policyVersion)
+	if err != nil {
+		return err
+	}
+	if identity.Decision != "pass" || identity.Confidence < threshold {
+		return catalogFailure(codePhotoIdentityUncertain)
+	}
+	return nil
+}
+
+func (p Policy) SupportedFindings(findings []domain.DraftFinding, evidence ai.EvidenceResult, policyVersion string) []domain.DraftFinding {
+	threshold, err := p.EvidenceThreshold(policyVersion)
+	if err != nil {
+		return nil
+	}
+	byKey := make(map[string]ai.EvidenceDecision, len(evidence.Findings))
+	for _, decision := range evidence.Findings {
+		byKey[decision.Key] = decision
+	}
+	supported := make([]domain.DraftFinding, 0, len(findings))
+	for _, finding := range findings {
+		decision, ok := byKey[finding.Key]
+		if !ok || !decision.Supported || decision.Confidence < threshold {
+			continue
+		}
+		supported = append(supported, finding)
+	}
+	return supported
+}
+
+func catalogFailure(code string) *PublicFailure {
+	if failure, ok := publicFailures[code]; ok {
+		copy := failure
+		return &copy
+	}
+	return NewPublicFailure(code, code, false)
+}

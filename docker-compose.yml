@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: jianwo
+      POSTGRES_USER: jianwo
+      POSTGRES_PASSWORD: jianwo
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - jianwo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jianwo -d jianwo"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./apps/server
+    env_file:
+      - path: ./apps/server/.env
+        required: false
+    # 只覆盖 compose 网络相关项。密钥/存储/AI 一律以 env_file 为准；
+    # 这里再写 ${VAR:-} 会把 env_file 里的 COS 密钥盖成空，本地就会退回 local 盘。
+    # 进程职责由二进制决定：api 跑 /app/uplook-api，不内嵌 Worker（RUN_WORKER 已删除）。
+    environment:
+      ADDR: ${ADDR:-:8080}
+      DATABASE_URL: ${DATABASE_URL:-postgres://jianwo:jianwo@postgres:5432/jianwo?sslmode=disable}
+      # WeChat DevTools 将 loopback IP 视为安全本地源；新版运行时拒绝 http://localhost 图片 URL。
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:58000}
+      # AI 路由只经文件（volume 挂载），不用 AI_ROUTING_JSON 以免密钥进 compose。
+      AI_ROUTING_FILE: /app/config/ai-routing.json
+    ports:
+      - "127.0.0.1:58000:8080"
+    volumes:
+      - jianwo_uploads:/app/data/uploads
+      - ${AI_ROUTING_HOST_FILE:-./apps/server/config/ai-routing.example.json}:/app/config/ai-routing.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ./apps/server
+    env_file:
+      - path: ./apps/server/.env
+        required: false
+    # Worker 与 API 共享数据库/COS/AI 路由配置；不暴露 HTTP 端口，
+    # 可独立扩缩容（docker compose up --scale worker=N）。
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://jianwo:jianwo@postgres:5432/jianwo?sslmode=disable}
+      WORKER_ID: ${WORKER_ID:-worker-1}
+      AI_ROUTING_FILE: /app/config/ai-routing.json
+    volumes:
+      - jianwo_uploads:/app/data/uploads
+      - ${AI_ROUTING_HOST_FILE:-./apps/server/config/ai-routing.example.json}:/app/config/ai-routing.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/app/uplook-worker"]
+
+volumes:
+  jianwo_pgdata:
+  jianwo_uploads:

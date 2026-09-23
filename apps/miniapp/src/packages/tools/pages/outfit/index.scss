@@ -1,0 +1,691 @@
+// 穿搭诊断 · 量体改衣单（编辑排版 / Atelier Editorial）
+// 排版语法：衬线大标、裁切角标、编号索引、细规线、页边批注——
+// 材质仍是品牌 token（墨/苔绿/奶油），告别全局的圆角卡片 + 毛玻璃。
+// 照片机械（aspectFit 羽化 / 失焦衬底 / 结果态 fixed 钉屏）与旧实现一比一保留。
+//
+// 一屏核算（空态/日限态）：高度不进 JS——外壳 .page--lock 锁 100vh 纵排，
+// 本容器 flex:1 吃掉导航占位以外的全部余量（含 spacer 的 margin，无处可漏）。
+// 结果态解除锁（单据从钉住的照片上滚过），外壳同步去掉 .page--lock。
+.od {
+  display: flex;
+  flex-direction: column;
+  gap: 36rpx;
+  // 锁高外壳里的 flex:1 即一屏；overflow 吞掉纸面预算残差。
+  // foot 的 margin-top:auto 依旧成立（富余空间吸到 foot 上方）。
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  // 底部呼吸（含 Home 条安全区）只在这一处，env 是唯一真值
+  padding: 20rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 12rpx);
+
+  // 结果态是「hero 钉屏 + 卡片上滚」的滚动叙事：解除一屏锁
+  &--done {
+    flex: 0 0 auto;
+    height: auto;
+    overflow: visible;
+    gap: 0;
+  }
+
+  // ---------- 照片 hero ----------
+  &__hero {
+    // 空态一屏：示范图不需要装 9:16 全身照的 820rpx 大框——高度让 flex 收缩
+    // （min 460 保示范图可读，max 650 防长屏独占）；结果态 inline 设满屏出血高。
+    // 820rpx 的整身照显影上限逻辑只在结果态有意义（本人照片 aspectFit）。
+    height: 650rpx;
+    min-height: 460rpx;
+    flex-shrink: 1;
+    flex-basis: auto;
+    border-radius: 0;
+    border: 0;
+
+    &-img {
+      width: 100%;
+      height: 100%;
+    }
+
+    // 示范图完整入镜的 letterbox 必须透明：露出底下同一张图的失焦衬底
+    &-img.example-image,
+    &-img .example-image__img {
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  &__hero-actions {
+    position: absolute;
+    top: 20rpx;
+    right: 20rpx;
+    z-index: 5;
+  }
+
+  // 「重选照片」：结果态透明导航下的可读 chip（scrim 底白字，照片上永远成立）
+  &__hero-alt {
+    padding: 8rpx 20rpx;
+    border-radius: 999rpx;
+    background: var(--scrim);
+    font-size: 20rpx;
+    color: #ffffff;
+  }
+
+  // 前景照片/锚点层的定位盒：默认铺满 hero；结果态由页面 inline top/bottom 让位
+  &__stage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    // 照片盒：横向羽化（垂直向在锐图自己的 --mv* 上）。渐变断点由页面按
+    // photoDims 实测写入 CSS 变量；未就绪兜底 48rpx，老基础库不支持 mask
+    // 时降级为硬边（有模糊层兜底）
+    &--photo {
+      -webkit-mask-image: linear-gradient(
+        90deg,
+        transparent var(--mh0, 0),
+        #000 var(--mh1, 48rpx),
+        #000 var(--mh2, calc(100% - 48rpx)),
+        transparent var(--mh3, 100%)
+      );
+      mask-image: linear-gradient(
+        90deg,
+        transparent var(--mh0, 0),
+        #000 var(--mh1, 48rpx),
+        #000 var(--mh2, calc(100% - 48rpx)),
+        transparent var(--mh3, 100%)
+      );
+    }
+
+    // 标记层（角标 + 编号锚点）的盒：整层不挡触摸（重选 chip / 滑动）
+    &--anno {
+      pointer-events: none;
+    }
+  }
+
+  // 对焦模糊层：与锐图同盒同几何（aspectFit），虚化 + 放大——
+  // 锐图硬边落在同一画面的失焦版上，模糊层自身边缘因 blur 的 alpha 自然软化
+  &__stage-blur {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    background-color: transparent;
+    border-radius: 0;
+    filter: blur(28rpx) saturate(1.2);
+    transform: scale(1.2);
+
+    .example-badge {
+      display: none;
+    }
+  }
+
+  // 本人照片的模糊衬底（铺满宽度，色自图出）：饱和拉高亮度略压，氛围不死灰
+  &__photo-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    filter: blur(36rpx) saturate(1.45) brightness(0.94);
+    transform: scale(1.25);
+  }
+
+  // 锐图：aspectFit 完整入镜 + 纵向羽化（--mv* 断点由页面实测写入）
+  &__hero-img--fit {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background-color: transparent;
+    border-radius: 0;
+    -webkit-mask-image: linear-gradient(
+      180deg,
+      transparent var(--mv0, 0),
+      #000 var(--mv1, 64rpx),
+      #000 var(--mv2, calc(100% - 64rpx)),
+      transparent var(--mv3, 100%)
+    );
+    mask-image: linear-gradient(
+      180deg,
+      transparent var(--mv0, 0),
+      #000 var(--mv1, 64rpx),
+      #000 var(--mv2, calc(100% - 64rpx)),
+      transparent var(--mv3, 100%)
+    );
+  }
+
+  // ---------- 空态：示范图 hero + 上传条 ----------
+  &__upload {
+    position: relative;
+    height: 100%;
+
+    // 模糊衬底铺满宽度（自图衍生的背景色，零新增资产）
+    &-backdrop {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 0;
+      filter: blur(36rpx) saturate(1.12) brightness(1.05);
+      transform: scale(1.25);
+
+      .example-badge {
+        display: none;
+      }
+    }
+
+    // 前景完整入镜的示范图压过衬底
+    .example-image {
+      background: transparent;
+    }
+
+    // 前景示范图压过衬底层（letterbox 透明）
+    .od__hero-img {
+      position: relative;
+      z-index: 1;
+      background-color: transparent;
+      border-radius: 0;
+    }
+
+    // 角标让位底部上传条
+    .example-badge {
+      top: 16rpx;
+      right: 16rpx;
+      bottom: auto;
+    }
+
+    &-bar {
+      position: absolute;
+      left: 24rpx;
+      right: 24rpx;
+      bottom: 24rpx;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10rpx;
+      height: 88rpx;
+      border-radius: 999rpx;
+      background: var(--scrim);
+      box-shadow: var(--shadow-card);
+
+      &-plus {
+        font-size: 32rpx;
+        line-height: 1;
+        color: #ffffff;
+      }
+
+      &-text {
+        font-size: 26rpx;
+        font-weight: 600;
+        color: #ffffff;
+      }
+    }
+  }
+
+  // ---------- 眉题行（刊头与改衣单共用）----------
+  &__mast {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-bottom: 12rpx;
+    border-bottom: 1rpx solid var(--ink);
+
+    &-meta {
+      font-size: 22rpx;
+      font-weight: 600;
+      letter-spacing: 6rpx;
+      color: var(--moss-deep);
+    }
+
+    &-rule {
+      font-size: 20rpx;
+      letter-spacing: 2rpx;
+      color: var(--ink-3);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  // ---------- 刊头（空态）----------
+  &__masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+    flex-shrink: 0;
+
+    // 标题左缘竖规线：编辑排版的悬挂缩进
+    padding-left: 20rpx;
+    border-left: 4rpx solid var(--moss);
+
+    &-title {
+      font-size: 48rpx;
+      line-height: 1.26;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: 2rpx;
+    }
+
+    &-desc {
+      font-size: 24rpx;
+      line-height: 1.6;
+      color: var(--ink-2);
+    }
+  }
+
+  // ---------- 拍摄须知：编号细目 ----------
+  &__notice {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    flex-shrink: 0;
+
+    &-label {
+      font-size: 22rpx;
+      font-weight: 600;
+      letter-spacing: 4rpx;
+      color: var(--ink-3);
+    }
+
+    &-row {
+      display: flex;
+      align-items: baseline;
+      gap: 18rpx;
+      padding: 8rpx 0;
+      border-bottom: 1rpx solid var(--line);
+    }
+
+    &-no {
+      flex-shrink: 0;
+      width: 44rpx;
+      font-size: 24rpx;
+      font-weight: 700;
+      color: var(--moss);
+      font-variant-numeric: tabular-nums;
+    }
+
+    &-text {
+      font-size: 25rpx;
+      line-height: 1.5;
+      color: var(--ink-2);
+    }
+  }
+
+  // ---------- 场景章节：目录式选择 ----------
+  &__context {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+
+    &-label {
+      font-size: 22rpx;
+      font-weight: 600;
+      letter-spacing: 4rpx;
+      color: var(--ink-3);
+    }
+
+    &-list {
+      display: flex;
+    }
+  }
+
+  &__chapter {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6rpx;
+    padding: 18rpx 0 14rpx;
+    border-bottom: 4rpx solid var(--line);
+    transition: border-color 0.2s ease;
+
+    &--active {
+      border-bottom-color: var(--ink);
+
+      .od__chapter-no,
+      .od__chapter-label {
+        color: var(--ink);
+      }
+    }
+
+    &-no {
+      font-size: 30rpx;
+      font-weight: 700;
+      color: var(--ink-3);
+      line-height: 1;
+      transition: color 0.2s ease;
+    }
+
+    &-label {
+      font-size: 26rpx;
+      color: var(--ink-2);
+      transition: color 0.2s ease;
+    }
+  }
+
+  // ---------- 结果态：照片满屏出血（透明导航），单据从钉住的照片上滚过 ----------
+  &--done {
+    gap: 0;
+
+    .od__hero {
+      // 钉住不滚：卡片（z3）从它上面滚过；文档流占位由页面同高 spacer 补上。
+      // fixed 后 bleed 负边距无意义且会推歪盒子，归零（left/right 已是满宽）
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1;
+      margin: 0;
+      // 实际高度由页面 inline 设为「实测导航高 + (1020+120)rpx」：导航区出血只铺
+      // 衬底，前景照片/锚点 stage 上下各让 56/120rpx（此 1140rpx 仅作首帧兜底）
+      height: 1140rpx;
+      border-radius: 0;
+      border: none;
+
+      // 顶部 scrim：压住照片保证透明导航的白标题/返回可读
+      &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 260rpx;
+        z-index: 2;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0));
+        pointer-events: none;
+      }
+
+      // 底部融化：照片渐变进内容底色，衔接不是一刀切
+      &::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 200rpx;
+        z-index: 2;
+        background: linear-gradient(180deg, rgba(244, 245, 242, 0), var(--bg));
+        pointer-events: none;
+      }
+    }
+
+    .od__hero-actions {
+      top: 28rpx;
+      right: calc(var(--page-gutter) + 8rpx);
+      z-index: 4;
+    }
+  }
+
+  // ---------- 改衣单（结果态）----------
+  &__slip {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 40rpx;
+    // 上叠钉住的照片：负边距顶进照片停靠带（与旧 sheet 同一机械）。
+    // 底垫 = 固定 CTA 栏全高（按钮 96 + 说明行 + 上下距 + 安全区）+ 余量，
+    // 否则滚到底时最后一段（边注）被 CTA 渐变盖住
+    margin: -88rpx calc(-1 * var(--page-gutter)) 0;
+    padding: 40rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 280rpx);
+    background: var(--bg);
+    box-shadow: var(--shadow-sheet);
+  }
+
+  &__advice {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+
+    // 引文区：细规线围出的核心建议——底线压住整个引文块
+    padding-bottom: 28rpx;
+    border-bottom: 1rpx solid var(--ink);
+
+    &-lead {
+      font-size: 22rpx;
+      letter-spacing: 2rpx;
+      color: var(--ink-3);
+    }
+
+    // 判词标题用 .serif：改衣单的裁缝批语，一屏只此一处（红线）
+    &-title {
+      font-size: 48rpx;
+      font-weight: 700;
+      line-height: 1.3;
+      color: var(--ink);
+    }
+
+    &-body {
+      font-size: 26rpx;
+      line-height: 1.8;
+      color: var(--ink-2);
+    }
+  }
+
+  // ---------- 还可以改：编号索引（与照片锚点 ①②③ 对应）----------
+  &__index {
+    display: flex;
+    flex-direction: column;
+
+    &-label {
+      font-size: 22rpx;
+      font-weight: 600;
+      letter-spacing: 4rpx;
+      color: var(--ink-3);
+      margin-bottom: 6rpx;
+    }
+
+    &-row {
+      display: flex;
+      align-items: baseline;
+      gap: 18rpx;
+      padding: 20rpx 0;
+      border-bottom: 1rpx solid var(--line);
+    }
+
+    &-mark {
+      flex-shrink: 0;
+      font-size: 30rpx;
+      font-weight: 700;
+      color: var(--moss);
+      line-height: 1;
+    }
+
+    &-text {
+      font-size: 28rpx;
+      line-height: 1.6;
+      color: var(--ink);
+    }
+  }
+
+  // ---------- 已经合适：页边批注 ----------
+  &__keepnote {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    padding-left: 20rpx;
+    border-left: 2rpx solid var(--moss);
+
+    &-label {
+      font-size: 20rpx;
+      letter-spacing: 3rpx;
+      color: var(--moss-deep);
+    }
+
+    &-text {
+      font-size: 24rpx;
+      line-height: 1.7;
+      color: var(--ink-2);
+    }
+  }
+
+  // ---------- 取景框角标 + 编号锚点 ----------
+  // 四角 L 形裁切标：量体裁衣的取景框（奶油线，压在照片四角——标记层未被羽化）
+  &__crop {
+    position: absolute;
+    width: 36rpx;
+    height: 36rpx;
+    border-color: rgba(244, 245, 242, 0.9);
+    border-style: solid;
+    border-width: 0;
+    z-index: 2;
+
+    &--tl {
+      top: 20rpx;
+      left: 20rpx;
+      border-top-width: 3rpx;
+      border-left-width: 3rpx;
+    }
+
+    &--tr {
+      top: 20rpx;
+      right: 20rpx;
+      border-top-width: 3rpx;
+      border-right-width: 3rpx;
+    }
+
+    &--bl {
+      bottom: 20rpx;
+      left: 20rpx;
+      border-bottom-width: 3rpx;
+      border-left-width: 3rpx;
+    }
+
+    &--br {
+      bottom: 20rpx;
+      right: 20rpx;
+      border-bottom-width: 3rpx;
+      border-right-width: 3rpx;
+    }
+  }
+
+  // 编号锚点：衬线圈号，奶油底 + 墨描边——钉在「还可以改」的位置上
+  &__pin {
+    position: absolute;
+    z-index: 3;
+    min-width: 52rpx;
+    height: 52rpx;
+    padding: 0 6rpx;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(244, 245, 242, 0.92);
+    border: 2rpx solid var(--ink);
+    color: var(--ink);
+    font-size: 28rpx;
+    font-weight: 700;
+    box-shadow: 0 6rpx 18rpx rgba(31, 34, 30, 0.25);
+  }
+
+  // ---------- 覆盖件 ----------
+  &__mask {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20rpx;
+    background: var(--scrim-heavy);
+
+    &-spin {
+      width: 48rpx;
+      height: 48rpx;
+    }
+
+    &-text {
+      font-size: 24rpx;
+      color: rgba(238, 240, 236, 0.92);
+    }
+  }
+
+  // ---------- 提示 / 拒识 / 底部 ----------
+  &__hint {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+
+    &-title {
+      font-size: 36rpx;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    &-desc {
+      font-size: 24rpx;
+      line-height: 1.65;
+      color: var(--ink-3);
+    }
+  }
+
+  // 照片门禁拒态：页边批注的变体——苔绿竖规线，动作交给主按钮「重新选择照片」
+  &__rejected {
+    padding: 20rpx 24rpx;
+    border-left: 4rpx solid var(--moss);
+    background: var(--moss-soft);
+
+    &-text {
+      font-size: 24rpx;
+      line-height: 1.6;
+      color: var(--ink-2);
+    }
+  }
+
+  // ---------- 固定 CTA 栏：内容从栏底渐显滚过，主按钮永远在拇指位 ----------
+  &__cta {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 4rpx;
+    padding: 32rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 8rpx);
+    background: linear-gradient(180deg, rgba(244, 245, 242, 0), var(--bg) 72rpx);
+  }
+
+  &__result-row {
+    display: flex;
+    justify-content: center;
+    gap: 48rpx;
+  }
+
+  &__result-alt {
+    padding: 16rpx 8rpx;
+    font-size: 24rpx;
+    color: var(--moss);
+  }
+
+  // ---------- 底部操作 ----------
+  &__foot {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    flex-shrink: 0;
+    // 锁高容器内沉底（把富余空间吸到 hero 与 foot 之间）
+    margin-top: auto;
+
+    &-row {
+      display: flex;
+      justify-content: center;
+      gap: 48rpx;
+    }
+
+    &-alt {
+      padding: 12rpx 8rpx;
+      font-size: 24rpx;
+      color: var(--moss);
+    }
+  }
+}

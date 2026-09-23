@@ -1,0 +1,851 @@
+// 首页样式（恢复 09-11 旧线视觉）：hero 锚点 + 分区规则线 + 次级入口降权重。
+// hero 文字一律 cream（card--hero 已设基色），这里只补排版细节。
+// 与旧线的两处适配：图片组件换成 SourceImage（内部类 .source-image__img，
+// 角标 .example-badge / 弱化 .example-soft 由组件按 source_kind 投影，页面只调位置）；
+// 新 AppHeader 占位精确到导航底边，不再需要用负 margin 抵消旧头部间距。
+.home {
+  display: flex;
+  flex-direction: column;
+
+  &__greeting {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+    // 导航下净距 = spacer 24rpx + 此处 4rpx ≈ 旧线 28rpx；
+    // 各页顶距统一收在 spacer，页面根节点不再自叠
+    padding: 4rpx 8rpx 28rpx;
+
+    &-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    &-kicker {
+      color: var(--ink-2);
+      font-size: 24rpx;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    &-date {
+      font-size: 22rpx;
+      color: var(--ink-3);
+    }
+
+    &-title {
+      padding: 0;
+      margin: 0;
+    }
+  }
+
+  // ---------- 分区（density 3：舒展留白） ----------
+  &__section {
+    display: flex;
+    flex-direction: column;
+    padding-top: 64rpx;
+  }
+
+  &__section-head {
+    display: flex;
+    flex-direction: column;
+    padding: 0 5rpx;
+
+    .section-title {
+      margin: 0 0 14rpx;
+      font-size: 32rpx;
+    }
+  }
+
+  // ---------- hero 主卡（每页至多一个视觉锚点） ----------
+  &__hero {
+    display: flex;
+    align-items: center;
+    gap: 24rpx;
+    padding: 36rpx 32rpx;
+    margin-top: 8rpx;
+
+    &-eyebrow {
+      font-size: 24rpx;
+      font-weight: 600;
+      letter-spacing: 0;
+      color: rgba(238, 240, 236, 0.78);
+    }
+
+    &-title {
+      margin-top: 10rpx;
+      font-size: 40rpx;
+      line-height: 1.3;
+      font-weight: 700;
+      color: var(--cream);
+    }
+
+    &-desc {
+      margin-top: 12rpx;
+      font-size: 26rpx;
+      line-height: 1.55;
+      color: rgba(238, 240, 236, 0.86);
+    }
+
+    &-link {
+      margin-top: 18rpx;
+      font-size: 26rpx;
+      font-weight: 600;
+      color: var(--cream);
+    }
+
+    &-note {
+      margin-top: 16rpx;
+      font-size: 22rpx;
+      color: rgba(238, 240, 236, 0.68);
+      text-align: center;
+    }
+
+    &-copy {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    &-img {
+      width: 168rpx;
+      height: 208rpx;
+      flex-shrink: 0;
+    }
+
+    // 新用户建档：纵向铺排
+    &--onboard {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+
+      .home__hero-desc {
+        margin-top: 14rpx;
+      }
+
+      .primary-button {
+        margin-top: 24rpx;
+      }
+    }
+  }
+
+  // ---------- 新用户建档 hero：流程与结果同屏 ----------
+  &__hero-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 30rpx;
+  }
+
+  &__hero-preview {
+    position: relative;
+    width: 176rpx;
+    height: 222rpx;
+    flex-shrink: 0;
+  }
+
+  &__preview-slice {
+    position: absolute;
+    width: 118rpx;
+    height: 164rpx;
+    border-radius: 18rpx;
+    display: flex;
+    align-items: flex-end;
+    padding: 12rpx;
+    overflow: hidden;
+    border: 2rpx solid rgba(238, 240, 236, 0.42);
+    box-shadow: 0 12rpx 28rpx rgba(20, 27, 17, 0.18);
+
+    &--1 {
+      left: 0;
+      top: 18rpx;
+      transform: rotate(-8deg);
+    }
+
+    &--2 {
+      left: 35rpx;
+      top: 0;
+      z-index: 2;
+    }
+
+    &--3 {
+      right: 0;
+      top: 28rpx;
+      transform: rotate(8deg);
+    }
+  }
+
+  &__preview-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+
+    // 深绿底上 0.92 不透明度会让示例图发奶；弱化保留模糊，存在感还回来
+    .example-soft {
+      opacity: 1;
+    }
+  }
+
+  &__preview-caption {
+    position: relative;
+    z-index: 3;
+    font-size: 18rpx;
+    font-weight: 700;
+    color: var(--cream);
+    text-shadow: 0 2rpx 8rpx rgba(20, 27, 17, 0.46);
+  }
+
+  &__steps {
+    display: flex;
+    gap: 12rpx;
+    margin-top: 24rpx;
+    padding-top: 20rpx;
+    border-top: 1rpx solid var(--line-on-deep);
+  }
+
+  &__step {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8rpx;
+    padding: 14rpx 10rpx;
+    border-radius: var(--radius-md);
+    background: rgba(238, 240, 236, 0.10);
+
+    // 序号 chip 与标题同行（标题已收 4~6 字，同行不再断行；
+    // 之前断行是「3 套可执行方案」太长逼出来的，不是设计意图）
+    &-index {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30rpx;
+      height: 30rpx;
+      flex-shrink: 0;
+      border-radius: 999rpx;
+      background: rgba(238, 240, 236, 0.88);
+      color: var(--moss-deep);
+      font-size: 16rpx;
+      font-weight: 750;
+    }
+
+    &-copy {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3rpx;
+    }
+
+    &-title {
+      font-size: 22rpx;
+      line-height: 1.35;
+      font-weight: 700;
+      color: var(--cream);
+    }
+
+    &-desc {
+      font-size: 20rpx;
+      line-height: 1.45;
+      color: rgba(238, 240, 236, 0.72);
+    }
+  }
+
+  &__hero--photo {
+    min-height: 280rpx;
+
+    .home__hero-img {
+      width: 200rpx;
+      height: 260rpx;
+    }
+  }
+
+  // ---------- 回访无今日方案：本人照片成为唯一视觉焦点 ----------
+  &__hero--report {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+
+    .home__hero-title {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      font-size: 36rpx;
+      line-height: 1.28;
+    }
+
+    .home__hero-desc {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      font-size: 22rpx;
+    }
+  }
+
+  &__report-main {
+    display: flex;
+    min-height: 314rpx;
+  }
+
+  &__hero--report &__hero-copy {
+    justify-content: center;
+    padding: 30rpx 18rpx 28rpx 30rpx;
+  }
+
+  &__report-visual {
+    position: relative;
+    width: 248rpx;
+    height: 314rpx;
+    flex-shrink: 0;
+    overflow: hidden;
+    background: var(--moss-deep);
+  }
+
+  &__report-image {
+    width: 100%;
+    height: 314rpx;
+    border-radius: 0;
+  }
+
+  // 宽幅品牌色交叉渐隐：消除「绿卡旁贴一张矩形照片」的硬接缝；
+  // 右侧保持清晰，轻微上下压暗让照片色调融入整张卡片。
+  &__report-shade {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(
+        90deg,
+        var(--moss-deep) 0%,
+        rgba(57, 73, 46, 0.94) 14%,
+        rgba(57, 73, 46, 0.62) 38%,
+        rgba(57, 73, 46, 0.18) 68%,
+        rgba(57, 73, 46, 0) 100%
+      ),
+      linear-gradient(
+        180deg,
+        rgba(35, 46, 29, 0.16) 0%,
+        rgba(35, 46, 29, 0) 34%,
+        rgba(35, 46, 29, 0) 68%,
+        rgba(35, 46, 29, 0.24) 100%
+      );
+    pointer-events: none;
+  }
+
+  &__report-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 82rpx;
+    padding: 18rpx 30rpx;
+    border-top: 1rpx solid rgba(238, 240, 236, 0.18);
+  }
+
+  &__report-action-label {
+    color: var(--cream);
+    font-size: 23rpx;
+    font-weight: 700;
+  }
+
+  &__report-action-meta {
+    color: rgba(238, 240, 236, 0.72);
+    font-size: 19rpx;
+  }
+
+  &__report-action-count {
+    margin-right: 4rpx;
+    color: var(--cream);
+    font-size: 32rpx;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  // ---------- 工具（1 张发型主卡 + 2 张安静卡；三色区分 + 场景风线稿图标） ----------
+  &__tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx;
+  }
+
+  &__tool {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    padding: 26rpx 20rpx 24rpx;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--moss-soft);
+
+    // 三色区分（与场景格同一低饱和色系）：全部 moss-soft 看起来死板
+    &--outfit {
+      background: #e8e4e6;
+    }
+
+    &--purchase {
+      background: #ede7db;
+    }
+
+    &-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 8rpx;
+      min-width: 0;
+    }
+
+    &-name-row {
+      display: flex;
+      align-items: center;
+      gap: 10rpx;
+      min-width: 0;
+    }
+
+    &-icon {
+      width: 34rpx;
+      height: 34rpx;
+      flex-shrink: 0;
+    }
+
+    // 标题上半部的占位水印：场合格同一语言（大号低透明线稿），
+    // 填掉左上半区的空白，不占信息层级
+    &-watermark {
+      position: absolute;
+      top: 14rpx;
+      left: 26rpx;
+      z-index: 1;
+      width: 148rpx;
+      height: 148rpx;
+      opacity: 0.15;
+      transform: rotate(-10deg);
+    }
+
+    // 主卡降一档：灰绿底 + 右侧照片，深绿只留报告 hero
+    // （每页至多一个深色视觉锚点；两块 moss-deep 连排会互相抢焦点）
+    &--lead {
+      flex: 1 1 100%;
+      // 定高不变高：视觉区比例（384×238rpx）是裁切方向的裁决依据，
+      // 卡高随内容漂移的话枢纽就失准（见 index.tsx frameAspect 注释）
+      height: 238rpx;
+      justify-content: flex-end;
+      padding: 32rpx 46% 30rpx 28rpx;
+      background: #d9e2d1;
+      isolation: isolate;
+
+      &::after {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        content: '';
+        // 左实右虚的融合带：左侧保住文案可读，右侧照片完整入镜后
+        // 脸落在视觉区中央（约 73% 卡宽），停顿点左移把清晰区让给它
+        background: linear-gradient(
+          90deg,
+          rgba(217, 226, 209, 1) 0%,
+          rgba(217, 226, 209, 0.96) 38%,
+          rgba(217, 226, 209, 0.55) 56%,
+          rgba(217, 226, 209, 0.14) 74%,
+          rgba(217, 226, 209, 0) 90%
+        );
+        pointer-events: none;
+      }
+
+      .home__tool-copy {
+        position: relative;
+        z-index: 2;
+      }
+
+      .home__tool-name {
+        font-size: 34rpx;
+        font-weight: 700;
+        color: var(--ink);
+      }
+
+      .home__tool-desc {
+        color: var(--ink-2);
+      }
+
+      .example-badge {
+        top: auto;
+        right: 12rpx;
+        bottom: 12rpx;
+        left: auto;
+        z-index: 4;
+        padding: 3rpx 8rpx;
+        font-size: 16rpx;
+      }
+    }
+
+    &-visual {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      z-index: -2;
+      width: 56%;
+      overflow: hidden;
+
+      // 全出血直出：单层真图（anchor=top 按宽铺满、顶对齐、底部越界裁切），
+      // 无模糊无色罩——4:3 头肩规范保证裁掉的只是背景。左缘 40rpx 羽化 +
+      // 卡面渐变把图溶进卡面；右/上/下贴卡片边缘，随卡片圆角裁切。
+      &-photo {
+        position: absolute;
+        inset: 0;
+        background-color: transparent;
+        border-radius: 0;
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 40rpx, #000 100%);
+        mask-image: linear-gradient(90deg, transparent, #000 40rpx, #000 100%);
+      }
+    }
+
+    &-badge {
+      position: absolute;
+      top: 12rpx;
+      right: 12rpx;
+      z-index: 5;
+      padding: 4rpx 12rpx;
+      border-radius: 999rpx;
+      background: var(--surface-strong);
+      color: var(--moss);
+      font-size: 20rpx;
+      font-weight: 650;
+
+      // 实时任务态：moss 实底 + 轻呼吸，区别于静态「推荐」标
+      &--live {
+        background: var(--moss);
+        color: #ffffff;
+        animation: home-badge-live 1.6s ease-in-out infinite;
+      }
+    }
+
+    &-name {
+      font-size: 26rpx;
+      font-weight: 650;
+      color: var(--ink);
+    }
+
+    &-desc {
+      font-size: 22rpx;
+      line-height: 1.45;
+      color: var(--ink-3);
+    }
+  }
+
+  // ---------- 场景（3:2 / 2:3 / 通栏的非对称图形网格） ----------
+  &__scenes {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12rpx;
+  }
+
+  &__scene {
+    position: relative;
+    grid-column: span 2;
+    min-width: 0;
+    min-height: 168rpx;
+    display: flex;
+    align-items: flex-end;
+    padding: 24rpx 22rpx;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    border: 0;
+
+    &--interview {
+      grid-column: span 3;
+      min-height: 196rpx;
+      background: #d7e0d2;
+
+      .home__scene-visual {
+        top: -34rpx;
+        right: -12rpx;
+        width: 178rpx;
+        height: 178rpx;
+        opacity: 0.28;
+        transform: rotate(-10deg);
+      }
+    }
+
+    &--wedding {
+      grid-column: span 2;
+      min-height: 196rpx;
+      background: var(--ink);
+
+      .home__scene-label,
+      .home__scene-desc {
+        color: var(--cream);
+      }
+
+      .home__scene-visual {
+        opacity: 0.24;
+        transform: rotate(10deg) scale(1.08);
+      }
+    }
+
+    &--date {
+      grid-column: span 2;
+      background: #e8e4e6;
+    }
+
+    &--daily {
+      grid-column: span 3;
+      background: #d5dfcf;
+
+      .home__scene-visual {
+        top: -40rpx;
+        right: -28rpx;
+        width: 190rpx;
+        height: 190rpx;
+        opacity: 0.26;
+        transform: rotate(7deg);
+      }
+    }
+
+    &--gathering {
+      grid-column: span 5;
+      min-height: 122rpx;
+      padding-left: 152rpx;
+      background: #e5e9e6;
+
+      .home__scene-visual {
+        right: auto;
+        left: 16rpx;
+        top: -40rpx;
+      }
+    }
+
+    &-visual {
+      position: absolute;
+      top: -26rpx;
+      right: -20rpx;
+      width: 150rpx;
+      height: 150rpx;
+      opacity: 0.18;
+      transform: rotate(-8deg);
+    }
+
+    &-icon {
+      width: 100%;
+      height: 100%;
+    }
+
+    &-copy {
+      position: relative;
+      z-index: 2;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4rpx;
+    }
+
+    &-label {
+      font-size: 26rpx;
+      font-weight: 650;
+      color: var(--ink);
+    }
+
+    &-desc {
+      font-size: 22rpx;
+      line-height: 1.4;
+      color: var(--ink-3);
+    }
+  }
+
+  &__scene-note {
+    margin-top: 18rpx;
+    padding: 0 5rpx;
+    font-size: 20rpx;
+    color: var(--moss);
+  }
+
+  // 方案集规划中的轻量入口（新线能力，旧线无对应物；按 scene-note 的安静权重处理）
+  &__planning {
+    align-self: flex-start;
+    padding: 0 5rpx;
+    font-size: 22rpx;
+    color: var(--moss);
+    text-decoration: underline;
+  }
+
+  // ---------- 顾问与衣橱（收尾锚点：通栏堆叠，advisor 重、wardrobe 轻） ----------
+  &__life {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+  }
+
+  &__life-item {
+    display: flex;
+    align-items: center;
+    gap: 20rpx;
+    padding: 30rpx 28rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface-strong);
+    border: 1rpx solid var(--line);
+
+    &-copy {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8rpx;
+      min-width: 0;
+    }
+
+    // 顾问是核心特色：mossSoft 通栏大卡 + 衬线标题，承接页面尾部重量
+    &--advisor {
+      padding: 36rpx 32rpx;
+      background: var(--moss-soft);
+      border: 0;
+    }
+
+    &-label {
+      font-size: 26rpx;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    &--advisor &-label {
+      font-size: 36rpx;
+      line-height: 1.3;
+      color: var(--moss-deep);
+    }
+
+    &-desc {
+      font-size: 22rpx;
+      line-height: 1.5;
+      color: var(--ink-3);
+    }
+
+    &-arrow {
+      font-size: 36rpx;
+      line-height: 1;
+      color: var(--ink-3);
+      flex-shrink: 0;
+    }
+  }
+
+  // ---------- 页脚（品牌签名收口：短规则线呼应 section-rule 家族） ----------
+  &__foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8rpx;
+    margin-top: 64rpx;
+
+    &-rule {
+      width: 64rpx;
+      height: 4rpx;
+      border-radius: 999rpx;
+      background: var(--moss);
+      margin-bottom: 14rpx;
+    }
+
+    &-brand {
+      font-size: 26rpx;
+      font-weight: 700;
+      letter-spacing: 0;
+      color: var(--ink-2);
+    }
+
+    &-note {
+      font-size: 22rpx;
+      color: var(--ink-3);
+    }
+  }
+
+  // ---------- 最近方案（续看入口：圆角图框 + 文案分层 + 行动链接） ----------
+  &__recent {
+    display: flex;
+    align-items: center;
+    gap: 26rpx;
+    padding: 26rpx 28rpx;
+
+    &-visual {
+      width: 160rpx;
+      height: 200rpx;
+      flex-shrink: 0;
+      overflow: hidden;
+      border-radius: var(--radius-md);
+      background: var(--moss-soft);
+    }
+
+    &-img {
+      width: 100%;
+      height: 100%;
+
+      .example-badge {
+        left: 50%;
+        right: auto;
+        bottom: 8rpx;
+        transform: translateX(-50%);
+        max-width: calc(100% - 8rpx);
+        padding: 3rpx 8rpx;
+        font-size: 16rpx;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+    }
+
+    &-copy {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10rpx;
+      min-width: 0;
+    }
+
+    &-name {
+      font-size: 30rpx;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    &-why {
+      font-size: 22rpx;
+      line-height: 1.55;
+      color: var(--ink-2);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    &-link {
+      margin-top: 2rpx;
+      font-size: 22rpx;
+      font-weight: 650;
+      color: var(--moss);
+    }
+
+    &-arrow {
+      font-size: 36rpx;
+      line-height: 1;
+      color: var(--ink-3);
+      flex-shrink: 0;
+    }
+  }
+}
+
+@keyframes home-badge-live {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home__tool-badge--live {
+    animation: none;
+  }
+}

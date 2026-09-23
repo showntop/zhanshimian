@@ -1,0 +1,28 @@
+.compare-toggle {
+  display: inline-flex;
+  padding: 6rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(5px);
+  border: 1rpx solid var(--line);
+  box-shadow: 0 3px 12px rgba(31, 34, 30, 0.08);
+
+  &__seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 112rpx;
+    height: 56rpx;
+    border-radius: 999rpx;
+    font-size: 24rpx;
+    color: var(--ink-2);
+    transition: all 0.2s ease;
+
+    &--active {
+      background: var(--surface-strong);
+      color: var(--ink);
+      font-weight: 600;
+      box-shadow: 0 2rpx 8rpx rgba(31, 34, 30, 0.08);
+    }
+  }
+}

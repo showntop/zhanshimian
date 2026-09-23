@@ -1,0 +1,217 @@
+.body-viewer {
+  width: 100%;
+
+  &__stage {
+    position: relative;
+    width: 100%;
+    height: 960rpx;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 50% 12%, rgba(238, 240, 236, 0.12), transparent 46%),
+      var(--moss-deep);
+  }
+
+  &__glow,
+  &__spot,
+  &__ring,
+  &__floor {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  &__glow {
+    inset: 0;
+    z-index: 0;
+    background: radial-gradient(ellipse at 50% 78%, rgba(238, 240, 236, 0.1), transparent 42%);
+  }
+
+  &__spot {
+    left: 50%;
+    top: -40rpx;
+    z-index: 0;
+    width: 480rpx;
+    height: 720rpx;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse at 50% 0%, rgba(238, 240, 236, 0.2), transparent 70%);
+  }
+
+  &__ring {
+    left: 50%;
+    bottom: 96rpx;
+    z-index: 1;
+    width: 560rpx;
+    height: 108rpx;
+    transform: translateX(-50%);
+    border: 2rpx solid var(--line-on-deep);
+    border-radius: 50%;
+    opacity: 0.45;
+    transition: opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  &__floor {
+    left: 50%;
+    bottom: 80rpx;
+    z-index: 1;
+    width: 500rpx;
+    height: 88rpx;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(238, 240, 236, 0.28) 0%, rgba(238, 240, 236, 0.06) 58%, transparent 72%);
+  }
+
+  &__stage--dragging &__ring {
+    opacity: 0.9;
+  }
+
+  &__figure {
+    position: absolute;
+    left: 88rpx;
+    right: 88rpx;
+    top: 36rpx;
+    bottom: 168rpx;
+    z-index: 2;
+  }
+
+  &__turntable,
+  &__video,
+  &__frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  &__turntable {
+    opacity: 0;
+    pointer-events: none;
+
+    &--on {
+      opacity: 1;
+    }
+  }
+
+  &__frame {
+    opacity: 0;
+
+    &--on {
+      opacity: 1;
+    }
+  }
+
+  &__video {
+    z-index: 3;
+    background: transparent;
+  }
+
+  &__pad {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+  }
+
+  &__steer {
+    position: absolute;
+    top: 50%;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 88rpx;
+    height: 88rpx;
+    margin-top: -80rpx;
+    border-radius: 999rpx;
+    background: var(--glass-on-photo);
+    border: 1rpx solid var(--line-on-deep);
+
+    &--prev {
+      left: 16rpx;
+    }
+
+    &--next {
+      right: 16rpx;
+    }
+  }
+
+  &__steer-mark {
+    color: var(--cream);
+    font-size: 44rpx;
+    line-height: 1;
+    margin-top: -6rpx;
+  }
+
+  &__badge {
+    right: 20rpx;
+    top: 20rpx;
+    bottom: auto;
+    z-index: 6;
+  }
+
+  &__angle {
+    position: absolute;
+    left: 50%;
+    bottom: 196rpx;
+    z-index: 6;
+    transform: translateX(-50%);
+    padding: 6rpx 20rpx;
+    border-radius: 999rpx;
+    background: var(--glass-on-photo);
+    color: var(--on-photo);
+    font-size: 22rpx;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
+  &__hint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 28rpx;
+    z-index: 6;
+    text-align: center;
+    color: var(--cream-muted);
+    font-size: 24rpx;
+    line-height: 1.4;
+    transition: opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    &--quiet {
+      opacity: 0.28;
+    }
+  }
+
+  &__compare {
+    margin: 24rpx 24rpx 0;
+    width: calc(100% - 48rpx);
+    height: 640rpx;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--surface-strong);
+  }
+
+  &__note {
+    display: block;
+    margin-top: 24rpx;
+    text-align: center;
+    color: var(--ink-2);
+    font-size: 26rpx;
+    line-height: 1.5;
+  }
+}
+
+.body-viewer {
+  &__plan {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  &__compare-img {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .body-viewer__ring,
+  .body-viewer__hint {
+    transition-duration: 0.01ms;
+  }
+}

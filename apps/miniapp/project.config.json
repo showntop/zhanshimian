@@ -1,0 +1,53 @@
+{
+  "compileType": "miniprogram",
+  "miniprogramRoot": "dist/",
+  "srcMiniprogramRoot": "dist/",
+  "projectname": "zhanshimian-miniapp",
+  "appid": "wx911e0fbcba0b24d0",
+  "libVersion": "trial",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "urlCheck": false,
+    "ignoreUploadUnusedFiles": false,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false
+  },
+  "packOptions": {
+    "ignore": [
+      {
+        "value": "assets/LICENSE.txt",
+        "type": "file"
+      },
+      {
+        "value": "README.md",
+        "type": "file"
+      }
+    ],
+    "include": [
+      {
+        "value": "assets/tabbar",
+        "type": "folder"
+      }
+    ]
+  },
+  "condition": {},
+  "simulatorPluginLibVersion": {},
+  "editorSetting": {}
+}

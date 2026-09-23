@@ -1,0 +1,29 @@
+{
+  "version": "render-quality-v1",
+  "technical": {
+    "mime_type": "image/jpeg",
+    "max_bytes": 20971520,
+    "max_pixels": 40000000,
+    "min_short_edge": 512,
+    "min_long_edge": 1024,
+    "require_single_person": true,
+    "allow_watermark": false,
+    "allow_text": false
+  },
+  "identity": {
+    "minimum_confidence": 0.82,
+    "unknown_decision": "retry"
+  },
+  "anatomy": {
+    "minimum_confidence": 0.9,
+    "parts": ["head", "torso", "arms", "legs", "hands"]
+  },
+  "composition": {
+    "minimum_confidence": 0.9,
+    "require_uncropped_head": true
+  },
+  "semantic": {
+    "minimum_confidence": 0.85,
+    "dimensions": ["hair", "makeup", "outfit", "unrequested_changes"]
+  }
+}

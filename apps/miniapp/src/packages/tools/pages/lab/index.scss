@@ -1,0 +1,295 @@
+.lab {
+  display: flex;
+  flex-direction: column;
+  gap: 28rpx;
+
+  &__title {
+    font-size: 38rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__card {
+    display: flex;
+    gap: 24rpx;
+    padding: 24rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    border: 1rpx solid var(--line);
+
+    &--wide {
+      flex-direction: column;
+    }
+
+    &--stage {
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+      border: 0;
+      background: var(--moss-deep);
+      color: var(--cream);
+    }
+
+    &-img {
+      width: 200rpx;
+      height: 260rpx;
+      border-radius: var(--radius-md);
+      flex-shrink: 0;
+    }
+
+    &-img.source-image {
+      width: 200rpx;
+      height: 260rpx;
+    }
+
+    &-copy {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10rpx;
+      min-width: 0;
+    }
+
+    &-copy--wide,
+    &-copy--state {
+      width: 100%;
+    }
+
+    &-copy--onstage {
+      width: 100%;
+      gap: 16rpx;
+      padding: 28rpx 28rpx 32rpx;
+    }
+
+    &-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    &-name {
+      font-size: 30rpx;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    &-status {
+      padding: 4rpx 16rpx;
+      border-radius: 999rpx;
+      background: var(--moss-soft);
+      font-size: 18rpx;
+      color: var(--ink-3);
+
+      &--live {
+        background: var(--moss-soft);
+        color: var(--moss);
+      }
+    }
+
+    &-desc {
+      font-size: 22rpx;
+      line-height: 1.6;
+      color: var(--ink-2);
+    }
+
+    &-btn {
+      align-self: flex-start;
+      margin-top: auto;
+      padding: 10rpx 28rpx;
+      border-radius: 999rpx;
+      background: var(--moss);
+      color: var(--cream);
+      font-size: 22rpx;
+      font-weight: 600;
+
+      &--busy {
+        opacity: 0.6;
+      }
+    }
+
+    &-viewer {
+      width: 100%;
+    }
+
+    &-progress {
+      display: flex;
+      flex-direction: column;
+      gap: 10rpx;
+      margin-top: 8rpx;
+    }
+
+    &-progress-track {
+      height: 8rpx;
+      border-radius: 999rpx;
+      background: rgba(238, 240, 236, 0.16);
+      overflow: hidden;
+    }
+
+    &-progress-fill {
+      height: 100%;
+      border-radius: 999rpx;
+      background: var(--cream);
+    }
+
+    &-progress-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16rpx;
+    }
+
+    &-progress-stage {
+      font-size: 22rpx;
+      color: var(--cream-muted);
+    }
+
+    &-progress-num {
+      font-size: 22rpx;
+      font-weight: 600;
+      color: var(--cream);
+    }
+
+    &-viewlast {
+      align-self: center;
+      margin-top: 8rpx;
+    }
+
+    .empty-state,
+    .error-state {
+      width: 100%;
+      padding: 32rpx 8rpx 16rpx;
+    }
+  }
+
+  &__card--stage &__card-name {
+    color: var(--cream);
+  }
+
+  &__card--stage &__card-desc {
+    color: var(--cream-muted);
+  }
+
+  &__card--stage &__card-status {
+    background: rgba(238, 240, 236, 0.12);
+    color: var(--cream-muted);
+
+    &--live {
+      background: rgba(238, 240, 236, 0.16);
+      color: var(--cream);
+    }
+  }
+
+  &__podium {
+    position: relative;
+    width: 100%;
+    height: 720rpx;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 50% 12%, rgba(238, 240, 236, 0.12), transparent 46%),
+      transparent;
+
+    &--dim {
+      opacity: 0.56;
+    }
+  }
+
+  &__podium-glow,
+  &__podium-spot,
+  &__podium-ring,
+  &__podium-floor {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  &__podium-glow {
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 78%, rgba(238, 240, 236, 0.1), transparent 42%);
+  }
+
+  &__podium-spot {
+    left: 50%;
+    top: -40rpx;
+    width: 420rpx;
+    height: 560rpx;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse at 50% 0%, rgba(238, 240, 236, 0.2), transparent 70%);
+  }
+
+  &__podium-ring {
+    left: 50%;
+    bottom: 72rpx;
+    width: 480rpx;
+    height: 92rpx;
+    transform: translateX(-50%);
+    border: 2rpx solid var(--line-on-deep);
+    border-radius: 50%;
+    opacity: 0.45;
+  }
+
+  &__podium-floor {
+    left: 50%;
+    bottom: 56rpx;
+    width: 420rpx;
+    height: 76rpx;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(238, 240, 236, 0.28) 0%, rgba(238, 240, 236, 0.06) 58%, transparent 72%);
+  }
+
+  &__podium-figure.source-image {
+    position: absolute;
+    left: 50%;
+    bottom: 88rpx;
+    z-index: 2;
+    width: 360rpx;
+    height: 560rpx;
+    transform: translateX(-50%);
+    background: transparent;
+    border-radius: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lab__podium--dim {
+    opacity: 0.72;
+  }
+}
+
+// 3D 形象 Lite 状态机（d173c9b 移植）：宽卡 / 进度条 / 查看器。
+.lab__card {
+  &--wide {
+    flex-direction: column;
+  }
+  &-copy--wide,
+  &-copy--state { width: 100%; }
+  &-btn {
+    &--busy { opacity: 0.6; }
+  }
+  &-viewer { width: 100%; margin-top: 8rpx; }
+  &-viewlast { align-self: flex-start; margin-top: 8rpx; }
+  &-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+    margin-top: 8rpx;
+  }
+  &-progress-track {
+    height: 8rpx;
+    border-radius: 999rpx;
+    background: var(--moss-soft);
+    overflow: hidden;
+  }
+  &-progress-fill {
+    height: 100%;
+    border-radius: 999rpx;
+    background: var(--moss);
+  }
+  &-progress-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16rpx;
+  }
+  &-progress-stage { font-size: 22rpx; color: var(--ink-2); }
+  &-progress-num { font-size: 22rpx; font-weight: 600; color: var(--moss); }
+}

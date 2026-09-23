@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>uplook · 首页 hero 改版原型（三版对比）</title>
+<style>
+/* 设计 token 还原：packages/design/src/tokens.data.mjs
+   视口 375px = 750rpx / 2，故 1rpx = 0.5px */
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#626862; --ink3:#686D67;
+  --moss:#587344; --moss-soft:#EDF1EA; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.12); --line-on-deep:rgba(238,240,236,.24);
+  --gutter:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Helvetica Neue',sans-serif;
+  background:#E7E9E5; color:var(--ink); line-height:1.5; -webkit-font-smoothing:antialiased;
+  padding:32px 24px 64px;
+}
+.wrap{max-width:1180px;margin:0 auto}
+
+/* ----------- 页头 ----------- */
+.doc-head{margin-bottom:24px}
+.doc-head h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
+.doc-head p{margin-top:6px;font-size:13px;color:var(--ink2);max-width:760px;line-height:1.7}
+.doc-head .warn{margin-top:10px;font-size:12px;color:var(--ink3)}
+
+/* ----------- Tab ----------- */
+.tabs{display:flex;gap:6px;margin:22px 0 20px;flex-wrap:wrap}
+.tab{
+  padding:8px 16px;border-radius:999px;border:1px solid var(--line);
+  background:#fff;color:var(--ink2);font-size:13px;font-weight:600;cursor:pointer;
+  font-family:inherit;transition:.16s;
+}
+.tab:hover{border-color:var(--moss)}
+.tab.on{background:var(--moss-deep);border-color:var(--moss-deep);color:var(--cream)}
+.tab small{display:block;font-size:11px;font-weight:400;opacity:.72;margin-top:1px}
+
+/* ----------- 布局 ----------- */
+.stage{display:none;gap:28px;align-items:flex-start}
+.stage.on{display:flex}
+@media (max-width:900px){.stage.on{flex-direction:column;align-items:center}}
+
+/* ----------- 手机 ----------- */
+.phone{
+  width:375px;flex:0 0 375px;height:800px;background:var(--bg);
+  border-radius:36px;overflow:hidden;position:relative;
+  box-shadow:0 18px 48px rgba(45,58,35,.20),0 2px 6px rgba(45,58,35,.10);
+}
+.statusbar{
+  height:44px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 22px;font-size:12px;font-weight:600;color:var(--ink);
+}
+.statusbar .dots{display:flex;gap:4px;align-items:center}
+.statusbar .dots i{width:4px;height:8px;background:var(--ink);border-radius:1px;display:block}
+.statusbar .dots i:nth-child(4){height:6px;opacity:.4}
+.navbar{
+  height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 var(--gutter);
+}
+.brand{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.brand .up{color:var(--ink)}
+.brand .look{color:var(--moss)}
+.navbar .right{font-size:12px;color:var(--ink3)}
+
+.screen{padding:0 var(--gutter);position:relative}
+.greet{padding:6px 2px 16px}
+.greet-top{display:flex;align-items:baseline;justify-content:space-between}
+.greet-kicker{font-size:12px;font-weight:600;color:var(--ink2)}
+.greet-date{font-size:11px;color:var(--ink3)}
+.greet-title{margin-top:5px;font-size:19px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+
+/* 下方区块占位（说明 hero 之外沿用现有设计） */
+.below{
+  margin-top:20px;padding:14px;border-radius:12px;background:rgba(105,115,100,.07);
+  border:1px dashed rgba(55,62,52,.16);
+}
+.below .ph{height:12px;border-radius:6px;background:rgba(105,115,100,.16);margin-bottom:8px}
+.below .ph.s{width:38%}
+.below .ph.l{width:88%}
+.below .row{display:flex;gap:8px;margin-top:12px}
+.below .box{flex:1;height:70px;border-radius:10px;background:rgba(105,115,100,.13)}
+.below .box.w{flex:1 1 100%;height:96px}
+.below-note{margin-top:10px;font-size:10px;color:var(--ink3);text-align:center}
+
+/* ----------- 通用 hero 卡 ----------- */
+.hero{
+  background:var(--moss-deep);border-radius:14px;overflow:hidden;position:relative;
+  box-shadow:0 10px 28px rgba(45,58,35,.24);color:var(--cream);
+}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+  letter-spacing:.2px;color:rgba(238,240,236,.80);
+}
+.hit{cursor:pointer}
+
+/* ----------- V1 全出血 ----------- */
+.v1{height:452px}
+.v1 .photo{position:absolute;inset:0;overflow:hidden}
+.v1 .photo svg{width:100%;height:100%;display:block}
+.v1 .topbar{
+  position:absolute;top:14px;left:14px;z-index:6;
+  padding:5px 10px;border-radius:999px;
+  background:rgba(30,35,29,.42);backdrop-filter:blur(10px);
+}
+.v1 .anchor{
+  position:absolute;z-index:5;width:26px;height:26px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;
+  border:1px solid rgba(238,240,236,.42);
+  background:rgba(30,35,29,.34);color:rgba(238,240,236,.72);
+  backdrop-filter:blur(6px);transition:.18s;
+}
+.v1 .anchor.on{
+  background:var(--cream);color:var(--moss-deep);border-color:var(--cream);
+  box-shadow:0 4px 14px rgba(30,35,29,.42);
+  /* 用独立 scale 属性：内联 transform(translate) 优先级更高，写 transform:scale 会被吃掉 */
+  scale:1.08;
+}
+.v1 .tag{
+  position:absolute;z-index:6;padding:3px 9px;border-radius:999px;
+  background:var(--cream);color:var(--moss-deep);font-size:10px;font-weight:700;
+  white-space:nowrap;box-shadow:0 4px 12px rgba(30,35,29,.30);
+  transition:left .22s cubic-bezier(.2,.8,.2,1),top .22s cubic-bezier(.2,.8,.2,1);
+}
+.v1 .tag i{font-style:normal;opacity:.55;margin-right:4px;font-weight:600}
+.v1 .foot{
+  position:absolute;left:0;right:0;bottom:0;z-index:7;padding:64px 16px 16px;
+  background:linear-gradient(180deg,rgba(57,73,46,0) 0%,rgba(57,73,46,.82) 34%,rgba(57,73,46,.97) 100%);
+}
+.v1 .foot-cat{font-size:11px;font-weight:700;color:rgba(238,240,236,.80);margin-bottom:5px}
+.v1 .foot-cat em{font-style:normal;font-size:15px;font-weight:800;color:var(--cream);margin-right:6px}
+.v1 .foot-rec{font-size:14px;line-height:1.5;font-weight:600;color:var(--cream);min-height:42px}
+.v1 .foot-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px}
+.v1 .btn{
+  padding:8px 15px;border-radius:999px;background:var(--cream);color:var(--moss-deep);
+  font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;border:0;
+}
+.v1 .more{font-size:11px;color:rgba(238,240,236,.66)}
+
+/* ----------- V2 分栏诊断单 ----------- */
+.v2{padding:14px}
+.v2-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.v2-body{display:flex;gap:12px}
+.v2-photo{
+  position:relative;width:132px;height:162px;flex:0 0 132px;
+  border-radius:10px;overflow:hidden;background:rgba(30,35,29,.18);
+}
+.v2-photo svg{width:100%;height:100%;display:block}
+.v2-photo .anchor{
+  position:absolute;width:20px;height:20px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;
+  font-family:inherit;cursor:pointer;border:1px solid rgba(238,240,236,.40);
+  background:rgba(30,35,29,.34);color:rgba(238,240,236,.70);backdrop-filter:blur(6px);transition:.18s;
+}
+.v2-photo .anchor.on{background:var(--cream);color:var(--moss-deep);border-color:var(--cream)}
+.v2-list{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.v2-row{
+  padding:7px 9px;border-radius:9px;cursor:pointer;transition:.18s;
+  border:1px solid transparent;
+}
+.v2-row .r-top{display:flex;align-items:center;gap:7px}
+.v2-row .r-n{
+  font-size:10px;font-weight:800;color:rgba(238,240,236,.52);
+  font-variant-numeric:tabular-nums;
+}
+.v2-row .r-cat{font-size:12px;font-weight:600;color:rgba(238,240,236,.62)}
+.v2-row .r-dot{width:5px;height:5px;border-radius:999px;background:var(--moss);margin-left:auto;opacity:0}
+.v2-row.on{background:rgba(238,240,236,.11);border-color:rgba(238,240,236,.20)}
+.v2-row.on .r-n{color:var(--cream)}
+.v2-row.on .r-cat{color:var(--cream);font-weight:700}
+.v2-row.on .r-dot{opacity:1}
+.v2-row .r-detail{margin-top:6px;display:none}
+.v2-row.on .r-detail{display:block}
+.v2-row .r-obs{font-size:10.5px;line-height:1.55;color:rgba(238,240,236,.72)}
+.v2-row .r-rec{font-size:10.5px;line-height:1.55;color:var(--cream);font-weight:600;margin-top:3px}
+.v2-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+.v2 .btn{
+  flex:1;padding:10px 14px;border-radius:999px;background:var(--cream);color:var(--moss-deep);
+  font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;border:0;text-align:center;
+}
+.v2 .more{font-size:11px;color:rgba(238,240,236,.62);white-space:nowrap}
+
+/* ----------- V3 每日焦点 ----------- */
+.v3{padding:18px 16px 16px}
+.v3-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.v3-seq{display:flex;gap:5px;align-items:center}
+.v3-seq i{
+  width:16px;height:3px;border-radius:999px;background:rgba(238,240,236,.24);display:block;
+}
+.v3-seq i.done{background:rgba(238,240,236,.46)}
+.v3-seq i.now{width:22px;background:var(--cream)}
+.v3-photo{
+  position:relative;height:184px;border-radius:12px;overflow:hidden;
+  background:rgba(30,35,29,.18);
+}
+.v3-photo svg{width:100%;height:100%;display:block}
+.v3-photo .anchor{
+  position:absolute;width:22px;height:22px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;
+  font-family:inherit;cursor:pointer;border:1px solid rgba(238,240,236,.40);
+  background:rgba(30,35,29,.34);color:rgba(238,240,236,.70);backdrop-filter:blur(6px);transition:.18s;
+}
+.v3-photo .anchor.on{background:var(--cream);color:var(--moss-deep);border-color:var(--cream)}
+.v3-focus{margin-top:14px}
+.v3-num{font-size:15px;font-weight:800;color:var(--cream);letter-spacing:-.3px}
+.v3-num span{opacity:.5;margin-right:5px}
+.v3-obs{font-size:13px;line-height:1.6;color:rgba(238,240,236,.78);margin-top:7px}
+.v3-rec{font-size:13px;line-height:1.6;color:var(--cream);font-weight:600;margin-top:5px}
+.v3-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px}
+.v3 .btn{
+  padding:10px 16px;border-radius:999px;background:var(--cream);color:var(--moss-deep);
+  font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;border:0;white-space:nowrap;
+}
+.v3 .tomorrow{font-size:11px;color:rgba(238,240,236,.60)}
+
+/* ----------- V4 通栏出血 + 卡片咬合（photo-hero--bleed + --hinge） ----------- */
+.v4{position:relative}
+.v4-photo{
+  position:relative;height:352px;margin:0 -16px;overflow:hidden;
+  background:rgba(30,35,29,.16);
+}
+.v4-photo svg{width:100%;height:100%;display:block}
+.v4-topbar{
+  position:absolute;top:14px;left:32px;z-index:6;
+  padding:5px 10px;border-radius:999px;
+  background:rgba(30,35,29,.42);backdrop-filter:blur(10px);
+}
+.v4-photo .anchor{
+  position:absolute;z-index:5;width:26px;height:26px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;
+  border:1px solid rgba(238,240,236,.42);
+  background:rgba(30,35,29,.34);color:rgba(238,240,236,.72);
+  backdrop-filter:blur(6px);transition:.18s;
+}
+.v4-photo .anchor.on{
+  background:var(--cream);color:var(--moss-deep);border-color:var(--cream);
+  box-shadow:0 4px 14px rgba(30,35,29,.42);scale:1.08;
+}
+/* 咬合卡：上移 36px 压住照片下缘，文字落在稳定白底上 */
+.v4-card{
+  position:relative;z-index:8;margin:-36px 0 0;
+  background:#fff;border-radius:14px;padding:16px 16px 14px;
+  box-shadow:0 6px 18px rgba(52,59,47,.13);
+}
+.v4-numline{display:flex;align-items:baseline;gap:6px}
+.v4-numline em{font-style:normal;font-size:15px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.v4-numline span{font-size:13px;font-weight:700;color:var(--moss)}
+.v4-obs{font-size:13px;line-height:1.6;color:var(--ink2);margin-top:8px}
+.v4-rec{font-size:13px;line-height:1.6;color:var(--ink);font-weight:600;margin-top:5px}
+.v4-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+.v4 .btn{
+  padding:9px 15px;border-radius:999px;background:var(--moss);color:#fff;
+  font-size:12px;font-weight:700;border:0;font-family:inherit;cursor:pointer;white-space:nowrap;
+}
+.v4 .more{font-size:11px;color:var(--ink3)}
+
+/* ----------- 说明面板 ----------- */
+.note{flex:1;min-width:280px;max-width:520px}
+.note h2{font-size:17px;font-weight:700;margin-bottom:4px}
+.note .sub{font-size:12px;color:var(--moss);font-weight:600;margin-bottom:14px}
+.note dl{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.note dt{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-top:12px}
+.note dt:first-child{margin-top:0}
+.note dd{font-size:13px;line-height:1.75;color:var(--ink);margin-top:3px}
+.note .warnline{
+  margin-top:16px;padding:10px 12px;border-radius:10px;background:rgba(126,84,69,.08);
+  font-size:12px;line-height:1.7;color:#6A4B3E;
+}
+.note .goodline{
+  margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(88,115,68,.10);
+  font-size:12px;line-height:1.7;color:#3D5230;
+}
+
+/* ----------- 新鲜感机制 ----------- */
+.fresh{
+  margin-top:44px;padding:24px;border-radius:16px;background:#fff;border:1px solid var(--line);
+}
+.fresh h2{font-size:17px;font-weight:700}
+.fresh .lede{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.75;max-width:820px}
+.days{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.day{
+  width:168px;border-radius:12px;padding:12px;border:1px solid var(--line);background:var(--bg);
+}
+.day.now{border-color:var(--moss);background:var(--moss-soft)}
+.day .d-top{display:flex;align-items:baseline;justify-content:space-between}
+.day .d-date{font-size:11px;color:var(--ink3)}
+.day.now .d-date{color:var(--moss);font-weight:700}
+.day .d-n{font-size:20px;font-weight:800;color:var(--ink3);font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.day.now .d-n{color:var(--moss-deep)}
+.day .d-cat{font-size:13px;font-weight:700;margin-top:6px;color:var(--ink2)}
+.day.now .d-cat{color:var(--moss-deep)}
+.day .d-txt{font-size:11px;line-height:1.6;color:var(--ink3);margin-top:4px}
+.day .d-state{margin-top:8px;font-size:10px;font-weight:700;color:var(--ink3)}
+.day.now .d-state{color:var(--moss)}
+.fresh-rules{display:flex;gap:28px;margin-top:22px;flex-wrap:wrap}
+.fresh-rules>div{flex:1;min-width:260px}
+.fresh-rules h3{font-size:12px;font-weight:700;color:var(--ink);margin-bottom:8px}
+.fresh-rules ul{list-style:none;font-size:12px;line-height:1.9;color:var(--ink2)}
+.fresh-rules li{padding-left:14px;position:relative}
+.fresh-rules li:before{content:'';position:absolute;left:0;top:9px;width:5px;height:5px;border-radius:999px;background:var(--moss)}
+.fresh-rules .no li:before{background:#9B4B45}
+</style>
+</head>
+<body>
+
+<!-- 共用人像（343×420 坐标系），各版本用不同 viewBox 取景 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#D8DAD3"/><stop offset="1" stop-color="#BFC3BA"/>
+  </linearGradient>
+  <linearGradient id="cl" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#8E9287"/><stop offset="1" stop-color="#7C8075"/>
+  </linearGradient>
+  <g id="figure">
+    <rect width="343" height="420" fill="url(#pg)"/>
+    <path d="M171.5 152 C136 158 110 190 98 236 L84 420 L259 420 L245 236 C233 190 207 158 171.5 152 Z" fill="url(#cl)"/>
+    <path d="M171.5 152 C150 156 132 172 122 196 L112 250 L140 258 L171.5 214 L203 258 L231 250 L221 196 C211 172 193 156 171.5 152 Z" fill="#9EA298" opacity=".55"/>
+    <rect x="152" y="126" width="39" height="40" rx="12" fill="#B4B2A8"/>
+    <ellipse cx="171.5" cy="92" rx="41" ry="52" fill="#C6C4B9"/>
+    <path d="M131 82 C130 44 152 28 171.5 28 C191 28 213 44 212 82 C206 66 196 54 171.5 54 C147 54 137 66 131 82 Z" fill="#5E6157"/>
+  </g>
+</defs></svg>
+
+<div class="wrap">
+
+  <div class="doc-head">
+    <h1>uplook 首页 hero 改版原型 · 四版对比</h1>
+    <p>四版都是「A 证据地图 + B 今天这一件事」的组合：用 <code>ReportFinding.anchor</code> 把可提升点标回本人照片，
+       底部只给一个今天可执行的动作。差别在<strong>照片与文字的关系</strong>：
+       V1 文字压在照片上、V2 清单主导、V3 序列主导、<strong>V4 通栏出血 + 卡片咬合</strong>。
+       V4 是对 V1 的修正：小卡里做全出血，手法与尺度不匹配（详见 V4 说明）。</p>
+    <p class="warn">原型为静态演示：照片用占位人像（真实实现走 <code>SourceImage</code>，本人照片保留「原本」角标）。
+       点击照片上的编号锚点 / 右侧清单行，可切换「今日焦点」，演示交互。尺寸按 375×812 视口，1rpx = 0.5px。</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" data-stage="v1">V1 证据地图 · 全出血<small>照片主导，冲击力最强</small></button>
+    <button class="tab" data-stage="v2">V2 分栏诊断单<small>清单主导，可扫读</small></button>
+    <button class="tab" data-stage="v3">V3 每日焦点 · 序列<small>序列主导，新鲜感最强</small></button>
+    <button class="tab" data-stage="v4">V4 通栏出血 · 咬合<small>照片真出血，文字有底盘</small></button>
+  </div>
+
+  <!-- ============ V1 ============ -->
+  <div class="stage on" id="stage-v1">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><i></i></span></div>
+      <div class="navbar">
+        <div class="brand"><span class="up">up</span><span class="look">look</span></div>
+        <div class="right">今天最好看</div>
+      </div>
+      <div class="screen">
+        <div class="greet">
+          <div class="greet-top">
+            <div class="greet-kicker">今天最好看</div>
+            <div class="greet-date">9月19日 · 周六</div>
+          </div>
+          <div class="greet-title">中午好，今天先解决这一个</div>
+        </div>
+
+        <div class="hero v1">
+          <div class="photo">
+            <svg viewBox="0 0 343 420" preserveAspectRatio="xMidYMid slice"><use href="#figure"/></svg>
+          </div>
+          <div class="topbar"><span class="eyebrow" id="v1-eyebrow">9月19日 · 今日焦点 02/4</span></div>
+          <div id="v1-anchors"></div>
+          <div class="tag" id="v1-tag"><i>02</i><span id="v1-tag-text">配色</span></div>
+          <div class="foot">
+            <div class="foot-cat"><em id="v1-num">02</em><span id="v1-cat">配色</span></div>
+            <div class="foot-rec" id="v1-rec">换成深一个色号的内搭，视线会落回脸部</div>
+            <div class="foot-row">
+              <button class="btn" id="v1-btn">去看怎么改 ›</button>
+              <span class="more" id="v1-more">还有 3 条，在报告里 ›</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="below">
+          <div class="ph s"></div><div class="ph l"></div>
+          <div class="row"><div class="box w"></div></div>
+          <div class="row"><div class="box"></div><div class="box"></div><div class="box"></div></div>
+          <div class="below-note">以下区块（工具 / 场合 / 最近方案 / 顾问）沿用现有设计，本次不动</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <h2>V1 · 证据地图（全出血）</h2>
+      <div class="sub">照片即诊断图 —— 卡片 = 一整张照片（小卡全出血存疑，修正见 V4）</div>
+      <p style="font-size:13px;line-height:1.75;color:var(--ink2)">
+        取消「绿卡里贴一张矩形照片」的旧结构，整卡就是本人照片，信息全部以浮层压在照片上：
+        顶部日期徽标、照片上的编号锚点、底部渐隐行动条。编号锚点直接复用
+        <code>ReportFinding.anchor</code>（报告页 <code>resolveFindingAnchor</code> 已实现）。
+      </p>
+      <dl>
+        <dt>主打</dt><dd>你的可提升点，看得见位置。</dd>
+        <dt>用户得到</dt><dd>不必点进报告，一眼看到「哪几处、分别在哪、怎么改」。</dd>
+        <dt>我们传递</dt><dd>给你看证据，而不是给你打分。</dd>
+        <dt>新鲜感怎么来</dt><dd>顶部 eyebrow 从「形象档案已就绪」（永久结论）换成「9月19日 · 今日焦点 02/4」（每日状态）；
+          锚点每天只亮一个，其余淡出；底部行动条每天换一条。</dd>
+        <dt>视觉突破</dt><dd>照片从装饰变成可交互的信息载体 —— 全页唯一能做到「信息密度翻倍、文字量减半」的手法。</dd>
+      </dl>
+      <div class="goodline">落地成本最低：锚点换算、标注胶囊、<code>.layer-on-photo</code> 在报告页与 design token 里都已存在，首页只是复用。</div>
+      <div class="warnline">风险：浮层压在照片上依赖 scrim 强度，浅色照片需保证文字对比度；底部渐隐区会吃掉照片约 90px，
+        全身照要按 <code>anchor="top"</code> 保住头部不被遮。</div>
+    </div>
+  </div>
+
+  <!-- ============ V2 ============ -->
+  <div class="stage" id="stage-v2">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><i></i></span></div>
+      <div class="navbar">
+        <div class="brand"><span class="up">up</span><span class="look">look</span></div>
+        <div class="right">今天最好看</div>
+      </div>
+      <div class="screen">
+        <div class="greet">
+          <div class="greet-top">
+            <div class="greet-kicker">今天最好看</div>
+            <div class="greet-date">9月19日 · 周六</div>
+          </div>
+          <div class="greet-title">中午好，今天先解决这一个</div>
+        </div>
+
+        <div class="hero v2">
+          <div class="v2-head">
+            <span class="eyebrow" id="v2-eyebrow">今日焦点 02/4</span>
+            <span class="eyebrow">9月19日</span>
+          </div>
+          <div class="v2-body">
+            <div class="v2-photo">
+              <svg viewBox="0 0 343 420" preserveAspectRatio="xMidYMid slice"><use href="#figure"/></svg>
+              <div id="v2-anchors"></div>
+            </div>
+            <div class="v2-list" id="v2-list"></div>
+          </div>
+          <div class="v2-foot">
+            <button class="btn" id="v2-btn">去做这一件事 ›</button>
+            <span class="more" id="v2-more">还有 3 条</span>
+          </div>
+        </div>
+
+        <div class="below">
+          <div class="ph s"></div><div class="ph l"></div>
+          <div class="row"><div class="box w"></div></div>
+          <div class="row"><div class="box"></div><div class="box"></div><div class="box"></div></div>
+          <div class="below-note">以下区块沿用现有设计，本次不动</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <h2>V2 · 分栏诊断单</h2>
+      <div class="sub">照片 + 清单并置 —— 卡片 = 一张可扫读的诊断单</div>
+      <p style="font-size:13px;line-height:1.75;color:var(--ink2)">
+        左侧照片带编号锚点，右侧是编号清单：今天这条展开显示「观察 → 怎么改」，其余三行收成一行标题。
+        点击任一行即切换焦点，照片上的锚点同步点亮。保留深绿卡片容器，结构最稳。
+      </p>
+      <dl>
+        <dt>主打</dt><dd>今天这一条，以及它在你身上的位置。</dd>
+        <dt>用户得到</dt><dd>不必逐个猜，四条一眼扫完，今天该看哪条一目了然。</dd>
+        <dt>我们传递</dt><dd>有条理、可核对 —— 每条都标得回来源照片。</dd>
+        <dt>新鲜感怎么来</dt><dd>清单是固定的，但「今天展开哪一条」每天变；其余三条从「没看过的清单」变成「已看过 / 明天的预告」，
+          同一份内容产生四天的阅读节奏。</dd>
+        <dt>视觉突破</dt><dd>把「一段抽象总结」换成「四条可核对的条目」，信息可信度提升最明显的一版。</dd>
+      </dl>
+      <div class="goodline">可读性最好：文字不压照片，无需 scrim，深浅照片都稳；对 4~6 条 findings 的数量变化容忍度最高。</div>
+      <div class="warnline">风险：照片被压到 132px 宽，锚点在小图上的辨识度下降；视觉冲击力弱于 V1，
+        「眼前一亮」的程度最低。</div>
+    </div>
+  </div>
+
+  <!-- ============ V3 ============ -->
+  <div class="stage" id="stage-v3">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><i></i></span></div>
+      <div class="navbar">
+        <div class="brand"><span class="up">up</span><span class="look">look</span></div>
+        <div class="right">今天最好看</div>
+      </div>
+      <div class="screen">
+        <div class="greet">
+          <div class="greet-top">
+            <div class="greet-kicker">今天最好看</div>
+            <div class="greet-date">9月19日 · 周六</div>
+          </div>
+          <div class="greet-title">中午好，今天先解决这一个</div>
+        </div>
+
+        <div class="hero v3">
+          <div class="v3-head">
+            <span class="eyebrow" id="v3-eyebrow">今日焦点 · 第 2 天</span>
+            <span class="v3-seq" id="v3-seq"></span>
+          </div>
+          <div class="v3-photo">
+            <svg viewBox="50 55 243 156" preserveAspectRatio="xMidYMid slice"><use href="#figure"/></svg>
+            <div id="v3-anchors"></div>
+          </div>
+          <div class="v3-focus">
+            <div class="v3-num"><span id="v3-num">02</span><span id="v3-cat">配色</span></div>
+            <div class="v3-obs" id="v3-obs">浅色内搭让上半身的重心往上散</div>
+            <div class="v3-rec" id="v3-rec">换成深一个色号的内搭，视线会落回脸部</div>
+          </div>
+          <div class="v3-foot">
+            <button class="btn" id="v3-btn">今天就这么穿 ›</button>
+            <span class="tomorrow" id="v3-tomorrow">明天：03 比例</span>
+          </div>
+        </div>
+
+        <div class="below">
+          <div class="ph s"></div><div class="ph l"></div>
+          <div class="row"><div class="box w"></div></div>
+          <div class="row"><div class="box"></div><div class="box"></div><div class="box"></div></div>
+          <div class="below-note">以下区块沿用现有设计，本次不动</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <h2>V3 · 每日焦点（序列）</h2>
+      <div class="sub">每天只亮一盏灯 —— 卡片 = 今天这一件事</div>
+      <p style="font-size:13px;line-height:1.75;color:var(--ink2)">
+        不追求一次看完四条，而是把四条 findings 摊成四天的节奏：顶部序列条显示进度，
+        照片只强调今天这个锚点（其余淡出），下方只讲这一条的「观察 → 怎么改」，底部给「明天的预告」。
+      </p>
+      <dl>
+        <dt>主打</dt><dd>今天，就解决这一件。</dd>
+        <dt>用户得到</dt><dd>零选择成本 —— 不用读完整报告，拿到一个可执行的动作，并知道明天是什么。</dd>
+        <dt>我们传递</dt><dd>不制造焦虑清单，只给你马上能做的一件事。</dd>
+        <dt>新鲜感怎么来</dt><dd>三版里最强：主角每天换、进度条每天推进、明天有预告，
+          「今天轮到哪个了」本身就是回首页的理由。</dd>
+        <dt>视觉突破</dt><dd>把静态报告变成有时间的序列 —— 唯一能让「明天再来」成立的一版。</dd>
+      </dl>
+      <div class="goodline">最契合「每天新鲜感」这个诉求；信息量最小、行动最明确，也最不容易触犯「不打清单式焦虑」的红线。</div>
+      <div class="warnline">风险：单条内容撑不满大卡，需要「明天的预告」和进度条补足重量；
+        若 findings 只有 1~2 条，序列机制会失效（需退化为 V1/V2）。</div>
+    </div>
+  </div>
+
+  <!-- ============ V4 ============ -->
+  <div class="stage" id="stage-v4">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><i></i></span></div>
+      <div class="navbar">
+        <div class="brand"><span class="up">up</span><span class="look">look</span></div>
+        <div class="right">今天最好看</div>
+      </div>
+      <div class="screen">
+        <div class="greet">
+          <div class="greet-top">
+            <div class="greet-kicker">今天最好看</div>
+            <div class="greet-date">9月19日 · 周六</div>
+          </div>
+          <div class="greet-title">中午好，今天先解决这一个</div>
+        </div>
+
+        <div class="hero v4">
+          <div class="v4-photo">
+            <svg viewBox="40 20 295 283" preserveAspectRatio="xMidYMid slice"><use href="#figure"/></svg>
+            <div class="v4-topbar"><span class="eyebrow" id="v4-eyebrow">9月19日 · 今日焦点 02/4</span></div>
+            <div id="v4-anchors"></div>
+          </div>
+          <div class="v4-card">
+            <div class="v4-numline"><em id="v4-num">02</em><span id="v4-cat">配色</span></div>
+            <div class="v4-obs" id="v4-obs">浅色内搭让上半身的重心往上散</div>
+            <div class="v4-rec" id="v4-rec">换成深一个色号的内搭，视线会落回脸部</div>
+            <div class="v4-foot">
+              <button class="btn" id="v4-btn">去看怎么改 ›</button>
+              <span class="more" id="v4-more">还有 3 条，在报告里 ›</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="below">
+          <div class="ph s"></div><div class="ph l"></div>
+          <div class="row"><div class="box w"></div></div>
+          <div class="row"><div class="box"></div><div class="box"></div><div class="box"></div></div>
+          <div class="below-note">以下区块沿用现有设计，本次不动</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <h2>V4 · 通栏出血 + 卡片咬合</h2>
+      <div class="sub">照片真的出血，文字有稳定底盘 —— 目前最推荐</div>
+      <p style="font-size:13px;line-height:1.75;color:var(--ink2)">
+        照片突破页面左右留白做通栏出血（无圆角、无边框，375 全宽），信息不再压在照片上，
+        而是放进一张咬合上来 36px 的 cream 卡里。锚点全部落在照片上半区，不会被底部内容遮住。
+        用的正是 <code>_base.scss</code> 里预留的 <code>.photo-hero--bleed</code> + <code>.photo-hero--hinge</code> 组合。
+      </p>
+      <dl>
+        <dt>解决了 V1 的什么</dt>
+        <dd>① 通栏无圆角 → 出血名副其实，不再是"小图贴卡里"；
+          ② 文字进白卡 → 明暗可控，深浅照片都不影响可读；
+          ③ 锚点在照片上半区 → 不会被行动条吃掉；
+          ④ 信息量回到四层（编号 / 观察 / 建议 / 按钮）。</dd>
+        <dt>用户得到</dt><dd>照片够大够沉浸，同时每条建议都读得清、点得到。</dd>
+        <dt>我们传递</dt><dd>克制而有条理 —— 证据在上，结论在下，各归其位。</dd>
+        <dt>新鲜感怎么来</dt><dd>同 V1：日期徽标进状态位、锚点每天只亮一个、底部每天换一条。
+          另可把 V3 的序列进度条与「明天的预告」并进白卡。</dd>
+        <dt>视觉突破</dt><dd>照片层 + 卡层的咬合结构自带景深，是四版里唯一「既有冲击力又不牺牲可读性」的。</dd>
+      </dl>
+      <div class="goodline">与现有设计系统同构：<code>--bleed</code> / <code>--hinge</code> / <code>.card</code> 都是现成语义类，
+        改动收敛在首页 hero，不动全局样式。</div>
+      <div class="warnline">风险：通栏出血后照片左右无留白，微信下需确认圆角裁切只作用于卡片不作用于照片；
+        照片高度 352px 仍占屏较高，可降到 300~320px 让下方工具区多露一些。</div>
+    </div>
+  </div>
+
+  <!-- ============ 新鲜感机制 ============ -->
+  <div class="fresh">
+    <h2>每天的新鲜感，靠什么解决</h2>
+    <p class="lede">
+      报告是静态的（生成后不再变），所以「卡片每天一模一样」是必然的。新鲜感不能靠换配色、换布局这类<strong>假新鲜</strong>，
+      要来自「每天真的给你不一样的东西」——<strong>今日焦点轮转</strong>：
+      把静态的 findings 列表变成一个「每天只亮一盏灯」的序列。
+    </p>
+    <div class="days" id="days"></div>
+    <div class="fresh-rules">
+      <div>
+        <h3>要做的（真新鲜）</h3>
+        <ul>
+          <li><strong>确定性轮转</strong>：按日期取模选中当日焦点，绝不用随机 —— 刷新页面就变等于不可信。</li>
+          <li><strong>日期进入状态位</strong>：eyebrow 从「形象档案已就绪」换成「9月19日 · 今日焦点 02/4」。</li>
+          <li><strong>锚点分三档</strong>：今天亮 / 已看过淡 / 未到最淡，产生序列感与追更感。</li>
+          <li><strong>明天有预告</strong>：底部一行「明天：03 比例」，给出回来的理由。</li>
+          <li><strong>今日造型优先</strong>：有 <code>today_plan</code> 时直接切今日造型态（真正的每日内容，已有逻辑）。</li>
+          <li><strong>时段语境</strong>：早上指向「今天」，晚上指向「明天要穿什么」。</li>
+        </ul>
+      </div>
+      <div>
+        <h3>不做的（假新鲜 / 越红线）</h3>
+        <ul class="no">
+          <li>不做随机推荐 —— 每次刷新内容不同，会让人觉得系统在瞎猜。</li>
+          <li>不做打卡 / 连续天数 —— 「已连续 3 天」是把产品焦虑转嫁给用户。</li>
+          <li>不换配色换布局冒充更新 —— 内容没变，视觉换皮，两天就被识破。</li>
+          <li>不写「你还有 3 个问题没解决」—— 清单式压迫，违反尊重表达红线。</li>
+          <li>不用警示红标注锚点 —— 一律 cream / moss 中性色。</li>
+          <li>不承诺「每天自动生成」—— 焦点来自已有 findings，不新增服务端承诺。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// 假数据：真实来自 Report.findings（category / label / visible_observation / recommendation / priority / anchor）
+const FINDINGS = [
+  { n:'01', cat:'发型', x:50, y:14,
+    obs:'发顶偏贴，头顶轮廓可以更立一点',
+    rec:'吹的时候把发根提起来，或换个更蓬松的层次' },
+  { n:'02', cat:'配色', x:50, y:44,
+    obs:'浅色内搭让上半身的重心往上散',
+    rec:'换成深一个色号的内搭，视线会落回脸部' },
+  { n:'03', cat:'比例', x:50, y:63,
+    obs:'外套下摆正好结束在腰最宽的位置',
+    rec:'换下摆略短或略长的版型，避开腰线' },
+  { n:'04', cat:'整体', x:31, y:50,
+    obs:'整体偏休闲，缺一处有结构的单品',
+    rec:'保持上装不变，下装换成直筒硬挺面料' },
+]
+
+// 各版本照片容器比例不同，锚点用各自的落点（原型精度：视觉合理即可）
+const POS = {
+  v1: [{x:50,y:13},{x:50,y:43},{x:50,y:62},{x:33,y:49}],
+  v2: [{x:50,y:14},{x:50,y:44},{x:50,y:63},{x:31,y:50}],
+  // v3 是头肩特写取景（viewBox 50 55 243 156），落点按该取景单独校准
+  v3: [{x:50,y:5},{x:50,y:40},{x:50,y:70},{x:28,y:50}],
+  // v4 是通栏宽取景（viewBox 40 20 295 283），锚点须落在照片上半区，避开咬合卡遮住的下缘
+  v4: [{x:45,y:14},{x:45,y:39},{x:45,y:64},{x:22,y:49}],
+}
+
+let focus = 1 // 今日焦点下标（0-based）：9月19日 → 第 2 条
+
+const $ = (id) => document.getElementById(id)
+const f = () => FINDINGS[focus]
+
+/* ---------- 渲染锚点 ---------- */
+function buildAnchors(version, box) {
+  box.innerHTML = FINDINGS.map((it, i) => {
+    const p = POS[version][i]
+    return `<button class="anchor${i === focus ? ' on' : ''}" data-focus="${i}"
+      style="left:${p.x}%;top:${p.y}%;transform:translate(-50%,-50%)">${it.n}</button>`
+  }).join('')
+}
+function paintAnchors(version) {
+  document.querySelectorAll(`#${version}-anchors .anchor`).forEach((el, i) => {
+    el.classList.toggle('on', i === focus)
+  })
+}
+
+/* ---------- V1 ---------- */
+function renderV1() {
+  buildAnchors('v1', $('v1-anchors'))
+  paintAnchors('v1')
+  const it = f()
+  const p = POS.v1[focus]
+  $('v1-eyebrow').textContent = `9月19日 · 今日焦点 ${it.n}/4`
+  $('v1-tag').style.left = `calc(${p.x}% + 20px)`
+  $('v1-tag').style.top = `calc(${p.y}% - 11px)`
+  $('v1-tag-text').textContent = it.cat
+  $('v1-num').textContent = it.n
+  $('v1-cat').textContent = it.cat
+  $('v1-rec').textContent = it.rec
+  $('v1-btn').textContent = `去看怎么改 ›`
+}
+
+/* ---------- V2 ---------- */
+function renderV2() {
+  buildAnchors('v2', $('v2-anchors'))
+  paintAnchors('v2')
+  $('v2-list').innerHTML = FINDINGS.map((it, i) => `
+    <div class="v2-row${i === focus ? ' on' : ''}" data-focus="${i}">
+      <div class="r-top">
+        <span class="r-n">${it.n}</span><span class="r-cat">${it.cat}</span><span class="r-dot"></span>
+      </div>
+      <div class="r-detail">
+        <div class="r-obs">${it.obs}</div>
+        <div class="r-rec">${it.rec}</div>
+      </div>
+    </div>`).join('')
+  $('v2-eyebrow').textContent = `今日焦点 ${f().n}/4`
+  $('v2-btn').textContent = `${f().cat}：去做这一件事 ›`
+  $('v2-more').textContent = `还有 ${FINDINGS.length - 1} 条`
+}
+
+/* ---------- V3 ---------- */
+function renderV3() {
+  buildAnchors('v3', $('v3-anchors'))
+  paintAnchors('v3')
+  $('v3-seq').innerHTML = FINDINGS.map((_, i) =>
+    `<i class="${i === focus ? 'now' : (i < focus ? 'done' : '')}"></i>`).join('')
+  const it = f()
+  const next = FINDINGS[(focus + 1) % FINDINGS.length]
+  $('v3-eyebrow').textContent = `今日焦点 · 第 ${focus + 1} 天`
+  $('v3-num').textContent = it.n
+  $('v3-cat').textContent = it.cat
+  $('v3-obs').textContent = it.obs
+  $('v3-rec').textContent = it.rec
+  $('v3-tomorrow').textContent = `明天：${next.n} ${next.cat}`
+}
+
+/* ---------- V4 ---------- */
+function renderV4() {
+  buildAnchors('v4', $('v4-anchors'))
+  paintAnchors('v4')
+  const it = f()
+  $('v4-eyebrow').textContent = `9月19日 · 今日焦点 ${it.n}/4`
+  $('v4-num').textContent = it.n
+  $('v4-cat').textContent = it.cat
+  $('v4-obs').textContent = it.obs
+  $('v4-rec').textContent = it.rec
+  $('v4-more').textContent = `还有 ${FINDINGS.length - 1} 条，在报告里 ›`
+}
+
+function renderAll() { renderV1(); renderV2(); renderV3(); renderV4() }
+
+/* ---------- 新鲜感四天序列 ---------- */
+function renderDays() {
+  const dates = ['9月18日 周五', '9月19日 周六', '9月20日 周日', '9月21日 周一']
+  $('days').innerHTML = FINDINGS.map((it, i) => `
+    <div class="day${i === focus ? ' now' : ''}">
+      <div class="d-top">
+        <span class="d-date">${dates[i]}</span>
+        <span class="d-n">${it.n}</span>
+      </div>
+      <div class="d-cat">${it.cat}</div>
+      <div class="d-txt">${it.rec}</div>
+      <div class="d-state">${i === focus ? '今天 · 全卡主角' : (i < focus ? '已看过 · 淡出' : '未到 · 更淡')}</div>
+    </div>`).join('')
+}
+
+/* ---------- 交互 ---------- */
+document.addEventListener('click', (e) => {
+  const hit = e.target.closest('[data-focus]')
+  if (hit) {
+    focus = Number(hit.dataset.focus)
+    renderAll(); renderDays()
+    return
+  }
+  const tab = e.target.closest('.tab')
+  if (tab) {
+    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t === tab))
+    document.querySelectorAll('.stage').forEach((s) => s.classList.toggle('on', s.id === `stage-${tab.dataset.stage}`))
+  }
+})
+
+renderAll(); renderDays()
+</script>
+</body>
+</html>

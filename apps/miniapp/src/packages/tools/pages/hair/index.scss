@@ -1,0 +1,815 @@
+// 发型设计：四步线性流程的样式。hero 一屏一事；方向卡横滑大卡。
+// 两页同一骨架（见底部 .hair--form）：选择态与结果态的照片同位同高、
+// 判词复用导语段、方向卡同尺寸同 y、主按钮内联同位。
+//
+// 一屏收束：输入态（S0 确认照片 / S1 选方向 / S2 生成中）页面高 = 一屏，
+// hero 只吃「一屏 − 导语 − 方向卡 − 主按钮」的剩余高度——照片按宽铺满、顶对齐，
+// 超出的下半截从底部裁掉（与 HeroPhoto 的 widthFix 直出一致，不裁脸），
+// 竖版正脸照不再把导语和主按钮顶出首屏（见 .hair--form）。
+.hair {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  min-height: calc(100vh - 200rpx);
+
+  // ---------- hero ----------
+  // 直出 + 框随图走：高度完全由图决定（widthFix），不裁侧不裁头；
+  // onPhoto 透明导航下照片垫到视口顶，顶部压 scrim 保证返回/标题可读
+  &__hero {
+    height: auto;
+    min-height: 430rpx;
+    border-radius: 0;
+    border: 0;
+
+    &-frame {
+      position: relative;
+      width: 100%;
+      height: auto;
+    }
+
+    &-scrim {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 160rpx;
+      z-index: 2;
+      background: linear-gradient(180deg, rgba(30, 34, 30, 0.42), rgba(30, 34, 30, 0));
+      pointer-events: none;
+    }
+  }
+
+  // ---------- hero 照片：直出（单层真图，anchor=top 顶对齐、底部越界裁切） ----------
+  // 高度由 HeroPhoto onLoad 按真实宽高算出、内联在 &__hero 上；这里只负责铺满。
+  // ---------- hero 照片：直出（单层真图，widthFix 按宽铺满、顶对齐不裁侧） ----------
+  // 高度随图；容器在文档流里，frame 包住它，覆盖层（角标/生成中）绝对定位其上
+  &__photo {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: auto;
+    background-color: transparent;
+    border-radius: 0;
+
+    &-img {
+      width: 100%;
+      height: auto;
+      background-color: transparent;
+      border-radius: 0;
+    }
+  }
+
+  &__badge {
+    position: absolute;
+    top: 200rpx;
+    left: 20rpx;
+    z-index: 4;
+    padding: 8rpx 20rpx;
+    border-radius: 999rpx;
+    background: var(--badge);
+    color: var(--on-photo);
+    font-size: 18rpx;
+  }
+
+  // ---------- S0 输入透明化：将用的照片 + 换一张 ----------
+  &__use-photo {
+    position: absolute;
+    left: 20rpx;
+    bottom: 20rpx;
+    z-index: 4;
+    padding: 10rpx 22rpx;
+    border-radius: 999rpx;
+    background: var(--glass);
+    font-size: 22rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  &__hero-actions {
+    position: absolute;
+    top: 200rpx;
+    right: 20rpx;
+    z-index: 4;
+  }
+
+  &__hero-alt {
+    display: block;
+    padding: 12rpx 24rpx;
+    border-radius: 999rpx;
+    background: var(--glass);
+    font-size: 22rpx;
+    color: var(--ink);
+  }
+
+  // ---------- S0 空态：拍照示范引导（镜像穿搭诊断的上传条） ----------
+  &__upload {
+    position: relative;
+    height: 100%;
+
+    &-bar {
+      position: absolute;
+      left: 24rpx;
+      right: 24rpx;
+      bottom: 24rpx;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10rpx;
+      height: 88rpx;
+      border-radius: 999rpx;
+      background: var(--glass);
+      box-shadow: var(--shadow-card);
+
+      &-plus {
+        font-size: 32rpx;
+        line-height: 1;
+        color: var(--moss);
+      }
+
+      &-text {
+        font-size: 26rpx;
+        font-weight: 600;
+        color: var(--ink);
+      }
+    }
+  }
+
+  // ---------- S2 生成中：源图 + 沉浸等待 ----------
+  &__gen {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 48rpx;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.28));
+
+    &-card {
+      display: flex;
+      align-items: center;
+      gap: 20rpx;
+      padding: 24rpx 32rpx;
+      border-radius: var(--radius-md);
+      background: var(--glass);
+      box-shadow: var(--shadow-card);
+    }
+
+    &-spin {
+      width: 44rpx;
+      height: 44rpx;
+      border-width: 4rpx;
+    }
+
+    &-texts {
+      display: flex;
+      flex-direction: column;
+      gap: 6rpx;
+    }
+
+    &-stage {
+      font-size: 26rpx;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    &-note {
+      font-size: 22rpx;
+      color: var(--ink-3);
+    }
+  }
+
+  // ---------- S3 结果：长按看原图 ----------
+  // 与结果图同一个相框（100%）：原图层 inset:0 覆盖的才是完整画面
+  &__compare {
+    position: relative;
+    width: 100%;
+    height: 100%;
+
+    &-original {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      opacity: 0;
+      transition: opacity 0.18s ease;
+
+      &--on {
+        opacity: 1;
+      }
+    }
+  }
+
+  &__hold-hint {
+    position: absolute;
+    left: 50%;
+    // 抬到结论色带的叠压区（24rpx）之上，不被盖住
+    bottom: 56rpx;
+    z-index: 4;
+    transform: translateX(-50%);
+    padding: 10rpx 24rpx;
+    border-radius: 999rpx;
+    background: var(--glass);
+    font-size: 22rpx;
+    color: var(--ink);
+  }
+
+  // ---------- 图下导语 / 结果判词 ----------
+  &__hint {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    // 两态等高的前提：纵向 padding 一致（结果态色带与选择态导语同高）
+    padding: 26rpx 0;
+
+    &-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8rpx;
+    }
+
+    // 标题行：方向名 +（结果态）✓ 日期
+    &-titlerow {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16rpx;
+    }
+
+    // 结果页的判词复用这两个类（方向名/说明是动态文本）：
+    // 超长截断成一行，两页这一段的高度才不会漂
+    &-title {
+      font-size: 40rpx;
+      font-weight: 700;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    &-day {
+      font-size: 20rpx;
+      color: var(--ink-3);
+      white-space: nowrap;
+    }
+
+    &-desc {
+      font-size: 24rpx;
+      line-height: 1.65;
+      color: var(--ink-3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  // ---------- 结果态：结论色带（深底白字，轻微叠压照片下缘） ----------
+  // 叠压 24rpx 用「上提 + 等量补偿」实现：文档流占位不变，几何与选择态一致，
+  // 切换时不会因为这段而跳。选择态同一位置是白底导语——同位不同质，区分度在这里。
+  &.hair--done .hair__hint {
+    flex-direction: row;
+    align-items: center;
+    gap: 16rpx;
+    margin: -24rpx calc(-1 * var(--page-gutter)) 24rpx;
+    padding-left: var(--page-gutter);
+    padding-right: var(--page-gutter);
+    // A：墨底标题块——杂志编辑感。字用奶油白不用纯白（纯白在墨底上太"数码"），
+    // 顶部苔绿规线锚住品牌。不需要投影：深底自己就从照片里分出来了。
+    background-color: var(--ink);
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.035) 0 2rpx,
+      transparent 2rpx 16rpx
+    );
+    border-top: 3rpx solid var(--moss);
+
+    .hair__hint-title {
+      color: var(--cream);
+    }
+
+    .hair__hint-day {
+      color: rgba(255, 255, 255, 0.66);
+    }
+
+    .hair__hint-desc {
+      color: rgba(255, 255, 255, 0.72);
+    }
+  }
+
+  // 四角裁切规线：结果态照片的「杂志大片」记号（纯 CSS，pointer-events 放行长按）
+  &__crop {
+    position: absolute;
+    width: 28rpx;
+    height: 28rpx;
+    z-index: 4;
+    pointer-events: none;
+    border: 0 solid rgba(255, 255, 255, 0.85);
+
+    &--tl {
+      top: 108rpx;
+      left: 16rpx;
+      border-top-width: 2rpx;
+      border-left-width: 2rpx;
+    }
+
+    &--tr {
+      top: 108rpx;
+      right: 16rpx;
+      border-top-width: 2rpx;
+      border-right-width: 2rpx;
+    }
+
+    &--bl {
+      bottom: 88rpx;
+      left: 16rpx;
+      border-bottom-width: 2rpx;
+      border-left-width: 2rpx;
+    }
+
+    &--br {
+      bottom: 88rpx;
+      right: 16rpx;
+      border-bottom-width: 2rpx;
+      border-right-width: 2rpx;
+    }
+  }
+
+  &__hint-detail {
+    flex: none;
+    font-size: 22rpx;
+    font-weight: 600;
+    color: var(--cream);
+    padding: 10rpx 24rpx;
+    border: 1rpx solid rgba(255, 255, 255, 0.42);
+    border-radius: 999rpx;
+    white-space: nowrap;
+  }
+
+  // ---------- 方向区标题行：选择态＝性别分段（左标签+右 pills），
+  // 结果态＝「换个方向看看」（左标签+右「换张照片」）——同一行高同一个 y ----------
+  &__gender {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16rpx;
+    // 行高以分段 pill 为准：结果态右侧只有文字时也保持同一行高（卡行 y 对齐的前提）
+    min-height: 68rpx;
+
+    &-label {
+      font-size: 24rpx;
+      font-weight: 600;
+      color: var(--ink-2);
+    }
+
+    &-pills {
+      display: flex;
+      gap: 16rpx;
+    }
+
+    // 结果态右位动作：与 pill 同行的文字链接
+    &-alt {
+      padding: 12rpx 8rpx;
+      font-size: 24rpx;
+      color: var(--moss);
+    }
+  }
+
+  // ---------- 方向卡轨：参考图铺满卡面，选中抬升（选择态与结果态同一张卡） ----------
+  &__cards {
+    width: 100%;
+    white-space: nowrap;
+    // 轨道两端渐隐：横滑有「往里还有」的暗示，边缘不硬切
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      #000 32rpx,
+      #000 calc(100% - 32rpx),
+      transparent 100%
+    );
+    mask-image: linear-gradient(90deg, transparent 0, #000 32rpx, #000 calc(100% - 32rpx), transparent 100%);
+
+    &-rail {
+      display: inline-flex;
+      gap: 16rpx;
+      // 末张卡右边距
+      padding-right: var(--page-gutter);
+      width: max-content;
+    }
+  }
+
+  &__card {
+    // 224×168 = 4:3：缩排保一屏（与首页卡同一显示规范的缩小版）
+    position: relative;
+    width: 224rpx;
+    border-radius: var(--radius-md);
+    background: var(--surface, #fff);
+    overflow: hidden;
+    border: 2rpx solid transparent;
+    // 未选中压一档、选中抬一档：参数对齐 motion.ts（select 200ms / 品牌缓动）
+    opacity: 0.78;
+    transform: scale(0.96);
+    transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1), border-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    &--active {
+      border-color: var(--moss);
+      opacity: 1;
+      transform: scale(1.04) translateY(-4rpx);
+      box-shadow: 0 14rpx 32rpx rgba(45, 58, 35, 0.24);
+    }
+
+    &-img {
+      width: 100%;
+      height: 168rpx;
+    }
+
+    // 没有参考图的方向（男士）与自定义：同高的浅色块，横滑轨道的节奏不塌
+    &-blank {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 168rpx;
+      background: var(--moss-soft);
+
+      &-icon {
+        width: 56rpx;
+        height: 56rpx;
+        opacity: 0.6;
+      }
+
+      &-plus {
+        font-size: 40rpx;
+        line-height: 1;
+        color: var(--moss);
+      }
+    }
+
+    // 自定义卡：虚线与「目录里的一款」区分开，未选中时也是一条可点的入口
+    &--custom {
+      border-style: dashed;
+      border-color: var(--line);
+      background: transparent;
+    }
+
+    &--custom.hair__card--active {
+      border-color: var(--moss);
+    }
+
+    // 名与差异标签压在参考图底部：卡面是图，不是「图 + 白块」
+    &-body {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2rpx;
+      padding: 28rpx 14rpx 12rpx;
+      background: linear-gradient(180deg, rgba(24, 28, 22, 0), rgba(24, 28, 22, 0.74));
+      white-space: normal;
+    }
+
+    &-name {
+      font-size: 24rpx;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.35);
+    }
+
+    &-tag {
+      font-size: 18rpx;
+      color: rgba(255, 255, 255, 0.82);
+    }
+
+    &-desc {
+      font-size: 18rpx;
+      line-height: 1.4;
+      color: var(--ink-3);
+    }
+
+    // 没图可铺的卡（既没生成图也没参考图）：文字回到浅色块上，不套图上的白字
+    &--blanked {
+      background: var(--moss-soft);
+
+      .hair__card-body {
+        position: static;
+        background: none;
+        padding: 14rpx 18rpx 16rpx;
+      }
+
+      .hair__card-name {
+        color: var(--ink);
+        text-shadow: none;
+      }
+
+      .hair__card-tag {
+        color: var(--ink-3);
+      }
+    }
+  }
+
+  // ---------- 卡面状态角标：已生成（自己的效果图，点了回放）/ 未生成（参考图，点了生成） ----------
+  // 用「有没有生成过」区分，不用来源标识：来源统一由 ref-note 那行文字交代
+  &__card-state {
+    position: absolute;
+    top: 10rpx;
+    right: 10rpx;
+    z-index: 2;
+    padding: 4rpx 12rpx;
+    border-radius: 999rpx;
+    border: 1rpx dashed rgba(255, 255, 255, 0.72);
+    background: rgba(24, 28, 22, 0.42);
+    font-size: 18rpx;
+    line-height: 1.5;
+    color: #fff;
+    white-space: nowrap;
+
+    // 已生成：透明墨底 + 对号 + 短日期——安静的一枚记号，不跟照片抢
+    &--done {
+      border: none;
+      background: rgba(24, 28, 22, 0.45);
+    }
+  }
+
+  // 无图可铺的卡（浅色块）：角标反成深色字，白字在浅底上读不出来
+  &__card--blanked &__card-state {
+    border-color: rgba(55, 62, 52, 0.4);
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--ink-2);
+  }
+
+  // 选择态第一张＝上次的效果（回程入口），描边与方向卡区分开
+  &__card--done {
+    border-color: var(--moss);
+  }
+
+  // ---------- 结果详情入口（hero 内的浮层 chip，不占文档流） ----------
+  &__detail-entry {
+    position: absolute;
+    right: 20rpx;
+    bottom: 20rpx;
+    z-index: 6;
+    padding: 8rpx 24rpx;
+    border-radius: 999rpx;
+    background: var(--glass);
+    border: 1rpx solid var(--line);
+    box-shadow: var(--shadow-card);
+
+    &-text {
+      font-size: 22rpx;
+      font-weight: 600;
+      color: var(--ink);
+    }
+  }
+
+  // ---------- 结果详情面板 ----------
+  &__detail {
+    display: flex;
+    flex-direction: column;
+    gap: 18rpx;
+
+    &-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16rpx;
+      padding-bottom: 16rpx;
+      border-bottom: 1rpx solid var(--line);
+    }
+
+    &-label {
+      font-size: 24rpx;
+      color: var(--ink-3);
+    }
+
+    &-value {
+      flex: 1;
+      font-size: 26rpx;
+      font-weight: 600;
+      color: var(--ink);
+      text-align: right;
+    }
+
+    // 基于的照片：缩略图（anchor=top 自带同图衬底）
+    &-thumb {
+      width: 120rpx;
+      height: 120rpx;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      flex: none;
+    }
+
+    &-note {
+      font-size: 22rpx;
+      line-height: 1.6;
+      color: var(--ink-3);
+    }
+  }
+
+  // 参考图来源说明（红线 2：角标不上屏，来源靠这行文字）
+  &__ref-note {
+    margin-top: -12rpx;
+    font-size: 20rpx;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+
+  // 生成结果「显影」：只挂在结果态（.hair__compare 内），换照片时也在，
+  // 但不会给输入态叠加第二次。小程序对 filter 支持不齐——透明与缩放才是主叙事。
+  .hair__compare .hair__photo-img {
+    animation: hairReveal 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  // ---------- 失败态：原因 + 双动作 ----------
+  &__failed {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+    padding: 24rpx 28rpx;
+    border-radius: var(--radius-md);
+    background: var(--moss-soft);
+
+    &-text {
+      font-size: 24rpx;
+      line-height: 1.6;
+      color: var(--ink);
+    }
+
+    &-row {
+      display: flex;
+      gap: 32rpx;
+    }
+
+    &-action {
+      padding: 8rpx 0;
+      font-size: 24rpx;
+      font-weight: 600;
+      color: var(--moss);
+    }
+  }
+
+  // ---------- 底部操作 ----------
+  &__foot {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+    margin-top: auto;
+    // 注意：这里不要用 min-height 去「对齐两态」——foot 高出来的是内容下方的
+    // 死白（flex column 顶部对齐），CTA 下面会空一大截。两态的 foot 高度差
+    // 只发生在「S1 还没选照片」时（多一条示例链接行），那条路径本来就整屏换内容。
+
+    // S1 内联按钮：紧跟方向卡，不满屏的留白留在页面尾部而不是内容中间
+    &--inline {
+      margin-top: 8rpx;
+    }
+
+    &-row {
+      display: flex;
+      justify-content: center;
+      gap: 48rpx;
+    }
+
+    &-alt {
+      padding: 20rpx 8rpx;
+      font-size: 24rpx;
+      color: var(--moss);
+    }
+  }
+
+  // ---------- 自定义方向：输入层（描述直接当方向名与提示词） ----------
+  &__custom-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+  }
+
+  &__custom-label {
+    font-size: 26rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  &__custom-input {
+    width: 100%;
+    min-height: 176rpx;
+    padding: 20rpx;
+    border-radius: var(--radius-md);
+    border: 1rpx solid var(--line);
+    background: var(--surface-strong);
+    font-size: 28rpx;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+
+  &__custom-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16rpx;
+  }
+
+  &__custom-helper {
+    flex: 1;
+    font-size: 22rpx;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+
+  &__custom-count {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__custom-empty {
+    font-size: 22rpx;
+    text-align: center;
+    color: var(--ink-3);
+  }
+}
+
+// ---------- 一屏收束（两页共用）：hero 吃剩余高度，其余元素全留首屏 ----------
+// 相框不再是「图多高就多高」（竖版正脸照能拉到 1300rpx+，把导语、方向卡、主按钮
+// 全顶出屏幕）；改成页面高 = 一屏，hero 拿剩下的高度。选择态照片 widthFix 顶对齐
+// 裁底（正脸照不裁脸）；结果态生成图 aspectFill 铺满同一个框（4:3 横图进竖框，
+// 居中裁两侧肩线，脸在中央不受影响）——两页照片同位同高，其余元素因此同 y。
+// 本页是一屏锁死 + CTA 沉底的结构：全局那 48rpx 底部呼吸在这里纯属浪费
+// （CTA 下面会空出一截），收紧到 24rpx——对减值必须与下面的 .hair--form 同步。
+.page--hair {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 24rpx);
+}
+
+.hair--form {
+  // 与 .page--hair 的底部内边距配套：容器 + 底垫 = 正好一屏
+  height: calc(100vh - env(safe-area-inset-bottom) - 24rpx);
+  // 矮屏 / 放大字号的保底：宁可页面滚动，也不把 hero 压成一条
+  min-height: 1040rpx;
+
+  .hair__hero {
+    // 唯一可伸缩项：余量全给照片，430rpx 是下限（不塌成横条）
+    flex: 1 1 auto;
+  }
+
+  // frame 绝对铺满 hero 盒：高度交给 flex 算，不再由照片高度决定
+  .hair__hero-frame {
+    position: absolute;
+    inset: 0;
+  }
+
+  // 照片吃满相框；顶部统一留 56rpx 呼吸——两态同一个起点，构图不顶死也不偏上。
+  // overflow 是关键：本地临时路径（还没上传）走的是裸 Image + widthFix，高度随图走，
+  // 不裁就会从框底探出去一截——结果态的下边缘因此跟它对不上。
+  .hair__photo {
+    height: 100%;
+    // 顶部呼吸加大：照片不顶死，构图偏下一点（96rpx ≈ 48pt）
+    padding-top: 96rpx;
+    overflow: hidden;
+  }
+
+  // SourceImage 根必须有确定高度：「铺高裁侧」时 img 是 absolute（height:100%），
+  // 容器一塌图就整个消失。100% 相对 .hair__photo 的内容盒（框高 − 顶部呼吸）。
+  // 本地临时路径的裸 Image 不带 .source-image 类，不受影响（widthFix 自然高度）。
+  .hair__photo .source-image {
+    height: 100%;
+  }
+
+  // 导语（结果态＝判词）/ 标题行 / 方向卡 / 失败块 / 主按钮按内容排布，
+  // 不参与压缩（余量只给 hero）
+  .hair__hint,
+  .hair__gender,
+  .hair__cards,
+  .hair__failed,
+  .hair__foot {
+    flex: none;
+  }
+}
+
+// 结果「显影」：失焦 + 微推近落到清晰（durations.fadeUp 520ms + 品牌缓动）。
+// 两态已统一映射规则（都顶对齐、都填满框、都不切头），切换时不再有位移可补——
+// 这里只表达「图从模糊到成形」，不做位移补偿（位移补偿会把已对齐的构图推歪）。
+@keyframes hairReveal {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+    filter: blur(12rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+// reduced motion：时长归零，只留终态（不许删动画，压时长）
+@media (prefers-reduced-motion: reduce) {
+  .hair__compare .hair__photo-img {
+    animation-duration: 1ms;
+  }
+
+  .hair__card {
+    transition-duration: 1ms;
+  }
+}

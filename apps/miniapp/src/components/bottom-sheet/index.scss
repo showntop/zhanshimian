@@ -1,0 +1,114 @@
+.bottom-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+
+  &__mask {
+    position: absolute;
+    inset: 0;
+    background: rgba(30, 33, 29, 0.35);
+    animation: bottom-sheet-fade 0.16s ease both;
+  }
+
+  &__panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    padding: 20rpx 32rpx calc(env(safe-area-inset-bottom) + 40rpx);
+    background: var(--surface-strong);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow: var(--shadow-sheet);
+    animation: bottom-sheet-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    // 松手回弹（拖拽中由内联 transform 接管，无过渡）
+    transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  &__panel--tall {
+    height: 85vh;
+    max-height: 85vh;
+    overflow: hidden;
+  }
+
+  // 下拉手势热区：grabber + 标题区（高度充足才好拖）
+  &__grab-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8rpx 0 4rpx;
+  }
+
+  &__grabber {
+    width: 72rpx;
+    height: 8rpx;
+    margin-bottom: 20rpx;
+    border-radius: 999rpx;
+    background: #d8ddd4;
+  }
+
+  &__title {
+    display: block;
+    font-size: 34rpx;
+    font-weight: 700;
+    color: var(--ink);
+    text-align: center;
+  }
+
+  &__desc {
+    display: block;
+    margin-top: 12rpx;
+    font-size: 24rpx;
+    color: var(--ink-2);
+    text-align: center;
+  }
+
+  &__body {
+    flex: 1;
+    min-height: 0;
+    margin-top: 28rpx;
+    display: flex;
+    flex-direction: column;
+  }
+
+  // 退场：面板更快更重地下滑（§4.3 sheetOut），遮罩同步淡出
+  &--exit &__mask {
+    animation: bottom-sheet-fade 0.2s ease reverse both;
+  }
+
+  &--exit &__panel {
+    animation: bottom-sheet-out 0.24s cubic-bezier(0.33, 0, 0.2, 1) both;
+  }
+}
+
+@keyframes bottom-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes bottom-sheet-out {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes bottom-sheet-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

@@ -1,0 +1,215 @@
+package storage
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"path"
+	"strconv"
+	"strings"
+	"time"
+
+	cos "github.com/tencentyun/cos-go-sdk-v5"
+	"github.com/zhanshimian/server/internal/domain"
+)
+
+type COSConfig struct {
+	BucketURL  string
+	SecretID   string
+	SecretKey  string
+	KeyPrefix  string
+	HTTPClient *http.Client
+}
+
+type COS struct {
+	client    *cos.Client
+	bucket    *url.URL
+	secretID  string
+	secretKey string
+	prefix    string
+}
+
+func NewCOS(cfg COSConfig) (*COS, error) {
+	bucketURL, err := url.Parse(strings.TrimSpace(cfg.BucketURL))
+	if err != nil || bucketURL.Scheme != "https" || bucketURL.Host == "" {
+		return nil, fmt.Errorf("COS bucket URL must be an absolute HTTPS URL")
+	}
+	if strings.TrimSpace(cfg.SecretID) == "" || strings.TrimSpace(cfg.SecretKey) == "" {
+		return nil, fmt.Errorf("COS secret id and key are required")
+	}
+	httpClient := cfg.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Transport: &cos.AuthorizationTransport{
+			SecretID: strings.TrimSpace(cfg.SecretID), SecretKey: strings.TrimSpace(cfg.SecretKey),
+		}}
+	}
+	return &COS{
+		client:   cos.NewClient(&cos.BaseURL{BucketURL: bucketURL}, httpClient),
+		bucket:   bucketURL,
+		secretID: strings.TrimSpace(cfg.SecretID), secretKey: strings.TrimSpace(cfg.SecretKey),
+		prefix: strings.Trim(strings.TrimSpace(cfg.KeyPrefix), "/"),
+	}, nil
+}
+
+func (c *COS) Save(ctx context.Context, key string, reader io.Reader) (string, error) {
+	key, err := c.objectKey(key)
+	if err != nil {
+		return "", err
+	}
+	response, err := c.client.Object.Put(ctx, key, reader, nil)
+	if response != nil && response.Body != nil {
+		response.Body.Close()
+	}
+	if err != nil {
+		return "", fmt.Errorf("save COS object: %w", err)
+	}
+	return key, nil
+}
+
+func (c *COS) Open(ctx context.Context, key string) (io.ReadCloser, error) {
+	key, err := c.objectKey(key)
+	if err != nil {
+		return nil, err
+	}
+	response, err := c.client.Object.Get(ctx, key, nil)
+	if err != nil {
+		return nil, fmt.Errorf("open COS object: %w", err)
+	}
+	return response.Body, nil
+}
+
+// OpenProcessed downloads a COS object after 数据万象 processing (download-time
+// imageMogr2). The bucket must have CI enabled; callers should fall back to Open.
+func (c *COS) OpenProcessed(ctx context.Context, key, process string) (io.ReadCloser, error) {
+	key, err := c.objectKey(key)
+	if err != nil {
+		return nil, err
+	}
+	process = strings.TrimSpace(process)
+	if process == "" {
+		return nil, fmt.Errorf("open processed COS object: empty process rule")
+	}
+	response, err := c.client.CI.Get(ctx, key, process, nil)
+	if err != nil {
+		if response != nil && response.Body != nil {
+			response.Body.Close()
+		}
+		return nil, fmt.Errorf("open processed COS object: %w", err)
+	}
+	return response.Body, nil
+}
+
+func (c *COS) Delete(ctx context.Context, key string) error {
+	key, err := c.objectKey(key)
+	if err != nil {
+		return err
+	}
+	response, err := c.client.Object.Delete(ctx, key)
+	if response != nil && response.Body != nil {
+		response.Body.Close()
+	}
+	if err != nil {
+		return fmt.Errorf("delete COS object: %w", err)
+	}
+	return nil
+}
+
+func (c *COS) SignedURL(ctx context.Context, key string, ttl time.Duration) (string, error) {
+	key, err := c.objectKey(key)
+	if err != nil {
+		return "", err
+	}
+	if ttl <= 0 {
+		ttl = 15 * time.Minute
+	}
+	value, err := c.client.Object.GetPresignedURL(ctx, http.MethodGet, key, c.secretID, c.secretKey, ttl, nil)
+	if err != nil {
+		return "", fmt.Errorf("sign COS object URL: %w", err)
+	}
+	return value.String(), nil
+}
+
+// RefreshURL re-signs one of the store's own object URLs (signed or plain)
+// so rows written before relative paths were persisted keep working after
+// the original signature expires. Unrecognized hosts return ok == false.
+func (c *COS) RefreshURL(value string, ttl time.Duration) (string, bool) {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" || parsed.Host != c.bucket.Host {
+		return "", false
+	}
+	basePath := strings.TrimSuffix(c.bucket.Path, "/")
+	key := strings.TrimPrefix(parsed.Path, basePath+"/")
+	if key == "" || key == parsed.Path {
+		return "", false
+	}
+	signed, err := c.SignedURL(context.Background(), key, ttl)
+	if err != nil {
+		return "", false
+	}
+	return signed, true
+}
+
+func (c *COS) PresignUpload(ctx context.Context, intent domain.UploadIntent, ttl time.Duration) (domain.UploadGrant, error) {
+	key, err := c.objectKey(intent.ObjectKey)
+	if err != nil {
+		return domain.UploadGrant{}, err
+	}
+	if ttl <= 0 {
+		ttl = 15 * time.Minute
+	}
+	// Content-Length 不能进签名头也不能要求客户端回传：微信小程序网络层
+	// 自管理 Content-Length，回传值被改写或缺失都会让 COS 判签名不符（403）。
+	headers := http.Header{}
+	headers.Set("Content-Type", intent.MIMEType)
+	headers.Set("x-cos-meta-sha256", intent.SHA256)
+	signed, err := c.client.Object.GetPresignedURL(ctx, http.MethodPut, key, c.secretID, c.secretKey, ttl, &cos.PresignedURLOptions{Header: &headers})
+	if err != nil {
+		return domain.UploadGrant{}, fmt.Errorf("sign COS upload URL: %w", err)
+	}
+	return domain.UploadGrant{
+		Method: http.MethodPut,
+		URL:    signed.String(),
+		Headers: map[string]string{
+			"Content-Type":      intent.MIMEType,
+			"x-cos-meta-sha256": intent.SHA256,
+		},
+		ExpiresAt: time.Now().Add(ttl),
+	}, nil
+}
+
+func (c *COS) HeadObject(ctx context.Context, objectKey string) (domain.ObjectMetadata, error) {
+	key, err := c.objectKey(objectKey)
+	if err != nil {
+		return domain.ObjectMetadata{}, err
+	}
+	response, err := c.client.Object.Head(ctx, key, nil)
+	if err != nil {
+		if cos.IsNotFoundError(err) {
+			return domain.ObjectMetadata{}, fmt.Errorf("%w: %s", ErrObjectNotFound, objectKey)
+		}
+		return domain.ObjectMetadata{}, fmt.Errorf("head COS object: %w", err)
+	}
+	byteSize, _ := strconv.ParseInt(response.Header.Get("Content-Length"), 10, 64)
+	if response.ContentLength > 0 {
+		byteSize = response.ContentLength
+	}
+	return domain.ObjectMetadata{
+		ObjectKey: objectKey,
+		MIMEType:  response.Header.Get("Content-Type"),
+		ByteSize:  byteSize,
+		SHA256:    response.Header.Get("x-cos-meta-sha256"),
+	}, nil
+}
+
+func (c *COS) objectKey(value string) (string, error) {
+	clean := path.Clean(strings.TrimPrefix(strings.TrimSpace(value), "/"))
+	if clean == "." || clean == "" || clean == ".." || strings.HasPrefix(clean, "../") {
+		return "", fmt.Errorf("invalid storage key")
+	}
+	if c.prefix == "" || clean == c.prefix || strings.HasPrefix(clean, c.prefix+"/") {
+		return clean, nil
+	}
+	return c.prefix + "/" + clean, nil
+}

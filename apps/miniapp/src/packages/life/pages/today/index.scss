@@ -1,0 +1,73 @@
+.today {
+  display: flex; flex-direction: column; gap: 28rpx;
+
+  &__ctx {
+    display: flex; flex-direction: column; gap: 6rpx;
+    padding: 24rpx 28rpx;
+    &-city { font-size: 30rpx; font-weight: 600; color: var(--ink); }
+    &-weather { font-size: 22rpx; color: var(--ink-2); }
+    &-edit { font-size: 18rpx; color: var(--moss); }
+  }
+
+  &__card {
+    display: flex; flex-direction: column; gap: 20rpx;
+    padding: 24rpx;
+  }
+
+  &__img-wrap { position: relative; height: 560rpx; border-radius: var(--radius-md); overflow: hidden; }
+  &__img, &__img.example-image { width: 100%; height: 100%; }
+  &__img-badge {
+    position: absolute; bottom: 16rpx; right: 16rpx;
+    padding: 6rpx 18rpx; border-radius: 999rpx;
+    background: var(--badge); color: var(--on-photo); font-size: 18rpx;
+  }
+  &__mask {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16rpx;
+    background: var(--glass);
+    &-spin {
+      width: 44rpx;
+      height: 44rpx;
+      border-width: 4rpx;
+    }
+    &-text { font-size: 22rpx; color: var(--ink); }
+  }
+
+  &__copy { display: flex; flex-direction: column; gap: 10rpx; }
+  &__title { font-size: 36rpx; font-weight: 700; color: var(--ink); }
+  &__summary { font-size: 24rpx; line-height: 1.65; color: var(--ink-2); }
+  &__step {
+    display: flex; gap: 16rpx; padding: 14rpx 0;
+    border-top: 1rpx solid var(--line);
+    &-label {
+      flex-shrink: 0; width: 88rpx;
+      font-size: 22rpx; font-weight: 600; letter-spacing: 0; color: var(--moss);
+    }
+    &-text { font-size: 24rpx; line-height: 1.6; color: var(--ink); }
+  }
+
+  &__actions { display: flex; flex-direction: column; gap: 18rpx; }
+  &__actions-row { display: flex; justify-content: center; gap: 40rpx; }
+  &__actions-alt { font-size: 24rpx; color: var(--moss); text-decoration: underline; }
+
+  &__feedback {
+    display: flex; flex-direction: column; gap: 16rpx;
+    &-title { font-size: 24rpx; font-weight: 600; color: var(--ink-2); }
+    &-pills { display: flex; flex-wrap: wrap; gap: 14rpx; }
+    &-pill {
+      padding: 12rpx 28rpx; border-radius: 999rpx;
+      background: var(--surface-strong); border: 1rpx solid var(--line);
+      font-size: 24rpx; color: var(--ink-2);
+      &--active { background: var(--moss-soft); border-color: var(--moss); color: var(--moss); font-weight: 600; }
+    }
+  }
+
+  &__viewer {
+    position: fixed; inset: 0; z-index: 300;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 48rpx; background: var(--scrim-heavy);
+    &-img { width: 100%; height: 72vh; }
+    &-close { margin-top: 24rpx; font-size: 22rpx; color: var(--on-photo-muted); }
+  }
+}
+

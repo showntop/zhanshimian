@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
+    "types": ["react"],
+    "baseUrl": ".",
+    "paths": {
+      "@zsm/core": ["../../packages/core/src/index.ts"],
+      "@zsm/design": ["../../packages/design/src/index.ts"]
+    }
+  },
+  "include": ["app", "src", "*.ts"]
+}

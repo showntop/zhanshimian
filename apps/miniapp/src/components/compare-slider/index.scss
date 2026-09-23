@@ -1,0 +1,93 @@
+// 对比滑杆：手柄描边辉光对齐 motion.ts compareHandleRing。
+.cmp {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--moss-soft);
+
+  // 内层图统一铺满、去自身圆角（外层统一裁切）
+  .example-image {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  &__layer {
+    position: absolute;
+    inset: 0;
+
+    // 上层裁切外壳：右缘即分界线
+    &--top {
+      overflow: hidden;
+      border-right: 2rpx solid rgba(255, 255, 255, 0.9);
+    }
+  }
+
+  &__clip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+  }
+
+  &__handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__handle-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -1rpx;
+    width: 2rpx;
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  &__handle-knob {
+    display: flex;
+    align-items: center;
+    gap: 6rpx;
+    width: 72rpx;
+    height: 72rpx;
+    border-radius: 999rpx;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 0 0 12rpx rgba(88, 115, 68, 0.15);
+    justify-content: center;
+  }
+
+  &__handle-arrow {
+    font-size: 30rpx;
+    line-height: 1;
+    color: var(--moss);
+    font-weight: 700;
+  }
+
+  &__label {
+    position: absolute;
+    bottom: 16rpx;
+    z-index: 2;
+    padding: 5rpx 16rpx;
+    border-radius: 999rpx;
+    background: var(--badge);
+    color: #ffffff;
+    font-size: 20rpx;
+    line-height: 1.5;
+
+    &--left {
+      left: 16rpx;
+    }
+
+    &--right {
+      right: 16rpx;
+    }
+  }
+}

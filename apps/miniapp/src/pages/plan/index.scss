@@ -1,0 +1,19 @@
+// 方案详情页外壳：照片 fixed 铺满整屏，导航透明浮在画面上（顶部渐变遮罩压标题）。
+// 页面可滚：内容板在文档流，上滑盖过照片看全量步骤（不再锁 100vh）。
+// 底色用奶油不用黑——上拉 overscroll 露出的是页面底色，照片以外的黑边很突兀。
+.page--plan {
+  min-height: 100vh;
+  padding: 0;
+  background: var(--bg);
+
+  .app-header-spacer {
+    margin-bottom: 0;
+    height: 0 !important;
+  }
+
+  .app-header--transparent {
+    background: linear-gradient(180deg, rgba(244, 245, 242, 0.82) 0%, rgba(244, 245, 242, 0) 100%);
+    border-bottom-color: transparent;
+    backdrop-filter: none;
+  }
+}

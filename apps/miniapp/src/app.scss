@@ -1,0 +1,10 @@
+/* 小程序全局样式：token（CSS 变量）+ 语义类（@zsm/design 单源）。 */
+@import "@zsm/design/dist/tokens.scss";
+@import "@zsm/design/styles/base.scss";
+
+page {
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 28rpx;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}

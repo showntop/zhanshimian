@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "identity_count": 60,
+  "photo_count": 180,
+  "report_count": 120,
+  "scene_brief_count": 120,
+  "plan_group_count": 180,
+  "render_min_count": 300,
+  "source_state_fixture_count": 64,
+  "feedback_sequence_count": 30,
+  "splits": {"development": 60, "validation": 20, "locked": 20},
+  "identity_cross_split_allowed": false
+}

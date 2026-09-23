@@ -1,0 +1,23 @@
+{
+  "version": "render-rollout-v1",
+  "route_version": "render-route-v1",
+  "quality_policy_version": "render-quality-v1",
+  "current_stage": "shadow",
+  "stages": [
+    {"name": "shadow", "percent": 0, "minimum_published_results": 300},
+    {"name": "5_percent", "percent": 5, "minimum_published_results": 200},
+    {"name": "25_percent", "percent": 25, "minimum_published_results": 500},
+    {"name": "50_percent", "percent": 50, "minimum_published_results": 1000},
+    {"name": "100_percent", "percent": 100, "minimum_published_results": 2000}
+  ],
+  "bucket_key": "user_id",
+  "change_one_factor_only": true,
+  "stop_on": {
+    "source_mismatch_count": 1,
+    "webp_publication_count": 1,
+    "old_generation_overwrite_count": 1,
+    "severe_failure_false_accept_rate": 0.01,
+    "first_candidate_p95_seconds": 240,
+    "provider_retention_violation_count": 1
+  }
+}

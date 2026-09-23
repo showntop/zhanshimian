@@ -1,0 +1,82 @@
+// 与旧 example-image 同名同名类，页面里已有的 .example-badge / .example-soft 覆盖继续生效
+// （styleIsolation: apply-shared：页面样式能影响组件内节点）。
+// .example-badge 的基础样式不在这里定义——全局单源在 @zsm/design 的 _base.scss
+// （app.wxss 经 apply-shared 穿透到组件内）。这里只保留组件自己的弱化档：
+// 若两边各写一份角标基础样式，改一处漏一处（9.16 磨砂 chip 改版踩过这个坑）。
+.source-image {
+  // absolute 的 img（铺高裁侧）以此为定位基准。少了这条，基准会跳到更外层
+  // 的 position:relative 祖先——img 与 backdrop（同图衬底）尺寸/起点不一致，
+  // 同一张照片被画两遍且错位重合（"人被切成两块"）。
+  position: relative;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background-color: var(--surface-soft, #edf1ea);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  &__img {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  // 衬底必须与可见图同一几何（fill 轴决定按宽还是按高）——不一致时两层同图
+  // 错位叠加，就是结果态「人被切成两块」的根源。position 由 --anchor-top 管
+  // （top center），对两种铺法都是正确的锚点。
+  &--fill-width {
+    background-size: 100% auto;
+  }
+
+  &--fill-height {
+    background-size: auto 100%;
+  }
+
+  // 人像顶对齐：衬底与可见图都从顶部起裁，多出的腿/背景从底部切掉。
+  &--anchor-top {
+    background-position: top center;
+  }
+
+  &--fill-width > &__img {
+    width: 100%;
+    height: auto;
+  }
+
+  // 图比相框更扁：按高铺满、水平居中裁侧，整个人仍在框内。
+  &--fill-height > &__img {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: auto;
+    height: 100%;
+    transform: translateX(-50%);
+  }
+
+  &--empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200rpx;
+    background: var(--moss-soft);
+  }
+
+  &__empty-text {
+    font-size: 24rpx;
+    color: var(--ink-2);
+  }
+
+  &__empty-action {
+    margin-top: 12rpx;
+    font-size: 24rpx;
+    color: var(--ink);
+    text-decoration: underline;
+  }
+}
+
+// 弱化：示例图 / 内置参考图不能看起来像用户本人的效果。
+.example-soft {
+  filter: blur(1.2rpx);
+  opacity: 0.92;
+}

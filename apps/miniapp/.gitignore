@@ -1,0 +1,2 @@
+# 构建时从 src/assets/tabbar 同步，供微信开发者工具按项目根解析 tabBar 图标
+/assets/

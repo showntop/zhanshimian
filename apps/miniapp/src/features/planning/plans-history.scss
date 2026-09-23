@@ -1,0 +1,81 @@
+// 往期方案区：横向滚动的集列表，浅卡 + 三联小图 + 日期/喜欢数。
+.plans-history {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  padding: 4rpx 0 8rpx;
+
+  &__title {
+    padding: 0 8rpx;
+    font-size: 26rpx;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+
+  &__row {
+    display: flex;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  &__item {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 10rpx;
+    padding: 16rpx;
+    margin-right: 16rpx;
+    border-radius: var(--radius-md);
+    background: var(--surface-strong);
+    border: 1rpx solid var(--line);
+
+    &--active {
+      border-color: var(--moss);
+      box-shadow: 0 4rpx 12rpx rgba(88, 115, 68, 0.2);
+    }
+  }
+
+  &__thumbs {
+    display: flex;
+    gap: 8rpx;
+  }
+
+  &__thumb {
+    width: 88rpx;
+    height: 110rpx;
+    border-radius: 10rpx;
+    overflow: hidden;
+    background: var(--moss-soft);
+
+    &--empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4rpx;
+    }
+  }
+
+  &__thumb-text {
+    font-size: 18rpx;
+    line-height: 1.3;
+    color: var(--ink-3);
+    text-align: center;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12rpx;
+  }
+
+  &__date {
+    font-size: 22rpx;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__likes {
+    font-size: 20rpx;
+    color: var(--moss);
+  }
+}

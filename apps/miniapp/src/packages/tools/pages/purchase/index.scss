@@ -1,0 +1,728 @@
+// 购买判断 · 检验单（票据 / Neo-brutalist 排版）
+// 排版语法：硬墨描边 + 硬偏移投影、巨号黑体判断、双线盖章、双栏对峙、
+// 点线收据行、撕票孔 CTA——材质仍是品牌 token（墨/苔绿/奶油），零圆角卡片零毛玻璃。
+// 照片机械（aspectFit 羽化 / 失焦衬底 / 结果态 fixed 钉屏）与旧实现一比一保留。
+//
+// 一屏核算（空态/日限态）：高度不进 JS——外壳 .page--lock 锁 100vh 纵排，
+// 本容器 flex:1 吃掉导航占位以外的全部余量（含 spacer 的 margin，无处可漏）。
+// 结果态解除锁（单据从钉住的照片上滚过），外壳同步去掉 .page--lock。
+.pk {
+  display: flex;
+  flex-direction: column;
+  gap: 32rpx;
+  // 锁高外壳里的 flex:1 即一屏；overflow 吞掉纸面预算残差。
+  // foot 的 margin-top:auto 依旧成立（富余空间吸到 foot 上方）。
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  // 底部呼吸（含 Home 条安全区）只在这一处，env 是唯一真值
+  padding: 20rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 12rpx);
+
+  // ---------- 单品 hero ----------
+  &__hero {
+    // 空态一屏：示范图托盘不需要占满 640rpx——flex 收缩兜底小屏
+    // （min 420 保送检处可读）；结果态 inline 设满屏出血高
+    height: 640rpx;
+    min-height: 420rpx;
+    flex-shrink: 1;
+    flex-basis: auto;
+    border-radius: 0;
+    border: 0;
+
+    &-img {
+      width: 100%;
+      height: 100%;
+    }
+
+    &-img.example-image,
+    &-img .example-image__img {
+      width: 100%;
+      height: 100%;
+    }
+
+    &-alt-wrap {
+      position: absolute;
+      top: 20rpx;
+      right: 20rpx;
+      z-index: 5;
+    }
+
+    // 「重选」：结果态透明导航下的可读 chip（scrim 底白字，照片上永远成立）
+    &-alt {
+      padding: 8rpx 20rpx;
+      border-radius: 999rpx;
+      background: var(--scrim);
+      font-size: 20rpx;
+      color: #ffffff;
+    }
+  }
+
+  // 前景照片的定位盒：默认铺满 hero；结果态由页面 inline top/bottom 让位
+  &__photo-stage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    // 横向羽化（垂直向在锐图 --mv* 上）；断点由页面按 photoDims 实测写入
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent var(--mh0, 0),
+      #000 var(--mh1, 48rpx),
+      #000 var(--mh2, calc(100% - 48rpx)),
+      transparent var(--mh3, 100%)
+    );
+    mask-image: linear-gradient(
+      90deg,
+      transparent var(--mh0, 0),
+      #000 var(--mh1, 48rpx),
+      #000 var(--mh2, calc(100% - 48rpx)),
+      transparent var(--mh3, 100%)
+    );
+  }
+
+  // 对焦模糊层：与锐图同盒同几何，虚化 + 放大，锐图硬边落在同一画面失焦版上
+  &__photo-blur {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    background-color: transparent;
+    border-radius: 0;
+    filter: blur(28rpx) saturate(1.2);
+    transform: scale(1.2);
+
+    .example-badge {
+      display: none;
+    }
+  }
+
+  // 本人照片的模糊衬底（铺满宽度，色自图出）：饱和拉高亮度略压，氛围不死灰
+  &__photo-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    filter: blur(36rpx) saturate(1.45) brightness(0.94);
+    transform: scale(1.25);
+  }
+
+  // 锐图：aspectFit 完整入镜 + 纵向羽化（--mv* 断点由页面实测写入）
+  &__hero-img--fit {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background-color: transparent;
+    border-radius: 0;
+    -webkit-mask-image: linear-gradient(
+      180deg,
+      transparent var(--mv0, 0),
+      #000 var(--mv1, 64rpx),
+      #000 var(--mv2, calc(100% - 64rpx)),
+      transparent var(--mv3, 100%)
+    );
+    mask-image: linear-gradient(
+      180deg,
+      transparent var(--mv0, 0),
+      #000 var(--mv1, 64rpx),
+      #000 var(--mv2, calc(100% - 64rpx)),
+      transparent var(--mv3, 100%)
+    );
+  }
+
+  // ---------- 空态：送检处托盘 ----------
+  &__upload {
+    position: relative;
+    height: 100%;
+
+    // 模糊衬底铺满宽度（自图衍生的背景色，零新增资产）
+    &-backdrop {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 0;
+      filter: blur(36rpx) saturate(1.12) brightness(1.05);
+      transform: scale(1.25);
+
+      .example-badge {
+        display: none;
+      }
+    }
+
+    // 前景完整入镜的示范图压过衬底
+    .example-image {
+      background: transparent;
+    }
+
+    // 前景示范图压过衬底层
+    .pk__hero-img {
+      position: relative;
+      z-index: 1;
+    }
+
+    // 角标让位托盘
+    .example-badge {
+      top: 16rpx;
+      right: 16rpx;
+      bottom: auto;
+    }
+  }
+
+  // 送检处：硬边取件口——墨描边 + 硬投影 + 内侧虚线裁切线 + 骑框标签；
+  // 空态的主动作就是「放入检体」：居中大 ＋，整个托盘可点
+  &__slot {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  &__slot-frame {
+    position: absolute;
+    inset: 24rpx;
+    border: 3rpx solid var(--ink);
+    border-radius: 8rpx;
+    box-shadow: 10rpx 10rpx 0 var(--moss-soft);
+
+    // 内侧虚线：票据的裁切线
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 10rpx;
+      border: 2rpx dashed rgba(32, 35, 32, 0.35);
+      border-radius: 4rpx;
+    }
+  }
+
+  // 票据字段标签：骑在框线上（切过描边），不是浮在框内
+  &__slot-label {
+    position: absolute;
+    top: 8rpx;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4rpx 20rpx;
+    background: var(--ink);
+    color: var(--cream);
+    font-size: 20rpx;
+    letter-spacing: 6rpx;
+    border-radius: 4rpx;
+  }
+
+  // 空托盘的主动作：居中大 ＋（墨底 + 苔绿硬投影）+ ink 底文字条
+  &__slot-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20rpx;
+    transform: translateY(-16rpx);
+  }
+
+  &__slot-plus-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 104rpx;
+    height: 104rpx;
+    background: var(--ink);
+    border-radius: 50%;
+    box-shadow: 8rpx 8rpx 0 var(--moss);
+  }
+
+  &__slot-plus {
+    font-size: 52rpx;
+    font-weight: 600;
+    color: var(--cream);
+    line-height: 1;
+  }
+
+  &__slot-text {
+    padding: 10rpx 28rpx;
+    background: var(--ink);
+    border-radius: 6rpx;
+    color: var(--cream);
+    font-size: 25rpx;
+    font-weight: 600;
+    letter-spacing: 2rpx;
+    white-space: nowrap;
+  }
+
+  // ---------- 单据头（题头与检验单共用）----------
+  &__mast {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+    padding-bottom: 12rpx;
+    border-bottom: 3rpx solid var(--ink);
+
+    &-meta {
+      flex-shrink: 0;
+      font-size: 22rpx;
+      font-weight: 700;
+      letter-spacing: 5rpx;
+      color: var(--ink);
+    }
+
+    // 题头点线：收据的分隔语法
+    &-dash {
+      flex: 1;
+      border-bottom: 2rpx dotted var(--ink-3);
+    }
+
+    &-serial {
+      flex-shrink: 0;
+      font-size: 20rpx;
+      letter-spacing: 2rpx;
+      color: var(--ink-2);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  // ---------- 巨号提问（空态题头）----------
+  &__question {
+    font-size: 56rpx;
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: 2rpx;
+    color: var(--ink);
+    flex-shrink: 0;
+  }
+
+  &__question-sub {
+    font-size: 24rpx;
+    line-height: 1.6;
+    color: var(--ink-2);
+    flex-shrink: 0;
+  }
+
+  // ---------- 送检须知：点线收据行（右端序号是行值）----------
+  &__notice {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+    flex-shrink: 0;
+
+    &-label {
+      font-size: 22rpx;
+      font-weight: 700;
+      letter-spacing: 4rpx;
+      color: var(--ink-3);
+    }
+
+    &-row {
+      display: flex;
+      align-items: baseline;
+      gap: 14rpx;
+    }
+
+    &-text {
+      flex-shrink: 0;
+      font-size: 25rpx;
+      color: var(--ink-2);
+    }
+
+    &-dots {
+      flex: 1;
+      border-bottom: 2rpx dotted var(--line);
+      transform: translateY(-4rpx);
+    }
+
+    &-no {
+      flex-shrink: 0;
+      font-size: 22rpx;
+      font-weight: 700;
+      color: var(--ink-3);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  // ---------- 结果态：照片满屏出血（透明导航），单据从钉住的照片上滚过 ----------
+  // 结果态是「hero 钉屏 + 单据上滚」的滚动叙事：解除一屏锁
+  &--done {
+    flex: 0 0 auto;
+    height: auto;
+    overflow: visible;
+    gap: 0;
+    // 给固定 CTA 栏留位（栏高含安全区，垫必须同含 env，否则滚到底差一截）
+    padding-bottom: calc(env(safe-area-inset-bottom) + 320rpx);
+
+    .pk__hero {
+      // 钉住不滚：卡片（z3）从它上面滚过；文档流占位由页面同高 spacer 补上。
+      // fixed 后 bleed 负边距无意义且会推歪盒子，归零
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1;
+      margin: 0;
+      // 实际高度由页面 inline 设为「实测导航高 + (820+120)rpx」（此值仅首帧兜底）
+      height: 940rpx;
+      border-radius: 0;
+      border: none;
+
+      // 顶部 scrim：压住照片保证透明导航的白标题/返回可读
+      &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 260rpx;
+        z-index: 2;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0));
+        pointer-events: none;
+      }
+
+      // 底部融化：照片渐变进内容底色
+      &::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 200rpx;
+        z-index: 2;
+        background: linear-gradient(180deg, rgba(244, 245, 242, 0), var(--bg));
+        pointer-events: none;
+      }
+    }
+
+    .pk__hero-alt-wrap {
+      top: 28rpx;
+      right: calc(var(--page-gutter) + 8rpx);
+      z-index: 4;
+    }
+  }
+
+  // ---------- 盖章（结果态照片右上）----------
+  &__stamp {
+    position: absolute;
+    right: 40rpx;
+    z-index: 8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rpx;
+    padding: 14rpx 26rpx;
+    transform: rotate(-10deg);
+    border: 4rpx double var(--moss);
+    border-radius: 10rpx;
+    background: rgba(244, 245, 242, 0.28);
+    pointer-events: none;
+
+    &-text {
+      font-size: 34rpx;
+      font-weight: 800;
+      letter-spacing: 8rpx;
+      color: var(--moss);
+    }
+
+    &-date {
+      font-size: 20rpx;
+      letter-spacing: 3rpx;
+      color: var(--moss);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  // ---------- 检验单（结果态）----------
+  &__ticket {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 36rpx;
+    // 上叠钉住的照片：负边距顶进照片停靠带（与旧 sheet 同一机械）
+    margin: -88rpx calc(-1 * var(--page-gutter)) 0;
+    padding: 40rpx var(--page-gutter) 8rpx;
+    background: var(--bg);
+    box-shadow: var(--shadow-sheet);
+  }
+
+  // 巨号判断
+  &__verdict {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+
+    &-lead {
+      font-size: 24rpx;
+      font-weight: 600;
+      letter-spacing: 3rpx;
+      color: var(--ink-2);
+    }
+
+    &-title {
+      font-size: 54rpx;
+      line-height: 1.26;
+      font-weight: 800;
+      letter-spacing: 1rpx;
+      color: var(--ink);
+    }
+
+    &-body {
+      font-size: 26rpx;
+      line-height: 1.8;
+      color: var(--ink-2);
+    }
+  }
+
+  // 双栏对峙：硬边面板 + 硬投影；单边时整行
+  &__versus {
+    display: flex;
+    gap: 20rpx;
+
+    &--single {
+      .pk__panel {
+        flex-basis: 100%;
+      }
+    }
+  }
+
+  &__panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+    padding: 22rpx 24rpx 24rpx;
+    background: var(--surface-strong);
+    border: 3rpx solid var(--ink);
+    border-radius: 8rpx;
+
+    &--keep {
+      box-shadow: 8rpx 8rpx 0 var(--moss-soft);
+    }
+
+    &--lift {
+      box-shadow: 8rpx 8rpx 0 var(--cream);
+    }
+
+    &-head {
+      display: flex;
+      align-items: baseline;
+      gap: 12rpx;
+      padding-bottom: 12rpx;
+      border-bottom: 2rpx dotted var(--line);
+    }
+
+    &-count {
+      font-size: 44rpx;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    &-title {
+      font-size: 24rpx;
+      font-weight: 700;
+      color: var(--ink-2);
+    }
+
+    &-item {
+      font-size: 24rpx;
+      line-height: 1.65;
+      color: var(--ink);
+    }
+  }
+
+  // 标签收据脚注
+  &__tags {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+
+    &-row {
+      display: flex;
+      align-items: baseline;
+      gap: 14rpx;
+    }
+
+    &-text {
+      flex-shrink: 0;
+      font-size: 22rpx;
+      color: var(--ink-3);
+    }
+
+    &-dots {
+      flex: 1;
+      border-bottom: 2rpx dotted var(--line);
+      transform: translateY(-4rpx);
+    }
+  }
+
+  // ---------- 覆盖件 ----------
+  &__mask {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20rpx;
+    background: var(--scrim-heavy);
+
+    &-spin {
+      width: 48rpx;
+      height: 48rpx;
+    }
+
+    &-text {
+      font-size: 24rpx;
+      color: rgba(238, 240, 236, 0.92);
+    }
+  }
+
+  // ---------- 提示 / 拒识 ----------
+  &__hint {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+
+    &-title {
+      font-size: 32rpx;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    &-desc {
+      font-size: 24rpx;
+      line-height: 1.7;
+      color: var(--ink-2);
+    }
+  }
+
+  // 拒识：硬边告示——墨左粗边 + 硬投影（票据的批注章语法）
+  &__rejected {
+    padding: 20rpx 24rpx;
+    border: 3rpx solid var(--ink);
+    border-left: 10rpx solid var(--ink);
+    border-radius: 8rpx;
+    background: var(--surface-strong);
+
+    &-text {
+      font-size: 24rpx;
+      line-height: 1.6;
+      color: var(--ink-2);
+    }
+  }
+
+  // ---------- 撕票孔 CTA（结果态固定底）----------
+  &__cta {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16rpx;
+    padding: 24rpx var(--page-gutter) calc(env(safe-area-inset-bottom) + 24rpx);
+    background: var(--bg);
+    // 撕边：整条虚线撕口
+    border-top: 3rpx dashed var(--ink);
+  }
+
+  // 双侧半圆缺口：撕票孔（底色圆盖住虚线上缘，露出下半弧）
+  &__cta-notch {
+    position: absolute;
+    top: -18rpx;
+    width: 36rpx;
+    height: 36rpx;
+    border-radius: 50%;
+    background: var(--bg);
+    clip-path: inset(50% 0 0 0);
+
+    &--l {
+      left: 20rpx;
+    }
+
+    &--r {
+      right: 20rpx;
+    }
+  }
+
+  // 硬边主按钮：墨底奶油字 + 硬投影（本页不用 PrimaryButton 的柔光语言）
+  &__go {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14rpx;
+    min-width: 420rpx;
+    padding: 26rpx 44rpx;
+    background: var(--ink);
+    border-radius: 8rpx;
+    box-shadow: 8rpx 8rpx 0 var(--moss);
+    transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    &--block {
+      width: 100%;
+    }
+
+    &--disabled {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    &--busy {
+      pointer-events: none;
+    }
+
+    &:active {
+      transform: translate(4rpx, 4rpx);
+      box-shadow: 4rpx 4rpx 0 var(--moss);
+    }
+
+    &-text {
+      font-size: 30rpx;
+      font-weight: 700;
+      letter-spacing: 2rpx;
+      color: var(--cream);
+    }
+
+    &-spin {
+      width: 30rpx;
+      height: 30rpx;
+    }
+  }
+
+  &__cta-alt,
+  &__foot-alt {
+    padding: 16rpx 8rpx;
+    font-size: 24rpx;
+    font-weight: 600;
+    color: var(--ink-2);
+    text-decoration: underline;
+    text-underline-offset: 6rpx;
+  }
+
+  // ---------- 底部操作（空态/日限态）----------
+  &__foot {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    flex-shrink: 0;
+    // 锁高容器内沉底（富余空间吸到 foot 上方）
+    margin-top: auto;
+
+    &-row {
+      display: flex;
+      justify-content: center;
+    }
+  }
+}

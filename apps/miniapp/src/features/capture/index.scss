@@ -1,0 +1,194 @@
+// 建档页：三联横排槽位（一屏见全貌）+ 页面与导航的呼吸间距。
+// 页面外壳（.page 内边距、AppHeader）归 pages/capture，这里只管内容。
+.capture-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 28rpx;
+
+  // ---------- 开场 ----------
+  &__intro {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+    padding: 0 8rpx;
+  }
+
+  &__eyebrow {
+    font-size: 24rpx;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: var(--ink-2);
+  }
+
+  &__title {
+    font-size: 44rpx;
+    font-weight: 700;
+    line-height: 1.28;
+    color: var(--ink);
+  }
+
+  &__lede {
+    font-size: 28rpx;
+    line-height: 1.65;
+    color: var(--ink-2);
+  }
+
+  // ---------- 三联槽位 ----------
+  &__slots {
+    display: flex;
+    gap: 12rpx;
+  }
+
+  &__slot {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10rpx;
+    padding: 16rpx 12rpx 20rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface-strong);
+    border: 1rpx solid var(--line);
+
+    &--focus {
+      transform: scale(1.04);
+      z-index: 2;
+      border-color: var(--moss);
+      box-shadow: var(--shadow-float);
+    }
+  }
+
+  &__photo {
+    position: relative;
+    width: 100%;
+    height: 300rpx;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--moss-soft);
+
+    // 空槽：虚线框示意「待填、可点」
+    &--empty {
+      border: 2rpx dashed rgba(88, 115, 68, 0.4);
+    }
+
+    // SourceImage 根节点与指导图都铺满相框
+    &-img,
+    &-guide {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    &-index {
+      position: absolute;
+      top: 10rpx;
+      left: 10rpx;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36rpx;
+      height: 36rpx;
+      border-radius: 999rpx;
+      background: rgba(30, 35, 29, 0.68);
+      color: var(--cream);
+      font-size: 18rpx;
+      font-weight: 700;
+    }
+
+    &-mask {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10rpx;
+      background: rgba(30, 35, 29, 0.58);
+
+      &--error {
+        background: rgba(30, 35, 29, 0.68);
+      }
+
+      &-text {
+        padding: 0 10rpx;
+        color: var(--cream);
+        font-size: 18rpx;
+        text-align: center;
+      }
+    }
+  }
+
+  &__spinner {
+    width: 32rpx;
+    height: 32rpx;
+  }
+
+  &__slot-label {
+    font-size: 26rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__slot-desc {
+    font-size: 20rpx;
+    line-height: 1.45;
+    text-align: center;
+    color: var(--ink-3);
+  }
+
+  &__slot-state {
+    padding: 4rpx 14rpx;
+    border-radius: 999rpx;
+    background: var(--moss-soft);
+    color: var(--moss);
+    font-size: 20rpx;
+    font-weight: 650;
+  }
+
+  &__slot-hint {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  // ---------- 底部（主按钮 + 次级入口 + 隐私） ----------
+  &__foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14rpx;
+    margin-top: 8rpx;
+
+    // 三张齐了：主按钮弹一下，给一个「可以提交了」的瞬间提示
+    &--ready .primary-button--solid {
+      animation: check-pop 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+  }
+
+  &__alt-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 80rpx;
+    font-size: 23rpx;
+    color: var(--moss);
+  }
+
+  &__demo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 72rpx;
+    font-size: 22rpx;
+    color: var(--ink-2);
+  }
+
+  &__privacy {
+    text-align: center;
+    font-size: 20rpx;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+}

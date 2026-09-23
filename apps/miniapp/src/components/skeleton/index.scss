@@ -1,0 +1,11 @@
+.skeleton-block {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  padding: 32rpx 0;
+}
+
+.skeleton-row {
+  height: 32rpx;
+  border-radius: var(--radius-sm);
+}
