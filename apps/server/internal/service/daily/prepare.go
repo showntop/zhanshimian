@@ -51,8 +51,10 @@ func (s *Service) Prepare(ctx context.Context, userID string, city string) (Prep
 	// 未命中、以及 DB 异常，都照给巡游脚本：巡游与内容、与 DB 都无关，
 	// 漏掉这一支客户端就只能播内置兜底（也就会看到那个圆圈）。
 	// DB 异常本身不算致命——generate 里自然会落到兜底。
+	//
+	// variant 在这里一并下发：等待期与收敛期同一套种子，客户端不必本地另算。
 	_ = city // 保留参数位：天气改在 generate 阶段按同一城市查询
-	roam := roamPresentation()
+	roam := roamPresentation(userID, genDate, s.motionVariantOverride)
 	result.Presentation = &roam
 	return result, nil
 }

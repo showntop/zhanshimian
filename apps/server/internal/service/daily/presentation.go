@@ -56,7 +56,11 @@ type Presentation struct {
 // kind=sketch_tour：客户端把每个分类的形状当场「画」出来（canvas 草图，
 // 零素材、可循环、可中断）。theme 字段就是分类 id，草图按它选画法；
 // form 保留给旧客户端（CSS 形态兜底渲染）。
-func roamPresentation() Presentation {
+//
+// params.variant 把等待期的方案也交给服务端决策：等待期与收敛期必须用同一
+// 套种子（hash(uid+date)），否则客户端本地另算一遍会出现「等待播旧巡游、
+// 收敛才切洗牌」的混搭，且等待期不预载时收敛期来不及（预载有 3s 闸）。
+func roamPresentation(userID, genDate, override string) Presentation {
 	themes := []struct {
 		theme string
 		form  string
@@ -79,7 +83,7 @@ func roamPresentation() Presentation {
 		Stages: []Stage{{
 			Phase:      "roam",
 			Kind:       "sketch_tour",
-			Params:     map[string]any{"themes": items, "per_ms": roamThemeMS},
+			Params:     map[string]any{"themes": items, "per_ms": roamThemeMS, "variant": motionVariant(userID, genDate, override)},
 			DurationMS: roamThemeMS * len(themes),
 		}},
 	}

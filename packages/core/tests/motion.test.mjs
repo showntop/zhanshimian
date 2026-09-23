@@ -8,6 +8,7 @@ import {
   planDuration,
   roamThemes,
   roamPerThemeMS,
+  roamVariant,
   readFramesParams,
 } from '../src/daily/motion.ts'
 
@@ -188,4 +189,15 @@ test('dress_lock：pace 缺省回落 normal，assets 缺省空串', () => {
   })
   assert.equal(parsed?.pace, 'normal')
   assert.deepEqual(parsed?.assets, { base: '', version: '' })
+})
+
+test('roamVariant：服务端下发的等待期方案与收敛期同一套种子', () => {
+  const dress = { phase: 'roam', kind: 'sketch_tour', params: { variant: 'dress', themes: [] } }
+  const sketch = { phase: 'roam', kind: 'sketch_tour', params: { variant: 'sketch' } }
+  assert.equal(roamVariant(dress), 'dress')
+  assert.equal(roamVariant(sketch), 'sketch')
+  // 旧服务端不下发 / 非法值 → 空串（客户端回落本地预测）
+  assert.equal(roamVariant({ phase: 'roam', kind: 'sketch_tour' }), '')
+  assert.equal(roamVariant({ phase: 'roam', kind: 'sketch_tour', params: { variant: 'bogus' } }), '')
+  assert.equal(roamVariant(undefined), '')
 })

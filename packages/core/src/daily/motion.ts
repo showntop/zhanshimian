@@ -72,6 +72,15 @@ export function roamPerThemeMS(stage: MotionStage | undefined, fallback = 4000):
   return typeof value === 'number' && value > 0 ? value : fallback
 }
 
+/**
+ * 等待期的动画方案（服务端 hash(uid+date) 下发，与收敛期同一套种子）。
+ * 旧服务端不下发该字段 → 空串，客户端回落到自己的本地预测。
+ */
+export function roamVariant(stage: MotionStage | undefined): 'dress' | 'sketch' | '' {
+  const value = stage?.params?.variant
+  return value === 'dress' || value === 'sketch' ? value : ''
+}
+
 // ---------- 序列帧揭晓 ----------
 
 export interface FramesParams {

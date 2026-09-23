@@ -118,3 +118,25 @@ func TestDressLockPresentation(t *testing.T) {
 		t.Fatalf("assets must be %q + version %s, got %v", wantBase, dressAssetsVersion, stage.Params["assets"])
 	}
 }
+
+// 等待期与收敛期必须同一套种子：两端各算一遍会出现「等待旧线、收敛洗牌」
+// 的混搭，且等待期不预载时收敛期来不及（预载有 3s 闸）。
+func TestRoamAndSettleAgreeOnVariant(t *testing.T) {
+	for i := 0; i < 24; i++ {
+		userID := "user-" + string(rune('a'+i%26)) + string(rune('0'+i/26))
+		genDate := "2026-09-2" + string(rune('0'+i%9))
+		roam := roamPresentation(userID, genDate, "")
+		variant := roam.Stages[0].Params["variant"]
+		want := motionVariant(userID, genDate, "")
+		if variant != want {
+			t.Fatalf("roam variant %v, want %s (uid=%s date=%s)", variant, want, userID, genDate)
+		}
+		if variant != MotionVariantSketch && variant != MotionVariantDress {
+			t.Fatalf("roam variant must be sketch or dress, got %v", variant)
+		}
+	}
+	// 灰度开关同时作用于两段
+	if got := roamPresentation("u", "2026-09-23", MotionVariantDress).Stages[0].Params["variant"]; got != MotionVariantDress {
+		t.Fatalf("override must apply to roam too, got %v", got)
+	}
+}

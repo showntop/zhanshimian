@@ -22,6 +22,7 @@ import {
   greetingForNow,
   planSlotLabel,
   readDressLockParams,
+  roamVariant,
   taskDoneText,
   trackEvent,
   type DisplayMedia,
@@ -272,10 +273,10 @@ export default function Home() {
   // 所以配色在渲染时由客户端注入（数据到位后传进来即可）。
   const dailyPalette: string[] = []
 
-  // 换装洗牌 variant：收敛期以服务端脚本为准（settle 脚本 kind=dress_lock，
-  // 服务端 hash(uid+date) 分流）；等待期脚本未到（prepare 不带 variant，
-  // spec §1），用装机种子+日期本地预测先行——预测只影响等待期视觉，与收敛
-  // 真相不一致也只是两段换了套皮，不空白。素材预载失败 → dress 整体退位，
+  // 换装洗牌 variant：等待期与收敛期都以服务端脚本为准——两端同一套种子
+  // （hash(uid+date)），否则各算一套会出现「等待播旧巡游、收敛才切洗牌」的
+  // 混搭，而且等待期不预载时收敛期来不及（预载有 3s 闸）。旧服务端不下发
+  // variant 字段时才用本地预测兜底。素材预载失败 → dress 整体退位，
   // sketch 巡游 + 帧揭晓照常（spec §4 降级矩阵）。
   const dressEnv = useMemo(() => {
     const read = (key: string): string => {
@@ -302,7 +303,14 @@ export default function Home() {
       colorLocked: read(DRESS_FILTER_OFF_KEY) === '1',
     }
   }, [])
-  const dressPredict = stableVariant(dressEnv.seedKey) === 'dress'
+  // 等待期方案：roam 脚本的 variant 优先；空串（旧服务端）= 本地预测兜底
+  const dressRoamVariant = useMemo(
+    () => roamVariant(roamScript?.stages.find((stage) => stage.phase === 'roam')),
+    [roamScript],
+  )
+  const dressPredict =
+    dressRoamVariant === 'dress' ||
+    (dressRoamVariant === '' && stableVariant(dressEnv.seedKey) === 'dress')
   const dressLock = useMemo(
     () => readDressLockParams(settleScript?.stages.find((stage) => stage.kind === 'dress_lock')),
     [settleScript],

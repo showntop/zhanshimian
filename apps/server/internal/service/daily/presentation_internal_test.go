@@ -127,7 +127,7 @@ func TestSettleFramesWhenAssetBaseConfigured(t *testing.T) {
 }
 
 func TestRoamCoversEveryTheme(t *testing.T) {
-	p := roamPresentation()
+	p := roamPresentation("u1", "2026-09-23", "")
 	if len(p.Stages) != 1 || p.Stages[0].Kind != "sketch_tour" {
 		t.Fatalf("roam = %+v", p.Stages)
 	}
