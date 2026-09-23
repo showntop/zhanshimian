@@ -30,6 +30,16 @@ import { addSave, readSaves, syncPendingSaves, type DailySave } from './saves'
 // 万一播放器没回调（脚本异常 / 页面被挂起），也不能永远停在收敛态不进内容。
 const SETTLE_FALLBACK_MS = 6000
 
+/**
+ * 兜底时长的实际值：脚本声明了 settle 时长（换装洗牌的收敛轮约 10s，比默认
+ * 兜底长）就以它为准 + 余量，否则用默认 6s。否则动画没播完就被切海报。
+ */
+function settleBudgetMS(script: MotionPresentation | null): number {
+  const settle = script?.stages.find((stage) => stage.phase === 'settle')
+  const declared = settle?.duration_ms ?? 0
+  return Math.max(SETTLE_FALLBACK_MS, declared + 2500)
+}
+
 export type DailyPhase = 'loading' | 'waiting' | 'settling' | 'content' | 'offline'
 
 /** 服务端内容的小程序视图：fit 已在服务端渲染成 fit_text */
@@ -153,13 +163,13 @@ export function useDailyPick(): DailyPickState {
     }
   }, [])
 
-  const settle = useCallback((view: DailyContentView) => {
+  const settle = useCallback((view: DailyContentView, script: MotionPresentation | null) => {
     setContent(view)
     writeCachedContent(view)
     setPhase('settling')
     setTimeout(() => {
       if (mounted.current) setPhase((current) => (current === 'settling' ? 'content' : current))
-    }, SETTLE_FALLBACK_MS)
+    }, settleBudgetMS(script))
   }, [])
 
   // 收敛动画播完 → 揭晓海报。由播放器回调，时长不再写死在客户端。
@@ -185,10 +195,13 @@ export function useDailyPick(): DailyPickState {
       })
       if (prepare.cache_hit) {
         // 当天已生成：不播巡游，直接进收敛（重进也要有揭晓感，只是更快）。
+        // 命中也带 roam 脚本（只有 variant）——客户端靠它在收敛前预载换装素材。
+        setRoamScript(scriptOf(prepare.presentation))
         const result = await peripherals.dailyGenerate()
         if (!mounted.current) return
-        setSettleScript(scriptOf(result.presentation))
-        settle(toView(result))
+        const script = scriptOf(result.presentation)
+        setSettleScript(script)
+        settle(toView(result), script)
         return
       }
       // 未命中：播巡游脚本等 generate 返回（选题在 LLM 调用里，等待期不知道讲什么）。
@@ -197,8 +210,9 @@ export function useDailyPick(): DailyPickState {
       // generate 永远 200：fallback 只是内容来源不同，不是失败分支。
       const result = await peripherals.dailyGenerate()
       if (!mounted.current) return
-      setSettleScript(scriptOf(result.presentation))
-      settle(toView(result))
+      const script = scriptOf(result.presentation)
+      setSettleScript(script)
+      settle(toView(result), script)
     } catch {
       // 网络错误：读本地缓存，无缓存给静默文案（有下一步动作）。
       if (!mounted.current) return

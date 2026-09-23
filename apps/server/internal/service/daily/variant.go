@@ -97,11 +97,19 @@ func dressLockPresentation(content domain.DailyContent, elapsedMS int, assetBase
 	if assetBase != "" {
 		dressBase = assetBase + "/assets/daily/dress"
 	}
+	// 收敛轮时长上界：客户端在脚本缺席时用它兜底放行，避免动画没播完就被
+	// 切海报（每维加速快切+飞卡约 2.4s，加四维连击与盖章停顿）。
+	dims := 3 // look/color/waist
+	if lookOfCategory(content.Category, seed) == "outfit" {
+		dims = 4 // hero look 才带发型维度（发型素材只做了 hero look）
+	}
+	durationMS := 1400 + dims*2400
 	return Presentation{
 		Version: presentationVersion,
 		Stages: []Stage{{
-			Phase: "settle",
-			Kind:  "dress_lock",
+			Phase:      "settle",
+			Kind:       "dress_lock",
+			DurationMS: durationMS,
 			Params: map[string]any{
 				"target": target,
 				"pace":   pace,

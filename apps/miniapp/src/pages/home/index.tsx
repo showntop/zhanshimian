@@ -347,6 +347,33 @@ export default function Home() {
   const dressOnWaiting = dressPredict && dressAssets.ready
   const dressOnSettling = Boolean(dressLockTarget) && dressAssets.ready
 
+  // TEMP 诊断（定位「换装洗牌不上场」用，确认后删除）：记录渲染分支时间线
+  const dressDiagStart = useRef(Date.now())
+  const dressDiagLog = useRef<string[]>([])
+  const dressDiagBranch = !dailyReady
+    ? dailySettling
+      ? dressOnSettling
+        ? 'dressSettle'
+        : 'oldSettle'
+      : dailyWaiting
+        ? dressOnWaiting
+          ? 'dressWait'
+          : 'oldWait'
+        : 'none'
+    : 'poster'
+  useEffect(() => {
+    const at = ((Date.now() - dressDiagStart.current) / 1000).toFixed(1)
+    const line = `${at}s ${phase}→${dressDiagBranch} ready=${dressAssets.ready ? 1 : 0} failed=${dressAssets.failed ? 1 : 0} pred=${dressPredict ? 1 : 0} lock=${dressLock ? 'y' : 'n'} roam=${dressRoamVariant || '-'}`
+    const log = dressDiagLog.current
+    if (log[log.length - 1] === line) return
+    log.push(line)
+    if (phase === 'content' && log.length > 1) {
+      const lines = log.slice(-9)
+      dressDiagLog.current = []
+      Taro.showModal({ title: 'dress 时间线', content: lines.join('\n'), showCancel: false })
+    }
+  }, [phase, dressDiagBranch, dressAssets.ready, dressAssets.failed, dressPredict, dressLock, dressRoamVariant])
+
   // 海报角落编号用日期而非序号：序号是静态的，日期才有"每天换一张"的时间感
   const todaySeq = useMemo(() => {
     const now = new Date()
