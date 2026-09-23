@@ -1,0 +1,873 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>每日内容 · 等待 × 揭晓 组合器</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#626862; --ink3:#686D67;
+  --moss:#587344; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.12); --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E4E6E2;color:var(--ink);-webkit-font-smoothing:antialiased;padding:22px 20px 60px}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:12.5px;color:var(--ink2);margin-top:6px;line-height:1.7;max-width:880px}
+.main{display:flex;gap:26px;align-items:flex-start;margin-top:18px;flex-wrap:wrap}
+
+.phone{width:375px;flex:0 0 375px;background:var(--bg);border-radius:30px;overflow:hidden;
+  box-shadow:0 18px 46px rgba(45,58,35,.20)}
+.sb{height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:11.5px;font-weight:600}
+.navbar{padding:2px 20px 0}
+.brand{font-size:16.5px;font-weight:700}.brand .look{color:var(--moss)}
+.greet{padding:14px 20px 0}
+.gk{font-size:11.5px;font-weight:600;color:var(--ink2)}
+.gtitle{margin-top:4px;font-size:18px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+.dcard{position:relative;margin:14px 0 0}
+.stage{position:relative;height:300px;overflow:hidden;
+  background:linear-gradient(150deg,#F3F5F0 0%,#E9EEE6 52%,#F1F2EC 100%)}
+.cap{position:absolute;left:20px;bottom:14px;font-size:11px;font-weight:600;color:var(--ink3);
+  letter-spacing:.5px;z-index:6;transition:opacity .25s}
+.slot{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.slot img{width:100%;height:100%;object-fit:cover}
+
+/* ---------- 等待段 ---------- */
+.cut{position:absolute;inset:0;opacity:0;transform:translateX(7%) scale(1.05);
+  transition:opacity .16s var(--ease),transform .3s var(--ease)}
+.cut.on{opacity:1;transform:none}
+.sketch{width:100%;height:100%;display:block;position:relative;z-index:2}
+.sketch path{fill:none;stroke:#39492E;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+/* 草图的三层语言：主体轮廓粗、辅助线虚、标注用强调色。
+   密度就来自这三层——真实的设计草稿不会只有孤零零几根轮廓。 */
+.sketch .guide{stroke-width:1.3;stroke-dasharray:5 5;opacity:.6}
+.sketch .note{stroke:#587344;stroke-width:2}
+/* 试探线：真实起稿会先画一条轻的找形，再画一条肯定的压上去。
+   这一轻一重就是"手绘感"的来源，与色温无关。 */
+.sketch .light{stroke-width:1.4;opacity:.4}
+/* 人物画完后轻微呼吸——画面因此是"活的"，不是画完就静止的插画 */
+@keyframes figBreathe{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-2.5px)}
+}
+.sketch .alive{animation:figBreathe 3.4s ease-in-out infinite}
+/* 极淡网格：铺底，消除大片空白的"空"感 */
+.grid{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(55,62,52,.07) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(90deg, rgba(55,62,52,.07) 0 1px, transparent 1px 26px)}
+/* 分类进度点：巡游到第几个方向，也顺带填掉底部空白 */
+.dots{position:absolute;left:0;right:0;bottom:32px;z-index:6;display:flex;justify-content:center;gap:9px}
+.dots i{width:5px;height:5px;border-radius:50%;background:rgba(63,70,60,.18);display:block;
+  transition:background .3s var(--ease)}
+.dots i.on{background:rgba(63,70,60,.6)}
+
+/* 递交层：巡游是冷灰纸底、揭晓视频是暖纸底，直接切会跳。
+   这一层在两段之间把底色过渡过去，再让内容交叉溶解。 */
+/* 递交层直接用揭晓的第一帧：背景质感因此 100% 一致——
+   实测帧背景是暖褐渐变（#ADA199 → #796D5F），纯色根本接不住。 */
+.handoff{position:absolute;inset:0;z-index:7;opacity:0;
+  background-image:url(./assets/frames/f_01.jpg);
+  background-size:cover;background-position:center;
+  transition:opacity .38s var(--ease)}
+.handoff.on{opacity:1}
+/* 画面锚点：左上角日期编号，让等待期不空（与海报的日期编号同一语言） */
+.mark{position:absolute;left:18px;top:14px;z-index:5;font-size:10px;font-weight:700;
+  letter-spacing:1.5px;color:rgba(63,70,60,.36)}
+.rack{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:0 26px}
+.item{display:flex;align-items:center;gap:12px;padding:6px;border-radius:10px;background:rgba(255,255,255,.6);
+  opacity:0;transform:translateX(26px);transition:opacity .3s var(--ease),transform .34s var(--ease)}
+.item.on{opacity:1;transform:none}
+.item img{width:44px;height:44px;object-fit:cover;border-radius:6px;flex:0 0 44px}
+.item span{font-size:11px;color:var(--ink2)}
+.item.picked{background:rgba(143,163,131,.34);box-shadow:0 0 0 2px rgba(87,115,68,.35)}
+.sheet{position:absolute;inset:18px 20px;background:#FBFCFA;border-radius:10px;
+  box-shadow:0 8px 24px rgba(45,58,35,.10);overflow:hidden}
+.el{position:absolute;opacity:0}
+.el--title{left:16px;top:14px;width:56%;height:14px;background:#3F463C;border-radius:3px}
+.el--sub{left:16px;top:36px;width:38%;height:8px;background:rgba(63,70,60,.35);border-radius:3px}
+.el--pic{right:14px;top:12px;width:96px;height:112px;border-radius:6px;overflow:hidden;background:#E8E4DC}
+.el--pic img{width:100%;height:100%;object-fit:cover}
+.el--swatch{left:16px;top:60px;display:flex;gap:6px}
+.el--swatch i{width:22px;height:22px;border-radius:4px;display:block}
+.el--note{left:16px;bottom:16px;width:64%;height:6px;background:rgba(63,70,60,.22);border-radius:3px}
+.el--rule{left:16px;bottom:30px;width:44%;height:2px;background:#B4674D}
+.desk{position:absolute;inset:0}
+.tool{position:absolute;width:66px;height:44px;border-radius:6px;display:flex;align-items:center;
+  justify-content:center;font-size:9px;color:var(--ink2);box-shadow:0 4px 10px rgba(45,58,35,.12)}
+.tool--swatch{background:linear-gradient(135deg,#8E9A83,#C9BFA8)}
+.tool--fabric{background:linear-gradient(135deg,#DCDCCF,#B4674D)}
+.tool--tape{background:#E8E4DC;border:1px dashed rgba(63,70,60,.4)}
+.tool--scissor{background:#CFD2C2}
+.tool--sketch{background:#FBFCFA;border:1px solid rgba(63,70,60,.18)}
+.dev{position:absolute;inset:0;overflow:hidden}
+.dev img{width:100%;height:100%;object-fit:cover;filter:blur(26px) saturate(.15) brightness(1.12);opacity:.12}
+
+/* ---------- 揭晓 ---------- */
+.vlayer{position:absolute;inset:0;z-index:8;background:#26282D}
+.vlayer video,.vlayer img{width:100%;height:100%;object-fit:cover;display:block}
+.poster{position:absolute;inset:0;z-index:9;opacity:0;pointer-events:none;
+  background:linear-gradient(158deg,#3B3D42 0%,#31333A 55%,#26282D 100%)}
+.poster.on{opacity:1;transition:opacity .38s var(--ease)}
+.poster.dev{filter:blur(18px) saturate(.15) contrast(.9);opacity:.4}
+.poster.dev.on{filter:none;opacity:1;transition:filter 1.1s var(--ease),opacity .5s var(--ease)}
+.poster.collage{transform:scale(.965);opacity:.2}
+.poster.collage.on{transform:none;opacity:1;transition:transform .52s var(--ease),opacity .42s var(--ease)}
+.poster__gloss{position:absolute;top:-40%;left:-60%;width:60%;height:180%;transform:rotate(18deg);
+  background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.30) 50%,rgba(255,255,255,0) 100%)}
+.poster.on .poster__gloss{animation:sweep .62s var(--ease) .04s 1}
+@keyframes sweep{from{transform:translateX(0) rotate(18deg)}to{transform:translateX(320%) rotate(18deg)}}
+/* 海报配图：用揭晓的尾帧——定格的那套就是海报上的那套，视觉闭环。
+   真实实现里这张图由 content.visual 下发（modality=photo + url），
+   与揭晓素材同源，服务端一起给。 */
+.poster__pic{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+/* 底部压暗：保证文字在任何配图上都能读 */
+.poster__scrim{position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(34,36,41,0) 26%,rgba(34,36,41,.88) 100%)}
+.poster__body{position:absolute;left:26px;right:26px;bottom:40px;transform:translateY(14px);opacity:0;
+  transition:all .42s var(--ease) .12s}
+/* 标注层（B 方案的上层）：底图是预生成的氛围，这一层按当天内容实时画——
+   腰线画在哪、框出哪几个色、廓形收在哪，都由内容参数决定。 */
+.marks{position:absolute;inset:0;z-index:10;pointer-events:none;opacity:0;
+  transition:opacity .42s var(--ease)}
+.marks.on{opacity:1}
+.marks path{fill:none;stroke:#F2F3EF;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.marks path.accent{stroke:#8FAE7A;stroke-width:2.2}
+.marks circle{fill:#F2F3EF}
+.marks text{fill:#F2F3EF;font-size:11px;font-weight:700;
+  font-family:-apple-system,'PingFang SC','Hiragino Sans GB',sans-serif}
+.poster.on .poster__body{transform:translateY(0);opacity:1}
+.poster__t{font-size:19px;line-height:1.35;font-weight:700;color:#F2F3EF;letter-spacing:-.3px}
+.poster__why{margin-top:8px;font-size:12px;line-height:1.6;color:rgba(242,243,239,.62)}
+.poster__btn{margin-top:16px;display:inline-block;padding:9px 22px;border-radius:999px;
+  background:#F2F3EF;color:#26282D;font-size:12.5px;font-weight:700}
+
+/* ---------- 面板 ---------- */
+.panel{flex:1;min-width:340px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px 20px}
+.panel h2{font-size:13px;font-weight:700;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:10px;margin-bottom:11px;flex-wrap:wrap}
+.row label{font-size:12px;color:var(--ink2);min-width:52px}
+select{font-family:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line);
+  border-radius:7px;background:#fff;color:var(--ink);min-width:210px}
+button{font-family:inherit;font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:999px;
+  border:1px solid var(--moss-deep);background:var(--moss-deep);color:var(--cream);cursor:pointer}
+button.ghost{background:#fff;color:var(--moss-deep)}
+.desc{font-size:11.5px;color:var(--ink2);line-height:1.7;background:#F7F8F5;border-radius:9px;
+  padding:10px 12px;margin-top:6px}
+.desc b{color:var(--ink)}
+.matrix{margin-top:8px;font-size:11px;color:var(--ink3);line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>每日内容 · 等待 × 揭晓 组合器</h1>
+  <div class="sub">
+    <b>最终方案：草图巡游 → 视频揭晓。</b>等待期把 7 个分类的形状依次"画"出来（零素材、可无限循环、
+    可随时中断），generate 返回后播 1.84s 视频完成"线稿 → 成形 → 定格"，海报叠在视频尾帧上。
+    两段之间有一拍递交（停 260ms 再揭晓），避免硬切。下面仍可任意搭配对比；
+    六个方向的对比器保留在 <code>daily-directions-sim.html</code>。
+  </div>
+
+  <div class="main">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>uplook</span></div>
+      <div class="navbar"><span class="brand">up<span class="look">look</span></span></div>
+      <div class="greet">
+        <div class="gk">今天最好看</div>
+        <div class="gtitle">你好，我是你的私人形象顾问</div>
+      </div>
+      <div class="dcard">
+        <div class="stage" id="stage">
+          <div class="grid" id="grid"></div>
+          <div class="slot" id="slot"></div>
+          <div class="dots" id="dots"></div>
+          <div class="handoff" id="handoff"></div>
+          <div class="mark">09.21</div>
+          <div class="cap" id="cap">今天这一条</div>
+          <div class="poster" id="poster">
+            <img class="poster__pic" id="posterPic" src="./assets/reveal-last.jpg" alt="">
+            <div class="poster__scrim"></div>
+            <div class="poster__gloss"></div>
+            <div class="poster__body">
+              <div class="poster__t" id="posterT">上短下长，腿就长了</div>
+              <div class="poster__why" id="posterW">腰线提高一拳，视线就被拉长了。</div>
+              <div class="poster__btn">收下</div>
+            </div>
+            <svg class="marks" id="marks" viewBox="0 0 375 300"></svg>
+          </div>
+        </div>
+      </div>
+      <div style="height:56px"></div>
+    </div>
+
+    <div class="panel">
+      <h2>组合</h2>
+      <div class="row">
+        <label>内容分类</label>
+        <select id="cat"></select>
+      </div>
+      <div class="row">
+        <label>等待</label>
+        <select id="wait"></select>
+      </div>
+      <div class="row">
+        <label>揭晓</label>
+        <select id="reveal"></select>
+        <button id="replay">↻ 重播</button>
+      </div>
+      <div class="desc" id="desc"></div>
+
+      <h2 style="margin-top:16px">推荐组合</h2>
+      <div class="matrix" id="matrix"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const LOOK1 = './assets/look-1.jpg'   // 通勤一身
+const LOOK2 = './assets/look-2.jpg'   // 上短下长（今天的建议）
+const FABRIC = './assets/roam-fabric.jpg'
+
+// 揭晓视频：原片 4s/3.1MB（带音轨）→ 加速到 1.84s + 去音轨 + 900×676，88KB。
+// 加速而不是裁剪：裁掉会丢"线稿成形"的过程，加速把过程留住且是揭晓该有的节奏。
+//
+// 但小程序 video 是原生组件：层级最高、不支持透明、不能与其它元素混合——
+// 背景是"烘焙"在画面里的，前端拿不到控制权。所以更通用的是下面的序列帧。
+const REVEAL_VIDEO = './assets/reveal.mp4'
+
+// 序列帧：从同一条视频抽 17 帧（760×570 / JPEG q5）共 204KB。
+// 用 <image> 播放就是普通元素——可叠任意背景、可与其它层混合、背景质感由前端控制。
+// 代价只有视频的 2.3 倍体积，换来完整的控制权，因此作为默认方案。
+const FRAMES = Array.from({ length: 17 }, (_, i) =>
+  './assets/frames/f_' + String(i + 1).padStart(2, '0') + '.jpg')
+const FRAMES_MS = 1840
+
+const el = (id) => document.getElementById(id)
+const slot = el('slot'), cap = el('cap'), poster = el('poster')
+
+let timers = []
+const clearTimers = () => { timers.forEach(clearTimeout); timers = [] }
+const later = (fn, ms) => { const id = setTimeout(fn, ms); timers.push(id); return id }
+const anim = (node, frames, opts) =>
+  node.animate(frames, Object.assign({ easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' }, opts))
+const say = (text, at) => later(() => { cap.textContent = text }, at)
+
+function reset() {
+  clearTimers()
+  poster.className = 'poster'
+  slot.innerHTML = ''
+  el('handoff').classList.remove('on')
+  const marks = el('marks')
+  if (marks) { marks.classList.remove('on'); marks.innerHTML = '' }
+  cap.style.opacity = 1
+  cap.textContent = '今天这一条'
+}
+
+/* ================= 等待段 ================= */
+/* 每个方向都在结束时回调 done，由它决定何时揭晓 */
+
+function waitCut(done) {
+  const shots = [LOOK1, LOOK2]
+  let at = 0, gap = 140
+  for (let i = 0; i < 10; i++) {
+    const url = shots[i % 2]
+    later(() => {
+      const node = document.createElement('div')
+      node.className = 'cut'
+      node.innerHTML = '<img src="' + url + '">'
+      slot.appendChild(node)
+      requestAnimationFrame(() => requestAnimationFrame(() => node.classList.add('on')))
+      Array.from(slot.querySelectorAll('.cut')).filter((n) => n !== node).forEach((old) => {
+        old.classList.remove('on'); setTimeout(() => old.remove(), 320)
+      })
+    }, at)
+    at += gap
+    gap = Math.round(gap * 1.22)
+  }
+  later(() => {
+    slot.innerHTML = '<img src="' + LOOK2 + '">'
+  }, at)
+  say('就是这套', at)
+  return at + 420
+}
+
+function waitSketch(done) {
+  slot.innerHTML =
+    '<svg class="sketch" viewBox="0 0 375 300">' +
+    '<path id="p1" d="M118 74 L150 62 L225 62 L257 74 L248 132 L127 132 Z"/>' +
+    '<path id="p2" d="M127 140 L248 140 L252 250 L206 250 L200 176 L175 176 L169 250 L123 250 Z"/>' +
+    '<path id="p3" d="M120 136 L255 136"/>' +
+    '<path id="p4" class="hint" d="M292 74 L292 250"/>' +
+    '<path id="p5" class="hint" d="M286 74 L298 74"/>' +
+    '<path id="p6" class="hint" d="M286 250 L298 250"/>' +
+    '</svg>'
+  const order = [['p1', 900, 0], ['p2', 780, 700], ['p3', 320, 1400],
+    ['p4', 420, 1760], ['p5', 180, 2100], ['p6', 180, 2220]]
+  order.forEach(([id, dur, delay]) => {
+    const node = slot.querySelector('#' + id)
+    const len = node.getTotalLength()
+    node.style.strokeDasharray = len
+    node.style.strokeDashoffset = len
+    anim(node, [{ strokeDashoffset: len }, { strokeDashoffset: 0 }], { duration: dur, delay })
+  })
+  say('就是这套', 2400)
+  return 2650
+}
+
+/* 各分类的"画法"：巡游时不是播素材，而是把每个分类的形状当场画出来。
+   零素材、可无限循环、可随时中断，绘制进度还能接真实生成进度。 */
+/* 每个分类的画法分三层：main 主体轮廓 / guide 辅助虚线 / note 强调标注。
+   密度来自这三层——真实的设计草稿不会只有孤零零几根轮廓线。
+   绘制顺序也是叙事：先起形，再落辅助线，最后加标注。 */
+const OUTLINES = {
+  color: {
+    main: ['M118 90 L156 90 L156 242 L118 242 Z', 'M166 58 L204 58 L204 242 L166 242 Z', 'M214 128 L252 128 L252 242 L214 242 Z'],
+    guide: ['M100 248 L275 248', 'M100 58 L275 58'],
+    note: ['M118 76 L156 76', 'M166 44 L204 44', 'M214 114 L252 114'],
+  },
+  fit: {
+    main: ['M142 52 L233 52 L252 244 L123 244 Z'],
+    guide: ['M187 38 L187 256', 'M136 116 L239 116', 'M132 180 L243 180'],
+    note: ['M142 42 L233 42', 'M132 184 L243 184'],
+  },
+  proportion: {
+    main: ['M126 56 L249 56 L249 134 L126 134 Z', 'M126 144 L249 144 L249 252 L126 252 Z'],
+    guide: ['M110 139 L265 139'],
+    note: ['M276 56 L276 134', 'M276 144 L276 252', 'M270 56 L282 56', 'M270 134 L282 134', 'M270 144 L282 144', 'M270 252 L282 252'],
+  },
+  fabric: {
+    main: ['M88 86 Q150 60 212 86 T312 86', 'M88 144 Q150 118 212 144 T312 144', 'M88 202 Q150 176 212 202 T312 202'],
+    guide: ['M88 64 L312 64', 'M88 224 L312 224'],
+    note: ['M330 86 L330 202', 'M324 86 L336 86', 'M324 202 L336 202'],
+  },
+  occasion: {
+    main: ['M88 68 L287 68 L287 224 L88 224 Z'],
+    guide: ['M88 146 L287 146', 'M187 68 L187 224'],
+    note: ['M112 104 L166 104 L166 198 L112 198 Z', 'M238 94 L272 94', 'M272 94 L262 84', 'M272 94 L262 102'],
+  },
+  howto: {
+    main: ['M120 68 L255 68 L255 228 L120 228 Z'],
+    guide: ['M112 136 L263 136', 'M112 176 L263 176'],
+    note: ['M106 132 L267 128', 'M106 180 L267 176'],
+  },
+  outfit: {
+    main: ['M120 54 L255 54 L255 118 L120 118 Z', 'M128 128 L247 128 L254 252 L121 252 Z'],
+    guide: ['M110 123 L265 123'],
+    note: ['M282 54 L282 118', 'M282 128 L282 252', 'M276 54 L288 54', 'M276 118 L288 118', 'M276 128 L288 128', 'M276 252 L288 252'],
+  },
+}
+const TOUR_LABELS = {
+  color: '在看颜色', fit: '在看版型', proportion: '在看比例', fabric: '在看面料',
+  occasion: '在看场合', howto: '在看穿法', outfit: '在看搭配',
+}
+
+// 衣架：所有草图都挂在它上面——画面因此一眼是"服装"的事，而不是抽象几何
+const HANGER = ['M187 34 L187 52', 'M187 52 L118 78', 'M187 52 L256 78', 'M108 78 L264 78']
+
+/* 人物：极简线条，圆头 + 直线躯干，无五官、无曲线。
+   有"人"在场，画面才像形象顾问在为你比划；不画细节是为了不碰身材红线。 */
+const FIGURE_HEAD = 'M78 92 a 8.5 8.5 0 1 0 17 0 a 8.5 8.5 0 1 0 -17 0'
+const FIGURE_BODY = ['M86 101 L86 158', 'M86 158 L72 232', 'M86 158 L100 232']
+// 每个分类的手臂姿态不同——"互动"就发生在手的动作里
+const ARMS = {
+  color: ['M86 114 L56 148', 'M86 114 L124 96'],   // 举起比色
+  fit: ['M86 114 L56 146', 'M86 114 L122 130'],
+  proportion: ['M86 114 L58 150', 'M86 114 L128 118'],
+  fabric: ['M86 114 L54 132', 'M86 114 L128 124'], // 手托布料
+  occasion: ['M86 114 L58 152', 'M86 114 L118 134'],
+  howto: ['M86 114 L64 94', 'M86 114 L116 140'],   // 抬手卷袖
+  outfit: ['M86 114 L56 148', 'M86 114 L126 124'],
+}
+// 视线：从手指向衣服，把"她在看这一身"画出来
+const GAZE = 'M124 118 L156 112'
+
+function fadeIn(sel, dur, delay) {
+  const node = slot.querySelector(sel)
+  if (node) anim(node, [{ opacity: 0 }, { opacity: .6 }], { duration: dur, delay })
+}
+
+/** 描边 + 笔尖跟随：笔尖沿真实路径走，所以"正在画"这件事看得见 */
+function drawPathWithPen(sel, dur, delay, svg) {
+  const node = svg.querySelector(sel)
+  if (!node) return
+  const len = node.getTotalLength()
+  node.style.strokeDasharray = len
+  node.style.strokeDashoffset = len
+  anim(node, [{ strokeDashoffset: len }, { strokeDashoffset: 0 }], { duration: dur, delay })
+  const pen = svg.querySelector('#pen')
+  if (!pen) return
+  later(() => {
+    const t0 = performance.now()
+    const tick = (now) => {
+      const p = Math.min(1, (now - t0) / dur)
+      const pt = node.getPointAtLength(len * p)
+      pen.setAttribute('cx', String(pt.x))
+      pen.setAttribute('cy', String(pt.y))
+      pen.setAttribute('opacity', p < 1 ? '0.85' : '0')
+      if (p < 1) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }, delay)
+}
+
+function waitSketchTour() {
+  // 最后一幅画的是当天内容所属的分类——这才是"等待期轮播、结束时落在今天这一类"
+  const all = ['color', 'fit', 'proportion', 'fabric', 'occasion', 'howto', 'outfit']
+  const order = all.filter((k) => k !== state.cat).concat([state.cat])
+  const per = 2300 // 人物 + 回描后单幅约 2.2s；线上可拉到 4s/主题
+  const dots = el('dots')
+  dots.innerHTML = order.map(() => '<i></i>').join('')
+  order.forEach((key, i) => {
+    later(() => {
+      const spec = OUTLINES[key]
+      const arms = ARMS[key] || ARMS.outfit
+      const tag = (list, cls, prefix) =>
+        list.map((d, j) => '<path id="' + prefix + j + '" class="' + cls + '" d="' + d + '"/>').join('')
+      // 手绘抖动：feTurbulence + 位移，让精确的 SVG 变成铅笔草稿。
+      // 每幅换一个 seed，于是每一笔的抖动都不一样，不像模板。
+      const seed = 3 + i * 7
+      slot.innerHTML =
+        '<svg class="sketch" viewBox="0 0 375 300">' +
+        '<defs><filter id="rough' + i + '">' +
+        '<feTurbulence type="fractalNoise" baseFrequency="0.032" numOctaves="2" seed="' + seed + '" result="n"/>' +
+        '<feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/>' +
+        '</filter></defs>' +
+        '<g filter="url(#rough' + i + ')">' +
+        // 人物不缩放：她是画面的主体，保持正常比例（画完会呼吸）
+        '<g id="figGroup">' +
+        '<path id="fh" class="main" d="' + FIGURE_HEAD + '"/>' +
+        tag(FIGURE_BODY, 'main', 'fb') +
+        tag(arms, 'main', 'fa') +
+        '</g>' +
+        // 衣架与衣服缩到右侧，给人物留出位置
+        '<g transform="translate(78,-2) scale(0.76)">' +
+        tag(HANGER, 'guide', 'hg') +
+        tag(spec.main, 'light', 'lm') +
+        tag(spec.main, 'main', 'mn') +
+        tag(spec.guide, 'guide', 'gd') +
+        tag(spec.note, 'note', 'nt') +
+        '</g>' +
+        '<path id="gz" class="guide" d="' + GAZE + '"/>' +
+        '</g>' +
+        // 笔尖放在滤镜外：手抖的是线条，笔尖要清晰
+        '<circle id="pen" r="3.2" fill="#587344" opacity="0"/>' +
+        '</svg>'
+      const svg = slot.querySelector('.sketch')
+      // 顺序即叙事：先有人 → 立衣架 → 起形 → 落辅助线 → 加标注 → 最后连上视线
+      let at = 0
+      drawPathWithPen('#fh', 140, at, svg); at += 80
+      FIGURE_BODY.forEach((_, j) => { drawPathWithPen('#fb' + j, 110, at, svg); at += 30 })
+      arms.forEach((_, j) => { drawPathWithPen('#fa' + j, 90, at, svg); at += 30 })
+      HANGER.forEach((_, j) => { fadeIn('#hg' + j, 130, at); at += 18 })
+      // 回描：先试探线（轻）再肯定线（重），两线略有错位，像真的起稿
+      spec.main.forEach((_, j) => {
+        drawPathWithPen('#lm' + j, 150, at, svg)
+        drawPathWithPen('#mn' + j, 200, at + 130, svg)
+        at += 165
+      })
+      // 人物画完"活"起来
+      later(() => {
+        const fig = svg.querySelector('#figGroup')
+        if (fig) fig.classList.add('alive')
+      }, 620)
+      spec.guide.forEach((_, j) => { fadeIn('#gd' + j, 120, at); at += 15 })
+      spec.note.forEach((_, j) => { drawPathWithPen('#nt' + j, 100, at, svg); at += 18 })
+      fadeIn('#gz', 220, at); at += 220
+      cap.textContent = TOUR_LABELS[key]
+      Array.from(dots.children).forEach((dot, k) => dot.classList.toggle('on', k === i))
+    }, i * per)
+  })
+  // 最后一幅画的是当天分类的线稿 —— 正好是揭晓的第一帧，两段因此无缝。
+  return order.length * per + 240
+}
+
+/* 真人版（描边揭示）：不再画线条，而是用一条粗描边当遮罩，
+   让真人照片沿着路径被"画"出来——真质感与绘制过程因此可以同时存在。
+   PERSON 现在是占位（复用已有图）；换成真人素材后同一套机制直接生效。 */
+const PERSON = {
+  color: LOOK1, fit: LOOK2, proportion: './assets/person-1.jpg', fabric: LOOK1,
+  occasion: LOOK1, howto: LOOK2, outfit: './assets/person-1.jpg',
+}
+
+function waitPerson() {
+  const all = ['color', 'fit', 'proportion', 'fabric', 'occasion', 'howto', 'outfit']
+  const order = all.filter((k) => k !== state.cat).concat([state.cat])
+  const per = 1200
+  const dots = el('dots')
+  dots.innerHTML = order.map(() => '<i></i>').join('')
+  order.forEach((key, i) => {
+    later(() => {
+      slot.innerHTML =
+        '<svg class="sketch person" viewBox="0 0 375 300">' +
+        '<defs><mask id="m' + i + '">' +
+        '<path id="mp" d="M187 44 L187 258" stroke="#fff" stroke-width="150" ' +
+        'fill="none" stroke-linecap="round"/>' +
+        '</mask></defs>' +
+        '<image href="' + PERSON[key] + '" x="46" y="26" width="283" height="248" ' +
+        'preserveAspectRatio="xMidYMid slice" mask="url(#m' + i + ')"/>' +
+        '</svg>'
+      const mp = slot.querySelector('#mp')
+      const len = mp.getTotalLength()
+      mp.style.strokeDasharray = len
+      mp.style.strokeDashoffset = len
+      anim(mp, [{ strokeDashoffset: len }, { strokeDashoffset: 0 }], { duration: 900 })
+      cap.textContent = TOUR_LABELS[key]
+      Array.from(dots.children).forEach((dot, k) => dot.classList.toggle('on', k === i))
+    }, i * per)
+  })
+  return order.length * per + 240
+}
+
+function waitWardrobe(done) {
+  const items = [
+    { img: FABRIC, name: '米白针织' }, { img: LOOK1, name: '通勤衬衫' },
+    { img: LOOK2, name: '高腰长裤' }, { img: FABRIC, name: '橄榄外套' },
+  ]
+  const rack = document.createElement('div')
+  rack.className = 'rack'
+  items.forEach((item, i) => {
+    const row = document.createElement('div')
+    row.className = 'item'
+    row.innerHTML = '<img src="' + item.img + '"><span>' + item.name + '</span>'
+    rack.appendChild(row)
+    later(() => row.classList.add('on'), i * 260)
+  })
+  slot.appendChild(rack)
+  later(() => {
+    Array.from(rack.children).forEach((node, i) => {
+      if (i === 0 || i === 2) node.classList.add('picked')
+      else node.style.opacity = '.35'
+    })
+  }, items.length * 260 + 240)
+  say('这套可以', items.length * 260 + 340)
+  return items.length * 260 + 700
+}
+
+function waitCollage(done) {
+  const sheet = document.createElement('div')
+  sheet.className = 'sheet'
+  sheet.innerHTML =
+    '<div class="el el--title"></div><div class="el el--sub"></div>' +
+    '<div class="el el--pic"><img src="' + LOOK2 + '"></div>' +
+    '<div class="el el--swatch"><i style="background:#E8E4DC"></i><i style="background:#8E9A83"></i><i style="background:#3F463C"></i></div>' +
+    '<div class="el el--rule"></div><div class="el el--note"></div>'
+  slot.appendChild(sheet)
+  Array.from(sheet.querySelectorAll('.el')).forEach((node, i) => {
+    const dx = (Math.random() * 2 - 1) * 90, dy = (Math.random() * 2 - 1) * 70
+    const rot = (Math.random() * 2 - 1) * 16
+    anim(node, [
+      { opacity: 0, transform: `translate(${dx}px,${dy}px) rotate(${rot}deg) scale(.94)` },
+      { opacity: 1, transform: 'none' },
+    ], { duration: 460, delay: i * 130 })
+  })
+  say('版面好了', 6 * 130 + 420)
+  return 6 * 130 + 700
+}
+
+function waitDesk(done) {
+  const desk = document.createElement('div')
+  desk.className = 'desk'
+  const tools = [['tool--swatch', '色卡', 26, 34], ['tool--fabric', '布样', 218, 26],
+    ['tool--tape', '皮尺', 40, 196], ['tool--scissor', '剪刀', 236, 190], ['tool--sketch', '草图', 140, 120]]
+  tools.forEach(([cls, name, x, y]) => {
+    const node = document.createElement('div')
+    node.className = 'tool ' + cls
+    node.textContent = name
+    node.style.left = x + 'px'; node.style.top = y + 'px'
+    desk.appendChild(node)
+    anim(node, [
+      { transform: `translate(${(Math.random() * 2 - 1) * 70}px,${(Math.random() * 2 - 1) * 60}px) rotate(${(Math.random() * 2 - 1) * 30}deg)` },
+      { transform: 'none' },
+    ], { duration: 620 })
+  })
+  slot.appendChild(desk)
+  const homeX = [22, 86, 150, 214, 278]
+  tools.forEach((_, i) => {
+    const node = desk.children[i]
+    later(() => {
+      anim(node, [{ left: node.style.left, top: node.style.top },
+        { left: homeX[i] + 'px', top: '236px' }], { duration: 620 })
+      node.style.left = homeX[i] + 'px'; node.style.top = '236px'
+    }, 700 + i * 260)
+  })
+  say('材料齐了', 700 + 5 * 260 + 300)
+  return 700 + 5 * 260 + 700
+}
+
+function waitDevelop(done) {
+  const dev = document.createElement('div')
+  dev.className = 'dev'
+  dev.innerHTML = '<img src="' + LOOK2 + '">'
+  slot.appendChild(dev)
+  anim(dev.querySelector('img'), [
+    { filter: 'blur(26px) saturate(.15) brightness(1.12)', opacity: .12 },
+    { filter: 'blur(9px) saturate(.6) brightness(1.05)', opacity: .55 },
+    { filter: 'blur(0px) saturate(1) brightness(1)', opacity: 1 },
+  ], { duration: 2600 })
+  say('快好了', 1800)
+  return 2700
+}
+
+/* 海报标注（B 方案的上层）：按当天内容实时画。
+   底图是预生成的氛围（分类级），这一层才是"今天到底讲什么"。 */
+/* 素材锚点：随揭晓素材一起标定的归一化坐标（0~1），标注全部由它换算而来，
+   因此标注必然落在衣服真实的位置上——不再是我手摆的数字。
+   注意：这里的数值是按尾帧估的，真实素材必须逐套标定（一套图标定一次即可，
+   因为预生成的图是固定的）。 */
+const ANCHORS = {
+  waist: 0.43,
+  top: [0.18, 0.43],
+  bottom: [0.48, 0.86],
+}
+
+const MARKS = {
+  outfit: (a) => {
+    const w = a.waist * 300
+    const t0 = a.top[0] * 300, t1 = a.top[1] * 300
+    const b0 = a.bottom[0] * 300, b1 = a.bottom[1] * 300
+    return {
+      lines: [`M300 ${t0} L300 ${t1}`, `M300 ${b0} L300 ${b1}`],
+      accent: [`M92 ${w} L283 ${w}`],
+      ticks: [[300, t0], [300, t1], [300, b0], [300, b1]],
+      texts: [['上短', 308, (t0 + t1) / 2], ['下长', 308, (b0 + b1) / 2]],
+    }
+  },
+  proportion: (a) => {
+    const w = a.waist * 300
+    const t0 = a.top[0] * 300, t1 = a.top[1] * 300
+    const b0 = a.bottom[0] * 300, b1 = a.bottom[1] * 300
+    return {
+      lines: [`M300 ${t0} L300 ${t1}`, `M300 ${b0} L300 ${b1}`],
+      accent: [`M92 ${w} L283 ${w}`],
+      ticks: [[300, t0], [300, t1], [300, b0], [300, b1]],
+      texts: [
+        ['上 ' + (a.waist).toFixed(2), 304, (t0 + t1) / 2],
+        ['下 ' + (1 - a.waist).toFixed(2), 304, (b0 + b1) / 2],
+      ],
+    }
+  },
+  color: {
+    lines: ['M154 92 L200 92 L200 138 L154 138 Z', 'M208 92 L254 92 L254 138 L208 138 Z'],
+    accent: ['M100 92 L146 92 L146 138 L100 138 Z'],
+    ticks: [],
+    texts: [['主', 112, 154], ['辅', 166, 154], ['点', 220, 154]],
+  },
+  fit: {
+    lines: ['M120 70 L255 70', 'M124 196 L251 196', 'M187 52 L187 214'],
+    accent: ['M112 130 L263 130'],
+    ticks: [[187, 70], [187, 130], [187, 196]],
+    texts: [['肩', 266, 74], ['腰', 266, 134], ['摆', 266, 200]],
+  },
+  fabric: {
+    lines: ['M92 96 Q150 80 208 96 T300 96', 'M92 150 Q150 134 208 150 T300 150',
+      'M196 170 L196 214', 'M186 204 L196 214 L206 204'],
+    accent: ['M196 170 L196 214'],
+    ticks: [],
+    texts: [['垂感', 206, 234]],
+  },
+  occasion: {
+    lines: ['M100 84 L275 84 L275 210 L100 210 Z', 'M240 60 L268 60', 'M268 60 L258 52', 'M268 60 L258 68'],
+    accent: ['M240 60 L268 60'],
+    ticks: [],
+    texts: [['暖光', 242, 50]],
+  },
+  howto: {
+    lines: ['M104 180 L271 180'],
+    accent: ['M104 138 L271 138'],
+    ticks: [[104, 138], [271, 138], [104, 180], [271, 180]],
+    texts: [['卷至肘上', 104, 128]],
+  },
+}
+
+// 海报文案也按分类走——同一张底图配不同主张，才看得出上层是"实时"的
+const POSTER_COPY = {
+  outfit: ['上短下长，腿就长了', '腰线提高一拳，视线就被拉长了。'],
+  proportion: ['腰线落在身高的 0.38', '分割线越靠上，下半身占比越大。'],
+  color: ['把这三个色放在一起', '同一组色重复出现，衣柜就自洽了。'],
+  fit: ['直筒比收腰更藏肉', '轮廓的腰部余量决定它是藏还是勒。'],
+  fabric: ['垂感好的料子不显壮', '面料自己往下走，轮廓就不会横向扩。'],
+  occasion: ['今天的场合偏暖，别穿冷调', '场合的色温决定你在画面里是融入还是跳出。'],
+  howto: ['袖子卷到肘上两指', '露出的那一截手腕，是全身最细的地方。'],
+}
+
+function drawMarks(key) {
+  // 分类若带锚点换算函数就用它（标注与底图严格对应），否则用字面标注
+  const raw = MARKS[key] || MARKS.outfit
+  const spec = typeof raw === 'function' ? raw(ANCHORS) : raw
+  const svg = el('marks')
+  let html = ''
+  spec.lines.forEach((d) => { html += '<path d="' + d + '"/>' })
+  ;(spec.accent || []).forEach((d) => { html += '<path class="accent" d="' + d + '"/>' })
+  ;(spec.ticks || []).forEach(([x, y]) => { html += '<circle cx="' + x + '" cy="' + y + '" r="2.6"/>' })
+  ;(spec.texts || []).forEach(([t, x, y]) => { html += '<text x="' + x + '" y="' + y + '">' + t + '</text>' })
+  svg.innerHTML = html
+  svg.classList.remove('on')
+  requestAnimationFrame(() => requestAnimationFrame(() => svg.classList.add('on')))
+}
+
+/* ================= 揭晓段 ================= */
+
+function revealSweep() {
+  poster.className = 'poster'
+  void poster.offsetWidth
+  poster.classList.add('on')
+}
+
+function revealDevelop() {
+  poster.className = 'poster dev'
+  void poster.offsetWidth
+  poster.classList.add('on')
+}
+
+function revealCollage() {
+  poster.className = 'poster collage'
+  void poster.offsetWidth
+  poster.classList.add('on')
+}
+
+/* 序列帧：普通元素，因此背景、层级、混合都由前端掌控 —— 这是它比 video 通用的根本原因 */
+function revealFrames() {
+  if (!FRAMES.length) { revealSweep(); return }
+  FRAMES.forEach((src) => { const pre = new Image(); pre.src = src }) // 预加载，切 src 才不闪
+  const layer = document.createElement('div')
+  layer.className = 'vlayer'
+  layer.style.opacity = 0
+  layer.style.transition = 'opacity .34s var(--ease)'
+  const img = document.createElement('img')
+  img.src = FRAMES[0]
+  layer.appendChild(img)
+  slot.appendChild(layer)
+  requestAnimationFrame(() => { layer.style.opacity = 1 })
+  const step = FRAMES_MS / FRAMES.length
+  FRAMES.forEach((src, i) => {
+    if (i === 0) return
+    later(() => { img.src = src }, i * step)
+  })
+  // 关键：海报配图直接用序列帧的最后一帧（同一个 URL）。
+  // 于是图已在序列帧里加载过、命中缓存，且两处尺寸与裁切完全一致——
+  // 定格到海报时画面本身不动，只有压暗与文字浮现。
+  const pic = el('posterPic')
+  if (pic) pic.src = FRAMES[FRAMES.length - 1]
+  // 定格后再停一拍，让"定住"这件事有分量，然后才上海报
+  later(revealSweep, FRAMES_MS + 320)
+}
+
+function revealVideo() {
+  if (!REVEAL_VIDEO) { revealSweep(); return }
+  const layer = document.createElement('div')
+  layer.className = 'vlayer'
+  layer.style.opacity = 0
+  layer.style.transition = 'opacity .38s var(--ease)'
+  layer.innerHTML = '<video src="' + REVEAL_VIDEO + '" autoplay muted playsinline></video>'
+  slot.appendChild(layer)
+  requestAnimationFrame(() => { layer.style.opacity = 1 })
+  const video = layer.querySelector('video')
+  video.play().catch(() => {})
+  // 视频定格后海报「叠」上去，不移除视频层：尾帧到海报之间不能闪一下空白。
+  // 兜底 2.6s 是必需的——CDN 抖一下不能让用户停在黑屏。
+  let done = false
+  const finish = () => {
+    if (done) return
+    done = true
+    try { video.pause() } catch (err) { /* 忽略：暂停失败不影响揭晓 */ }
+    revealSweep()
+  }
+  video.addEventListener('ended', finish)
+  video.addEventListener('error', finish)
+  later(finish, 2600)
+}
+
+/* ================= 编排 ================= */
+
+const WAITS = {
+  person:   { label: '真人（描边揭示）', run: waitPerson, note: '真人照片沿路径被"画"出来：真质感 + 绘制过程都在；代价是需要 7 张素材' },
+  tour:     { label: '草图巡游（最终方案）', run: waitSketchTour, note: '零素材：依次画出 7 个分类的形状，可无限循环；最后一幅线稿正好接揭晓首帧' },
+  sketch:   { label: '草图绘制（单幅）', run: waitSketch,   note: '零素材，进度可接真实生成进度' },
+  cut:      { label: '成衣快切', run: waitCut,      note: '两套之间快切减速，素材驱动' },
+  wardrobe: { label: '自己的衣橱', run: waitWardrobe, note: '个性化最强（此处用现有图模拟）' },
+  collage:  { label: '杂志排版', run: waitCollage,  note: '终点即成品' },
+  desk:     { label: '顾问工作台', run: waitDesk,    note: '整理类 ASMR，偏安静' },
+  develop:  { label: '显影', run: waitDevelop,      note: '安静优雅，等待感强' },
+}
+
+const REVEALS = {
+  frames:  { label: '序列帧（推荐）', run: revealFrames, note: '17 帧 / 204KB。普通元素：背景质感前端可控、可叠层、可混合' },
+  video:   { label: '视频（原生组件）', run: revealVideo, note: '88KB 更小，但背景烘焙在画面里、层级最高、不支持透明' },
+  sweep:   { label: '光泽扫过', run: revealSweep,   note: '利落，快慢都合适' },
+  develop: { label: '显影浮现', run: revealDevelop, note: '有仪式感，但会把等待感放大' },
+  collage: { label: '排版收拢', run: revealCollage, note: '从略缩到齐整，与排版类等待最搭' },
+}
+
+const COMBOS = [
+  ['tour', 'frames', '★ 最终方案：草图巡游（零素材、可无限循环）→ 序列帧揭晓（线稿→成形→定格）。背景用首帧对齐，质感一致。'],
+  ['tour', 'video', '对照组：同样的内容走 video 组件——注意背景质感与层级的差别。'],
+  ['tour', 'collage', '两段都零素材：巡游画完，元素归位成版面。不依赖 CDN。'],
+  ['cut', 'develop', '节奏反差：快切是热的、显影是静的，收得住。'],
+  ['desk', 'sweep', '安静型：整理完，光泽一划。'],
+]
+
+// 当天内容所属的分类：它决定巡游最后一幅画什么、海报用什么主张与标注
+const state = { cat: 'outfit' }
+
+const HANDOFF_MS = 260 // 递交：等待最后一帧停一拍再揭晓，避免硬切
+
+function play() {
+  reset()
+  const cat = el('cat').value
+  state.cat = cat
+  const waitKey = el('wait').value
+  const revealKey = el('reveal').value
+  // 海报文案按内容分类走：同一张底图配不同主张，才看得出上层标注是"实时"的
+  const copy = POSTER_COPY[cat] || POSTER_COPY.outfit
+  el('posterT').textContent = copy[0]
+  el('posterW').textContent = copy[1]
+  say('在为你挑', 0)
+  const until = WAITS[waitKey].run(() => {})
+  later(() => {
+    cap.style.opacity = 0
+    REVEALS[revealKey].run()
+  }, until + HANDOFF_MS)
+  // 标注层最后登场：先成形（底图），再指出今天要你注意的那个点
+  later(() => drawMarks(cat), until + HANDOFF_MS + 950)
+  el('desc').innerHTML =
+    '<b>等待：</b>' + WAITS[waitKey].note + '<br><b>揭晓：</b>' + REVEALS[revealKey].note
+}
+
+const waitSel = el('wait'), revealSel = el('reveal')
+Object.keys(WAITS).forEach((k) => {
+  const o = document.createElement('option'); o.value = k; o.textContent = WAITS[k].label; waitSel.appendChild(o)
+})
+Object.keys(REVEALS).forEach((k) => {
+  const o = document.createElement('option'); o.value = k; o.textContent = REVEALS[k].label; revealSel.appendChild(o)
+})
+const catSel = el('cat')
+Object.keys(TOUR_LABELS).forEach((k) => {
+  const o = document.createElement('option')
+  o.value = k
+  o.textContent = TOUR_LABELS[k].replace('在看', '')
+  catSel.appendChild(o)
+})
+catSel.value = state.cat
+catSel.onchange = play
+
+waitSel.value = 'tour'
+revealSel.value = 'frames'
+waitSel.onchange = play
+revealSel.onchange = play
+el('replay').onclick = play
+
+const matrix = el('matrix')
+COMBOS.forEach(([w, r, why]) => {
+  const row = document.createElement('div')
+  row.innerHTML = '· <b style="color:var(--ink)">' + WAITS[w].label + ' → ' + REVEALS[r].label + '</b>：' + why
+  row.style.cursor = 'pointer'
+  row.onclick = () => { waitSel.value = w; revealSel.value = r; play() }
+  matrix.appendChild(row)
+})
+
+play()
+</script>
+</body>
+</html>

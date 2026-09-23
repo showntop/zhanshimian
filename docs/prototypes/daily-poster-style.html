@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>每日内容 · 海报式布局探索</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#626862; --ink3:#686D67;
+  --moss:#587344; --moss-soft:#EDF1EA; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E4E6E2;color:var(--ink);-webkit-font-smoothing:antialiased;padding:28px 24px 60px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-size:21px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.75;max-width:900px}
+.tabs{display:flex;gap:7px;margin:18px 0;flex-wrap:wrap}
+.tab{padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  color:var(--ink2);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--moss-deep);border-color:var(--moss-deep);color:var(--cream)}
+.main{display:flex;gap:30px;align-items:flex-start;flex-wrap:wrap}
+
+.phone{width:375px;flex:0 0 375px;height:800px;border-radius:32px;overflow:hidden;
+  display:flex;flex-direction:column;box-shadow:0 18px 48px rgba(45,58,35,.20);background:var(--bg)}
+@media (max-width:1040px){.phone{flex:0 0 auto;width:375px}}
+.sb{height:44px;flex:0 0 44px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 22px;font-size:12px;font-weight:600}
+.sig{display:flex;gap:4px;align-items:center}
+.sig i{width:4px;height:8px;background:var(--ink);border-radius:1px;display:block}
+.sig i:nth-child(4){height:6px;opacity:.4}
+.navbar{display:flex;align-items:center;gap:10px;padding:0 16px 6px}
+.back{font-size:20px;line-height:1;opacity:.82}
+.ctx{display:flex;align-items:baseline;justify-content:space-between;padding:0 18px 4px}
+.ctx-m{font-size:12px;font-weight:600;color:var(--ink3)}
+.ctx-c{font-size:12px;color:var(--ink3)}
+
+/* ---------- 海报区 ---------- */
+.poster{position:relative;flex:0 0 420px;height:420px;overflow:hidden}
+/* 大字：压在底层，出血被裁切，浅到近乎背景的一部分 */
+.poster-word{
+  position:absolute;left:-18px;top:34px;z-index:1;
+  font-size:132px;line-height:.82;font-weight:900;letter-spacing:-9px;
+  color:rgba(88,115,68,.16);white-space:nowrap;transform:rotate(-7deg);
+}
+.poster-word2{
+  position:absolute;left:44px;top:150px;z-index:1;
+  font-size:132px;line-height:.82;font-weight:900;letter-spacing:-9px;
+  color:rgba(88,115,68,.10);white-space:nowrap;transform:rotate(-7deg);
+}
+/* 细规则线，压在字上做编辑感 */
+.poster-rule{position:absolute;left:0;right:0;top:268px;height:1px;background:rgba(55,62,52,.16);z-index:4}
+.poster-no{
+  position:absolute;right:18px;top:252px;z-index:4;
+  font-size:11px;font-weight:700;letter-spacing:1.4px;color:var(--ink3);
+}
+/* 单品：白底素材用 multiply 融进页面，去掉容器与圆角 */
+.item{
+  position:absolute;z-index:3;mix-blend-mode:multiply;
+  object-fit:contain;display:block;
+}
+.item-1{width:200px;left:16px;top:120px;transform:rotate(-4deg)}
+.item-2{width:168px;right:-6px;top:216px;transform:rotate(5deg)}
+.item-3{width:104px;left:52px;top:300px;transform:rotate(-2deg);opacity:.94}
+/* 悬浮强调块：一小块高饱和色，制造不和谐的点缀 */
+.poster-chip{
+  position:absolute;left:212px;top:96px;z-index:5;
+  padding:6px 12px;border-radius:999px;background:#D9744F;color:#fff;
+  font-size:11px;font-weight:800;letter-spacing:.6px;transform:rotate(-3deg);
+  box-shadow:0 6px 16px rgba(217,116,79,.32);
+}
+
+/* ---------- 正文 ---------- */
+.body{padding:8px 18px 24px}
+.meta{font-size:11px;font-weight:600;letter-spacing:1rpx;color:var(--ink3)}
+.title{display:block;margin-top:10px;font-size:27px;line-height:1.2;font-weight:800;letter-spacing:-.8px}
+.lead{display:block;margin-top:12px;font-size:14px;line-height:1.7;color:var(--ink2)}
+.fit{margin-top:16px;padding-left:12px;border-left:2px solid var(--moss);
+  font-size:14px;line-height:1.75;color:var(--ink)}
+.why{display:block;margin-top:12px;font-size:11.5px;line-height:1.7;color:var(--ink3)}
+.cta{height:48px;border-radius:999px;background:var(--moss-deep);color:var(--cream);
+  display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;margin-top:20px;cursor:pointer}
+.link{margin-top:12px;text-align:center;font-size:13px;font-weight:600;color:var(--moss)}
+
+/* ---------- 说明 ---------- */
+.note{flex:1;min-width:300px;max-width:470px}
+.note h3{font-size:17px;font-weight:700}
+.note .sub2{font-size:12px;color:var(--moss);font-weight:600;margin:4px 0 14px}
+.note dl{border-top:1px solid var(--line);padding-top:12px}
+.note dt{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-top:12px}
+.note dt:first-child{margin-top:0}
+.note dd{font-size:12.5px;line-height:1.8;color:var(--ink);margin-top:3px}
+.warnline{margin-top:14px;padding:11px 13px;border-radius:10px;background:rgba(126,84,69,.08);
+  font-size:12px;line-height:1.7;color:#6A4B3E}
+.goodline{margin-top:12px;padding:11px 13px;border-radius:10px;background:rgba(88,115,68,.10);
+  font-size:12px;line-height:1.7;color:#3D5230}
+.code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:rgba(105,115,100,.12);
+  padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>海报式布局探索</h1>
+  <p class="sub">核心改动只有一条：<strong>去掉容器，让素材直接出现在页面上</strong>。
+    白底素材靠 <span class="code">mix-blend-mode: multiply</span> 融进页面——白色消失、内容浮起来。
+    配超大字号出血铺底 + 单品错落摆放 + 一小块高饱和色打破和谐。</p>
+
+  <div class="tabs">
+    <button class="tab on" data-stage="a">当前做法（对比）</button>
+    <button class="tab" data-stage="b">海报式</button>
+  </div>
+
+  <div class="main">
+    <!-- ============ A 当前做法 ============ -->
+    <div class="stage" id="stage-a" style="display:flex;gap:30px;align-items:flex-start;flex-wrap:wrap">
+      <div class="phone" style="background:var(--bg)">
+        <div class="sb"><span>9:41</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><span class="back">‹</span></div>
+        <div class="body">
+          <div class="meta" style="margin-top:6px">色彩 · 第 05 条</div>
+          <div class="title">全黑并不自动显瘦</div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <div style="flex:1;height:230px;border-radius:8px;overflow:hidden;background:#fff;box-shadow:0 2px 8px rgba(45,58,35,.10)">
+              <img src="./assets/black-flat.jpg" style="width:100%;height:100%;object-fit:contain">
+            </div>
+            <div style="flex:1;height:230px;border-radius:8px;overflow:hidden;background:#fff;box-shadow:0 2px 8px rgba(45,58,35,.10)">
+              <img src="./assets/black-layered.jpg" style="width:100%;height:100%;object-fit:contain">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <div style="flex:1;text-align:center;font-size:11px;color:var(--ink2)">材质单一的全黑</div>
+            <div style="flex:1;text-align:center;font-size:11px;color:var(--ink2)">靠材质分层的黑</div>
+          </div>
+          <div class="fit" style="margin-top:20px">你五官对比适中，撑得住全黑。但记得给一个亮部（领口、包或鞋），否则整体会闷。</div>
+          <div class="cta">收进我的配色库</div>
+        </div>
+      </div>
+      <div class="note">
+        <h3>A · 当前做法</h3>
+        <div class="sub2">两个白卡圆角容器并排</div>
+        <dl>
+          <dt>问题一：素材被装起来了</dt><dd>圆角 + 白底 + 阴影把素材变成"缩略图"，两张一样大、齐平对齐，是网格不是构图。</dd>
+          <dt>问题二：白底压在浅绿底上</dt><dd>素材本身是白底 JPEG，垫一层浅色底后边缘发脏，像没抠干净的图。</dd>
+          <dt>问题三：没有封面感</dt><dd>读完记不住。标题、正文、按钮都是默认长相，没有任何一处有设计处理。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- ============ B 海报式 ============ -->
+    <div class="stage" id="stage-b" style="display:none;gap:30px;align-items:flex-start;flex-wrap:wrap">
+      <div class="phone">
+        <div class="sb"><span>9:41</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><span class="back">‹</span></div>
+        <div class="ctx"><span class="ctx-m">11月8日 · 15° 多云</span><span class="ctx-c">杭州</span></div>
+
+        <div class="poster">
+          <div class="poster-word">全黑</div>
+          <div class="poster-word2">不一定瘦</div>
+          <div class="poster-rule"></div>
+          <div class="poster-no">No. 05</div>
+          <img class="item item-1" src="./assets/black-flat.jpg" alt="">
+          <img class="item item-2" src="./assets/black-layered.jpg" alt="">
+          <div class="poster-chip">同样的黑，差在材质</div>
+        </div>
+
+        <div class="body">
+          <div class="meta">色彩 · 第 05 条</div>
+          <div class="title">全黑并不自动显瘦</div>
+          <div class="lead">黑色显瘦这句话，只对了一半。</div>
+          <div class="fit">你五官对比适中，撑得住全黑。但记得给一个亮部——领口、包或鞋，否则整体会闷。</div>
+          <div class="why">显瘦靠的是轮廓和材质的一致性，不是颜色的深浅。</div>
+          <div class="cta">收进我的配色库</div>
+          <div class="link">看看我穿这样 ›</div>
+        </div>
+      </div>
+
+      <div class="note">
+        <h3>B · 海报式</h3>
+        <div class="sub2">去容器 · 大字出血 · 单品错落</div>
+        <dl>
+          <dt>去掉容器</dt><dd>素材不再套白卡和圆角，靠 <span class="code">mix-blend-mode: multiply</span> 让白底消失、内容融进页面。这一步是从"缩略图"变"杂志页"的分水岭。</dd>
+          <dt>大字出血铺底</dt><dd>"全黑 / 不一定瘦" 132px 压在底层，字被屏幕两边裁掉、还旋转 -7°，浅到像是背景纹理。它不承载信息，只提供氛围和重量。</dd>
+          <dt>非对称错落</dt><dd>两张图大小不同（200 / 168）、位置错开、各自带一点反向旋转。没有等分，也没有对齐网格。</dd>
+          <dt>一处不和谐</dt><dd>右上角一小块橘红胶囊。整页是绿灰调，只有它是暖橙——这一下"刺"出来，页面就活了。<strong>只此一处，多一处就乱。</strong></dd>
+          <dt>编辑细节</dt><dd>一条贯穿的细线 + 右端 "No. 05"：杂志的页码感，比"第 5 条"这种功能文案有质感。</dd>
+        </dl>
+        <div class="goodline">这一版可以立刻落地：不需要新素材，只改布局与样式。等单件素材到位，错落可以做得更自由。</div>
+        <div class="warnline"><b>要验证的两点</b>：① <span class="code">mix-blend-mode</span> 在小程序的兼容性——不支持的话白底会露出来，备选是素材改透明 PNG；② 132px 大字在小屏上的裁切位置，需要真机调。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('.tab')
+  if (!t) return
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('on', b === t))
+  const a = document.getElementById('stage-a'), b = document.getElementById('stage-b')
+  a.style.display = t.dataset.stage === 'a' ? 'flex' : 'none'
+  b.style.display = t.dataset.stage === 'b' ? 'flex' : 'none'
+})
+</script>
+</body>
+</html>

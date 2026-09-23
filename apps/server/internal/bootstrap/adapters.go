@@ -21,6 +21,7 @@ import (
 	"github.com/zhanshimian/server/internal/service/account"
 	"github.com/zhanshimian/server/internal/service/assessment"
 	"github.com/zhanshimian/server/internal/service/body"
+	"github.com/zhanshimian/server/internal/service/daily"
 	"github.com/zhanshimian/server/internal/service/diagnostic"
 	"github.com/zhanshimian/server/internal/service/today"
 	"github.com/zhanshimian/server/internal/storage"
@@ -130,6 +131,15 @@ type todayWeatherAdapter struct{ inner provider.WeatherProvider }
 func (a todayWeatherAdapter) Current(ctx context.Context, city string) (today.Weather, error) {
 	w, err := a.inner.Current(ctx, city)
 	return today.Weather{City: w.City, Condition: w.Condition, Temperature: w.Temperature}, err
+}
+
+// dailyWeatherAdapter 把 provider.WeatherProvider 适配到 daily.WeatherProvider
+// （每日内容的语境依赖与 today 同源：demo / 高德同一 provider）。
+type dailyWeatherAdapter struct{ inner provider.WeatherProvider }
+
+func (a dailyWeatherAdapter) Current(ctx context.Context, city string) (daily.Weather, error) {
+	w, err := a.inner.Current(ctx, city)
+	return daily.Weather{City: w.City, Condition: w.Condition, Temperature: w.Temperature}, err
 }
 
 // mediaURLSigner 给外围读模型（home/today/diagnostic/wardrobe）的展示媒体

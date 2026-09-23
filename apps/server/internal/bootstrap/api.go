@@ -18,6 +18,7 @@ import (
 	"github.com/zhanshimian/server/internal/service/account"
 	"github.com/zhanshimian/server/internal/service/advisor"
 	"github.com/zhanshimian/server/internal/service/billing"
+	"github.com/zhanshimian/server/internal/service/daily"
 	"github.com/zhanshimian/server/internal/service/diagnostic"
 	"github.com/zhanshimian/server/internal/service/execution"
 	"github.com/zhanshimian/server/internal/service/feedback"
@@ -143,6 +144,14 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 	mediaSigner := newMediaURLSigner(objects, cfg.PublicBaseURL, cfg.AssetURLTTL)
 	todaySvc := today.New(store, store, providerai.NewTodayPlanner(structuredRuntimeAdapter{ai.Runtime}), todayWeatherAdapter{inner: weather}, today.NewClock()).
 		WithMediaSigner(mediaSigner)
+	// 每日内容：选品/收藏走 store，生成走 AI 能力路由（capability=daily_content）；
+	// planner 未配置或失败时在 service 内落到兜底池，客户端永远拿到内容。
+	dailySvc := daily.New(store, store, store, store, store, daily.NewClock()).
+		WithPlanner(providerai.NewDailyContentPlanner(structuredRuntimeAdapter{ai.Runtime})).
+		WithWeather(dailyWeatherAdapter{inner: weather}).
+		WithAssetBase(cfg.PublicBaseURL).
+		WithMotionVariant(cfg.DailyMotionVariant).
+		WithForceRegen(cfg.DailyForceRegen)
 	wardrobeSvc := wardrobe.New(store, store).WithMediaSigner(mediaSigner).WithMediaChecker(store)
 	advisorSvc := advisor.New(store, store, providerai.NewAdvisorChat(structuredRuntimeAdapter{ai.Runtime})).WithUsageGate(store)
 	diagnosticSvc := diagnostic.New(store, store, providerai.NewDiagnostic(structuredRuntimeAdapter{ai.Runtime}),
@@ -190,6 +199,7 @@ func BuildAPIWithDependencies(cfg config.Config, logger *slog.Logger, deps Depen
 		Execution:  executionSvc,
 		Feedback:   feedbackSvc,
 		Today:      todaySvc,
+		Daily:      dailySvc,
 		Wardrobe:   wardrobeSvc,
 		Advisor:    advisorSvc,
 		Diagnostic: diagnosticSvc,

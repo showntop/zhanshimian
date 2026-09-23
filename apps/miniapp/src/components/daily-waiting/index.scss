@@ -1,0 +1,190 @@
+// 等待动画：纯 CSS 循环段 + 落位收尾段（is-settling）。全部 rpx；
+// prefers-reduced-motion 归零（动画停帧、元素保持可见）。
+
+.dw-wait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 560rpx;
+  gap: 40rpx;
+}
+
+// ---------- 颜色：三枚色片轮转 ----------
+.dw-wait__swatch {
+  display: flex;
+  gap: 28rpx;
+}
+
+.dw-wait__chip {
+  width: 96rpx;
+  height: 144rpx;
+  border-radius: 8rpx;
+  background: #8e9a83;
+  opacity: 0.55;
+  animation: dw-chip 1.6s ease-in-out infinite;
+
+  &--2 {
+    background: #c9cfd4;
+    animation-delay: 0.25s;
+  }
+
+  &--3 {
+    background: #b4674d;
+    animation-delay: 0.5s;
+  }
+}
+
+@keyframes dw-chip {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-16rpx);
+  }
+}
+
+// ---------- 比例：一颗点沿纵向滑行 ----------
+.dw-wait__axis {
+  position: relative;
+  width: 8rpx;
+  height: 260rpx;
+}
+
+.dw-wait__axis-line {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 8rpx;
+  background: rgba(63, 70, 60, 0.16);
+}
+
+.dw-wait__axis-dot {
+  position: absolute;
+  left: -22rpx;
+  top: 0;
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  background: #4a5245;
+  animation: dw-axis 1.8s ease-in-out infinite;
+}
+
+@keyframes dw-axis {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(208rpx);
+  }
+}
+
+// ---------- 面料 / 版型：三条横向折痕次第亮起 ----------
+.dw-wait__fold {
+  display: flex;
+  flex-direction: column;
+  gap: 34rpx;
+  width: 320rpx;
+}
+
+.dw-wait__fold-line {
+  height: 14rpx;
+  border-radius: 8rpx;
+  background: #8a8f83;
+  opacity: 0.3;
+  animation: dw-fold 1.8s ease-in-out infinite;
+
+  &--2 {
+    animation-delay: 0.3s;
+  }
+
+  &--3 {
+    animation-delay: 0.6s;
+  }
+}
+
+@keyframes dw-fold {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scaleX(0.7);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scaleX(1);
+  }
+}
+
+// ---------- 兜底场景：呼吸圆环 ----------
+.dw-wait__pulse {
+  position: relative;
+  width: 160rpx;
+  height: 160rpx;
+}
+
+.dw-wait__pulse-ring {
+  position: absolute;
+  inset: 0;
+  border: 4rpx solid rgba(63, 70, 60, 0.3);
+  border-radius: 50%;
+  animation: dw-pulse 2s ease-in-out infinite;
+}
+
+.dw-wait__pulse-dot {
+  position: absolute;
+  left: 58rpx;
+  top: 58rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: #4a5245;
+}
+
+@keyframes dw-pulse {
+  0%,
+  100% {
+    transform: scale(0.82);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+// ---------- 落位收尾：整体收到静止 ----------
+.dw-wait.is-settling {
+  .dw-wait__chip,
+  .dw-wait__axis-dot,
+  .dw-wait__fold-line,
+  .dw-wait__pulse-ring {
+    animation: none;
+    opacity: 0.9;
+    transform: none;
+  }
+}
+
+.dw-wait__label {
+  font-size: 24rpx;
+  letter-spacing: 6rpx;
+  color: rgba(63, 70, 60, 0.55);
+}
+
+// 减动效偏好：全部归零，元素保持可见（AGENTS 动效规约）。
+@media (prefers-reduced-motion: reduce) {
+  .dw-wait__chip,
+  .dw-wait__axis-dot,
+  .dw-wait__fold-line,
+  .dw-wait__pulse-ring {
+    animation: none !important;
+    opacity: 0.9 !important;
+    transform: none !important;
+  }
+}

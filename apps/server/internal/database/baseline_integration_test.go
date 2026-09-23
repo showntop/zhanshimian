@@ -41,9 +41,9 @@ func TestBaselineCreatesOnlyNewSchema(t *testing.T) {
 		"advisor_conversations", "advisor_messages", "analysis_runs",
 		"billing_ledger", "billing_orders", "billing_reservations", "billing_usage", "billing_wallets",
 		"body_presentations",
-		"diagnostics", "execution_events", "execution_feedback", "execution_steps",
-		"executions", "generation_feedback", "hair_previews",
-		"idempotency_keys", "media_assets", "object_gc_jobs", "operations",
+		"daily_collection", "daily_content", "diagnostics", "execution_events", "execution_feedback", "execution_steps",
+		"executions", "generation_feedback", "generation_run", "hair_previews",
+		"idempotency_keys", "knowledge_fact", "media_assets", "object_gc_jobs", "operations",
 		"photo_set_items", "photo_sets", "plan_selections", "plan_sets",
 		"plan_step_groundings", "plan_steps", "plan_variant_decisions", "plan_variants",
 		"preference_memories", "product_events", "provider_invocations",
@@ -162,7 +162,7 @@ func TestResetThenMigrateRebuildsFromScratch(t *testing.T) {
 		t.Fatal(err)
 	}
 	rows.Close()
-	if tableCount != 51 {
-		t.Fatalf("rebuilt table count = %d, want 51", tableCount)
+	if tableCount != 55 {
+		t.Fatalf("rebuilt table count = %d, want 55", tableCount)
 	}
 }

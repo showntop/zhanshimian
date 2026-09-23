@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"regexp"
 	"strings"
 
 	"github.com/zhanshimian/server/internal/domain"
@@ -23,9 +22,11 @@ const (
 	maxFindings          = 6
 )
 
-var (
-	copyPolicyBanned = regexp.MustCompile(`颜值|身材分|评分|百分位|缺陷严重|诊断|疾病|族裔|性格`)
+// copyPolicyBanned 指向全服务端唯一的词源（domain.BannedCopyPattern）：
+// 报告草稿校验与每日内容生成校验共用，两处不分裂。
+var copyPolicyBanned = domain.BannedCopyPattern
 
+var (
 	photoQualityReasons = map[string]bool{
 		"multiple_people":       true,
 		"no_person":             true,

@@ -17,6 +17,7 @@ import (
 	"github.com/zhanshimian/server/internal/service/advisor"
 	"github.com/zhanshimian/server/internal/service/billing"
 	"github.com/zhanshimian/server/internal/service/body"
+	"github.com/zhanshimian/server/internal/service/daily"
 	"github.com/zhanshimian/server/internal/service/diagnostic"
 	"github.com/zhanshimian/server/internal/service/media"
 	"github.com/zhanshimian/server/internal/service/operation"
@@ -38,6 +39,7 @@ func New(deps Dependencies, logger *slog.Logger, devLoginEnabled bool, runtime R
 		execution:    deps.Execution,
 		feedback:     deps.Feedback,
 		today:        deps.Today,
+		daily:        deps.Daily,
 		wardrobe:     deps.Wardrobe,
 		advisor:      deps.Advisor,
 		diagnostic:   deps.Diagnostic,
@@ -114,6 +116,15 @@ func New(deps Dependencies, logger *slog.Logger, devLoginEnabled bool, runtime R
 	mux.Handle("POST /v1/today/plans", api.auth(api.requireIdempotency(http.HandlerFunc(api.createTodayPlan))))
 	mux.Handle("POST /v1/today/plans/{id}/activate", api.auth(http.HandlerFunc(api.activateTodayPlan)))
 	mux.Handle("POST /v1/today/plans/{id}/feedback", api.auth(http.HandlerFunc(api.feedbackTodayPlan)))
+
+	// 每日内容：两段式（prepare 选品 → generate 生成），generate 永远 200。
+	mux.Handle("POST /v1/daily/prepare", api.auth(http.HandlerFunc(api.prepareDaily)))
+	mux.Handle("POST /v1/daily/generate", api.auth(http.HandlerFunc(api.generateDaily)))
+	mux.Handle("POST /v1/daily/collection", api.auth(http.HandlerFunc(api.createDailyCollection)))
+	mux.Handle("GET /v1/daily/collection", api.auth(http.HandlerFunc(api.listDailyCollection)))
+	mux.Handle("GET /v1/daily/collection/stats", api.auth(http.HandlerFunc(api.getDailyCollectionStats)))
+	mux.Handle("PATCH /v1/daily/collection/{id}", api.auth(http.HandlerFunc(api.patchDailyCollection)))
+	mux.Handle("DELETE /v1/daily/collection/{id}", api.auth(http.HandlerFunc(api.deleteDailyCollection)))
 
 	mux.Handle("POST /v1/shares", api.auth(http.HandlerFunc(api.createShare)))
 	mux.Handle("DELETE /v1/shares/{id}", api.auth(http.HandlerFunc(api.deleteShare)))
@@ -232,6 +243,8 @@ func (a *API) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), advisor.ErrValidation.Error()+": "))
 	case errors.Is(err, wardrobe.ErrValidation):
 		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), wardrobe.ErrValidation.Error()+": "))
+	case errors.Is(err, daily.ErrValidation):
+		writeError(w, r, http.StatusBadRequest, "validation_error", strings.TrimPrefix(err.Error(), daily.ErrValidation.Error()+": "))
 	case errors.Is(err, billing.ErrPaymentUnavailable):
 		writeError(w, r, http.StatusServiceUnavailable, "payment_unavailable", "购买暂未开通")
 	case errors.Is(err, diagnostic.ErrPhotoRejected):

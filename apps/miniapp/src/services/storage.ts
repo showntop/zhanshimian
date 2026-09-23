@@ -13,6 +13,10 @@ export const STORAGE_KEYS = {
   openCreditSheet: 'zsm_open_credit_sheet',
   // 发型方向的性别分段（女士/男士）：只是「上次看的那一侧」，不改变任何业务事实
   hairGender: 'zsm_hair_gender',
+  // 每日内容「收下」记录（dedupeKey + 归入哪个资产库）。
+  // 服务端「我的手册」接口就绪前暂存本地；就绪后必须移除，改由服务端持有。
+  // 不进 UI_PREFERENCE_KEYS：它是用户数据，不该被 UI schema 版本变化清掉。
+  dailySaves: 'zsm_daily_saves',
 } as const
 
 /** UI 偏好 key：schema 版本变化时只清这些，不迁移任何业务值。 */

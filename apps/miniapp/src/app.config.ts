@@ -5,12 +5,15 @@ export default defineAppConfig({
     backgroundTextStyle: 'dark',
     navigationBarTextStyle: 'black',
   },
-  // 主包 11 页：tab 3 + 主闭环（建档→分析→报告→方案→清单→反馈）+ 场景 Brief。
+  // 主包 11 页：tab 3 + 每日内容（今日）+ 主闭环（建档→分析→报告→方案→清单→反馈）+ 场景 Brief。
   // tab 页必须主包；主闭环是产品唯一不可延迟路径，首跑零分包下载等待。
+  // 「今日」是每日必访路径，同样不能等分包下载，故放主包；
+  // 「我的手册」是低频查看的资产页，放 life 分包，不挤占已经很紧的主包体积。
   pages: [
     'pages/home/index',
     'pages/plans/index',
     'pages/profile/index',
+    'pages/today/index',
     'pages/scene/index',
     'pages/capture/index',
     'pages/analysis/index',
@@ -34,6 +37,7 @@ export default defineAppConfig({
       root: 'packages/life',
       pages: [
         'pages/today/index',
+        'pages/handbook/index',
         'pages/wardrobe/index',
         'pages/advisor/index',
         'pages/share/index',

@@ -22,7 +22,13 @@ const result = await ci.upload({
   project,
   version,
   desc,
-  setting: { es6: true, minify: true, minifyWXSS: true, minifyWXML: true },
+  // Taro(Vite) 产物已是转译后的 CJS；但 esbuild 无法下转 generator，
+  // 产物里会残留 function*（见 dist/vendors.js）。微信侧任何二次编译
+  // （es6 / enhance 增强编译）都会把它转成 regenerator 并注入
+  // require('@babel/runtime/helpers/regeneratorValues')，而项目未配 npm
+  // 构建、包内无 @babel/runtime 文件 → 运行时 "module not defined"。
+  // 因此 es6 与 enhance 必须同时显式关掉，防止继承 project.config.json。
+  setting: { es6: false, enhance: false, minify: true, minifyWXSS: true, minifyWXML: true },
   onProgressUpdate: (info) => console.log('[upload]', info),
 });
 console.log('[upload] ✅ 成功:', version, JSON.stringify(result.subPackageInfo || ''));

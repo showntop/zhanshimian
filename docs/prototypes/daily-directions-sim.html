@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>每日内容 · 六个方向对比器</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#626862; --ink3:#686D67;
+  --moss:#587344; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.12); --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E4E6E2;color:var(--ink);-webkit-font-smoothing:antialiased;padding:22px 20px 60px}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:12.5px;color:var(--ink2);margin-top:6px;line-height:1.7;max-width:860px}
+.main{display:flex;gap:26px;align-items:flex-start;margin-top:18px;flex-wrap:wrap}
+
+.phone{width:375px;flex:0 0 375px;background:var(--bg);border-radius:30px;overflow:hidden;
+  box-shadow:0 18px 46px rgba(45,58,35,.20)}
+.sb{height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:11.5px;font-weight:600}
+.navbar{padding:2px 20px 0}
+.brand{font-size:16.5px;font-weight:700}.brand .look{color:var(--moss)}
+.greet{padding:14px 20px 0}
+.gk{font-size:11.5px;font-weight:600;color:var(--ink2)}
+.gtitle{margin-top:4px;font-size:18px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+
+.dcard{position:relative;margin:14px 0 0}
+.stage{position:relative;height:300px;overflow:hidden;
+  background:linear-gradient(150deg,#F3F5F0 0%,#E9EEE6 52%,#F1F2EC 100%)}
+.cap{position:absolute;left:20px;bottom:14px;font-size:11px;font-weight:600;color:var(--ink3);
+  letter-spacing:.5px;z-index:6;transition:opacity .2s}
+
+/* 舞台内的通用元素 */
+.slot{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.slot img{width:100%;height:100%;object-fit:cover}
+.abs{position:absolute}
+
+/* ---------- ① 成衣快切 ---------- */
+.cut{position:absolute;inset:0;opacity:0;transform:translateX(7%) scale(1.05);
+  transition:opacity .16s var(--ease),transform .3s var(--ease)}
+.cut.on{opacity:1;transform:none}
+
+/* ---------- ② 草图绘制 ---------- */
+.sketch{width:100%;height:100%;display:block}
+.sketch path,.sketch line,.sketch circle{fill:none;stroke:#3F463C;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+.sketch .hint{stroke:#B4674D;stroke-width:1.6;stroke-dasharray:4 4}
+.pen{position:absolute;width:8px;height:8px;border-radius:50%;background:#B4674D;
+  opacity:0;transition:opacity .2s}
+.pen.on{opacity:.9}
+
+/* ---------- ③ 自己的衣橱 ---------- */
+.rack{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:0 26px}
+.item{display:flex;align-items:center;gap:12px;padding:6px;border-radius:10px;
+  background:rgba(255,255,255,.6);opacity:0;transform:translateX(26px)}
+.item.on{opacity:1;transform:none}
+.item img{width:44px;height:44px;object-fit:cover;border-radius:6px;flex:0 0 44px}
+.item span{font-size:11px;color:var(--ink2)}
+.item.picked{background:rgba(143,163,131,.34);box-shadow:0 0 0 2px rgba(87,115,68,.35)}
+
+/* ---------- ④ 杂志排版 ---------- */
+.sheet{position:absolute;inset:18px 20px;background:#FBFCFA;border-radius:10px;
+  box-shadow:0 8px 24px rgba(45,58,35,.10);overflow:hidden}
+.el{position:absolute;opacity:0}
+.el.on{opacity:1}
+.el--title{left:16px;top:14px;width:56%;height:14px;background:#3F463C;border-radius:3px}
+.el--sub{left:16px;top:36px;width:38%;height:8px;background:rgba(63,70,60,.35);border-radius:3px}
+.el--pic{right:14px;top:12px;width:96px;height:112px;border-radius:6px;overflow:hidden;background:#E8E4DC}
+.el--pic img{width:100%;height:100%;object-fit:cover}
+.el--swatch{left:16px;top:60px;display:flex;gap:6px}
+.el--swatch i{width:22px;height:22px;border-radius:4px;display:block}
+.el--note{left:16px;bottom:16px;width:64%;height:6px;background:rgba(63,70,60,.22);border-radius:3px}
+.el--rule{left:16px;bottom:30px;width:44%;height:2px;background:#B4674D}
+
+/* ---------- ⑤ 顾问工作台 ---------- */
+.desk{position:absolute;inset:0}
+.tool{position:absolute;width:66px;height:44px;border-radius:6px;display:flex;
+  align-items:center;justify-content:center;font-size:9px;color:var(--ink2);
+  box-shadow:0 4px 10px rgba(45,58,35,.12)}
+.tool--swatch{background:linear-gradient(135deg,#8E9A83,#C9BFA8)}
+.tool--fabric{background:linear-gradient(135deg,#DCDCCF,#B4674D)}
+.tool--tape{background:#E8E4DC;border:1px dashed rgba(63,70,60,.4)}
+.tool--scissor{background:#CFD2C2}
+.tool--sketch{background:#FBFCFA;border:1px solid rgba(63,70,60,.18)}
+
+/* ---------- ⑥ 显影 ---------- */
+.dev{position:absolute;inset:0;overflow:hidden}
+.dev img{width:100%;height:100%;object-fit:cover;filter:blur(26px) saturate(.15) brightness(1.12);opacity:.12}
+
+/* ---------- 海报 ---------- */
+.poster{position:absolute;inset:0;z-index:9;opacity:0;pointer-events:none;
+  background:linear-gradient(158deg,#3B3D42 0%,#31333A 55%,#26282D 100%)}
+.poster.on{opacity:1;transition:opacity .38s var(--ease)}
+.poster__gloss{position:absolute;top:-40%;left:-60%;width:60%;height:180%;transform:rotate(18deg);
+  background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.30) 50%,rgba(255,255,255,0) 100%)}
+.poster.on .poster__gloss{animation:sweep .62s var(--ease) .04s 1}
+@keyframes sweep{from{transform:translateX(0) rotate(18deg)}to{transform:translateX(320%) rotate(18deg)}}
+.poster__body{position:absolute;left:26px;right:26px;top:44%;transform:translateY(14px);opacity:0;
+  transition:all .42s var(--ease) .12s}
+.poster.on .poster__body{transform:translateY(0);opacity:1}
+.poster__t{font-size:19px;line-height:1.35;font-weight:700;color:#F2F3EF;letter-spacing:-.3px}
+.poster__why{margin-top:8px;font-size:12px;line-height:1.6;color:rgba(242,243,239,.62)}
+.poster__btn{margin-top:16px;display:inline-block;padding:9px 22px;border-radius:999px;
+  background:#F2F3EF;color:#26282D;font-size:12.5px;font-weight:700}
+
+/* ---------- 面板 ---------- */
+.panel{flex:1;min-width:340px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px 20px}
+.panel h2{font-size:13px;font-weight:700;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:10px;margin-bottom:11px;flex-wrap:wrap}
+.row label{font-size:12px;color:var(--ink2);min-width:60px}
+select{font-family:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--line);
+  border-radius:7px;background:#fff;color:var(--ink);min-width:230px}
+button{font-family:inherit;font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:999px;
+  border:1px solid var(--moss-deep);background:var(--moss-deep);color:var(--cream);cursor:pointer}
+button.ghost{background:#fff;color:var(--moss-deep)}
+.desc{font-size:11.5px;color:var(--ink2);line-height:1.7;background:#F7F8F5;border-radius:9px;
+  padding:10px 12px;margin-top:6px}
+.desc b{color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+.card{border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:11px;
+  color:var(--ink2);line-height:1.55;cursor:pointer;background:#fff}
+.card.on{border-color:var(--moss-deep);box-shadow:0 0 0 1px var(--moss-deep) inset}
+.card b{display:block;font-size:12px;color:var(--ink);margin-bottom:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>每日内容 · 六个方向对比器</h1>
+  <div class="sub">
+    同一件事的六种解法：等 AI 生成这 20~40 秒里，屏幕上该发生什么。下面每张卡片都能直接点，
+    也可以从下拉选。全部用现有素材与纯代码实现，不依赖新素材。
+  </div>
+
+  <div class="main">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>uplook</span></div>
+      <div class="navbar"><span class="brand">up<span class="look">look</span></span></div>
+      <div class="greet">
+        <div class="gk">今天最好看</div>
+        <div class="gtitle">你好，我是你的私人形象顾问</div>
+      </div>
+      <div class="dcard">
+        <div class="stage" id="stage">
+          <div class="slot" id="slot"></div>
+          <div class="cap" id="cap">今天这一条</div>
+          <div class="poster" id="poster">
+            <div class="poster__gloss"></div>
+            <div class="poster__body">
+              <div class="poster__t" id="pt">上短下长，腿就长了</div>
+              <div class="poster__why" id="pw">腰线提高一拳，视线就被拉长了。</div>
+              <div class="poster__btn">收下</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="height:56px"></div>
+    </div>
+
+    <div class="panel">
+      <h2>选一个方向</h2>
+      <div class="row">
+        <label>方向</label>
+        <select id="dir"></select>
+        <button id="replay">↻ 重播</button>
+      </div>
+      <div class="desc" id="dirDesc"></div>
+
+      <h2 style="margin-top:16px">六个都在这，直接点</h2>
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const LOOK1 = './assets/look-1.jpg'   // 通勤一身
+const LOOK2 = './assets/look-2.jpg'   // 上短下长（今天的建议）
+const FABRIC = './assets/roam-fabric.jpg'
+
+const el = (id) => document.getElementById(id)
+const slot = el('slot'), cap = el('cap'), poster = el('poster')
+
+let timers = []
+const clearTimers = () => { timers.forEach(clearTimeout); timers = [] }
+const later = (fn, ms) => { const id = setTimeout(fn, ms); timers.push(id); return id }
+const anim = (node, frames, opts) => node.animate(frames, Object.assign({ easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' }, opts))
+
+function reset() {
+  clearTimers()
+  poster.classList.remove('on')
+  slot.innerHTML = ''
+  cap.style.opacity = 1
+  cap.textContent = '今天这一条'
+}
+
+function reveal(delay) {
+  later(() => {
+    cap.style.opacity = 0
+    poster.classList.add('on')
+  }, delay)
+}
+
+const say = (text, at) => later(() => { cap.textContent = text }, at)
+
+/* ============ ① 成衣快切（现有方向） ============ */
+function dirCut() {
+  reset()
+  say('在为你挑', 0)
+  const shots = [LOOK1, LOOK2]
+  let at = 0
+  let gap = 140
+  // 两套之间快切，间隔递增（越来越慢 = 越来越接近决定）
+  for (let i = 0; i < 10; i++) {
+    const url = shots[i % 2]
+    later(() => {
+      const node = document.createElement('div')
+      node.className = 'cut'
+      node.innerHTML = '<img src="' + url + '">'
+      slot.appendChild(node)
+      requestAnimationFrame(() => requestAnimationFrame(() => node.classList.add('on')))
+      Array.from(slot.querySelectorAll('.cut')).filter((n) => n !== node).forEach((old) => {
+        old.classList.remove('on')
+        setTimeout(() => old.remove(), 320)
+      })
+    }, at)
+    at += gap
+    gap = Math.round(gap * 1.22)
+  }
+  // 定格到建议那套
+  later(() => {
+    slot.innerHTML = '<img src="' + LOOK2 + '" style="width:100%;height:100%;object-fit:cover">'
+  }, at)
+  reveal(at + 520)
+  return at + 900
+}
+
+/* ============ ② 草图绘制 ============ */
+function dirSketch() {
+  reset()
+  say('在画', 0)
+  slot.innerHTML =
+    '<svg class="sketch" viewBox="0 0 375 300">' +
+    // 上装（短款）
+    '<path id="p1" d="M118 74 L150 62 L225 62 L257 74 L248 132 L127 132 Z"/>' +
+    // 下装（高腰长裤）
+    '<path id="p2" d="M127 140 L248 140 L252 250 L206 250 L200 176 L175 176 L169 250 L123 250 Z"/>' +
+    // 腰线
+    '<path id="p3" d="M120 136 L255 136"/>' +
+    // 比例标注（上短下长的关键）
+    '<path id="p4" class="hint" d="M292 74 L292 250"/>' +
+    '<path id="p5" class="hint" d="M286 74 L298 74"/>' +
+    '<path id="p6" class="hint" d="M286 250 L298 250"/>' +
+    '</svg>'
+  const order = [
+    ['p1', 900, 0], ['p2', 780, 700], ['p3', 320, 1400],
+    ['p4', 420, 1760], ['p5', 180, 2100], ['p6', 180, 2220],
+  ]
+  order.forEach(([id, dur, delay]) => {
+    const node = slot.querySelector('#' + id)
+    const len = node.getTotalLength()
+    node.style.strokeDasharray = len
+    node.style.strokeDashoffset = len
+    anim(node, [{ strokeDashoffset: len }, { strokeDashoffset: 0 }], { duration: dur, delay })
+  })
+  say('就是这套', 2400)
+  reveal(2700)
+  return 3100
+}
+
+/* ============ ③ 自己的衣橱（模拟） ============ */
+function dirWardrobe() {
+  reset()
+  say('在你的衣橱里翻找', 0)
+  const items = [
+    { img: FABRIC, name: '米白针织' },
+    { img: LOOK1, name: '通勤衬衫' },
+    { img: LOOK2, name: '高腰长裤' },
+    { img: FABRIC, name: '橄榄外套' },
+  ]
+  const rack = document.createElement('div')
+  rack.className = 'rack'
+  items.forEach((item, i) => {
+    const row = document.createElement('div')
+    row.className = 'item'
+    row.innerHTML = '<img src="' + item.img + '"><span>' + item.name + '</span>'
+    rack.appendChild(row)
+    later(() => row.classList.add('on'), i * 260)
+  })
+  slot.appendChild(rack)
+  // 挑中其中两件（上 + 下）
+  later(() => {
+    Array.from(rack.children).forEach((node, i) => {
+      if (i === 0 || i === 2) node.classList.add('picked')
+      else node.style.opacity = '.35'
+    })
+  }, items.length * 260 + 240)
+  say('这套可以', items.length * 260 + 340)
+  reveal(items.length * 260 + 900)
+  return items.length * 260 + 1300
+}
+
+/* ============ ④ 杂志排版 ============ */
+function dirCollage() {
+  reset()
+  say('在排版', 0)
+  const sheet = document.createElement('div')
+  sheet.className = 'sheet'
+  sheet.innerHTML =
+    '<div class="el el--title"></div>' +
+    '<div class="el el--sub"></div>' +
+    '<div class="el el--pic"><img src="' + LOOK2 + '"></div>' +
+    '<div class="el el--swatch"><i style="background:#E8E4DC"></i><i style="background:#8E9A83"></i><i style="background:#3F463C"></i></div>' +
+    '<div class="el el--rule"></div>' +
+    '<div class="el el--note"></div>'
+  slot.appendChild(sheet)
+  Array.from(sheet.querySelectorAll('.el')).forEach((node, i) => {
+    const dx = (Math.random() * 2 - 1) * 90
+    const dy = (Math.random() * 2 - 1) * 70
+    const rot = (Math.random() * 2 - 1) * 16
+    anim(node, [
+      { opacity: 0, transform: `translate(${dx}px,${dy}px) rotate(${rot}deg) scale(.94)` },
+      { opacity: 1, transform: 'none' },
+    ], { duration: 460, delay: i * 130 })
+    node.classList.add('on')
+  })
+  say('版面好了', 6 * 130 + 420)
+  reveal(6 * 130 + 800)
+  return 6 * 130 + 1200
+}
+
+/* ============ ⑤ 顾问工作台 ============ */
+function dirDesk() {
+  reset()
+  say('在整理材料', 0)
+  const desk = document.createElement('div')
+  desk.className = 'desk'
+  const tools = [
+    ['tool--swatch', '色卡', 26, 34],
+    ['tool--fabric', '布样', 218, 26],
+    ['tool--tape', '皮尺', 40, 196],
+    ['tool--scissor', '剪刀', 236, 190],
+    ['tool--sketch', '草图', 140, 120],
+  ]
+  tools.forEach(([cls, name, x, y]) => {
+    const node = document.createElement('div')
+    node.className = 'tool ' + cls
+    node.textContent = name
+    node.style.left = x + 'px'
+    node.style.top = y + 'px'
+    desk.appendChild(node)
+    // 散乱 → 归位到桌面底部一排
+    anim(node, [
+      { transform: `translate(${(Math.random() * 2 - 1) * 70}px,${(Math.random() * 2 - 1) * 60}px) rotate(${(Math.random() * 2 - 1) * 30}deg)` },
+      { transform: 'none' },
+    ], { duration: 620 })
+  })
+  slot.appendChild(desk)
+  const homeX = [22, 86, 150, 214, 278]
+  const homeY = 236
+  tools.forEach((_, i) => {
+    const node = desk.children[i]
+    later(() => {
+      anim(node, [
+        { left: node.style.left, top: node.style.top },
+        { left: homeX[i] + 'px', top: homeY + 'px' },
+      ], { duration: 620 })
+      node.style.left = homeX[i] + 'px'
+      node.style.top = homeY + 'px'
+    }, 700 + i * 260)
+  })
+  say('材料齐了', 700 + 5 * 260 + 300)
+  reveal(700 + 5 * 260 + 800)
+  return 700 + 5 * 260 + 1200
+}
+
+/* ============ ⑥ 显影 ============ */
+function dirDevelop() {
+  reset()
+  say('在显影', 0)
+  const dev = document.createElement('div')
+  dev.className = 'dev'
+  dev.innerHTML = '<img src="' + LOOK2 + '">'
+  slot.appendChild(dev)
+  const img = dev.querySelector('img')
+  // 两段：先出轮廓，再出细节——像相纸在药水里慢慢显出来
+  anim(img, [
+    { filter: 'blur(26px) saturate(.15) brightness(1.12)', opacity: .12 },
+    { filter: 'blur(9px) saturate(.6) brightness(1.05)', opacity: .55 },
+    { filter: 'blur(0px) saturate(1) brightness(1)', opacity: 1 },
+  ], { duration: 2600 })
+  say('快好了', 1800)
+  reveal(2700)
+  return 3000
+}
+
+const DIRECTIONS = {
+  cut: {
+    label: '① 成衣快切（现有）', run: dirCut,
+    desc: '<b>爽感</b>：帧率即信息率——开场切得快看不清，逐渐慢到能辨认，最后停住。' +
+      '<b>优点</b>：能量足、短视频语汇。<b>短板</b>：依赖素材质量；两套图循环，看久了会认出来。',
+  },
+  sketch: {
+    label: '② 草图绘制', run: dirSketch,
+    desc: '<b>爽感</b>：看着它被"设计出来"——线条延伸、成形、收笔，绘制过程本身解压。' +
+      '<b>最妙的一点</b>：绘制进度可以真实对应生成进度，画到 60% 就是生成到 60%，' +
+      '不是假循环。<b>零素材</b>，纯 SVG 描边。',
+  },
+  wardrobe: {
+    label: '③ 自己的衣橱（模拟）', run: dirWardrobe,
+    desc: '<b>爽感</b>：画面里是"我的衣服"，代入感比任何精美素材都强。' +
+      '<b>应题度最高</b>：建议本来就该用你自己的衣服搭。<b>前提</b>：依赖衣橱数据，' +
+      '用户没传够衣服时要回落通用素材（此处用现有图模拟）。',
+  },
+  collage: {
+    label: '④ 杂志排版', run: dirCollage,
+    desc: '<b>爽感</b>：元素从散乱飞入归位，秩序从混乱中产生。' +
+      '<b>最契合的一点</b>：动画的终点就是成品——版面排好 = 今天的海报，不存在"演完再切走"。',
+  },
+  desk: {
+    label: '⑤ 顾问工作台', run: dirDesk,
+    desc: '<b>爽感</b>：整理/收纳类 ASMR——看着东西被一件件归位，生理性舒服。' +
+      '<b>优点</b>：顾问的工作过程可视化，素材需求低（工具都是简单几何）。' +
+      '<b>短板</b>：偏安静，是"舒服"不是"爽"。',
+  },
+  develop: {
+    label: '⑥ 显影', run: dirDevelop,
+    desc: '<b>爽感</b>：延迟满足 + 仪式感，揭晓那一瞬最有分量。' +
+      '<b>隐喻精准</b>：显影本来就需要时间——等待不是被浪费的，是物理必需的。' +
+      '<b>零素材</b>：纯 CSS filter。<b>短板</b>：安静、慢，适合优雅不适合爽。',
+  },
+}
+
+function play(key) {
+  const dir = DIRECTIONS[key]
+  if (!dir) return
+  state.dir = key
+  el('dir').value = key
+  el('dirDesc').innerHTML = dir.desc
+  Array.from(el('grid').children).forEach((card) => {
+    card.classList.toggle('on', card.dataset.key === key)
+  })
+  dir.run()
+}
+
+const state = { dir: 'sketch' }
+
+const sel = el('dir')
+Object.keys(DIRECTIONS).forEach((key) => {
+  const opt = document.createElement('option')
+  opt.value = key
+  opt.textContent = DIRECTIONS[key].label
+  sel.appendChild(opt)
+})
+sel.onchange = (e) => play(e.target.value)
+
+const grid = el('grid')
+Object.keys(DIRECTIONS).forEach((key) => {
+  const card = document.createElement('div')
+  card.className = 'card'
+  card.dataset.key = key
+  card.innerHTML = '<b>' + DIRECTIONS[key].label + '</b>' + DIRECTIONS[key].desc
+  card.onclick = () => play(key)
+  grid.appendChild(card)
+})
+
+el('replay').onclick = () => play(state.dir)
+play(state.dir)
+</script>
+</body>
+</html>

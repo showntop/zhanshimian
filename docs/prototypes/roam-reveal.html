@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>等待方式 · 真人逐层显影（机制驱动）</title>
+<style>
+  :root{--ease:cubic-bezier(.2,.8,.2,1);}
+  *{box-sizing:border-box}
+  body{background:#E8E4DC;font-family:system-ui,-apple-system,PingFang SC;margin:0;padding:24px;
+       display:flex;flex-direction:column;align-items:center;gap:14px;color:#3F463C}
+  body.rm *{animation:none !important;transition:none !important}
+
+  .card-wrap{width:750px;height:560px;position:relative;overflow:hidden;border-radius:18px;
+             background:#E8E4DC;box-shadow:0 10px 48px rgba(0,0,0,.13)}
+
+  .stage{position:absolute;inset:0}
+  /* 底层：灰度（未显影） */
+  .gray{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+        filter:grayscale(1) contrast(.92) brightness(1.04)}
+  /* 顶层：彩色，靠 clip-path 从上往下揭示 = 显影 */
+  .color{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+         clip-path:inset(0 0 100% 0);
+         transition:clip-path .48s var(--ease)}
+  .shot{position:absolute;inset:0;will-change:transform,filter}
+  .shot.enter{animation:roll .27s var(--ease)}
+  @keyframes roll{
+    0%{transform:translateY(54px);filter:blur(9px);opacity:.35}
+    100%{transform:none;filter:none;opacity:1}}
+
+  /* ---------- 叠加层 ---------- */
+  .ov{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .34s var(--ease)}
+  .ov.on{opacity:1}
+
+  /* 比例：腰线 + 上下块 + 刻度 */
+  .waist{position:absolute;left:0;right:0;height:2px;
+         background:linear-gradient(90deg,rgba(142,154,131,0),#8E9A83 12%,#8E9A83 88%,rgba(142,154,131,0));
+         box-shadow:0 0 14px rgba(142,154,131,.55);transition:top .5s var(--ease)}
+  .waist::before,.waist::after{content:'';position:absolute;top:-5px;width:2px;height:12px;background:#8E9A83}
+  .waist::before{left:12%} .waist::after{right:12%}
+  .block{position:absolute;left:0;right:0;background:rgba(142,154,131,.10);transition:all .5s var(--ease)}
+  .tick{position:absolute;left:16%;right:16%;height:1px;background:repeating-linear-gradient(90deg,
+        rgba(142,154,131,.55) 0 6px, transparent 6px 12px)}
+
+  /* 颜色：色卡 */
+  .sw{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;gap:9px;padding:0 0 20px}
+  .sw i{width:74px;height:26px;border-radius:7px;box-shadow:0 3px 10px rgba(0,0,0,.14);
+        border:1px solid rgba(255,255,255,.5);transition:transform .42s var(--ease)}
+  .sw i.big{transform:translateY(-7px) scaleY(1.28)}
+
+  /* 设计稿角标 */
+  .corner{position:absolute;font-size:10px;letter-spacing:.14em;color:rgba(255,255,255,.86);
+          background:rgba(63,70,60,.34);padding:3px 8px;border-radius:5px;backdrop-filter:blur(3px)}
+  .c-tl{left:16px;top:16px} .c-br{right:16px;bottom:16px}
+
+  .caption{position:absolute;left:32px;bottom:26px;z-index:9}
+  .caption .c1{font-size:23px;letter-spacing:.13em;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.45)}
+  .caption .c2{margin-top:7px;font-size:11px;letter-spacing:.15em;color:rgba(255,255,255,.82);
+               text-shadow:0 1px 8px rgba(0,0,0,.4)}
+
+  .ctl{display:flex;gap:14px;align-items:center;font-size:14px;flex-wrap:wrap;justify-content:center}
+  button,select{padding:7px 15px;border-radius:9px;border:1px solid #3F463C;background:transparent;
+                color:#3F463C;cursor:pointer;font-size:14px}
+  label{display:inline-flex;gap:6px;align-items:center}
+  .hud{opacity:.65;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+  <div class="card-wrap">
+    <div class="stage">
+      <div class="shot" id="shot">
+        <img class="gray"  id="imgGray">
+        <img class="color" id="imgColor">
+      </div>
+
+      <!-- 比例叠加 -->
+      <div class="ov" id="ovRatio">
+        <div class="block" id="bkUp"></div>
+        <div class="block" id="bkDn"></div>
+        <div class="tick" id="tkUp"></div>
+        <div class="tick" id="tkDn"></div>
+        <div class="waist" id="waist" style="top:52%"></div>
+      </div>
+
+      <!-- 颜色叠加 -->
+      <div class="ov" id="ovColor">
+        <div class="sw" id="sw"></div>
+      </div>
+
+      <div class="corner c-tl" id="cTL">CROQUIS · 01</div>
+      <div class="corner c-br" id="cBR"></div>
+
+      <div class="caption">
+        <div class="c1" id="c1">在看搭配</div>
+        <div class="c2" id="c2">正在为你搭配</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ctl">
+    <button id="replay">重播</button>
+    <select id="cat">
+      <option value="outfit">搭配</option>
+      <option value="ratio">比例</option>
+      <option value="color">颜色</option>
+      <option value="auto" selected>自动轮播</option>
+    </select>
+    <label>停留 <input type="range" id="hold" min="500" max="2200" step="100" value="1100">
+      <span class="hud" id="holdv">1100ms</span></label>
+    <label><input type="checkbox" id="rm"> 减动效</label>
+    <span class="hud" id="hud"></span>
+  </div>
+
+<script>
+/* 状态池：从 20 帧里挑出的「互相差异最大」的 8 个状态（顺序播会有大量近乎静止的切换） */
+const POOL = ['f_01','f_02','f_05','f_08','f_12','f_14','f_17','f_19'];
+const FR = i => 'assets/frames-roam/' + POOL[i] + '.jpg';
+
+const CATS = {
+  outfit:{ name:'搭配', t1:'在看搭配', t2:'正在为你搭配' },
+  ratio: { name:'比例', t1:'在看比例', t2:'腰线在找位置' },
+  color: { name:'颜色', t1:'在看颜色', t2:'配色正在收敛' },
+};
+const SW = ['#C9BBA6','#9A8B72','#6E6350','#B4553C'];
+
+const shot=document.getElementById('shot'), g=document.getElementById('imgGray'), c=document.getElementById('imgColor');
+const ovRatio=document.getElementById('ovRatio'), ovColor=document.getElementById('ovColor');
+const waist=document.getElementById('waist'), bkUp=document.getElementById('bkUp'), bkDn=document.getElementById('bkDn');
+const tkUp=document.getElementById('tkUp'), tkDn=document.getElementById('tkDn');
+const sw=document.getElementById('sw'), c1=document.getElementById('c1'), c2=document.getElementById('c2');
+const cBR=document.getElementById('cBR'), cTL=document.getElementById('cTL');
+const catSel=document.getElementById('cat'), hold=document.getElementById('hold'), rm=document.getElementById('rm');
+
+SW.forEach(h=>{ const i=document.createElement('i'); i.style.background=h; sw.appendChild(i); });
+const swEls=[...sw.children];
+
+let timers=[], idx=0, catIdx=0;
+const clear=()=>{timers.forEach(clearTimeout);timers=[];};
+const later=(fn,ms)=>timers.push(setTimeout(fn,ms));
+
+function setCat(k){
+  const v=CATS[k];
+  c1.textContent=v.t1; c2.textContent=v.t2;
+  cBR.textContent='分类 · '+v.name;
+  ovRatio.classList.toggle('on', k==='ratio');
+  ovColor.classList.toggle('on', k==='color');
+}
+
+function showFrame(i){
+  const src=FR(i);
+  g.src=src; c.src=src;
+  // 显影：彩色层从上往下揭示
+  c.style.transition='none'; c.style.clipPath='inset(0 0 100% 0)';
+  void c.offsetWidth;
+  c.style.transition=''; c.style.clipPath='inset(0 0 0% 0)';
+  // 滚轮：新状态带位移+模糊滑入
+  shot.classList.remove('enter'); void shot.offsetWidth; shot.classList.add('enter');
+  cTL.textContent='CROQUIS · '+String(i+1).padStart(2,'0');
+}
+
+function step(){
+  showFrame(idx);
+  idx=(idx+1)%POOL.length;
+  later(step, +hold.value);
+}
+
+function loopCat(){
+  const keys=['outfit','ratio','color'];
+  setCat(keys[catIdx%3]); catIdx++;
+  later(loopCat, 3000);
+}
+
+/* 比例层：腰线上下游走 */
+let waistOn=null;
+function tickRatio(){
+  if(!ovRatio.classList.contains('on')){ later(tickRatio,600); return; }
+  const t=(Date.now()/6400) % 1;
+  const p=50 + Math.sin(t*Math.PI*2)*8;          // 42% ~ 58%
+  waist.style.top=p+'%';
+  bkUp.style.top='0'; bkUp.style.height=p+'%';
+  bkDn.style.top=p+'%'; bkDn.style.height=(100-p)+'%';
+  tkUp.style.top=(p*0.55)+'%';
+  tkDn.style.top=(p+(100-p)*0.45)+'%';
+  later(tickRatio,60);
+}
+
+/* 颜色层：色卡依次放大 */
+function tickColor(){
+  if(!ovColor.classList.contains('on')){ later(tickColor,600); return; }
+  const n=Math.floor(Date.now()/1100) % swEls.length;
+  swEls.forEach((e,i)=>e.classList.toggle('big', i===n));
+  later(tickColor,300);
+}
+
+function run(){
+  clear(); idx=0; catIdx=0;
+  if(catSel.value==='auto'){ setCat('outfit'); loopCat(); }
+  else setCat(catSel.value);
+  step();
+}
+
+catSel.onchange=run;
+hold.oninput=()=>{document.getElementById('holdv').textContent=hold.value+'ms';
+  document.getElementById('hud').textContent='一轮 '+POOL.length+' 态 ≈ '+(POOL.length*hold.value/1000).toFixed(1)+'s';};
+rm.onchange=()=>document.body.classList.toggle('rm', rm.checked);
+document.getElementById('replay').onclick=run;
+hold.oninput();
+run();
+tickRatio(); tickColor();
+</script>
+</body>
+</html>

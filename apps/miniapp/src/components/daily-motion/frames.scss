@@ -1,0 +1,49 @@
+// 序列帧揭晓（dm-frames）：暖纸递交底 + 逐帧图层。
+// 纸色取自帧序列实测背景（暖褐渐变）——纯色接不住帧里的质感。
+// 硬约束（AGENTS）：一律 rpx；prefers-reduced-motion 归零。
+
+.dm-frames {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  background: linear-gradient(150deg, #ada199 0%, #96908a 52%, #796d5f 100%);
+  animation: dmFramesIn 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  &__img {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    animation: dmFramesIn 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+    // 垫底的前一帧：不出场动画，只负责解码迟到时兜住画面
+    &--under {
+      animation: none;
+      opacity: 1;
+    }
+  }
+}
+
+@keyframes dmFramesIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dm-frames,
+  .dm-frames__img {
+    animation: none;
+    opacity: 1;
+  }
+}

@@ -517,6 +517,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/daily/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 每日内容缓存探测
+         * @description 纯缓存探测（一次 DB 读）：当天已生成时 cache_hit=true、scenario 为当日分类 （客户端直接拉内容不播等待动画）；未命中 cache_hit=false、scenario 为空串， 选题由 generate 阶段的 LLM 决定，客户端播通用过场动画。
+         */
+        post: operations["prepareDaily"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/daily/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 生成今日内容
+         * @description 单次 LLM 调用完成选题与成文（语境驱动：天气/画像/近推历史/收藏信号 + 可选参考事实）。永远返回 200 与内容：source=generated 表示 AI 生成， source=fallback 表示兜底池内容（降级对客户端透明，结构完全一致）。 同一用户同一天幂等：重复调用返回当天已生成的那条。
+         */
+        post: operations["generateDaily"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/daily/collection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 我的手册
+         * @description 收下的内容按保存时间倒序；category 过滤某一格，缺省返回全部。
+         */
+        get: operations["listDailyCollection"];
+        put?: never;
+        /**
+         * 收下今日内容
+         * @description 固化内容副本（服务端按 content_id 取回，不信任客户端文案）与素材引用， 幂等键 (user_id, content_key)：重复收下返回已存在的那条。
+         */
+        post: operations["createDailyCollection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/daily/collection/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 手册分格计数
+         * @description 全部分格（七格 + general）的条数，客户端徽标用它展示。
+         */
+        get: operations["getDailyCollectionStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/daily/collection/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * 移出手册
+         * @description 幂等：已删/不存在同样返回 204。
+         */
+        delete: operations["deleteDailyCollection"];
+        options?: never;
+        head?: never;
+        /**
+         * 推进生命周期或改备注
+         * @description status 走 saved→tried→kept；note 覆盖用户备注。字段缺省表示不修改。
+         */
+        patch: operations["updateDailyCollection"];
+        trace?: never;
+    };
     "/v1/shares": {
         parameters: {
             query?: never;
@@ -1346,6 +1454,159 @@ export interface components {
             day_type: string;
             /** @description 日程识别结果 */
             schedule: string;
+        };
+        DailyPrepare: {
+            /** Format: date */
+            gen_date: string;
+            /** @description cache_hit=true 时为当日内容分类（信息性）；未命中为空串 */
+            scenario: string;
+            cache_hit: boolean;
+            /** @description 等待期（roam）脚本；未命中时才需要播。命中当天内容时也会下发 （只带 params.variant），供客户端提前预载换装素材——缓存命中的 日子没有等待期，generate 一返回就进收敛，预载晚一步就只能回落 序列帧揭晓 */
+            presentation?: components["schemas"]["DailyPresentation"];
+        };
+        DailyGenerateResult: {
+            /**
+             * @description generated=AI 基于知识事实生成；fallback=兜底池内容（结构完全一致）
+             * @enum {string}
+             */
+            source: "generated" | "fallback";
+            content: components["schemas"]["DailyContent"];
+            /** @description 收敛 + 揭晓（settle/reveal）脚本；定格的那一套就是 content 本身 */
+            presentation?: components["schemas"]["DailyPresentation"];
+        };
+        DailyPresentation: {
+            /** @description 脚本协议版本；客户端遇到不认识的版本按无脚本处理 */
+            version: number;
+            /** @description 按数组顺序播放 */
+            stages: components["schemas"]["DailyStage"][];
+        };
+        DailyStage: {
+            /**
+             * @description roam=等待期（可循环）；settle=内容到位后；reveal=揭晓
+             * @enum {string}
+             */
+            phase: "roam" | "settle" | "reveal";
+            /** @description 能力名（sketch_tour / frames / roam_tour / converge / sweep / develop / dress_lock …）。sketch_tour=巡游主题逐笔画出（params.themes）； frames=序列帧揭晓（params.urls + interval_ms + hold_ms，逐帧播完 定格再揭晓海报）；dress_lock=换装洗牌收敛（params.target 四维 语义值 look/color/waist/hair + params.pace + params.assets.base）， 客户端不认识时按既有纪律回落，不空白。 */
+            kind: string;
+            /** @description converge 用：形态渲染器名（outfit_blocks / ratio_blocks / swatch_bars / silhouette_shape …）。变体空间由它自己定义。 */
+            form?: string;
+            /** @description kind 与 form 自己解释的参数，服务端不校验语义 */
+            params?: {
+                [key: string]: unknown;
+            };
+            asset?: components["schemas"]["DailyMotionAsset"];
+            /** @description 本阶段时长（roam 用；settle 的时长由 params.tempo 决定） */
+            duration_ms?: number;
+            /** @description 循环次数；0 或省略表示无限循环直到被打断 */
+            repeat?: number;
+            /** @description 本阶段配的短文案（如「在看颜色」），由服务端给，客户端不写死 */
+            label?: string;
+        };
+        DailyMotionAsset: {
+            /** @description 远程素材地址（https）。主包只有几十 KB 余量且首页是 tab 页不能进分包， 所以序列帧 / Lottie 只能走 CDN；客户端在它就绪前用 CSS 形态顶上。 */
+            url: string;
+            /** @enum {string} */
+            kind: "lottie" | "sprite" | "still";
+            frames?: number;
+            fps?: number;
+            w?: number;
+            h?: number;
+        };
+        DailyContentVisual: {
+            /** @enum {string} */
+            modality: "swatch" | "compare" | "diagram" | "photo" | "video" | "generated" | "poster";
+            /** @description 程序化视觉的绘制参数；由客户端窄化解析，解析不出降级 alt */
+            spec: {
+                [key: string]: unknown;
+            };
+            /** @description 无障碍/无图时的文字兜底 */
+            alt: string;
+        };
+        DailyContent: {
+            /** Format: uuid */
+            id: string;
+            type: components["schemas"]["DailyContentType"];
+            /** @description 选题（杂志式标题，通用内容，不个性化） */
+            topic: string;
+            lead: string;
+            /** @description 适配说明：唯一被个性化的部分，已按该用户形象基因渲染 */
+            fit_text: string;
+            why: string;
+            visual: components["schemas"]["DailyContentVisual"];
+            asset: components["schemas"]["CollectionCategory"];
+            /** @description 内容去重键；收藏的 content_key */
+            dedupe_key: string;
+        };
+        /** @enum {string} */
+        DailyContentType: "color" | "silhouette" | "proportion" | "fabric" | "item" | "occasion" | "howto" | "hair" | "makeup" | "accessory" | "general";
+        /** @enum {string} */
+        CollectionCategory: "color" | "fit" | "proportion" | "fabric" | "occasion" | "howto" | "outfit" | "hair" | "makeup" | "accessory" | "general";
+        /** @enum {string} */
+        CollectionStatus: "saved" | "tried" | "kept";
+        ContentSnapshot: {
+            /** Format: uuid */
+            id: string;
+            type: components["schemas"]["DailyContentType"];
+            topic: string;
+            lead: string;
+            /** @description 收下那一刻已渲染的适配说明（内容池迭代不影响） */
+            fitText: string;
+            why: string;
+            visual: components["schemas"]["DailyContentVisual"];
+            category: components["schemas"]["CollectionCategory"];
+        };
+        CollectionAsset: {
+            /** @enum {string} */
+            kind: "colors" | "media" | "wardrobe_item" | "wardrobe_outfit" | "plan" | "product";
+            /** @description kind=colors 时的色值列表 */
+            colors?: string[];
+            media_id?: string;
+            /** @enum {string} */
+            role?: "cover" | "figure" | "video";
+            item_id?: string;
+            outfit_id?: string;
+            plan_id?: string;
+            source?: string;
+            ref?: string;
+        };
+        SavedContext: {
+            temperature?: number;
+            condition?: string;
+            dayType?: string;
+            season?: string;
+            city?: string;
+            schedule?: string;
+        };
+        DailyCollection: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            content_id: string;
+            content_key: string;
+            category: components["schemas"]["CollectionCategory"];
+            status: components["schemas"]["CollectionStatus"];
+            note: string;
+            title: string;
+            summary: string;
+            content_snapshot: components["schemas"]["ContentSnapshot"];
+            assets: components["schemas"]["CollectionAsset"][];
+            context: components["schemas"]["SavedContext"];
+            /** Format: date-time */
+            saved_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        DailyCollectionStats: {
+            counts: {
+                color: number;
+                fit: number;
+                proportion: number;
+                fabric: number;
+                occasion: number;
+                howto: number;
+                outfit: number;
+            };
+            total: number;
         };
         TodayPlan: {
             /** Format: uuid */
@@ -3276,6 +3537,221 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope"] & {
                         data: components["schemas"]["TodayPlan"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    prepareDaily: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description 覆盖城市（选填） */
+                    city?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 缓存探测结果 */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["DailyPrepare"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    generateDaily: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description 天气语境的城市（选填，缺省用服务端默认城市） */
+                    city?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 今日内容（generated 或 fallback） */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["DailyGenerateResult"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listDailyCollection: {
+        parameters: {
+            query?: {
+                category?: components["schemas"]["CollectionCategory"];
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 收藏列表 */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["DailyCollection"][];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createDailyCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    content_id: string;
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 已收下（重复收下返回既有条目） */
+            201: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["DailyCollection"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getDailyCollectionStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分类计数 */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["DailyCollectionStats"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteDailyCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 收藏条目 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已移出 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateDailyCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 收藏条目 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    status?: components["schemas"]["CollectionStatus"];
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 更新后的收藏 */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["DailyCollection"];
                     };
                 };
             };

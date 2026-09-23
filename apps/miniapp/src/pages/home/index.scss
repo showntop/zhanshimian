@@ -1,8 +1,14 @@
-// 首页样式（恢复 09-11 旧线视觉）：hero 锚点 + 分区规则线 + 次级入口降权重。
+// 首页样式（09-20 编辑式重设计）：巨号衬线日期锚点 + 出血 hero + 拱形照片窗 +
+// 不规则比例条 + 不对称工具网格。构图层大胆破格，元素层严守 token（同语法异构图）。
 // hero 文字一律 cream（card--hero 已设基色），这里只补排版细节。
 // 与旧线的两处适配：图片组件换成 SourceImage（内部类 .source-image__img，
 // 角标 .example-badge / 弱化 .example-soft 由组件按 source_kind 投影，页面只调位置）；
 // 新 AppHeader 占位精确到导航底边，不再需要用负 margin 抵消旧头部间距。
+
+// 编辑式破色：陶土橘只做句读、比例条末段这类 <5% 面积的点缀（不走警示红，红线 1）。
+// 页面级色值沿用现有先例（工具卡/场景格的低饱和hex），不进全局 token——破色只属首页。
+$clay: #c4693b;
+
 .home {
   display: flex;
   flex-direction: column;
@@ -13,7 +19,7 @@
     gap: 10rpx;
     // 导航下净距 = spacer 24rpx + 此处 4rpx ≈ 旧线 28rpx；
     // 各页顶距统一收在 spacer，页面根节点不再自叠
-    padding: 4rpx 8rpx 28rpx;
+    padding: 4rpx 8rpx 36rpx;
 
     &-top {
       display: flex;
@@ -28,14 +34,40 @@
       letter-spacing: 0;
     }
 
-    &-date {
+    &-week {
       font-size: 22rpx;
       color: var(--ink-3);
     }
 
+    // 编辑式锚点：巨号衬线日期居左，问候语沉到右下角对齐日期基线——
+    // 一屏第一眼的"杂志页眉"，替代旧版左对齐小字堆叠
+    &-anchor {
+      display: flex;
+      align-items: flex-end;
+      gap: 24rpx;
+      margin-top: 14rpx;
+    }
+
+    &-date {
+      flex-shrink: 0;
+      font-size: 104rpx;
+      line-height: 0.92;
+      letter-spacing: -3rpx;
+      color: var(--moss-deep);
+      font-variant-numeric: tabular-nums;
+    }
+
+    // 句读破色：整屏最小的一粒陶土橘，给巨号日期一个停顿
+    &-dot {
+      color: $clay;
+    }
+
     &-title {
-      padding: 0;
+      flex: 1;
+      min-width: 0;
+      padding: 0 0 10rpx;
       margin: 0;
+      font-size: 36rpx;
     }
   }
 
@@ -55,6 +87,13 @@
       margin: 0 0 14rpx;
       font-size: 32rpx;
     }
+
+    // 首页的规则线比全局版更有"笔触"：更粗、渐变淡出收尾，避免过于几何的点缀感
+    .section-rule {
+      width: 72rpx;
+      height: 6rpx;
+      background: linear-gradient(90deg, var(--moss) 0%, var(--moss) 52%, rgba(90, 125, 74, 0) 100%);
+    }
   }
 
   // ---------- hero 主卡（每页至多一个视觉锚点） ----------
@@ -64,6 +103,13 @@
     gap: 24rpx;
     padding: 36rpx 32rpx;
     margin-top: 8rpx;
+    position: relative;
+    overflow: hidden;
+    // 双向柔光"着色"：左上打光、右下压暗——深绿卡从实色块变成有体积的空间，
+    // 不用投影堆层次（层次靠光，不靠叠）
+    background-image:
+      radial-gradient(130% 100% at 14% -12%, rgba(238, 240, 236, 0.14) 0%, rgba(238, 240, 236, 0) 54%),
+      radial-gradient(90% 72% at 108% 112%, rgba(24, 31, 19, 0.34) 0%, rgba(24, 31, 19, 0) 62%);
 
     &-eyebrow {
       font-size: 24rpx;
@@ -264,6 +310,32 @@
     }
   }
 
+  // 今日造型 hero：右侧出血到屏边 + 照片升格为"拱形窗"（顶左满圆、底左小圆角）。
+  // 全屏只此一处出血破格——非平衡焦点，替代旧版"矩形卡旁贴矩形图"的硬拼。
+  // 注意与 --photo 同特异性，靠书写次序压过它（--today 必须在 --photo 之后）。
+  &__hero--today {
+    position: relative;
+    align-items: stretch;
+    min-height: 344rpx;
+    margin-right: calc(-1 * var(--page-gutter));
+    padding: 40rpx 264rpx 40rpx 36rpx;
+    border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+
+    .home__hero-copy {
+      justify-content: center;
+    }
+
+    .home__hero-img {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 232rpx;
+      height: auto;
+      border-radius: 200rpx 0 0 var(--radius-md);
+    }
+  }
+
   // ---------- 回访无今日方案：本人照片成为唯一视觉焦点 ----------
   &__hero--report {
     flex-direction: column;
@@ -367,7 +439,132 @@
     font-variant-numeric: tabular-nums;
   }
 
-  // ---------- 工具（1 张发型主卡 + 2 张安静卡；三色区分 + 场景风线稿图标） ----------
+  // ---------- 每日内容（今天这一条）----------
+  // 已改为海报式（图文同层、承载块跟随文字），样式收在 components/daily-poster/index.scss
+
+  // 巡游/收敛与海报同区同宽：一样出血通栏，避免揭晓时宽度跳一下。
+  // 高度写死是因为动画区是"占位"的——海报上屏时高度必须一致，否则会抖。
+  &__daily-waiting {
+    height: 520rpx;
+    margin-left: -32rpx;
+    margin-right: -32rpx;
+    border-radius: 24rpx;
+    background: var(--moss-soft);
+    overflow: hidden;
+  }
+
+  // 换装洗牌卡是 750×560（原型尺寸），比通用动画区高 40rpx——
+  // 沿用 520 会把卡底（含盖章）裁掉，落地保留时尤其明显。
+  &--dress {
+    height: 560rpx;
+  }
+
+  // 洗牌落地保留时，内容海报退到卡片下方的引导条（主入口仍在今日页）。
+  // 有边界 + 副提示 + 箭头，比单纯一行更像「下一步」；面板落定后淡入。
+  &__daily-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16rpx;
+    margin-top: 24rpx;
+    padding: 20rpx 24rpx;
+    border: 2rpx solid var(--line, rgba(63, 70, 60, 0.14));
+    border-radius: 18rpx;
+    background: var(--paper, #fff);
+  }
+
+  &__daily-entry--in {
+    animation: home-entry-in 0.42s ease-out 0.3s both;
+  }
+
+  &__daily-entry-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 6rpx;
+    min-width: 0;
+  }
+
+  &__daily-entry-label {
+    font-size: 26rpx;
+    font-weight: 700;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 460rpx;
+  }
+
+  &__daily-entry-hint {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__daily-entry-link {
+    flex-shrink: 0;
+    font-size: 25rpx;
+    font-weight: 700;
+    color: var(--moss);
+    animation: home-entry-nudge 2.6s ease-in-out 1s infinite;
+  }
+
+  // 报告退位：不再是首页主角，入口降级为一行
+  // 进展感锚点 = 不规则比例条 + 衬线数字 + 小后缀（编辑式"数据注脚"）
+  &__archive {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 20rpx;
+    padding: 12rpx 6rpx;
+  }
+
+  &__archive-text {
+    font-size: 26rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__archive-meta {
+    display: flex;
+    align-items: center;
+    gap: 6rpx;
+  }
+
+  // 比例节奏条：宽度刻意不规则（88/36/64/28/52/44rpx），条数=可提升点数；
+  // 首段 moss-deep 定调、中段安静、末段陶土橘破色收尾
+  &__archive-bars {
+    display: flex;
+    align-items: center;
+    gap: 6rpx;
+    margin-right: 12rpx;
+  }
+
+  &__archive-bar {
+    height: 8rpx;
+    border-radius: 999rpx;
+    background: var(--disabled);
+
+    &--lead {
+      background: var(--moss-deep);
+    }
+
+    &--tail {
+      background: $clay;
+    }
+  }
+
+  &__archive-num {
+    color: var(--moss-deep);
+    font-size: 36rpx;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__archive-suffix {
+    font-size: 21rpx;
+    color: var(--ink-3);
+  }
+
+  // ---------- 工具（1 张拱形主卡 + 2 张错位安静卡；三色区分 + 场景风线稿图标） ----------
   &__tools {
     display: flex;
     flex-wrap: wrap;
@@ -386,12 +583,16 @@
     overflow: hidden;
     background: var(--moss-soft);
 
-    // 三色区分（与场景格同一低饱和色系）：全部 moss-soft 看起来死板
+    // 不对称双卡：outfit 略宽压住视觉重心，purchase 窄一档并下沉错位 + 右下单角拱——
+    // 等宽并排是"货架"，错位才是"版面"
     &--outfit {
+      flex: 1.32;
       background: #e8e4e6;
     }
 
     &--purchase {
+      margin-top: 28rpx;
+      border-radius: var(--radius-lg) var(--radius-lg) 64rpx var(--radius-lg);
       background: #ede7db;
     }
 
@@ -437,6 +638,8 @@
       height: 238rpx;
       justify-content: flex-end;
       padding: 32rpx 46% 30rpx 28rpx;
+      // 右上 128rpx 大拱角：工具区的不对称签名，照片随卡缘裁切自然入拱
+      border-radius: var(--radius-lg) 128rpx var(--radius-lg) var(--radius-lg);
       background: #d9e2d1;
       isolation: isolate;
 
@@ -833,6 +1036,28 @@
   }
 }
 
+@keyframes home-entry-in {
+  from {
+    opacity: 0;
+    transform: translateY(10rpx);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// 箭头轻推：视线引导，幅度刻意很小（不做“跳来跳去”的召唤）
+@keyframes home-entry-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(6rpx);
+  }
+}
+
 @keyframes home-badge-live {
   0%,
   100% {
@@ -847,5 +1072,13 @@
 @media (prefers-reduced-motion: reduce) {
   .home__tool-badge--live {
     animation: none;
+  }
+
+  // 引导条必须可见：只停动画，不做位移/透明
+  .home__daily-entry--in,
+  .home__daily-entry-link {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }

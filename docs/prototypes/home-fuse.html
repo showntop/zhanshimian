@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>白色卡片如何融进视觉区</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#5E665D; --ink3:#8A9189;
+  --moss:#587344; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.13);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E4E6E2;color:var(--ink);-webkit-font-smoothing:antialiased;padding:26px 22px 60px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-size:21px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.75;max-width:930px}
+.tabs{display:flex;gap:7px;margin:18px 0 16px;flex-wrap:wrap}
+.tab{padding:8px 15px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  color:var(--ink2);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--moss-deep);border-color:var(--moss-deep);color:var(--cream)}
+.main{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+.stage{display:none}.stage.on{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+
+.phone{width:375px;flex:0 0 375px;background:var(--bg);border-radius:30px;overflow:hidden;
+  box-shadow:0 18px 46px rgba(45,58,35,.20)}
+.sb{height:42px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:12px;font-weight:600}
+.sig{display:flex;gap:4px;align-items:center}
+.sig i{width:4px;height:8px;background:var(--ink);border-radius:1px;display:block}
+.sig i:nth-child(4){height:6px;opacity:.4}
+.navbar{display:flex;align-items:center;justify-content:space-between;padding:4px 20px 0}
+.brand{font-size:17px;font-weight:700}.brand .up{color:var(--ink)}.brand .look{color:var(--moss)}
+.right{font-size:11px;color:var(--ink3)}
+.greet{padding:14px 20px 0}
+.gt{display:flex;align-items:baseline;justify-content:space-between}
+.gk{font-size:12px;font-weight:600;color:var(--ink2)}
+.gd{font-size:11px;color:var(--ink3)}
+.gtitle{margin-top:4px;font-size:18px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+
+/* ========== 共用：视觉元素 ========== */
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.42;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.28'/></svg>")}
+.vtag{position:absolute;top:13px;left:18px;z-index:9;padding:4px 10px;border-radius:999px;
+  background:rgba(30,35,29,.38);color:var(--cream);font-size:10px;font-weight:700;
+  letter-spacing:.5px;backdrop-filter:blur(10px)}
+.vseq{position:absolute;right:18px;bottom:14px;z-index:9;font-size:10.5px;font-weight:700;
+  color:rgba(32,35,32,.40);font-variant-numeric:tabular-nums;letter-spacing:.6px}
+.sw i{position:absolute;border-radius:4px;display:block;
+  box-shadow:0 10px 24px rgba(45,58,35,.16);animation:float 7s ease-in-out infinite}
+.sw i:nth-child(1){width:31%;height:44%;left:5%;top:22%;transform:rotate(-4deg);animation-delay:0s}
+.sw i:nth-child(2){width:24%;height:33%;left:38%;top:12%;transform:rotate(3deg);animation-delay:1.1s}
+.sw i:nth-child(3){width:20%;height:28%;left:35%;top:52%;transform:rotate(-2deg);animation-delay:2.2s}
+.sw i:nth-child(4){width:26%;height:36%;right:-6%;top:38%;transform:rotate(5deg);animation-delay:3.3s}
+.sw i.hero{width:34%;height:52%;left:9%;top:20%;transform:rotate(-3deg);z-index:5;
+  box-shadow:0 0 0 2px var(--moss),0 16px 34px rgba(45,58,35,.22)}
+@keyframes float{0%,100%{translate:0 0}50%{translate:0 -7px}}
+.title{font-size:22px;line-height:1.22;font-weight:700;letter-spacing:-.7px}
+.title .dim{color:var(--ink3)}
+.hook{margin-top:7px;font-size:12.5px;line-height:1.6;color:var(--ink2)}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:13px}
+.cta{padding:9px 15px;border-radius:999px;background:var(--moss-deep);color:var(--cream);
+  font-size:12.5px;font-weight:700;border:0;font-family:inherit;cursor:pointer}
+.more{font-size:11.5px;font-weight:600;color:var(--moss)}
+@keyframes fog1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(34px,28px) scale(1.10)}}
+@keyframes fog2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-28px,22px) scale(1.08)}}
+
+/* ================= A 渐变延续：无卡片 ================= */
+.a-hero{position:relative;margin-top:14px;
+  /* 背景从上到下连续：视觉色 → 过渡 → 页面背景。没有任何一步是突变的 */
+  background:linear-gradient(180deg,#E5E9DE 0%,#EAEEE4 30%,#EFF1EC 55%,#F2F4F0 76%,var(--bg) 100%)}
+.a-fog{position:absolute;border-radius:50%;mix-blend-mode:multiply;opacity:.8}
+.a-vis{position:relative;height:236px;overflow:visible}  /* 色雾不裁，可飘到文字区 */
+.a-fogwrap{position:absolute;inset:0;overflow:hidden;pointer-events:none}  /* 只裁色雾的溢出，不裁它向下 */
+.a-el{position:absolute;inset:0;overflow:hidden}  /* 主体元素裁在视觉区内 */
+.a-text{position:relative;z-index:4;padding:6px 20px 20px}
+
+/* ================= B 元素跨界 ================= */
+.b-hero{position:relative;margin-top:14px;
+  background:linear-gradient(180deg,#E5E9DE 0%,#EAEEE4 30%,#EFF1EC 55%,#F2F4F0 76%,var(--bg) 100%)}
+.b-fogwrap{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.b-el{position:relative;height:236px;overflow:hidden}
+/* 跨界元素：放在 hero 层，不被 236px 裁掉，一直伸到文字区 */
+.b-cross{position:absolute;z-index:3;border-radius:4px;
+  box-shadow:0 12px 28px rgba(45,58,35,.18);animation:float 7.6s ease-in-out infinite}
+.b-cross.c1{width:22%;left:6%;top:150px;height:150px;transform:rotate(-6deg);background:#FBFBF8}
+.b-cross.c2{width:15%;left:30%;top:196px;height:112px;transform:rotate(4deg);background:#EFEADC;opacity:.92}
+/* 文字让开左侧跨界元素 */
+.b-text{position:relative;z-index:5;padding:6px 20px 20px 20px}
+.b-text.pad{padding-left:34%}
+
+/* ================= C 斜切咬合 ================= */
+.c-hero{position:relative;margin-top:14px}
+.c-vis{position:relative;height:238px;overflow:hidden;
+  background:linear-gradient(150deg,#E7EBE1 0%,#DFE5D8 60%,#E8ECE2 100%);
+  /* 底部斜切：边界线本身被设计，不是直线 */
+  clip-path:polygon(0 0,100% 0,100% 90%,0 100%)}
+.c-text{position:relative;margin-top:-16px;padding:14px 20px 20px;
+  background:linear-gradient(180deg,#F1F3EE 0%,var(--bg) 88%);
+  clip-path:polygon(0 0,100% 10%,100% 100%,0 100%)}
+
+/* ================= D 现状对照：白卡咬合 ================= */
+.d-hero{position:relative;margin-top:14px}
+.d-vis{position:relative;height:236px;overflow:hidden;
+  background:linear-gradient(150deg,#E7EBE1 0%,#DFE5D8 60%,#E8ECE2 100%)}
+.d-card{margin:-22px 14px 0;background:#fff;border-radius:14px;padding:15px 16px 14px;
+  box-shadow:0 8px 22px rgba(52,59,47,.13)}
+
+.below{padding:20px 16px 24px}
+.bh{font-size:16px;font-weight:700;margin-bottom:8px}
+.brule{width:24px;height:2px;background:var(--moss);margin-bottom:11px}
+.brow{display:flex;gap:8px;margin-bottom:8px}
+.bph{flex:1;height:56px;border-radius:10px;background:rgba(105,115,100,.10)}
+.bph.l{height:86px}
+
+.note{flex:1;min-width:300px;max-width:470px}
+.note h3{font-size:17px;font-weight:700}
+.note .sub2{font-size:12px;color:var(--moss);font-weight:600;margin:4px 0 13px}
+.note dl{border-top:1px solid var(--line);padding-top:12px}
+.note dt{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-top:12px}
+.note dt:first-child{margin-top:0}
+.note dd{font-size:12.5px;line-height:1.78;color:var(--ink);margin-top:3px}
+.goodline{margin-top:14px;padding:11px 13px;border-radius:10px;background:rgba(88,115,68,.10);
+  font-size:12px;line-height:1.7;color:#3D5230}
+.warnline{margin-top:12px;padding:11px 13px;border-radius:10px;background:rgba(126,84,69,.08);
+  font-size:12px;line-height:1.7;color:#6A4B3E}
+code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:rgba(105,115,100,.12);padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>白色卡片如何融进视觉区</h1>
+  <p class="sub">咬合（hinge）这个手法天然就是"两个物体叠在一起"——那道白色矩形边界，就是"贴上去"的证据。
+    要真正一体，得让<b>背景连续、元素跨界、边界消失</b>。三个方案递进：A 背景连续 → B 元素也跨界 → C 边界被设计成斜线。</p>
+
+  <div class="tabs">
+    <button class="tab on" data-stage="a">A 渐变延续</button>
+    <button class="tab" data-stage="b">B 元素跨界</button>
+    <button class="tab" data-stage="c">C 斜切咬合</button>
+    <button class="tab" data-stage="d">D 现状对照</button>
+  </div>
+
+  <div class="main">
+    <!-- ===== A ===== -->
+    <div class="stage on" id="stage-a">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet"><div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div></div>
+
+        <div class="a-hero">
+          <div class="a-fogwrap">
+            <div class="a-fog" style="width:290px;height:290px;left:-80px;top:-100px;background:radial-gradient(circle,rgba(198,216,186,.75),rgba(198,216,186,0) 70%);animation:fog1 26s ease-in-out infinite"></div>
+            <div class="a-fog" style="width:250px;height:250px;right:-70px;top:40px;background:radial-gradient(circle,rgba(228,221,201,.7),rgba(228,221,201,0) 70%);animation:fog2 33s ease-in-out infinite"></div>
+          </div>
+          <div class="a-vis">
+            <div class="a-el">
+              <div class="sw">
+                <i class="hero" style="background:#FBFBF8"></i>
+                <i style="background:#F2F4F1"></i>
+                <i style="background:#EFEADC"></i>
+                <i style="background:#E6DECD"></i>
+              </div>
+              <div class="grain"></div>
+            </div>
+            <div class="vtag">色卡</div>
+            <div class="vseq">09 / 24</div>
+          </div>
+          <div class="a-text">
+            <div class="title">冬天的白，<span class="dim">不止一种</span></div>
+            <div class="hook">你是冷调肤色，挑白色先看它是偏蓝还是偏黄。</div>
+            <div class="foot"><button class="cta">收进我的色卡</button><span class="more">今日页看完整 ›</span></div>
+          </div>
+        </div>
+
+        <div class="below"><div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div></div>
+      </div>
+      <div class="note">
+        <h3>A · 渐变延续</h3><div class="sub2">取消卡片，让背景自己流下来</div>
+        <dl>
+          <dt>做法</dt><dd>整个 hero 是一个容器，背景是一条从上到下的连续渐变：<br>
+            <code>视觉色 → 过渡 → 页面背景</code>。<b>没有白色矩形、没有圆角、没有阴影</b>。</dd>
+          <dt>关键：色雾不被裁</dt><dd>主体元素裁在 236px，但<b>色雾是 hero 层</b>，可以一直飘到文字区。所以视觉区和文字区之间<b>没有一条线</b>，只有色彩的渐变。</dd>
+          <dt>可读性怎么保</dt><dd>文字从 236px 之后开始，此时背景已经渐变到 <code>#EFF1EC</code> 附近——深字落在浅底上，和之前白卡一样安全，但你看不出底在哪换的。</dd>
+          <dt>代价</dt><dd>hero 和下方区块之间只剩留白作分隔，层次感比白卡弱。好处是<b>它不再像一个"组件"，而是页面顶端的一段色彩场</b>——特殊性反而更强。</dd>
+        </dl>
+        <div class="goodline">这是最彻底的一体化：<b>不存在"卡片"这个物体</b>，只有一段渐变的场，视觉在上面、文字在下面。</div>
+      </div>
+    </div>
+
+    <!-- ===== B ===== -->
+    <div class="stage" id="stage-b">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet"><div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div></div>
+
+        <div class="b-hero">
+          <div class="b-fogwrap">
+            <div class="a-fog" style="width:290px;height:290px;left:-80px;top:-100px;background:radial-gradient(circle,rgba(198,216,186,.75),rgba(198,216,186,0) 70%);animation:fog1 26s ease-in-out infinite"></div>
+            <div class="a-fog" style="width:250px;height:250px;right:-70px;top:40px;background:radial-gradient(circle,rgba(228,221,201,.7),rgba(228,221,201,0) 70%);animation:fog2 33s ease-in-out infinite"></div>
+          </div>
+          <div class="b-el">
+            <div class="sw">
+              <i class="hero" style="background:#FBFBF8"></i>
+              <i style="background:#F2F4F1"></i>
+            </div>
+            <div class="grain"></div>
+            <div class="vtag">色卡</div>
+            <div class="vseq">09 / 24</div>
+          </div>
+          <!-- 跨界：布样从视觉区伸进文字区，文字让开左侧 -->
+          <div class="b-cross c1"></div>
+          <div class="b-cross c2"></div>
+          <div class="b-text pad">
+            <div class="title">冬天的白，<span class="dim">不止一种</span></div>
+            <div class="hook">你是冷调肤色，挑白色先看它是偏蓝还是偏黄。</div>
+            <div class="foot"><button class="cta">收进我的色卡</button><span class="more">今日页看完整 ›</span></div>
+          </div>
+        </div>
+
+        <div class="below"><div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div></div>
+      </div>
+      <div class="note">
+        <h3>B · 元素跨界</h3><div class="sub2">视觉主体伸进文字区，文字让开</div>
+        <dl>
+          <dt>做法</dt><dd>在 A 的基础上，让两片布样<b>不被 236px 裁掉</b>——它们放在 hero 层，一直伸到文字区（150px → 300px）。</dd>
+          <dt>文字让开左边</dt><dd>文字区 <code>padding-left:34%</code>，从跨界元素右侧开始。<b>图和字是并置交织的，不是上下两块。</b></dd>
+          <dt>为什么这一体感最强</dt><dd>因为有<b>遮挡关系</b>——布样压在文字区的背景上。只要有一件东西跨越了原来的边界，"两个物体"的错觉就消失了。</dd>
+          <dt>风险</dt><dd>① 文字宽度被压缩到 66%，长标题要断更多行；② 跨界元素在内容很长的那天会和文字打架，<b>需要按内容长度限制跨界深度</b>。</dd>
+        </dl>
+        <div class="warnline">B 最强，也最脆。它依赖"文字不太长"这个前提。稳妥做法是：<b>A 打底，B 只在标题短于 N 字时启用。</b></div>
+      </div>
+    </div>
+
+    <!-- ===== C ===== -->
+    <div class="stage" id="stage-c">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet"><div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div></div>
+
+        <div class="c-hero">
+          <div class="c-vis">
+            <div class="a-fog" style="width:290px;height:290px;left:-80px;top:-100px;background:radial-gradient(circle,rgba(198,216,186,.75),rgba(198,216,186,0) 70%);animation:fog1 26s ease-in-out infinite"></div>
+            <div class="sw">
+              <i class="hero" style="background:#FBFBF8"></i>
+              <i style="background:#F2F4F1"></i>
+              <i style="background:#EFEADC"></i>
+              <i style="background:#E6DECD"></i>
+            </div>
+            <div class="grain"></div>
+            <div class="vtag">色卡</div>
+            <div class="vseq">09 / 24</div>
+          </div>
+          <div class="c-text">
+            <div class="title">冬天的白，<span class="dim">不止一种</span></div>
+            <div class="hook">你是冷调肤色，挑白色先看它是偏蓝还是偏黄。</div>
+            <div class="foot"><button class="cta">收进我的色卡</button><span class="more">今日页看完整 ›</span></div>
+          </div>
+        </div>
+
+        <div class="below"><div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div></div>
+      </div>
+      <div class="note">
+        <h3>C · 斜切咬合</h3><div class="sub2">边界本身被设计成一条斜线</div>
+        <dl>
+          <dt>做法</dt><dd>两块都用 <code>clip-path</code>：视觉区底部斜切（右低左高），文字区顶部斜切补上，两者交叠 16px。<br>
+            交界线是一条 <b>7% 落差的斜线</b>，不是水平线。</dd>
+          <dt>为什么斜线有用</dt><dd>眼睛对水平线极其敏感——一条水平线就是"这里是两个东西"。斜线会打散这个判断，读起来像<b>一块被折过的纸</b>。</dd>
+          <dt>和 A 的区别</dt><dd>A 是<b>没有边界</b>；C 是<b>有边界，但边界是设计过的</b>。C 保留了"两层"的层次感，同时不显得是贴上去的。</dd>
+          <dt>成本最低</dt><dd>只改 <code>clip-path</code>，不动结构、不影响可读性、不依赖文字长度。<b>三个方案里最稳的。</b></dd>
+        </dl>
+        <div class="goodline">如果 B 的风险不能接受，我推荐 <b>C</b>：改动最小，且"贴卡片"的感觉立刻消失。</div>
+      </div>
+    </div>
+
+    <!-- ===== D ===== -->
+    <div class="stage" id="stage-d">
+      <div class="phone">
+        <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+        <div class="greet"><div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+          <div class="gtitle">晚上好，继续今天的形象计划</div></div>
+
+        <div class="d-hero">
+          <div class="d-vis">
+            <div class="a-fog" style="width:290px;height:290px;left:-80px;top:-100px;background:radial-gradient(circle,rgba(198,216,186,.75),rgba(198,216,186,0) 70%);animation:fog1 26s ease-in-out infinite"></div>
+            <div class="sw">
+              <i class="hero" style="background:#FBFBF8"></i>
+              <i style="background:#F2F4F1"></i>
+              <i style="background:#EFEADC"></i>
+              <i style="background:#E6DECD"></i>
+            </div>
+            <div class="grain"></div>
+            <div class="vtag">色卡</div>
+            <div class="vseq">09 / 24</div>
+          </div>
+          <div class="d-card">
+            <div class="title">冬天的白，<span class="dim">不止一种</span></div>
+            <div class="hook">你是冷调肤色，挑白色先看它是偏蓝还是偏黄。</div>
+            <div class="foot"><button class="cta">收进我的色卡</button><span class="more">今日页看完整 ›</span></div>
+          </div>
+        </div>
+
+        <div class="below"><div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+          <div class="bph l"></div><div class="brow"><div class="bph"></div><div class="bph"></div></div></div>
+      </div>
+      <div class="note">
+        <h3>D · 现状对照</h3><div class="sub2">白卡咬合 —— 你现在看到的</div>
+        <dl>
+          <dt>问题在哪</dt><dd>三处同时宣告"这是两个东西"：<br>
+            ① 白色矩形边界（和下方的工具卡是同一种白）<br>
+            ② 14px 圆角（和工具卡的圆角一样大）<br>
+            ③ 投影 <code>0 8px 22px</code>（明确说"我浮在上面"）</dd>
+          <dt>为什么必然显得"贴"</dt><dd>咬合只解决了<b>位置</b>（上移 22px 压住照片），没解决<b>材质</b>。它还是一张白卡，只是位置高了一点。</dd>
+          <dt>和工具卡的冲突</dt><dd>最要命的一点：这张卡和下面的"发型设计""穿搭诊断"<b>用的是同一套白卡语言</b>。主角卡和配角卡一个样，那它就只是"第一张配角卡"。</dd>
+        </dl>
+        <div class="warnline">对照 A/C 看就明白了：<b>一体化的关键不是位置，是让 hero 不再拥有一张"卡"的外形。</b></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('.tab')
+  if (!t) return
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('on', b === t))
+  document.querySelectorAll('.stage').forEach((s) => s.classList.toggle('on', s.id === 'stage-' + t.dataset.stage))
+})
+</script>
+</body>
+</html>

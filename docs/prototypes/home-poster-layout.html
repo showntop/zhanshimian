@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>海报式布局 · 修正版</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#5E665D; --ink3:#8A9189;
+  --moss:#587344; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.13);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E4E6E2;color:var(--ink);-webkit-font-smoothing:antialiased;padding:26px 22px 60px}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:21px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.75;max-width:960px}
+.ctrl{display:flex;gap:7px;margin:16px 0;flex-wrap:wrap;align-items:center}
+.ctrl .lb{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-right:2px}
+.btn{padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn.on{background:var(--moss-deep);border-color:var(--moss-deep);color:var(--cream)}
+.main{display:flex;gap:30px;align-items:flex-start;flex-wrap:wrap}
+
+.phone{background:var(--bg);border-radius:30px;overflow:hidden;position:relative;flex:0 0 auto;
+  box-shadow:0 18px 46px rgba(45,58,35,.20);transition:height .3s}
+.phone[data-size="se"]{width:320px;height:568px}
+.phone[data-size="14"]{width:390px;height:844px}
+.phone[data-size="max"]{width:428px;height:926px}
+.sb{display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:12px;font-weight:600}
+.phone[data-size="se"] .sb{height:20px}
+.phone[data-size="14"] .sb,.phone[data-size="max"] .sb{height:47px}
+.sig{display:flex;gap:4px;align-items:center}
+.sig i{width:4px;height:8px;background:var(--ink);border-radius:1px;display:block}
+.sig i:nth-child(4){height:6px;opacity:.4}
+.navbar{display:flex;align-items:center;justify-content:space-between;padding:2px 20px 0}
+.phone[data-size="se"] .navbar{padding:2px 16px 0}
+.brand{font-size:16px;font-weight:700}.brand .up{color:var(--ink)}.brand .look{color:var(--moss)}
+.right{font-size:10.5px;color:var(--ink3)}
+.greet{padding:12px 20px 0}
+.phone[data-size="se"] .greet{padding:10px 16px 0}
+.gt{display:flex;align-items:baseline;justify-content:space-between}
+.gk{font-size:11.5px;font-weight:600;color:var(--ink2)}
+.gd{font-size:10.5px;color:var(--ink3)}
+.gtitle{margin-top:4px;font-size:17px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+.phone[data-size="se"] .gtitle{font-size:16px}
+
+.hero{position:relative;margin-top:12px}
+.hero.deep{background:linear-gradient(180deg,#3E4B36 0%,#44513B 30%,#8E9A86 56%,#EFF1EC 76%,var(--bg) 100%)}
+.hero.paper{background:linear-gradient(180deg,#2E3A27 0%,#38452F 26%,#EDEFE9 60%,#F2F4F0 84%,var(--bg) 100%)}
+.hero.warm{background:linear-gradient(180deg,#EFEDE6 0%,#EAE8DF 34%,#EFEFE9 62%,#F2F4F0 84%,var(--bg) 100%)}
+
+.vis{position:relative;overflow:visible}
+.phone[data-size="se"] .vis{height:178px}
+.phone[data-size="14"] .vis{height:236px}
+.phone[data-size="max"] .vis{height:262px}
+.elwrap{position:absolute;inset:0;overflow:hidden}
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.4;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.28'/></svg>")}
+.vtag{position:absolute;top:12px;left:18px;z-index:9;padding:4px 10px;border-radius:999px;
+  background:rgba(30,35,29,.38);color:var(--cream);font-size:10px;font-weight:700;
+  letter-spacing:.5px;backdrop-filter:blur(10px)}
+.vseq{position:absolute;right:18px;bottom:12px;z-index:9;font-size:10px;font-weight:700;
+  color:rgba(32,35,32,.34);font-variant-numeric:tabular-nums;letter-spacing:.6px}
+
+.p{position:absolute;border-radius:5px;display:block;
+  box-shadow:inset 0 0 0 1px rgba(32,40,28,.07),0 10px 24px rgba(45,58,35,.17)}
+.p.hero{box-shadow:inset 0 0 0 1px rgba(88,115,68,.5),0 0 0 2px var(--moss),0 16px 34px rgba(45,58,35,.24)}
+.p .no{position:absolute;left:6px;bottom:4px;font-size:8.5px;font-weight:700;
+  color:rgba(40,48,36,.36);letter-spacing:.4px}
+/* 跨界元素：与布局计算解耦，位置全部由 JS 给出 */
+.x{position:absolute;z-index:3;border-radius:5px;
+  box-shadow:inset 0 0 0 1px rgba(32,40,28,.07),0 14px 30px rgba(45,58,35,.19)}
+.cut{position:absolute;z-index:2;width:1px;
+  background:linear-gradient(180deg,rgba(88,115,68,0),rgba(88,115,68,.45) 30%,rgba(88,115,68,.10))}
+
+.text{position:relative;z-index:6}
+.title{font-size:22px;line-height:1.24;font-weight:700;letter-spacing:-.7px}
+.phone[data-size="se"] .title{font-size:19px}
+.title .dim{color:var(--ink3)}
+.hook{margin-top:7px;font-size:12.5px;line-height:1.62;color:var(--ink2)}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.cta{padding:9px 15px;border-radius:999px;background:var(--moss-deep);color:var(--cream);
+  font-size:12.5px;font-weight:700;border:0;font-family:inherit;cursor:pointer;white-space:nowrap}
+.more{font-size:11.5px;font-weight:600;color:var(--moss);white-space:nowrap}
+
+/* 调试层：默认彻底不可见 */
+.guides{position:absolute;inset:0;z-index:20;pointer-events:none;display:none}
+.guides.on{display:block}
+.gline{position:absolute;left:0;right:0;height:1px;background:rgba(200,60,60,.6)}
+.gline.b{background:rgba(50,110,200,.75)}
+.glabel{position:absolute;right:2px;font-size:9px;font-weight:700;color:#fff;
+  background:rgba(200,60,60,.92);padding:1px 4px;border-radius:3px;transform:translateY(-50%)}
+.gline.b .glabel{background:rgba(50,110,200,.92)}
+.safe{position:absolute;top:0;bottom:0;display:none;
+  background:repeating-linear-gradient(45deg,rgba(50,110,200,.10) 0 5px,transparent 5px 10px);
+  border-left:1px dashed rgba(50,110,200,.7)}
+.guides.on .safe{display:block}
+
+.below{padding:16px 16px 20px}
+.bh{font-size:15px;font-weight:700;margin-bottom:7px}
+.brule{width:22px;height:2px;background:var(--moss);margin-bottom:10px}
+.brow{display:flex;gap:8px;margin-bottom:8px}
+.bph{flex:1;height:52px;border-radius:10px;background:rgba(105,115,100,.11)}
+.bph.l{height:80px}
+
+.note{flex:1;min-width:310px;max-width:530px}
+.note h3{font-size:17px;font-weight:700}
+.note .sub2{font-size:12px;color:var(--moss);font-weight:600;margin:4px 0 13px}
+.note dl{border-top:1px solid var(--line);padding-top:12px}
+.note dt{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-top:12px}
+.note dt:first-child{margin-top:0}
+.note dd{font-size:12.5px;line-height:1.78;color:var(--ink);margin-top:3px}
+table{border-collapse:collapse;width:100%;margin-top:8px;font-size:12px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line)}
+th{font-size:10.5px;color:var(--ink3);font-weight:700}
+.fix{margin-top:14px;padding:11px 13px;border-radius:10px;background:rgba(88,115,68,.10);
+  font-size:12px;line-height:1.75;color:#3D5230}
+.warnline{margin-top:12px;padding:11px 13px;border-radius:10px;background:rgba(126,84,69,.08);
+  font-size:12px;line-height:1.7;color:#6A4B3E}
+code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:rgba(105,115,100,.12);padding:1px 5px;border-radius:4px}
+.fog{position:absolute;border-radius:50%;mix-blend-mode:multiply;opacity:.8;pointer-events:none}
+@keyframes fog1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(34px,28px) scale(1.10)}}
+@keyframes fog2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-28px,22px) scale(1.08)}}
+@keyframes float{0%,100%{translate:0 0}50%{translate:0 -7px}}
+@keyframes sweep{0%{translate:-30% 0}55%,100%{translate:220% 0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>海报式布局 · 修正版</h1>
+  <p class="sub">修掉了三个 bug：① 跨界元素<b>封顶</b>，不再溢到下方区块；② 跨界与文字<b>横向分离</b>，各占一边不打架；
+    ③ 安全区斜纹只在<b>开调试时才出现</b>，默认不可见。另外换掉了"冬天的白"——白/米白在浅底上没有对比，不是好例子。</p>
+
+  <div class="ctrl">
+    <span class="lb">内容</span>
+    <button class="btn on" data-c="palette">你的色域</button>
+    <button class="btn" data-c="shape">版型</button>
+    <button class="btn" data-c="fabric">面料</button>
+    <span class="lb" style="margin-left:10px">屏幕</span>
+    <button class="btn" data-s="se">SE 568</button>
+    <button class="btn on" data-s="14">14 · 844</button>
+    <button class="btn" data-s="max">Max 926</button>
+    <span class="lb" style="margin-left:10px">文案</span>
+    <button class="btn on" data-t="short">短</button>
+    <button class="btn" data-t="long">长</button>
+    <button class="btn" id="gbtn">调试线</button>
+  </div>
+
+  <div class="main">
+    <div class="phone" id="phone" data-size="14">
+      <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+      <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+      <div class="greet"><div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+        <div class="gtitle">晚上好，继续今天的形象计划</div></div>
+
+      <div class="hero" id="hero">
+        <div class="vis" id="vis">
+          <div class="elwrap" id="elwrap"></div>
+          <div class="vtag" id="vtag">色卡</div>
+          <div class="vseq">09 / 24</div>
+        </div>
+        <div class="text" id="text"></div>
+        <div class="guides" id="guides"></div>
+      </div>
+
+      <div class="below">
+        <div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+        <div class="bph l"></div>
+        <div class="brow"><div class="bph"></div><div class="bph"></div></div>
+        <div class="brow"><div class="bph"></div><div class="bph"></div></div>
+      </div>
+    </div>
+
+    <div class="note">
+      <h3>三处修正</h3>
+      <div class="sub2">跨界只需要"跨过"，不需要"深入"</div>
+      <dl>
+        <dt>① 跨界封顶</dt><dd>跨界元素底部一律 <code>≤ hero 底 − 16px</code>，JS 里做 clamp。它<b>永远不可能</b>盖住下方区块。</dd>
+        <dt>② 横向分离</dt><dd>跨界元素只占一侧（<b>48%–76%</b> 或 <b>70%–92%</b>），文字容器另一侧留 <code>padding-right</code>。
+          各占一边，不靠 z-index 硬压。</dd>
+        <dt>③ 探出多少</dt><dd>只探出视觉区边界 <b>56px</b>。上一版探了 100+px，那是"深入"不是"跨越"——
+          <b>跨界的作用是打破那条线，不是占领文字区。</b></dd>
+        <dt>④ 调试线隔离</dt><dd>安全区、尺寸线全部移进 <code>.guides</code>，默认 <code>display:none</code>。点「调试线」才出现。</dd>
+      </dl>
+
+      <h3 style="margin-top:22px">换掉例子的原因</h3>
+      <dl>
+        <dt>色卡类不能用白色系内容</dt><dd>"冬天的白"——色片就是白、米白，<b>在绿白背景上等于没有对比</b>，看着像几片空纸。
+          色卡这个视觉的价值就是"颜色"，内容必须选<b>有明暗或色相差</b>的。</dd>
+        <dt>这版的例子</dt><dd>「你的色域」——冷调皮肤适合的一组颜色，色片之间有<b>明确的明暗和冷暖差</b>，深浅错落之后视觉立刻成立。</dd>
+        <dt>如果一定要做"冬天的白"</dt><dd>那就得像色卡实物那样：<b>深底 + 细描边 + 色号</b>。色片上加 <code>no</code> 那样的编号，靠形制而非颜色建立识别。</dd>
+      </dl>
+
+      <h3 style="margin-top:22px">高度（不变）</h3>
+      <table>
+        <tr><th>屏幕</th><th>视觉区</th><th>hero</th><th>占屏</th><th>下方可见</th></tr>
+        <tr><td>SE 568</td><td><b>178</b></td><td>~322</td><td>57%</td><td>~140 · 1 行</td></tr>
+        <tr><td>14 · 844</td><td><b>236</b></td><td>~392</td><td><b>46%</b></td><td>~300 · 2–3 行</td></tr>
+        <tr><td>Max 926</td><td><b>262</b></td><td>~420</td><td>45%</td><td>~370 · 3 行</td></tr>
+      </table>
+      <div class="fix">硬指标：<b>切任何内容、任何屏幕，下方都要露出一个完整入口。</b>
+        点「调试线」能看到红线标在 hero 底 —— 它永远在线框之上，不会越界。</div>
+      <div class="warnline">剩下一个真风险：跨界元素和标题<b>横向</b>不冲突了，但如果标题特别长（&gt;18 字）会把文字区顶高，
+        hero 占比可能超 50%。长文案下我会让<b>跨界深度从 56px 收到 32px</b>，腾出高度。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const OVERLAP_SHORT = 56, OVERLAP_LONG = 32   // 探出视觉区的深度：长文案收窄
+
+const CONTENT = {
+  palette: {
+    cls: 'paper', tag: '色卡',
+    title: '你的色域，<span class="dim">是偏冷的</span>',
+    titleLong: '你的色域是偏冷的，<span class="dim">这让很多颜色都好挑</span>',
+    hook: '这组颜色贴着你的皮肤都不会打架。',
+    hookLong: '这组颜色贴着你的皮肤都不会打架，深浅之间还能自由叠穿。',
+    cta: '收进我的色卡',
+    side: 'right',
+    els: [
+      {w:'30%', h:'46%', l:'6%',  t:'16%', rot:-5, bg:'#2F4A57', z:5, hero:1, no:'01'},
+      {w:'22%', h:'34%', l:'40%', t:'10%', rot:4,  bg:'#5C7E88', no:'02'},
+      {w:'17%', h:'24%', l:'41%', t:'52%', rot:-3, bg:'#A8BEC0', no:'03'},
+      {w:'24%', h:'40%', l:'64%', t:'30%', rot:6,  bg:'#D8E0DC', no:'04'},
+    ],
+    cut: {l:'52%', top:'34%', h:'150px', rot:8},
+    cross: {side:'right', l:'70%', w:'22%', h:118, rot:-6, bg:'#7E9AA2', no:'05'},
+  },
+  shape: {
+    cls: 'deep', tag: '版型',
+    title: '落肩正在抹掉<span class="dim">你的肩线</span>',
+    titleLong: '落肩的流行，正在<span class="dim">悄悄抹掉</span>你本来就不宽的肩线',
+    hook: '你肩偏窄，选肩缝正好落在肩点的。',
+    hookLong: '你肩偏窄、骨架偏小。落肩会把本来就不宽的肩再吃掉一层，上半身的框架就没了。',
+    cta: '收进我的版型库',
+    side: 'right',
+    svg: true,
+    cross: {side:'right', l:'72%', w:'20%', h:126, rot:5, bg:'#2B3524'},
+    cut: {l:'46%', top:'42%', h:'136px', rot:-6},
+  },
+  fabric: {
+    cls: 'warm', tag: '面料',
+    title: '光泽会<span class="dim">放大体积</span>',
+    titleLong: '光泽这种东西，其实会<span class="dim">悄悄放大</span>你的体积',
+    hook: '你骨架偏小，光泽留一处就够。',
+    hookLong: '你骨架偏小。硬挺的厚面料会自己撑出形状；有光泽的面料会把边界往外推，留一处就够。',
+    cta: '收进我的面料库',
+    side: 'right',
+    els: [
+      {w:'36%', h:'48%', l:'5%',  t:'20%', rot:-4, bg:'#63685E', fiber:1},
+      {w:'28%', h:'40%', l:'47%', t:'12%', rot:5,  bg:'#8B9A82', fiber:1, sheen:1},
+    ],
+    cross: {side:'right', l:'74%', w:'18%', h:110, rot:-7, bg:'#78866F', fiber:1},
+    cut: {l:'58%', top:'36%', h:'140px', rot:-9},
+  },
+}
+
+let cur = 'palette', long = false
+
+const visH = () => {
+  const s = document.getElementById('phone').dataset.size
+  return s === 'se' ? 178 : s === 'max' ? 262 : 236
+}
+
+function render() {
+  const c = CONTENT[cur]
+  const hero = document.getElementById('hero')
+  hero.className = 'hero ' + c.cls
+  const vh = visH()
+
+  // ---- 视觉区内主体元素 ----
+  let html = ''
+  if (c.svg) {
+    html += `<svg viewBox="0 0 390 240" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">
+      <path d="M 34 76 Q 98 64 138 90 L 158 162" fill="none" stroke="rgba(238,240,236,.34)" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 5"/>
+      <path d="M 172 60 L 248 56 L 258 168" fill="none" stroke="#EEF0EC" stroke-width="2.4" stroke-linecap="round"/>
+      <line x1="248" y1="44" x2="248" y2="190" stroke="rgba(88,115,68,.55)" stroke-width="1" stroke-dasharray="3 4"/>
+    </svg>`
+  }
+  ;(c.els || []).forEach((e) => {
+    html += `<div class="p${e.hero ? ' hero' : ''}" style="width:${e.w};height:${e.h};left:${e.l};top:${e.t};
+      transform:rotate(${e.rot}deg);background:${e.bg};${e.z ? 'z-index:' + e.z + ';' : ''}${e.fiber ? 'overflow:hidden;' : ''}">
+      ${e.no ? `<span class="no">${e.no}</span>` : ''}
+      ${e.fiber ? `<div style="position:absolute;inset:0;opacity:.5;background-image:url(&quot;data:image/svg+xml;utf8,<svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;200&#39; height=&#39;200&#39;><filter id=&#39;f&#39;><feTurbulence type=&#39;fractalNoise&#39; baseFrequency=&#39;0.02 0.85&#39; numOctaves=&#39;4&#39; seed=&#39;7&#39;/><feColorMatrix type=&#39;saturate&#39; values=&#39;0&#39;/></filter><rect width=&#39;200&#39; height=&#39;200&#39; filter=&#39;url(%23f)&#39; opacity=&#39;0.5&#39;/></svg>&quot;)"></div>` : ''}
+      ${e.sheen ? `<div style="position:absolute;top:-60%;left:-40%;width:70%;height:220%;transform:rotate(18deg);background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.62) 50%,rgba(255,255,255,0));animation:sweep 6.5s ease-in-out infinite"></div>` : ''}
+    </div>`
+  })
+  html += `<div class="grain" style="${c.cls === 'deep' || c.cls === 'paper' ? 'opacity:.22' : ''}"></div>`
+  document.getElementById('elwrap').innerHTML = html
+  document.getElementById('vtag').textContent = c.tag
+
+  // ---- 文字（先渲染，才能测量高度来 clamp 跨界元素）----
+  const t = document.getElementById('text')
+  const padSide = c.side === 'right' ? 'padding:20px 32% 20px 20px' : 'padding:20px 20px 20px 32%'
+  t.innerHTML = `<div style="position:relative;${padSide}">
+      <div class="title">${long ? c.titleLong : c.title}</div>
+      <div class="hook">${long ? c.hookLong : c.hook}</div>
+      <div class="foot"><button class="cta">${c.cta}</button><span class="more">今日页看完整 ›</span></div>
+    </div>`
+
+  // ---- 跨界元素：探出 56px，且底部 clamp 在 hero 内 ----
+  document.querySelectorAll('.x,.cut').forEach((n) => n.remove())
+  const overlap = long ? OVERLAP_LONG : OVERLAP_SHORT
+  const heroH = hero.getBoundingClientRect().height
+  const xTop = vh - overlap
+  const maxBottom = heroH - 16
+  let xh = '', crossBottom = null
+  if (c.cross) {
+    const h = Math.max(60, Math.min(c.cross.h, maxBottom - xTop))
+    crossBottom = xTop + h
+    xh += `<div class="x" style="left:${c.cross.l};width:${c.cross.w};top:${xTop}px;height:${h}px;
+      transform:rotate(${c.cross.rot}deg);background:${c.cross.bg};${c.cross.fiber ? 'overflow:hidden' : ''}">
+      ${c.cross.fiber ? `<div style="position:absolute;inset:0;opacity:.45;background-image:url(&quot;data:image/svg+xml;utf8,<svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;200&#39; height=&#39;200&#39;><filter id=&#39;f2&#39;><feTurbulence type=&#39;fractalNoise&#39; baseFrequency=&#39;0.02 0.85&#39; numOctaves=&#39;4&#39; seed=&#39;3&#39;/><feColorMatrix type=&#39;saturate&#39; values=&#39;0&#39;/></filter><rect width=&#39;200&#39; height=&#39;200&#39; filter=&#39;url(%23f2)&#39; opacity=&#39;0.5&#39;/></svg>&quot;)"></div>` : ''}
+    </div>`
+  }
+  if (c.cut) {
+    const cTop = parseInt(c.cut.top)
+    xh += `<div class="cut" style="left:${c.cut.l};top:${cTop}px;height:${Math.max(40, Math.min(parseInt(c.cut.h), maxBottom - cTop))}px;transform:rotate(${c.cut.rot}deg)"></div>`
+  }
+  hero.insertAdjacentHTML('beforeend', xh)
+
+  drawGuides(crossBottom, vh, heroH)
+}
+
+/* 调试层：所有数值都相对 hero 顶部，和元素的定位坐标系一致 */
+function drawGuides(crossBottom, vh, heroH) {
+  const g = document.getElementById('guides'), phone = document.getElementById('phone')
+  const pr = phone.getBoundingClientRect(), hr = document.getElementById('hero').getBoundingClientRect()
+  const heroTop = hr.top - pr.top
+  const side = CONTENT[cur].side
+  const safeStyle = side === 'right' ? 'left:68%;right:0' : 'left:0;right:68%'
+  g.innerHTML =
+    `<div class="safe" style="${safeStyle}"></div>` +
+    `<div class="gline" style="top:${heroTop + vh}px"><span class="glabel">视觉区 ${vh}px</span></div>` +
+    (crossBottom != null ? `<div class="gline b" style="top:${heroTop + crossBottom}px"><span class="glabel">跨界底 ${Math.round(crossBottom)} ≤ hero 底 ${Math.round(heroH - 16)}</span></div>` : '') +
+    `<div class="gline" style="top:${hr.bottom - pr.top}px"><span class="glabel">hero ${Math.round(hr.height)}px · 占屏 ${Math.round(hr.height / pr.height * 100)}%</span></div>`
+}
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.btn')
+  if (!b) return
+  if (b.dataset.c) { cur = b.dataset.c; document.querySelectorAll('[data-c]').forEach(x => x.classList.toggle('on', x === b)); render() }
+  if (b.dataset.s) { document.getElementById('phone').dataset.size = b.dataset.s; document.querySelectorAll('[data-s]').forEach(x => x.classList.toggle('on', x === b)); setTimeout(render, 320) }
+  if (b.dataset.t) { long = b.dataset.t === 'long'; document.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x === b)); render() }
+  if (b.id === 'gbtn') { b.classList.toggle('on'); document.getElementById('guides').classList.toggle('on'); render() }
+})
+window.addEventListener('load', render)
+render()
+</script>
+</body>
+</html>

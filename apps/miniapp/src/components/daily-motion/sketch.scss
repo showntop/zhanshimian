@@ -1,0 +1,97 @@
+// 草图巡游（dm-sketch）：纸面网格 + canvas 线稿 + 进度点 + 标签 + 日期编号。
+// 线条与颜色在 sketch.tsx 的 canvas 里；这里只有「纸」与「注脚」。
+// 硬约束（AGENTS）：一律 rpx；prefers-reduced-motion 归零。
+
+.dm-sketch {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transition: opacity 0.36s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  // 揭晓递交：停笔定格、整体淡出，把画面让给序列帧
+  &.is-fading {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  // 极淡网格：铺底，消除大片空白的「空」感
+  &__grid {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    pointer-events: none;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(55, 62, 52, 0.06) 0 2rpx, transparent 2rpx 52rpx),
+      repeating-linear-gradient(90deg, rgba(55, 62, 52, 0.06) 0 2rpx, transparent 2rpx 52rpx);
+  }
+
+  &__canvas {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  // 画面锚点：左上角日期编号（与海报的日期编号同一语言）
+  &__mark {
+    position: absolute;
+    top: 28rpx;
+    left: 36rpx;
+    z-index: 2;
+    font-size: 20rpx;
+    font-weight: 700;
+    letter-spacing: 3rpx;
+    color: rgba(63, 70, 60, 0.36);
+  }
+
+  // 分类进度点：巡游到第几个方向，也顺带填掉底部空白
+  &__dots {
+    position: absolute;
+    right: 0;
+    bottom: 64rpx;
+    left: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    gap: 18rpx;
+  }
+
+  &__dot {
+    width: 10rpx;
+    height: 10rpx;
+    border-radius: 50%;
+    background: rgba(63, 70, 60, 0.18);
+    transition: background 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    &.is-on {
+      background: rgba(63, 70, 60, 0.6);
+    }
+  }
+
+  &__label {
+    position: absolute;
+    bottom: 28rpx;
+    left: 36rpx;
+    z-index: 2;
+    font-size: 22rpx;
+    letter-spacing: 4rpx;
+    color: rgba(63, 70, 60, 0.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dm-sketch {
+    transition: none;
+  }
+
+  .dm-sketch__dot {
+    transition: none;
+  }
+}

@@ -348,6 +348,101 @@ export const HOME_COPY = {
   wardrobeEntryDesc: '让方案用上你已有的衣服'
 } as const
 
+// ---------- 每日内容（今天这一条） ----------
+// 红线沿用：不评价身体、不制造清单式压迫、不做连续天数与断签提醒。
+// 池子不够时宁可不推，也不用「塞衣角」这类通用条目凑数。
+export const DAILY_COPY = {
+  eyebrow: '今天这一条',
+  // 等待动画：巡游的文案优先用服务端随脚本下发的那份（改文案不用发版）；
+  // 收敛这两句是过程状态，与具体分类无关，所以留在客户端。
+  motionSettling: '在为你挑',
+  motionLocked: '就是这套',
+  // 换装洗牌（原型 daily-dressup-asset.html）：试衣间文案 + 揭晓面板
+  dressCaptionIdle: '今天穿什么',
+  dressCaptionSub: '正在为你搭配',
+  dressCaptionSettled: '今天这一身',
+  dressRevealTitle: '今天这一身',
+  dressRevealSub: 'uplook · 为你搭好的一身',
+  dressRevealGhost: 'TODAY · ONE LOOK',
+  dressStamp: '今日',
+  // 洗牌落地后：内容海报退到卡片下方的一行入口（内容主入口仍在今日页）
+  dressContentLabel: '今日内容',
+  // 引导进今日页：页里有「为什么这样搭」+ 收进手册，文案按页内实有的东西写
+  dressContentHint: '为什么这样搭，都写在里面',
+  dressContentLink: '看今日详情 ›',
+  // 巡游内置主题：巡游是通用内容，不该等网络才有——prepare 没回来时（首屏
+  // loading）也要立刻有东西可播，否则等待期会退成「一个圆圈」，像卡住了。
+  // 服务端脚本到达后覆盖这份；form 名要与 daily-motion/forms.tsx 的注册表对上。
+  motionRoamThemes: [
+    { form: 'swatch_bars', label: '在看颜色' },
+    { form: 'silhouette_shape', label: '在看版型' },
+    { form: 'ratio_blocks', label: '在看比例' },
+    { form: 'texture_lines', label: '在看面料' },
+    { form: 'scene_panel', label: '在看场合' },
+    { form: 'fold_lines', label: '在看穿法' },
+    { form: 'outfit_blocks', label: '在看搭配' },
+    { form: 'silhouette_shape', label: '在看发型' },
+    { form: 'swatch_bars', label: '在看妆容' },
+    { form: 'outfit_blocks', label: '在看配饰' },
+  ],
+  handbookTitle: '我的手册',
+  handbookEntry: '我的手册',
+  handbookEntryDesc: '收下的每一条，都在这里',
+  seeItAction: '看看我穿这样 ›',
+  // 按钮统一「收下」：分类名里的"场合 / 技巧"组合成「收进我的场合」会拗口。
+  // 分类在手册里呈现，toast 补一句「已收进 · 颜色」。
+  saveAction: '收下',
+  savedToastPrefix: '已收进 · ',
+  // 已收下后按钮置为已完成态（今日页）
+  savedPrefix: '已收进 · ',
+  // 兜底内容的角标：内容来源不同（服务端 source=fallback），不写「AI 生成」
+  fallbackBadge: '今日精选',
+  // 离线：本地有缓存就直接呈现；无缓存给静默文案 + 下一步动作
+  offlineTitle: '今天的内容还没取到',
+  offlineBody: '网络恢复后重新进入，或先看看收下的手册。',
+  retryAction: '重新加载 ›',
+  emptyTitle: '今天没有可推的内容',
+  emptyBody: '内容池在当前条件下没有合适的条目。宁可不推，也不凑数。',
+  handbookEmptyTitle: '手册还是空的',
+  handbookEmptyBody: '收下今天这一条，手册就开始变厚了。',
+  // 手册的分类：去掉"库"字、用两个字的常用词，不用"色卡 / 廓形"这类专业词。
+  // 「色卡」和「配色库」用户分不清，合并为「颜色」。
+  bucketNames: {
+    color: '颜色',
+    fit: '版型',
+    proportion: '比例',
+    fabric: '面料',
+    occasion: '场合',
+    howto: '技巧',
+    outfit: '搭配',
+    hair: '发型',
+    makeup: '妆容',
+    accessory: '配饰',
+    general: '综合',
+  },
+  typeNames: {
+    color: '颜色',
+    silhouette: '版型',
+    proportion: '比例',
+    fabric: '面料',
+    item: '单品',
+    occasion: '场合',
+    howto: '技巧',
+    hair: '发型',
+    makeup: '妆容',
+    accessory: '配饰',
+    general: '综合',
+  },
+} as const
+
+export function dailyBucketName(bucket: string): string {
+  return DAILY_COPY.bucketNames[bucket as keyof typeof DAILY_COPY.bucketNames] ?? '手册'
+}
+
+export function dailyTypeName(type: string): string {
+  return DAILY_COPY.typeNames[type as keyof typeof DAILY_COPY.typeNames] ?? ''
+}
+
 // ---------- 首页任务完成轻提醒 ----------
 // 轮询到终态时按 kind（render 再按 subject_type）给具体文案；execution_feedback 是后台写入，不打扰。
 export const TASK_DONE_COPY = {

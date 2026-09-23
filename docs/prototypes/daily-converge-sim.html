@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>每日内容 · 收敛动画模拟器（5 种爽感方案）</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#626862; --ink3:#686D67;
+  --moss:#587344; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.12); --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E4E6E2;color:var(--ink);-webkit-font-smoothing:antialiased;padding:22px 20px 60px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:12.5px;color:var(--ink2);margin-top:6px;line-height:1.7;max-width:860px}
+.main{display:flex;gap:26px;align-items:flex-start;margin-top:18px;flex-wrap:wrap}
+
+/* ---------- 手机 ---------- */
+.phone{width:375px;flex:0 0 375px;background:var(--bg);border-radius:30px;overflow:hidden;
+  box-shadow:0 18px 46px rgba(45,58,35,.20)}
+.sb{height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:11.5px;font-weight:600}
+.navbar{display:flex;align-items:center;justify-content:space-between;padding:2px 20px 0}
+.brand{font-size:16.5px;font-weight:700}.brand .look{color:var(--moss)}
+.greet{padding:14px 20px 0}
+.gk{font-size:11.5px;font-weight:600;color:var(--ink2)}
+.gtitle{margin-top:4px;font-size:18px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+.dcard{position:relative;margin-top:14px}
+.stage{position:relative;height:300px;overflow:hidden;
+  background:linear-gradient(150deg,#F3F5F0 0%,#E9EEE6 52%,#F1F2EC 100%)}
+.blob{position:absolute;border-radius:50%;opacity:.9}
+.b1{width:280px;height:280px;left:-70px;top:-90px;
+  background:radial-gradient(circle,rgba(197,215,185,.85) 0%,rgba(197,215,185,0) 70%);
+  animation:drift1 23s ease-in-out infinite}
+.b2{width:250px;height:250px;right:-70px;top:60px;
+  background:radial-gradient(circle,rgba(227,220,200,.8) 0%,rgba(227,220,200,0) 70%);
+  animation:drift2 29s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,26px) scale(1.1)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-26px,20px) scale(1.08)}}
+
+.layer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.layer--g2{opacity:0}.layer--g1{opacity:0}
+.cap{position:absolute;left:20px;bottom:16px;font-size:11px;font-weight:600;color:var(--ink3);
+  letter-spacing:.5px;z-index:6}
+.badge{position:absolute;left:20px;top:14px;z-index:8;padding:4px 10px;border-radius:999px;
+  background:rgba(30,35,29,.40);color:var(--cream);font-size:10.5px;font-weight:700;
+  backdrop-filter:blur(10px);opacity:0;transition:opacity .3s var(--ease)}
+.badge.on{opacity:1}
+
+/* 各方案用到的容器 */
+.sl{display:flex;align-items:center;justify-content:center;height:100%;position:relative;width:100%}
+.fz{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;will-change:filter,opacity}
+.sh{position:absolute;inset:0;display:flex;align-items:center;overflow:hidden}
+.sh__row{display:flex;gap:14px;align-items:center;will-change:transform}
+.sh__card{flex:0 0 132px;height:216px;border-radius:12px;background:#fff;
+  box-shadow:0 6px 18px rgba(45,58,35,.10);display:flex;align-items:center;justify-content:center;
+  transition:opacity .2s var(--ease)}
+.cv{position:absolute;inset:0}
+
+/* ---------- 质感：素材到位前的观感近似 ----------
+   没有素材时几何块是纯色扁平的，观感差一个量级。这里用内阴影做出体积、
+   用噪点做出材质，至少能判断「有质感之后是什么水平」。 */
+.stage.tex [class*="dm__"]:not([class*="layer"]):not([class*="waist"]) {
+  box-shadow:
+    inset 0 3px 10px rgba(255, 255, 255, 0.34),
+    inset 0 -12px 22px rgba(40, 48, 36, 0.20),
+    0 14px 28px rgba(45, 58, 35, 0.18);
+}
+.grain{position:absolute;inset:0;z-index:5;pointer-events:none;opacity:0;
+  mix-blend-mode:multiply;transition:opacity .3s var(--ease);
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.5'/></svg>")}
+.stage.tex .grain{opacity:.17}
+
+/* 真实素材帧：ASSETS 里填了 URL 才走这一路（object-fit 保证不变形） */
+.shot{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:0;transition:opacity .8s var(--ease)}
+.shot.on{opacity:1}
+/* ---------- 快切剪辑 ----------
+   每个镜头短、切换带统一方向的推进，靠「帧率 = 信息率」制造节奏：
+   开场快到看不清（混乱），逐渐慢到能辨认（收敛），最后停住。 */
+.cut-layer{position:absolute;inset:0;opacity:0;transform:translateX(7%) scale(1.05);
+  transition:opacity .16s var(--ease), transform .30s var(--ease)}
+.cut-layer.on{opacity:1;transform:none}
+.cut-layer img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* 单张素材靠缓慢漂移制造流动感：省掉多帧，观感却更"在呼吸" */
+.shot.drift{object-fit:cover;animation:kenburns 7s ease-in-out infinite alternate}
+@keyframes kenburns{
+  from{transform:scale(1.06) translate(-1.6%,-1.2%)}
+  to{transform:scale(1.13) translate(1.6%,1.4%)}
+}
+
+/* 海报 */
+.poster{position:absolute;inset:0;z-index:9;opacity:0;pointer-events:none;
+  background:linear-gradient(158deg,#3B3D42 0%,#31333A 55%,#26282D 100%)}
+.poster.on{opacity:1;transition:opacity .34s var(--ease)}
+.poster.dev{filter:blur(16px) saturate(.15) contrast(.85);opacity:.55}
+.poster.dev.on{filter:blur(0) saturate(1) contrast(1);opacity:1;transition:filter 1.5s var(--ease),opacity .5s var(--ease)}
+.poster__gloss{position:absolute;top:-40%;left:-60%;width:60%;height:180%;transform:rotate(18deg);
+  background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.30) 50%,rgba(255,255,255,0) 100%)}
+.poster.on .poster__gloss{animation:sweep .62s var(--ease) .04s 1}
+@keyframes sweep{from{transform:translateX(0) rotate(18deg)}to{transform:translateX(320%) rotate(18deg)}}
+.poster__body{position:absolute;left:26px;right:26px;top:44%;transform:translateY(14px);opacity:0;
+  transition:all .42s var(--ease) .12s}
+.poster.on .poster__body{transform:translateY(0);opacity:1}
+.poster__t{font-size:19px;line-height:1.35;font-weight:700;color:#F2F3EF;letter-spacing:-.3px}
+.poster__why{margin-top:8px;font-size:12px;line-height:1.6;color:rgba(242,243,239,.62)}
+.poster__btn{margin-top:16px;display:inline-block;padding:9px 22px;border-radius:999px;
+  background:#F2F3EF;color:#26282D;font-size:12.5px;font-weight:700}
+
+/* ---------- 面板 ---------- */
+.panel{flex:1;min-width:340px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px 20px}
+.panel h2{font-size:13px;font-weight:700;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:10px;margin-bottom:11px;flex-wrap:wrap}
+.row label{font-size:12px;color:var(--ink2);min-width:74px}
+select,input[type=range]{font-family:inherit;font-size:12px;padding:5px 8px;border:1px solid var(--line);
+  border-radius:7px;background:#fff;color:var(--ink)}
+input[type=range]{width:150px;padding:0;border:none}
+button{font-family:inherit;font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:999px;
+  border:1px solid var(--moss-deep);background:var(--moss-deep);color:var(--cream);cursor:pointer}
+button.ghost{background:#fff;color:var(--moss-deep)}
+.chk{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2)}
+.val{font-size:11px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.hr{height:1px;background:var(--line);margin:14px 0}
+.json{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;line-height:1.6;
+  background:#F7F8F5;border:1px solid var(--line);border-radius:9px;padding:10px 12px;
+  color:#3d443c;white-space:pre-wrap;max-height:200px;overflow:auto}
+.note{font-size:11.5px;color:var(--ink3);line-height:1.7;margin-top:8px}
+.desc{font-size:11.5px;color:var(--ink2);line-height:1.65;background:#F7F8F5;border-radius:9px;
+  padding:9px 11px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>每日内容 · 收敛动画模拟器</h1>
+  <div class="sub">
+    同一个「从无序到有序」的内核，五种不同的爽感来源。切换方案与分类对比：滚轮制动（裁决感）、
+    对焦（认知闭合）、粒子聚形（熵减）、洗牌（筛选淘汰）；揭晓再选光泽扫过或显影。
+    定格的那一套始终是内容本身，不是随机停在哪。
+  </div>
+
+  <div class="main">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>uplook</span></div>
+      <div class="navbar"><span class="brand">up<span class="look">look</span></span></div>
+      <div class="greet">
+        <div class="gk">今天最好看</div>
+        <div class="gtitle">你好，我是你的私人形象顾问</div>
+      </div>
+      <div class="dcard">
+        <div class="stage" id="stage">
+          <div class="blob b1"></div><div class="blob b2"></div>
+          <div class="grain" id="grain"></div>
+          <div class="layer layer--g2" id="g2"></div>
+          <div class="layer layer--g1" id="g1"></div>
+          <div class="layer layer--main" id="main"></div>
+          <div class="badge" id="badge">搭配</div>
+          <div class="cap" id="cap">今天这一条</div>
+          <div class="poster" id="poster">
+            <div class="poster__gloss"></div>
+            <div class="poster__body">
+              <div class="poster__t" id="pt"></div>
+              <div class="poster__why" id="pw"></div>
+              <div class="poster__btn">收下</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="height:56px"></div>
+    </div>
+
+    <div class="panel">
+      <h2>播放</h2>
+      <div class="row">
+        <button id="play">▶ 完整流程（巡游 → 收敛 → 揭晓）</button>
+        <button class="ghost" id="roam">只播收敛（几何形态）</button>
+      </div>
+      <div class="row">
+        <label>收敛方案</label>
+        <select id="strat"></select>
+      </div>
+      <div class="desc" id="stratDesc"></div>
+
+      <div class="hr"></div>
+      <h2>内容分类（决定「变什么」）</h2>
+      <div class="row">
+        <label>分类</label>
+        <select id="kind"></select>
+        <span class="val" id="kindNote"></span>
+      </div>
+
+      <div class="hr"></div>
+      <h2>参数（服务端下发）</h2>
+      <div class="row">
+        <label>等待时长</label>
+        <select id="waited">
+          <option value="fast">秒回（&lt;3s）</option>
+          <option value="mid" selected>常规（3–15s）</option>
+          <option value="slow">长等（&gt;15s）</option>
+        </select>
+        <span class="val" id="waitedV"></span>
+      </div>
+      <div class="row">
+        <label>步数</label>
+        <input type="range" id="steps" min="6" max="26" value="14">
+        <span class="val" id="stepsV">14</span>
+      </div>
+      <div class="row">
+        <label>起始间隔</label>
+        <input type="range" id="iv0" min="60" max="260" value="90" step="10">
+        <span class="val" id="iv0V">90ms</span>
+      </div>
+      <div class="row">
+        <label>结束间隔</label>
+        <input type="range" id="iv1" min="200" max="600" value="300" step="20">
+        <span class="val" id="iv1V">300ms</span>
+      </div>
+      <div class="row">
+        <label>衰减曲线</label>
+        <select id="curve">
+          <option value="1">线性</option>
+          <option value="2" selected>二次 quadOut</option>
+          <option value="3">三次 cubicOut</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>揭晓方式</label>
+        <select id="reveal">
+          <option value="gloss">光泽扫过</option>
+          <option value="develop">显影（渐清晰）</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>剪辑</label>
+        <select id="edit">
+          <option value="cut" selected>快切（短镜头推进）</option>
+          <option value="drift">漂移（缓慢流动）</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>素材</label>
+        <select id="assetMode">
+          <option value="geo">几何（无素材 · 现状）</option>
+          <option value="tex">几何 + 质感（体积 / 噪点）</option>
+          <option value="shot">真实素材帧（填 ASSETS）</option>
+        </select>
+        <span class="val" id="assetNote"></span>
+      </div>
+      <div class="row">
+        <label class="chk"><input type="checkbox" id="over" checked> 过冲回弹</label>
+        <label class="chk"><input type="checkbox" id="theatrical" checked> 戏剧停顿</label>
+        <label class="chk"><input type="checkbox" id="rm"> 减动效</label>
+      </div>
+      <div class="desc">戏剧停顿 = 制动回响（每个轴锁死那拍停 95ms）＋最后犹豫（定格前晃一下 150ms）＋定格蓄力（静止 190ms 再揭晓）。关掉就退回纯匀速收敛。</div>
+
+      <div class="hr"></div>
+      <h2>当前下发的 script</h2>
+      <div class="json" id="json"></div>
+      <div class="note" id="note"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const P = { ink:'#3F463C', sage:'#8E9A83', cream:'#E8E4DC', clay:'#B4674D',
+  slate:'#5E6B72', sand:'#C9BFA8', moss:'#587344', plum:'#6B4A5B' };
+const px = (v,m)=>Math.round(v*m);
+const el = id => document.getElementById(id);
+const g1=el('g1'), g2=el('g2'), main=el('main'), badge=el('badge'),
+      cap=el('cap'), poster=el('poster');
+
+/* ============ 分类 = 一组「轴」，html(vals) 画出抽象几何 ============ */
+const KINDS = {
+  outfit:{
+    label:'搭配', badge:'搭配', topic:'上短下长，腿就长了', why:'腰线提高一拳，视线就被拉长了。',
+    axes:[{id:'top',name:'上装长度',variants:[0.30,0.42,0.58,0.74],brakeAt:1},
+          {id:'bottom',name:'下装长度',variants:[0.62,0.50,0.40,0.34],brakeAt:.85},
+          {id:'color',name:'配色',variants:[[P.cream,P.ink],[P.sage,P.slate],[P.clay,P.sand],[P.plum,P.cream]],brakeAt:.7}],
+    target:[0,0,0], counter:[3,0,2],
+    html(v){const[t,b,c]=v,H=210;
+      return '<div style="display:flex;flex-direction:column;align-items:center;gap:6px">'+
+        '<div style="width:112px;height:'+px(t,H)+'px;border-radius:8px 8px 4px 4px;background:'+c[0]+'"></div>'+
+        '<div style="width:104px;height:'+px(b,H)+'px;border-radius:4px 4px 6px 6px;background:'+c[1]+'"></div></div>';}
+  },
+  proportion:{
+    label:'比例', badge:'比例', topic:'腰线落在身高的 0.38', why:'分割线越靠上，下半身占比越大。',
+    axes:[{id:'waist',name:'腰线位置',variants:[0.28,0.38,0.48,0.58],brakeAt:1},
+          {id:'vol',name:'上下量感',variants:[0.34,0.44,0.56,0.66],brakeAt:.85},
+          {id:'color',name:'配色',variants:[[P.cream,P.ink],[P.sage,P.slate],[P.sand,P.moss]],brakeAt:.7}],
+    target:[1,1,0], counter:[3,0,1],
+    html(v){const[w,vo,c]=v,H=240,W=132,top=px(w,H);
+      return '<div style="position:relative;width:'+W+'px;height:'+H+'px">'+
+        '<div style="position:absolute;top:0;left:0;right:0;height:'+top+'px;background:'+c[0]+';border-radius:8px 8px 3px 3px"></div>'+
+        '<div style="position:absolute;top:'+top+'px;left:0;right:0;bottom:0;background:'+c[1]+';border-radius:3px 3px 8px 8px"></div>'+
+        '<div style="position:absolute;top:'+(top-2)+'px;left:-8px;right:-8px;height:3px;background:'+P.clay+'"></div></div>';}
+  },
+  color:{
+    label:'颜色', badge:'颜色', topic:'把这三个色放在一起', why:'同一组色重复出现，衣柜就自洽了。',
+    axes:[{id:'hue',name:'色相',variants:[[P.clay,P.sage,P.cream],[P.plum,P.sand,P.slate],[P.cream,P.ink,P.sage],[P.moss,P.cream,P.clay]],brakeAt:1},
+          {id:'order',name:'排列',variants:[[0,1,2],[2,0,1],[1,2,0]],brakeAt:.86},
+          {id:'lift',name:'明度',variants:[1,.86,.72],brakeAt:.7}],
+    target:[2,0,0], counter:[0,2,2],
+    html(v){const[h,o,l]=v,bars=o.map(i=>h[i]);
+      return '<div style="display:flex;align-items:flex-end;gap:12px;height:200px">'+
+        bars.map((c,i)=>'<div style="width:54px;height:'+[150,190,120][i]+'px;border-radius:7px;background:'+c+
+          ';filter:brightness('+l+')"></div>').join('')+'</div>';}
+  },
+  fit:{
+    label:'版型', badge:'版型', topic:'直筒比收腰更藏肉', why:'轮廓的腰部余量决定它是藏还是勒。',
+    axes:[{id:'shoulder',name:'肩宽',variants:[.52,.62,.74,.86],brakeAt:1},
+          {id:'waist',name:'腰宽',variants:[.40,.52,.66,.80],brakeAt:.85},
+          {id:'hem',name:'摆宽',variants:[.50,.64,.80,.94],brakeAt:.72}],
+    target:[1,2,1], counter:[3,0,3],
+    html(v){const[s,w,h]=v,H=230,W=150,cx=W/2;
+      return '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'"><path d="M '+Math.round(cx-W*s/2)+
+        ' 0 L '+Math.round(cx+W*s/2)+' 0 L '+Math.round(cx+W*w/2)+' '+Math.round(H*.45)+' L '+Math.round(cx+W*h/2)+
+        ' '+H+' L '+Math.round(cx-W*h/2)+' '+H+' L '+Math.round(cx-W*w/2)+' '+Math.round(H*.45)+
+        ' Z" fill="'+P.sage+'" fill-opacity="0.85"/></svg>';}
+  },
+  fabric:{
+    label:'面料', badge:'面料', topic:'垂感好的料子不显壮', why:'面料自己往下走，轮廓就不会横向扩。',
+    axes:[{id:'density',name:'纹理密度',variants:[5,8,12,18],brakeAt:1},
+          {id:'amp',name:'起伏幅度',variants:[4,9,15,22],brakeAt:.85},
+          {id:'tone',name:'明暗',variants:['#8E9A83','#6E7A64','#A9B39C','#5A6355'],brakeAt:.7}],
+    target:[2,1,0], counter:[0,3,2],
+    html(v){const[d,a,t]=v;let s='';
+      for(let i=0;i<d;i++){const y=24+i*(196/d),off=Math.sin(i/d*Math.PI*2)*a;
+        s+='<div style="position:absolute;left:34px;right:34px;top:'+y+'px;height:5px;border-radius:3px;background:'+t+
+           ';transform:translateX('+off.toFixed(1)+'px)"></div>';}
+      return '<div style="position:relative;width:100%;height:220px">'+s+'</div>';}
+  },
+  howto:{
+    label:'技巧', badge:'技巧', topic:'袖子卷到肘上两指', why:'露出的那一截手腕，是全身最细的地方。',
+    axes:[{id:'fold',name:'折叠层数',variants:[0,1,2,3],brakeAt:1},
+          {id:'pos',name:'位置',variants:[.30,.46,.62,.78],brakeAt:.85},
+          {id:'tilt',name:'角度',variants:[-14,-6,0,10],brakeAt:.7}],
+    target:[2,1,2], counter:[0,3,0],
+    html(v){const[f,p,t]=v;let s='<div style="width:150px;height:96px;border-radius:8px;background:'+P.cream+'"></div>';
+      for(let i=0;i<f;i++)s+='<div style="position:absolute;width:150px;height:12px;border-radius:4px;background:'+P.sage+
+        ';top:'+Math.round(30+p*140+i*15)+'px;transform:rotate('+t+'deg)"></div>';
+      return '<div style="position:relative;width:150px;height:230px">'+s+'</div>';}
+  },
+  occasion:{
+    label:'场合', badge:'场合', topic:'今天的场合偏暖，别穿冷调', why:'场合的色温决定你在画面里是融入还是跳出。',
+    axes:[{id:'temp',name:'色温',variants:['#8FA6B8','#C9C3B4','#D8BFA0','#C08A62'],brakeAt:1},
+          {id:'light',name:'明暗',variants:[.9,.72,.55,.4],brakeAt:.85},
+          {id:'shape',name:'元素',variants:[.3,.5,.7,.9],brakeAt:.7}],
+    target:[2,1,1], counter:[0,3,3],
+    html(v){const[t,l,s]=v;
+      return '<div style="width:230px;height:210px;border-radius:14px;background:'+t+';filter:brightness('+l+
+        ');position:relative;overflow:hidden"><div style="position:absolute;left:'+Math.round(20+s*40)+
+        'px;top:30px;width:70px;height:150px;border-radius:8px;background:rgba(255,255,255,'+
+        (0.16+s*0.24).toFixed(2)+')"></div></div>';}
+  }
+};
+
+/* ============ 素材 ============
+   填上 URL 就走真实素材帧；留空则回落几何形态——所以素材没到位时原型照样能跑。
+   规格：750×520 PNG，单张 < 60KB，走 CDN（小程序主包只剩几十 KB，塞不下）。
+   颜色 / 比例 / 搭配刻意不做素材：它们要接 gene 色板、随内容变，做成图就写死了。 */
+// 三种填法都支持，按"最少素材"排序：
+//   1) 单张图    fabric: 'https://…/fabric.png'          → 缓慢漂移（Ken Burns）
+//   2) 数组      fabric: ['…1.png','…2.png']             → 多帧 cross-fade 循环
+//   3) 雪碧图    fabric: {url:'…sheet.png', cols:2, rows:2, index:0}
+//                                                        → 一张图切帧，零额外请求
+// 留空则回落几何形态：素材没到位时原型照样能跑。
+const ASSETS = {
+  // 四宫格一张切 2×2：0 面料 / 1 场合 / 2 穿法 / 3 版型
+  fabric:   { url: './assets/roam-sheet.png', cols: 2, rows: 2, index: 0 },
+  occasion: { url: './assets/roam-sheet.png', cols: 2, rows: 2, index: 1 },
+  howto:    { url: './assets/roam-sheet.png', cols: 2, rows: 2, index: 2 },
+  fit:      { url: './assets/roam-sheet.png', cols: 2, rows: 2, index: 3 },
+  // 想换成独立图就改成：fabric: './assets/roam-fabric.jpg',
+};
+
+function shotMarkup(url, extra) {
+  return '<img class="shot on ' + (extra || '') + '" src="' + url + '">'
+}
+
+/** 雪碧图：一张图切成等分网格，按 index 取其中一格 */
+function spriteStyle(entry) {
+  const cols = entry.cols || 1
+  const rows = entry.rows || 1
+  const x = (entry.index || 0) % cols
+  const y = Math.floor((entry.index || 0) / cols) % rows
+  // 宽度按列数放大，高度 auto 保持素材原比例——否则 4:3 的素材塞进 1.44:1 的
+  // 卡片会被横向拉伸变形；宁可上下多裁一点，也不能把布料和廓形拉歪。
+  return (
+    'background-image:url(' + entry.url + ');' +
+    'background-size:' + cols * 100 + '% auto;' +
+    'background-position:' + (cols > 1 ? (x / (cols - 1)) * 100 : 0) + '% ' +
+    (rows > 1 ? (y / (rows - 1)) * 100 : 0) + '%;'
+  )
+}
+
+function paintFrames(host, entry, index) {
+  // 单张：显示一次 + 缓慢漂移，靠 CSS 制造流动感（省掉 2/3 的素材量）
+  if (typeof entry === 'string' && entry) {
+    const key = 's|' + entry
+    if (host.dataset.frames !== key) {
+      host.innerHTML = shotMarkup(entry, 'drift')
+      host.dataset.frames = key
+    }
+    return
+  }
+  // 雪碧图：一格一帧
+  if (entry && entry.url) {
+    const key = 'p|' + entry.url + '|' + (entry.index || 0)
+    if (host.dataset.frames !== key) {
+      host.innerHTML = '<div class="shot on" style="' + spriteStyle(entry) + '"></div>'
+      host.dataset.frames = key
+    }
+    return
+  }
+  // 数组：多帧 cross-fade
+  const frames = Array.isArray(entry) ? entry : []
+  if (frames.length) {
+    const key = frames.join('|')
+    if (host.dataset.frames !== key) {
+      host.innerHTML = frames.map((url, i) => shotMarkup(url, i === 0 ? '' : '')).join('')
+      host.dataset.frames = key
+    }
+    const shots = Array.from(host.querySelectorAll('.shot'))
+    const active = index % shots.length
+    shots.forEach((img, i) => img.classList.toggle('on', i === active))
+  }
+}
+
+/* ============ 通用工具 ============ */
+// 自适应节奏：等得越久，揭晓越隆重（默认「常规」≈ 3.4s + 停顿）
+// 延长不靠单纯放慢间隔 —— 靠三个有戏的节奏点：制动回响 / 最后犹豫 / 定格蓄力。
+const PRESETS = {
+  fast:{steps:13, iv0:85,  iv1:270, label:'≈2.3s'},
+  mid: {steps:16, iv0:95,  iv1:330, label:'≈3.4s'},
+  slow:{steps:18, iv0:100, iv1:380, label:'≈4.3s'}
+};
+const state = {kind:'outfit', strat:'fused', preset:'mid',
+  steps:16, iv0:95, iv1:330, curve:2, over:true, rm:false, reveal:'gloss',
+  theatrical:true, assetMode:'shot'};
+let timers=[];
+const clearTimers=()=>{timers.forEach(clearTimeout);timers=[]};
+const later=(fn,ms)=>{const id=setTimeout(fn,ms);timers.push(id)};
+const K=()=>KINDS[state.kind];
+const valsOf=(k,idx)=>idx.map((v,i)=>k.axes[i].variants[v]);
+const htmlOf=(k,idx)=>k.html(valsOf(k,idx));
+function sample(axis,targetIdx,amp){
+  const n=axis.variants.length;
+  if(amp<=0.02) return targetIdx;
+  const spread=Math.max(1,Math.round((n-1)*amp));
+  return Math.max(0,Math.min(n-1,targetIdx+Math.round((Math.random()*2-1)*spread)));
+}
+// 巡游每主题停留（演示用，真实节奏由服务端脚本的 per_ms 下发 = 4000）
+const ROAM_PER = 700
+// 快切：单镜头时长。低于 120ms 就成闪烁了，250ms 上下是短视频的舒适区
+const CUT_PER = 250
+
+// 快切用的是独立图（每主题一张）；四宫格适合"漂移"，不适合高频切换
+const ASSETS_IND = {
+  outfit: './assets/look-1.jpg',
+  proportion: './assets/look-2.jpg',
+  fabric: './assets/roam-fabric.jpg',
+  occasion: './assets/roam-occasion.jpg',
+  howto: './assets/roam-howto.png',
+  fit: './assets/roam-fit.png',
+}
+
+// 成衣平铺：巡游与收敛共用同一批。收敛时多套快切 → 减速 → 定格到建议那套；
+// 只有 1 张时不会切换（第 2 张到位即自动生效）。
+const LOOKS = [
+  './assets/look-1.jpg', // 通勤一身（作候选项）
+  './assets/look-2.jpg', // 上短下长（定格目标：建议就是它）
+]
+
+/** 收敛也吃素材：定格哪一套由轴的语义决定——上装落在 cropped（上短下长）就用第 2 张 */
+function convergeMarkup(k, indices) {
+  if (state.assetMode === 'shot' && k === KINDS.outfit && LOOKS.length > 1) {
+    const url = indices[0] === 0 ? LOOKS[1] : LOOKS[0]
+    return '<img class="shot on" src="' + url + '">'
+  }
+  return htmlOf(k, indices)
+}
+
+/** 硬切会廉价：新镜头从右侧推进 + 160ms 交叉溶解，旧镜头延时移除 */
+function cut(host, html) {
+  const layer = document.createElement('div')
+  layer.className = 'cut-layer'
+  layer.innerHTML = html
+  host.appendChild(layer)
+  requestAnimationFrame(() => requestAnimationFrame(() => layer.classList.add('on')))
+  Array.from(host.querySelectorAll('.cut-layer'))
+    .filter((node) => node !== layer)
+    .forEach((old) => {
+      old.classList.remove('on')
+      setTimeout(() => old.remove(), 320)
+    })
+}
+
+function resetCard(){
+  clearTimers();
+  poster.classList.remove('on','dev');
+  poster.style.filter=''; poster.style.opacity='';
+  badge.classList.remove('on');
+  g1.innerHTML='';g2.innerHTML='';g1.style.opacity=0;g2.style.opacity=0;
+  cap.textContent='今天这一条';
+  if(rafId){cancelAnimationFrame(rafId);rafId=0;}
+}
+
+/* ============ 五种收敛方案 ============ */
+let rafId=0;
+
+/* A 滚轮制动：原地变形 + 真实前一帧残影 + 依次制动 + 过冲回弹 */
+function stratReel(done){
+  const k=K(), n=state.rm?2:state.steps, target=k.target;
+  let cur=k.counter.slice(), t=0;
+  for(let s=0;s<n;s++){
+    const p=n===1?1:s/(n-1);
+    const amp=Math.pow(1-p,Number(state.curve));
+    const iv=Math.round(state.iv0+(state.iv1-state.iv0)*p);
+    cur=cur.map((v,i)=>p>=k.axes[i].brakeAt?target[i]:sample(k.axes[i],target[i],amp));
+    const vals=cur.slice(), ampNow=amp;
+    later(()=>{
+      if(state.rm){g1.style.opacity=0;g2.style.opacity=0;}
+      else{
+        g2.innerHTML=g1.innerHTML;g1.innerHTML=main.innerHTML;
+        const a=Math.max(0,Math.min(.5,ampNow*.5));
+        g1.style.opacity=a;g2.style.opacity=a*.45;
+        g1.style.filter='blur('+(.6+ampNow*2.4).toFixed(2)+'px)';
+        g2.style.filter='blur('+(1.2+ampNow*3.6).toFixed(2)+'px)';
+      }
+      main.innerHTML='<div class="sl">'+htmlOf(k,vals)+'</div>';
+      cap.textContent='在试第 '+(s+1)+' 套';
+    },t);
+    t+=iv;
+  }
+  // 过冲回弹
+  if(state.over&&!state.rm){
+    const ov=target.map((v,i)=>Math.max(0,Math.min(k.axes[i].variants.length-1,v+(Math.random()<.5?-1:1))));
+    later(()=>{main.innerHTML='<div class="sl">'+htmlOf(k,ov)+'</div>'},t); t+=90;
+    later(()=>{main.innerHTML='<div class="sl">'+htmlOf(k,target)+'</div>'},t); t+=110;
+  }else{
+    later(()=>{main.innerHTML='<div class="sl">'+htmlOf(k,target)+'</div>'},t); t+=120;
+  }
+  return t;
+}
+
+/* B 对焦：多个可能的世界叠加且失焦 → 焦点收拢，错的淡出，只剩一个真实 */
+function stratFocus(done){
+  const k=K(), target=k.target, n=state.rm?2:state.steps;
+  const cands=[k.counter.slice(), target.slice(),
+    target.map((v,i)=>sample(k.axes[i],v,.8)), target.map((v,i)=>sample(k.axes[i],v,.5))];
+  main.innerHTML='<div class="sl" id="fzwrap"></div>';
+  const wrap=el('fzwrap');
+  cands.forEach((c,i)=>{
+    const d=document.createElement('div');
+    d.className='fz'; d.innerHTML=htmlOf(k,c);
+    d.style.filter='blur(16px)'; d.style.opacity=.55;
+    wrap.appendChild(d);
+  });
+  const layers=[...wrap.querySelectorAll('.fz')];
+  let t=0;
+  for(let s=0;s<n;s++){
+    const p=n===1?1:s/(n-1);
+    const amp=Math.pow(1-p,Number(state.curve));
+    const iv=Math.round(state.iv0+(state.iv1-state.iv0)*p);
+    // 每层：非目标层逐渐淡出 + 继续失焦；目标层逐渐清晰
+    later(()=>{
+      layers.forEach((d,i)=>{
+        const isT = i===1;
+        d.style.filter='blur('+(isT? (amp*16).toFixed(1) : (8+amp*14).toFixed(1))+'px)';
+        d.style.opacity=isT? (.55+.45*(1-amp)).toFixed(2) : (.5*amp).toFixed(2);
+      });
+      cap.textContent='在试第 '+(s+1)+' 套';
+    },t);
+    t+=iv;
+  }
+  later(()=>{
+    layers.forEach((d,i)=>{
+      const isT=i===1;
+      d.style.transition='filter .32s var(--ease),opacity .32s var(--ease)';
+      d.style.filter=isT?'blur(0px)':'blur(22px)';
+      d.style.opacity=isT?1:0;
+    });
+  },t);
+  return t+340;
+}
+
+/* C 粒子聚形：散乱粒子 → 归位成形，抖动/颜色/速度同时收敛 */
+function stratParticle(done){
+  const k=K(), target=k.target, n=state.rm?2:state.steps;
+  main.innerHTML='<canvas class="cv" id="cvc" width="750" height="600"></canvas>';
+  const cv=el('cvc'), ctx=cv.getContext('2d');
+  const W=750,H=600,cx=W/2;
+  // 目标：按分类画一个"靶形"——取目标形态的两个主色与两块矩形（抽象为上下两块）
+  const vals=valsOf(k,target);
+  const tRect={x:cx-56,y:150,w:112,h:120}, bRect={x:cx-52,y:274,w:104,h:150};
+  const colA=(vals[2]&&vals[2][0])||P.sage, colB=(vals[2]&&vals[2][1])||P.ink;
+  const N=state.rm?40:150;
+  const parts=[];
+  for(let i=0;i<N;i++){
+    const inTop=i%2===0;
+    const r=inTop?tRect:bRect;
+    parts.push({
+      sx:Math.random()*W, sy:Math.random()*H,
+      ex:r.x+Math.random()*r.w, ey:r.y+Math.random()*r.h,
+      c0:[P.clay,P.plum,P.slate,P.sand][i%4], c1:inTop?colA:colB,
+      j:14+Math.random()*22, r:2+Math.random()*3.4
+    });
+  }
+  const total=state.rm?300:1500;
+  const t0=performance.now();
+  function frame(now){
+    const p=Math.min(1,(now-t0)/total);
+    const e=1-Math.pow(1-p,3);
+    const jit=(1-e);
+    ctx.clearRect(0,0,W,H);
+    for(const q of parts){
+      const x=q.sx+(q.ex-q.sx)*e + (Math.random()*2-1)*q.j*jit;
+      const y=q.sy+(q.ey-q.sy)*e + (Math.random()*2-1)*q.j*jit;
+      ctx.fillStyle = e>.92? q.c1 : q.c0;
+      ctx.globalAlpha = .35+.65*e;
+      ctx.beginPath(); ctx.arc(x,y,q.r,0,6.283); ctx.fill();
+    }
+    // 末段：粒子连成实体块
+    if(e>.92){
+      const a=(e-.92)/.08;
+      ctx.globalAlpha=a;
+      ctx.fillStyle=colA; ctx.fillRect(tRect.x,tRect.y,tRect.w,tRect.h);
+      ctx.fillStyle=colB; ctx.fillRect(bRect.x,bRect.y,bRect.w,bRect.h);
+    }
+    ctx.globalAlpha=1;
+    if(p<1){ rafId=requestAnimationFrame(frame); }
+    else { setTimeout(()=>{main.innerHTML='<div class="sl">'+htmlOf(k,target)+'</div>';},120); }
+  }
+  rafId=requestAnimationFrame(frame);
+  cap.textContent='在成形';
+  return total+260;
+}
+
+/* D 洗牌：候选横向飞过 → 减速 → 一张被选中并放大定格 */
+function stratShuffle(done){
+  const k=K(), target=k.target, n=state.rm?2:state.steps;
+  const cands=[k.counter.slice(), target.map((v,i)=>sample(k.axes[i],v,.7)),
+               target.slice(), target.map((v,i)=>sample(k.axes[i],v,.6))];
+  const WIN=1; // 目标在索引 2
+  main.innerHTML='<div class="sh"><div class="sh__row" id="shrow"></div></div>';
+  const row=el('shrow');
+  cands.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='sh__card'; d.innerHTML=htmlOf(k,c);
+    row.appendChild(d);
+  });
+  const cards=[...row.querySelectorAll('.sh__card')];
+  const CARD=132+14;
+  let idx=0, t=0;
+  for(let s=0;s<n;s++){
+    const p=n===1?1:s/(n-1);
+    const amp=Math.pow(1-p,Number(state.curve));
+    const iv=Math.round(state.iv0+(state.iv1-state.iv0)*p);
+    if(amp>.12) idx=Math.floor(Math.random()*cands.length);
+    else idx=WIN;
+    const cur=idx;
+    later(()=>{
+      row.style.transition='transform '+Math.round(iv*.8)+'ms var(--ease)';
+      row.style.transform='translateX('+(187-cur*CARD-66)+'px)';
+      cards.forEach((c,i)=>{c.style.opacity = (i===cur)?1:.34;});
+      cap.textContent='在试第 '+(s+1)+' 套';
+    },t);
+    t+=iv;
+  }
+  later(()=>{
+    cards.forEach((c,i)=>{c.style.opacity=(i===WIN)?1:0;});
+    row.style.transition='transform .26s var(--ease)';
+    row.style.transform='translateX('+(187-WIN*CARD-66)+'px) scale(1.0)';
+  },t);
+  return t+300;
+}
+
+/* E 融合：位移 / 清晰度 / 存活 / 形态幅度 / 色彩 / 节奏 六维同时收敛 */
+function stratFused(done){
+  const k=K(), target=k.target, n=state.rm?2:state.steps;
+  const cands=[k.counter.slice(),
+               target.map((v,i)=>sample(k.axes[i],v,.75)),
+               target.slice(),
+               target.map((v,i)=>sample(k.axes[i],v,.55))];
+  main.innerHTML='<div class="sl" id="fzw"></div>';
+  const wrap=el('fzw');
+  cands.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='fz'; d.innerHTML=htmlOf(k,c);
+    wrap.appendChild(d);
+  });
+  const layers=[...wrap.querySelectorAll('.fz')];
+  const brakeDone={};
+  let t=0;
+  for(let s=0;s<n;s++){
+    const p=n===1?1:s/(n-1);
+    const amp=Math.pow(1-p,Number(state.curve));
+    const iv=Math.round(state.iv0+(state.iv1-state.iv0)*p);
+    // 形态幅度收敛：非目标层继续乱跳，目标层逐渐锁定
+    const jump=cands.map((c,i)=>i===2?c:c.map((v,j)=>sample(k.axes[j],target[j],amp)));
+    later(()=>{
+      jump.forEach((c,i)=>{
+        const d=layers[i], isT=(i===2);
+        const drift=amp*46*(isT?.4:1);
+        const dx=(Math.random()*2-1)*drift, dy=(Math.random()*2-1)*drift*.6;
+        d.innerHTML=convergeMarkup(k,c);
+        d.style.transform='translate('+dx.toFixed(1)+'px,'+dy.toFixed(1)+'px)';
+        d.style.filter='blur('+(isT?amp*14:(6+amp*16)).toFixed(1)+'px)';
+        d.style.opacity=(isT?(.45+.55*(1-amp)):(.55*amp)).toFixed(2);
+      });
+      cap.textContent='在试第 '+(s+1)+' 套';
+    },t);
+    t+=iv;
+    // 制动回响：某个轴刚锁死的那一拍停一下，让「咔」有回响
+    if(state.theatrical && !state.rm){
+      let braked=false;
+      k.axes.forEach(ax=>{ if(p>=ax.brakeAt && !brakeDone[ax.id]){brakeDone[ax.id]=true;braked=true;} });
+      if(braked) t+=95;
+    }
+  }
+  // 定格：目标层归位清晰，其余淡出
+  later(()=>{
+    layers.forEach((d,i)=>{
+      const isT=(i===2);
+      d.style.transition='transform .3s var(--ease),filter .3s var(--ease),opacity .3s var(--ease)';
+      d.style.transform=isT?'translate(0,0) scale(1.03)':'translate(0,0) scale(.94)';
+      d.style.filter=isT?'blur(0px)':'blur(24px)';
+      d.style.opacity=isT?1:0;
+    });
+  },t);
+  // 最后犹豫：像轮盘停在目标前晃一下（有戏的延长，不是单纯拖慢）
+  if(state.theatrical && !state.rm){
+    later(()=>{layers[2].style.transform='translate(-5px,-7px) scale(1.015)';cap.textContent='就是这套';},t);
+    t+=150;
+  }
+  if(state.over&&!state.rm){
+    later(()=>{layers[2].style.transform='translate(0,0) scale(.985)';},t+300);
+    later(()=>{layers[2].style.transform='translate(0,0) scale(1)';},t+390);
+    t+=470;
+  } else { t+=330; }
+  // 定格蓄力：静止一拍再揭晓，用静默制造张力
+  return t + (state.theatrical && !state.rm ? 190 : 0);
+}
+
+const STRATS = {
+  fused:{label:'E 融合（六维同时收敛 · 推荐）',fn:stratFused,
+    desc:'位移/清晰度/存活/形态幅度/色彩/节奏六维用同一条衰减曲线同时收敛。看起来是一个动作，不是四段拼接。'},
+  reel:{label:'A 滚轮制动（裁决感）',fn:stratReel,
+    desc:'原地变形 + 真实前一帧残影。三个轴依次制动（配色→下装→上身），最后过冲半格回弹。爽感来自「咔哒」的停止点。'},
+  focus:{label:'B 对焦（认知闭合）',fn:stratFocus,
+    desc:'四种可能同时叠加且失焦，随收敛逐渐只剩一个清晰。不靠动作幅度，靠清晰度提升带来满足感，杂志感最强。'},
+  particle:{label:'C 粒子聚形（熵减）',fn:stratParticle,
+    desc:'150 颗粒子从散乱位置归位，位置/抖动/颜色/透明度四维同时收敛，末段连成实体块。最直观的「从无序到有序」。'},
+  shuffle:{label:'D 洗牌（筛选淘汰）',fn:stratShuffle,
+    desc:'候选横向飞过，速度递减，非选中项淡出，目标那张居中定格。语义是「从一堆里挑出你」。'}
+};
+
+/* ============ 揭晓 ============ */
+function reveal(){
+  const k=K();
+  g1.style.opacity=0;g2.style.opacity=0;
+  badge.textContent=k.badge;badge.classList.add('on');
+  cap.textContent='今天这一条';
+  el('pt').textContent=k.topic; el('pw').textContent=k.why;
+  if(state.reveal==='develop'){
+    poster.classList.add('dev');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>poster.classList.add('on')));
+  }else{
+    poster.classList.remove('dev');
+    poster.classList.add('on');
+  }
+}
+
+function play(){
+  resetCard();
+  const t=STRATS[state.strat].fn(reveal);
+  later(reveal, Math.max(0,t));
+}
+
+function playRoam(){
+  resetCard();
+  const order=['color','fit','proportion','fabric','occasion','howto','outfit'];
+  order.forEach((kind,i)=>{
+    later(()=>{
+      const k=KINDS[kind];
+      g1.innerHTML='';g2.innerHTML='';g1.style.opacity=0;g2.style.opacity=0;
+      const asset = state.assetMode==='shot' ? (ASSETS[kind]||'') : '';
+      if (asset){
+        paintFrames(main, asset, 0);
+        // 只有数组（多帧）才需要轮播；单张靠漂移、雪碧图取一格即可
+        if (Array.isArray(asset) && asset.length>1){
+          asset.forEach((_, f)=>{
+            if (f>0) later(()=>paintFrames(main, asset, f), f*(ROAM_PER/asset.length));
+          });
+        }
+      } else {
+        main.dataset.frames='';
+        main.innerHTML='<div class="sl">'+htmlOf(k,k.target)+'</div>';
+      }
+      cap.textContent='在看'+k.label;
+    }, i*ROAM_PER);
+  });
+  later(()=>{state.kind='outfit';el('kind').value='outfit';sync();play();}, order.length*ROAM_PER);
+}
+
+/* ============ 面板 ============ */
+function sync(){
+  const k=K();
+  el('json').textContent=JSON.stringify({
+    phase:'settle', kind:'converge', strategy:state.strat,
+    params:{
+      axes:k.axes.map(a=>({id:a.id,name:a.name,variants:a.variants.length,brakeAt:a.brakeAt})),
+      target:k.target, counter:k.counter,
+      interval:[state.iv0,state.iv1], amplitude:[1,.05], curve:'quadOut',
+      overshoot:state.over, reveal:state.reveal
+    }
+  },null,1);
+  el('kindNote').textContent='轴：'+k.axes.map(a=>a.name).join(' / ');
+  el('note').textContent='定格 = '+k.topic;
+  el('stratDesc').textContent=STRATS[state.strat].desc;
+  const base=state.steps*(state.iv0+state.iv1)/2/1000;
+  const est=(base + (state.theatrical?1.10:0.47)).toFixed(1);
+  el('waitedV').textContent='收敛 ≈'+est+'s ＋揭晓 0.8s';
+}
+
+el('edit').value = state.edit
+el('edit').onchange = e=>{ state.edit = e.target.value; playRoam() }
+
+el('assetMode').value = state.assetMode
+el('assetMode').onchange = e=>{
+  state.assetMode = e.target.value
+  stage.classList.toggle('tex', state.assetMode!=='geo')
+  const filled = Object.values(ASSETS).filter(v =>
+    typeof v === 'string' ? v.length>0 : !!(v && (v.url || v.length))).length
+  el('assetNote').textContent = state.assetMode==='shot'
+    ? (LOOKS.length > 1 ? '巡游 + 收敛都用素材' : '素材用于巡游；收敛需第 2 套穿搭才生效')
+    : (state.assetMode==='tex' ? '仍是几何，只加了体积与噪点' : '')
+  void filled
+  play()
+}
+
+const ss=el('strat');
+Object.keys(STRATS).forEach(k=>{
+  const o=document.createElement('option');o.value=k;o.textContent=STRATS[k].label;ss.appendChild(o);
+});
+ss.value=state.strat; ss.onchange=e=>{state.strat=e.target.value;sync();play();};
+
+const ks=el('kind');
+Object.keys(KINDS).forEach(k=>{
+  const o=document.createElement('option');o.value=k;o.textContent=KINDS[k].label+'（'+k+'）';ks.appendChild(o);
+});
+ks.value=state.kind; ks.onchange=e=>{state.kind=e.target.value;sync();play();};
+
+const bind=(id,key,fmt)=>{const n=el(id);n.oninput=e=>{state[key]=Number(e.target.value);
+  el(id+'V').textContent=fmt(state[key]);sync();};};
+bind('steps','steps',v=>v); bind('iv0','iv0',v=>v+'ms'); bind('iv1','iv1',v=>v+'ms');
+
+// 等待时长 → 自动套用节奏预设（滑到自定义即脱离预设）
+function applyPreset(name){
+  const p=PRESETS[name];
+  state.preset=name; state.steps=p.steps; state.iv0=p.iv0; state.iv1=p.iv1;
+  el('steps').value=p.steps; el('iv0').value=p.iv0; el('iv1').value=p.iv1;
+  el('stepsV').textContent=p.steps; el('iv0V').textContent=p.iv0+'ms'; el('iv1V').textContent=p.iv1+'ms';
+  sync(); play();
+}
+el('waited').onchange = e => applyPreset(e.target.value);
+el('curve').onchange=e=>{state.curve=e.target.value;sync();};
+el('reveal').onchange=e=>{state.reveal=e.target.value;sync();play();};
+el('over').onchange=e=>{state.over=e.target.checked;sync();};
+el('theatrical').onchange=e=>{state.theatrical=e.target.checked;sync();play();};
+el('rm').onchange=e=>{state.rm=e.target.checked;sync();play();};
+// 主按钮跑完整流程：素材只用在巡游段，收敛段要随轴变形（上装变短、腰线移动），
+// 静态素材图做不了，所以收敛仍是几何 / 未来的 SVG 剪影。
+el('play').onclick=playRoam; el('roam').onclick=play;
+
+sync();
+stage.classList.toggle('tex', state.assetMode!=='geo');
+el('assetNote').textContent = state.assetMode==='shot'
+  ? (LOOKS.length > 1 ? '巡游 + 收敛都用素材' : '素材用于巡游；收敛需第 2 套穿搭才生效')
+  : (state.assetMode==='tex' ? '仍是几何，只加了体积与噪点' : '');
+playRoam();
+</script>
+</body>
+</html>

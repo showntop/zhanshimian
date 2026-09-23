@@ -11,21 +11,28 @@ import (
 )
 
 type Config struct {
-	Environment           string
-	Addr                  string
-	DatabaseURL           string
-	PublicBaseURL         string
-	UploadDir             string
-	AssetDir              string
-	StorageProvider       string
-	AssetURLTTL           time.Duration
-	COSBucketURL          string
-	COSRegion             string
-	COSEndpoint           string
-	COSSecretID           string
-	COSSecretKey          string
-	COSKeyPrefix          string
-	DevLoginEnabled       bool
+	Environment     string
+	Addr            string
+	DatabaseURL     string
+	PublicBaseURL   string
+	UploadDir       string
+	AssetDir        string
+	StorageProvider string
+	AssetURLTTL     time.Duration
+	COSBucketURL    string
+	COSRegion       string
+	COSEndpoint     string
+	COSSecretID     string
+	COSSecretKey    string
+	COSKeyPrefix    string
+	DevLoginEnabled bool
+	// DailyForceRegen 调试开关：跳过「同一用户同一天只生成一次」的幂等，
+	// 每次 prepare/generate 都实时重选事实并重生成（覆盖当天记录）。
+	// 仅供非生产环境调每日内容与视觉；生产环境 Load 会直接拒绝。
+	DailyForceRegen bool
+	// 每日动画方案覆盖：空=按 hash(uid+date) 分流；sketch=关停回旧线；
+	// dress=全量放量（灰度/紧急开关）。
+	DailyMotionVariant    string
 	WeChatAppID           string
 	WeChatAppSecret       string
 	WeChatAPIBaseURL      string
@@ -86,6 +93,8 @@ func Load() (Config, error) {
 		COSSecretKey:             os.Getenv("COS_SECRET_KEY"),
 		COSKeyPrefix:             env("COS_KEY_PREFIX", "jianwo"),
 		DevLoginEnabled:          envBool("DEV_LOGIN_ENABLED", true),
+		DailyForceRegen:          envBool("DAILY_FORCE_REGEN", false),
+		DailyMotionVariant:       strings.TrimSpace(os.Getenv("DAILY_MOTION_VARIANT")),
 		WeChatAppID:              os.Getenv("WECHAT_APP_ID"),
 		WeChatAppSecret:          os.Getenv("WECHAT_APP_SECRET"),
 		WeChatAPIBaseURL:         env("WECHAT_API_BASE_URL", "https://api.weixin.qq.com/sns/jscode2session"),
@@ -162,9 +171,15 @@ func Load() (Config, error) {
 	if cfg.SmsProvider == "aliyun" && (cfg.AliyunSmsAccessKeyID == "" || cfg.AliyunSmsAccessKeySecret == "") {
 		return Config{}, fmt.Errorf("ALIYUN_SMS_ACCESS_KEY_ID and ALIYUN_SMS_ACCESS_KEY_SECRET are required for aliyun SMS")
 	}
+	if cfg.DailyMotionVariant != "" && cfg.DailyMotionVariant != "sketch" && cfg.DailyMotionVariant != "dress" {
+		return Config{}, fmt.Errorf("DAILY_MOTION_VARIANT must be empty, sketch or dress")
+	}
 	if cfg.Environment == "production" {
 		if cfg.DevLoginEnabled {
 			return Config{}, fmt.Errorf("DEV_LOGIN_ENABLED must be false in production")
+		}
+		if cfg.DailyForceRegen {
+			return Config{}, fmt.Errorf("DAILY_FORCE_REGEN must be false in production")
 		}
 		if cfg.WeChatAppID == "" || cfg.WeChatAppSecret == "" {
 			return Config{}, fmt.Errorf("WECHAT_APP_ID and WECHAT_APP_SECRET are required in production")

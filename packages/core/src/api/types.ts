@@ -57,6 +57,18 @@ export type CreateBodyPresentationRequest = components['schemas']['CreateBodyPre
 export type TodayContext = components['schemas']['TodayContext']
 export type TodayPlan = components['schemas']['TodayPlan']
 export type TodayPlanAccepted = components['schemas']['TodayPlanAccepted']
+
+// 每日内容（Daily）：契约类型与生成 schema 同源。
+// 注意：DailyContentDTO 叫 DTO 是因为 core/src/daily 的本地内容池类型
+// （带 fit 函数的 DailyContent）仍被选品纯函数使用，两者不混用；
+// 服务端内容一律走 DTO（fit 已在服务端渲染成 fit_text）。
+export type DailyPrepare = components['schemas']['DailyPrepare']
+export type DailyGenerateResult = components['schemas']['DailyGenerateResult']
+export type DailyContentDTO = components['schemas']['DailyContent']
+export type DailyContentVisual = components['schemas']['DailyContentVisual']
+export type DailyContentType = components['schemas']['DailyContentType']
+export type DailyCollection = components['schemas']['DailyCollection']
+export type DailyCollectionStats = components['schemas']['DailyCollectionStats']
 export type Share = components['schemas']['Share']
 export type ShareView = components['schemas']['ShareView']
 export type WardrobeItem = components['schemas']['WardrobeItem']

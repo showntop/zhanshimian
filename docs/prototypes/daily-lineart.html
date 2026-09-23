@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>等待方式 · 线稿逐层补全（比例 → 颜色 → 搭配 → 定格）</title>
+<style>
+  :root{--ease:cubic-bezier(.2,.8,.2,1);}
+  *{box-sizing:border-box}
+  body{background:#E8E4DC;font-family:system-ui,-apple-system,PingFang SC;margin:0;padding:26px;
+       display:flex;flex-direction:column;align-items:center;gap:16px;color:#3F463C}
+
+  .card{width:750px;height:560px;position:relative;overflow:hidden;border-radius:18px;
+        background:linear-gradient(160deg,#F4F1EB 0%,#E6E1D8 100%);
+        box-shadow:0 10px 48px rgba(0,0,0,.13)}
+  .stage{position:absolute;inset:0}
+  .layer{position:absolute;inset:0;width:100%;height:100%}
+
+  /* 上色层：纯色 + 区域 mask（mask 由 JS 按当前线稿注入） */
+  .paint{z-index:1}
+  .z{position:absolute;inset:0;opacity:0;transform:translateY(12px);
+     -webkit-mask-size:100% 100%;mask-size:100% 100%;
+     -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+     -webkit-mask-position:center;mask-position:center}
+  /* 线稿层：白底黑线 × multiply（白底透出下层颜色，黑线保留） */
+  .line{z-index:3;mix-blend-mode:multiply;clip-path:inset(0 0 100% 0)}
+
+  .guides{z-index:4;opacity:0}
+  .gl{position:absolute;left:6%;right:6%;height:1px;
+      background:repeating-linear-gradient(90deg,rgba(63,70,60,.7) 0 9px,transparent 9px 22px)}
+  .gl.w{height:2px;left:2%;right:2%;
+        background:linear-gradient(90deg,rgba(142,154,131,0),#8E9A83 18%,#8E9A83 82%,rgba(142,154,131,0))}
+  .gl .tick{position:absolute;top:-5px;width:1px;height:11px;background:rgba(63,70,60,.65)}
+  .gl .tick.l{left:0}.gl .tick.r{right:0}
+  .glabel{position:absolute;left:4%;font-size:11px;letter-spacing:.14em;color:#7C8577}
+
+  .sheen{z-index:5;pointer-events:none;opacity:0;
+         background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.5) 50%,transparent 62%)}
+
+  .caption{position:absolute;left:46%;bottom:40px;z-index:9}
+  .caption .c1{font-size:25px;letter-spacing:.14em;color:#3F463C;transition:opacity .28s var(--ease)}
+  .caption .c2{margin-top:9px;font-size:12px;letter-spacing:.16em;color:#8A9083}
+  .badge{position:absolute;right:32px;top:28px;padding:6px 15px;border-radius:999px;font-size:12px;
+         letter-spacing:.12em;background:rgba(255,255,255,.85);color:#3F463C;z-index:9}
+
+  /* ---- 时间线：一轮 3.7s ---- */
+  .card.go .line   {animation:draw .85s var(--ease) .05s forwards}
+  .card.go .guides {animation:fadeIn .5s var(--ease) .62s forwards}
+  .card.go .z      {animation:paint .5s var(--ease) forwards}
+  .card.go .z[data-z="hair"]  {animation-delay:.92s}
+  .card.go .z[data-z="face"]  {animation-delay:1.06s}
+  .card.go .z[data-z="skin"]  {animation-delay:1.14s}
+  .card.go .z[data-z="top"]   {animation-delay:1.58s}
+  .card.go .z[data-z="bottom"]{animation-delay:1.88s}
+  .card.go .sheen  {animation:sheen .62s var(--ease) 2.62s forwards}
+
+  @keyframes draw  {to{clip-path:inset(0 0 0 0)}}
+  @keyframes paint {to{opacity:1;transform:translateY(0)}}
+  @keyframes fadeIn{to{opacity:1}}
+  @keyframes sheen {0%{opacity:0;transform:translateX(-40%)}45%{opacity:.85}100%{opacity:0;transform:translateX(40%)}}
+
+  .ctl{display:flex;gap:14px;align-items:center;font-size:14px;flex-wrap:wrap;justify-content:center}
+  button,select{padding:7px 15px;border-radius:9px;border:1px solid #3F463C;background:transparent;
+                color:#3F463C;cursor:pointer;font-size:14px}
+  label{display:inline-flex;gap:6px;align-items:center}
+  .hud{opacity:.65;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="stage">
+      <div class="paint layer">
+        <i class="z" data-z="hair"></i>
+        <i class="z" data-z="face"></i>
+        <i class="z" data-z="skin"></i>
+        <i class="z" data-z="top"></i>
+        <i class="z" data-z="bottom"></i>
+      </div>
+
+      <div class="guides layer">
+        <div class="gl" style="top:21%"></div>
+        <div class="gl w" style="top:50%"><i class="tick l"></i><i class="tick r"></i></div>
+        <div class="glabel" style="top:51.5%">腰线</div>
+      </div>
+
+      <img class="line layer" id="lineimg" src="assets/lineart/lineart-outfit.png" alt="">
+      <div class="sheen layer"></div>
+    </div>
+
+    <div class="badge" id="badge">比例</div>
+    <div class="caption">
+      <div class="c1" id="c1">先量比例</div>
+      <div class="c2">正在为你准备今天的内容</div>
+    </div>
+  </div>
+
+  <div class="ctl">
+    <select id="look">
+      <option value="outfit">搭配（针织+阔腿裤）</option>
+      <option value="ratio">比例（短上衣+高腰裤）</option>
+      <option value="fit">版型（A 字连衣裙）</option>
+      <option value="occasion">场合（西装叠穿）</option>
+    </select>
+    <button id="replay">重播</button>
+    <label><input type="checkbox" id="auto" checked> 循环</label>
+    <span class="hud">一轮 3.7s</span>
+  </div>
+
+<script>
+  const COLORS = { hair:'#4A3B2E', face:'#E4C0A1', skin:'#E4C0A1', top:'#D9D0C1', bottom:'#B7A089' };
+  const card = document.getElementById('card');
+  const lineimg = document.getElementById('lineimg');
+  const zs = [...document.querySelectorAll('.z')];
+  const c1 = document.getElementById('c1'), badge = document.getElementById('badge');
+  const auto = document.getElementById('auto'), lookSel = document.getElementById('look');
+
+  zs.forEach(z => { z.style.background = COLORS[z.dataset.z]; });
+
+  function setLook(k) {
+    lineimg.src = 'assets/lineart/lineart-' + k + '.png';
+    zs.forEach(z => {
+      const u = 'url(assets/masks/' + k + '/' + z.dataset.z + '.png)';
+      z.style.webkitMaskImage = u; z.style.maskImage = u;
+    });
+    run();
+  }
+
+  const PHASES = [
+    [0,    '比例', '先量比例'],
+    [620,  '比例', '在看比例'],
+    [950,  '颜色', '开始上色'],
+    [1600, '搭配', '在看搭配'],
+    [2620, '完成', '今天这一身'],
+  ];
+  let timers = [];
+  function run() {
+    timers.forEach(clearTimeout); timers = [];
+    card.classList.remove('go');
+    void card.offsetWidth;
+    card.classList.add('go');
+    PHASES.forEach(([t, b, txt]) => {
+      timers.push(setTimeout(() => {
+        badge.textContent = b;
+        c1.style.opacity = 0;
+        setTimeout(() => { c1.textContent = txt; c1.style.opacity = 1; }, 140);
+      }, t));
+    });
+  }
+
+  document.getElementById('replay').onclick = run;
+  lookSel.onchange = e => setLook(e.target.value);
+  let iv = setInterval(() => { if (auto.checked) run(); }, 3700);
+  card.addEventListener('mouseenter', () => clearInterval(iv));
+  card.addEventListener('mouseleave', () => { clearInterval(iv); iv = setInterval(() => { if (auto.checked) run(); }, 3700); });
+
+  setLook('outfit');
+</script>
+</body>
+</html>

@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>首页海报 · 文字分散参与构图</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#5E665D; --ink3:#8A9189;
+  --moss:#587344; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.13);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E4E6E2;color:var(--ink);-webkit-font-smoothing:antialiased;padding:26px 22px 60px}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:21px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.75;max-width:960px}
+.ctrl{display:flex;gap:7px;margin:16px 0;flex-wrap:wrap;align-items:center}
+.ctrl .lb{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-right:2px}
+.btn{padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn.on{background:var(--moss-deep);border-color:var(--moss-deep);color:var(--cream)}
+.main{display:flex;gap:30px;align-items:flex-start;flex-wrap:wrap}
+
+.phone{background:var(--bg);border-radius:30px;overflow:hidden;position:relative;flex:0 0 auto;
+  box-shadow:0 18px 46px rgba(45,58,35,.20)}
+.phone[data-size="se"]{width:320px;height:568px}
+.phone[data-size="14"]{width:390px;height:844px}
+.phone[data-size="max"]{width:428px;height:926px}
+.sb{display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:12px;font-weight:600}
+.phone[data-size="se"] .sb{height:20px}
+.phone[data-size="14"] .sb,.phone[data-size="max"] .sb{height:47px}
+.sig{display:flex;gap:4px;align-items:center}
+.sig i{width:4px;height:8px;background:var(--ink);border-radius:1px;display:block}
+.sig i:nth-child(4){height:6px;opacity:.4}
+.navbar{display:flex;align-items:center;justify-content:space-between;padding:2px 20px 0}
+.brand{font-size:16px;font-weight:700}.brand .up{color:var(--ink)}.brand .look{color:var(--moss)}
+.right{font-size:10.5px;color:var(--ink3)}
+.greet{padding:12px 20px 0}
+.gt{display:flex;align-items:baseline;justify-content:space-between}
+.gk{font-size:11.5px;font-weight:600;color:var(--ink2)}
+.gd{font-size:10.5px;color:var(--ink3)}
+.gtitle{margin-top:4px;font-size:17px;line-height:1.3;font-weight:700;letter-spacing:-.5px}
+
+.poster{position:relative;margin:12px 0 0;overflow:hidden}
+.phone[data-size="se"] .poster{height:250px}
+.phone[data-size="14"] .poster{height:320px}
+.phone[data-size="max"] .poster{height:344px}
+
+.base{position:absolute;inset:0}
+.el{position:absolute;border-radius:6px;animation:float 8s ease-in-out infinite;
+  box-shadow:inset 0 0 0 1px rgba(32,40,28,.06),0 9px 20px rgba(45,58,35,.14)}
+.no{position:absolute;left:6px;bottom:4px;font-size:8px;font-weight:700;letter-spacing:.5px;opacity:.45}
+.sheen{position:absolute;top:-60%;left:-40%;width:70%;height:220%;transform:rotate(18deg);
+  background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.6) 50%,rgba(255,255,255,0));
+  animation:sweep 6.5s ease-in-out infinite}
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.34;z-index:6;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.28'/></svg>")}
+.fog{position:absolute;border-radius:50%;pointer-events:none;z-index:1}
+.rule{position:absolute;z-index:7;background:currentColor;opacity:.28}
+
+/* ===== 文字：每个块独立定位，互不依附 ===== */
+.tx{position:absolute;z-index:8}
+.seq{font-size:9.5px;font-weight:700;letter-spacing:1.2px;opacity:.62;font-variant-numeric:tabular-nums}
+.tt{font-size:22px;line-height:1.18;font-weight:700;letter-spacing:-.8px}
+.phone[data-size="se"] .tt{font-size:19px}
+.hh{font-size:11.5px;line-height:1.55;opacity:.78}
+.cta{padding:8px 14px;border-radius:999px;font-size:12px;font-weight:700;border:0;
+  font-family:inherit;cursor:pointer;white-space:nowrap;display:inline-block}
+.lnk{font-size:10.5px;font-weight:600;white-space:nowrap;display:inline-block}
+.poster.light .tx{color:var(--cream)}
+.poster.light .cta{background:var(--cream);color:#26302A}
+.poster.light .lnk{color:rgba(238,240,236,.78)}
+.poster.dark .tx{color:var(--ink)}
+.poster.dark .cta{background:var(--moss-deep);color:var(--cream)}
+.poster.dark .lnk{color:var(--moss)}
+/* 竖排小标：杂志常用的边角元素 */
+.vmark{position:absolute;z-index:8;font-size:9px;font-weight:700;letter-spacing:2px;
+  writing-mode:vertical-rl;opacity:.45}
+
+.below{padding:14px 16px 18px}
+.below .bh{font-size:15px;font-weight:700;margin-bottom:7px}
+.brule{width:22px;height:2px;background:var(--moss);margin-bottom:9px}
+.brow{display:flex;gap:8px;margin-bottom:8px}
+.bph{flex:1;height:48px;border-radius:10px;background:rgba(105,115,100,.11)}
+.bph.l{height:74px}
+
+.note{flex:1;min-width:310px;max-width:540px}
+.note h3{font-size:17px;font-weight:700}
+.note .sub2{font-size:12px;color:var(--moss);font-weight:600;margin:4px 0 13px}
+.note dl{border-top:1px solid var(--line);padding-top:12px}
+.note dt{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-top:12px}
+.note dt:first-child{margin-top:0}
+.note dd{font-size:12.5px;line-height:1.78;color:var(--ink);margin-top:3px}
+table{border-collapse:collapse;width:100%;margin-top:8px;font-size:12px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line)}
+th{font-size:10.5px;color:var(--ink3);font-weight:700}
+.fix{margin-top:14px;padding:11px 13px;border-radius:10px;background:rgba(88,115,68,.10);
+  font-size:12px;line-height:1.75;color:#3D5230}
+.warnline{margin-top:12px;padding:11px 13px;border-radius:10px;background:rgba(126,84,69,.08);
+  font-size:12px;line-height:1.7;color:#6A4B3E}
+code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:rgba(105,115,100,.12);padding:1px 5px;border-radius:4px}
+@keyframes float{0%,100%{translate:0 0}50%{translate:0 -6px}}
+@keyframes fog1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(28px,22px) scale(1.08)}}
+@keyframes fog2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-22px,16px) scale(1.06)}}
+@keyframes sweep{0%{translate:-30% 0}55%,100%{translate:220% 0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>首页海报 · 文字分散参与构图</h1>
+  <p class="sub">v2 没有卡（无白底/圆角/边框），但文字仍是<b>一整块集中排版</b>——标题、钩子、按钮挤在一起、基线对齐，那是排版块不是构图。
+    这一版把文字<b>拆成独立元素</b>各自定位：编号在角、标题在一处、钩子缩进错开、按钮又在一处，彼此<b>基线不对齐</b>。</p>
+
+  <div class="ctrl">
+    <span class="lb">内容</span>
+    <button class="btn on" data-c="palette">色域</button>
+    <button class="btn" data-c="shape">版型</button>
+    <button class="btn" data-c="fabric">面料</button>
+    <span class="lb" style="margin-left:10px">屏幕</span>
+    <button class="btn" data-s="se">SE 568</button>
+    <button class="btn on" data-s="14">14 · 844</button>
+    <button class="btn" data-s="max">Max 926</button>
+    <span class="lb" style="margin-left:10px">文案</span>
+    <button class="btn on" data-t="short">短</button>
+    <button class="btn" data-t="long">长</button>
+    <button class="btn" id="gbtn">调试线</button>
+  </div>
+
+  <div class="main">
+    <div class="phone" id="phone" data-size="14">
+      <div class="sb"><span>22:21</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+      <div class="navbar"><div class="brand"><span class="up">up</span><span class="look">look</span></div><div class="right">今天最好看</div></div>
+      <div class="greet"><div class="gt"><div class="gk">今天最好看</div><div class="gd">9月19日 · 周六</div></div>
+        <div class="gtitle">晚上好，继续今天的形象计划</div></div>
+      <div class="poster" id="poster"></div>
+      <div class="below">
+        <div class="bh">直接解决眼前的一件事</div><div class="brule"></div>
+        <div class="bph l"></div>
+        <div class="brow"><div class="bph"></div><div class="bph"></div></div>
+      </div>
+    </div>
+
+    <div class="note">
+      <h3>文字不再是"一块"</h3>
+      <div class="sub2">四个独立元素，各自定位、基线错开</div>
+      <dl>
+        <dt>拆成什么</dt><dd>编号 / 标题 / 钩子 / 按钮+链接 —— 四个<b>独立绝对定位</b>的元素，各走各的位置，
+          不再由一个父容器统一排。</dd>
+        <dt>关键：基线不对齐</dt><dd>色域型里标题在 <code>left 9%</code>，钩子在 <code>left 27%</code>——
+          <b>故意错开 18%</b>。左边缘不齐，眼睛才会把每一块当成独立元素来读。</dd>
+        <dt>位置随类型变化</dt><dd>色域：标题左、钩子缩进、按钮左下。<br>
+          版型：标题左、钩子更靠右、按钮<b>右下</b>（换个角）。<br>
+          面料：标题<b>靠右下</b>（因为视觉元素在左上）、按钮左下。<br>
+          <b>三个类型的构图各不相同</b>，不是同一套模板换颜色。</dd>
+        <dt>竖排小标</dt><dd>右侧边一条 <code>writing-mode:vertical-rl</code> 的小字（类别名），
+          杂志常用的边角元素，成本几乎为零但很提气质。</dd>
+      </dl>
+
+      <h3 style="margin-top:20px">这样排的风险</h3>
+      <dl>
+        <dt>可读性要逐块确认</dt><dd>文字一分散，每块落在不同背景上，<b>必须逐块验证对比度</b>。
+          这一版靠"整块底板同色"规避——底板是深的就是全深，浅的全浅，所有文字块共用同一个 tone。</dd>
+        <dt>如果哪天底板本身有明暗变化</dt><dd>就得给单个文字块加局部 scrim，或者把它挪到底板同色的区域。
+          <b>这是"分散"的代价</b>：集中排版只需验一次，分散要验四次。</dd>
+        <dt>长文案会打破构图</dt><dd>切「长文案」看：钩子变两行会往下顶，可能吃到按钮。
+          兜底是<b>标题降字号 + 钩子限一行</b>，但那会损失构图。</dd>
+      </dl>
+
+      <div class="fix">我的判断：<b>分散排版值得这个代价</b>。集中排版无论如何都是"图 + 一段字"，
+        只有拆开，文字才真正成为构图的一部分——这才是你要的杂志感。</div>
+      <div class="warnline">但有一条底线：<b>不能为了错开而错开</b>。每块的位移都要有理由
+        （避开某个视觉元素、呼应某条边、制造阅读顺序）。随便乱放只会变乱，不会变高级。</div>
+
+      <h3 style="margin-top:20px">高度不变</h3>
+      <table>
+        <tr><th>屏幕</th><th>海报区</th><th>占屏</th><th>下方可见</th></tr>
+        <tr><td>14 · 844</td><td><b>320</b></td><td><b>38%</b></td><td>~380 · 3 行</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const FIBER = "url(&quot;data:image/svg+xml;utf8,<svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;200&#39; height=&#39;200&#39;><filter id=&#39;f&#39;><feTurbulence type=&#39;fractalNoise&#39; baseFrequency=&#39;0.02 0.85&#39; numOctaves=&#39;4&#39; seed=&#39;7&#39;/><feColorMatrix type=&#39;saturate&#39; values=&#39;0&#39;/></filter><rect width=&#39;200&#39; height=&#39;200&#39; filter=&#39;url(%23f)&#39; opacity=&#39;0.5&#39;/></svg>&quot;)"
+
+/* text：四个独立块，各自 left/top/width；vmark 是竖排边角标 */
+const CONTENT = {
+  palette: {
+    tone: 'light', seq: '09 / 24', vmark: 'COLOR',
+    title: '你的色域，<br>是偏冷的', titleLong: '你的色域偏冷，<br>挑颜色会简单很多',
+    hook: '这组颜色贴着你的皮肤都不会打架。', hookLong: '这组颜色贴着你的皮肤都不会打架，深浅之间还能自由叠穿。',
+    cta: '收进我的色卡',
+    base: 'linear-gradient(158deg,#24363D 0%,#2C4550 52%,#1F2E34 100%)',
+    fogs: [{w:250,h:250,l:'-60px',t:'-70px',c:'rgba(120,160,178,.30)',a:'fog1 27s'},
+           {w:210,h:210,r:'-50px',t:'90px',c:'rgba(190,200,190,.20)',a:'fog2 33s'}],
+    els: [
+      {l:'3%',  t:'6%',  w:'29%', h:'26%', rot:5,  bg:'#5C7E88', no:'01', d:'.2s'},
+      {l:'37%', t:'2%',  w:'25%', h:'21%', rot:-4, bg:'#7E9AA2', no:'02', d:'1.0s'},
+      {l:'68%', t:'9%',  w:'27%', h:'22%', rot:6,  bg:'#A8BEC0', no:'03', d:'2.0s'},
+      {l:'70%', t:'42%', w:'28%', h:'23%', rot:-7, bg:'#D8E0DC', no:'04', d:'2.9s'},
+    ],
+    text: {
+      seq:   {l:'9%',  t:'7%',  w:'40%'},
+      tt:    {l:'9%',  t:'46%', w:'66%'},
+      hh:    {l:'27%', t:'69%', w:'52%'},   // 故意缩进 18%，与标题左缘不齐
+      act:   {l:'9%',  t:'86%'},
+    },
+    rule: {l:'9%', t:'64%', w:'22%', h:'1px'},   // 标题与钩子之间的一条短线
+  },
+  shape: {
+    tone: 'light', seq: '03 / 24', vmark: 'SILHOUETTE',
+    title: '落肩正在抹掉<br>你的肩线', titleLong: '落肩的流行，<br>正在抹掉你的肩线',
+    hook: '你肩偏窄，选肩缝正好落在肩点的。', hookLong: '你肩偏窄、骨架偏小。落肩会把本来就不宽的肩再吃掉一层。',
+    cta: '收进我的版型库',
+    base: 'linear-gradient(155deg,#38452F 0%,#42503A 55%,#2E3927 100%)',
+    svg: true,
+    els: [
+      {l:'54%', t:'4%',  w:'34%', h:'24%', rot:5,  bg:'#8E9A86', no:'01', d:'.6s'},
+      {l:'70%', t:'32%', w:'30%', h:'20%', rot:-7, bg:'#C3CBBB', no:'02', d:'1.8s'},
+    ],
+    text: {
+      seq: {l:'9%',  t:'7%',  w:'40%'},
+      tt:  {l:'9%',  t:'40%', w:'62%'},
+      hh:  {l:'34%', t:'62%', w:'48%'},
+      act: {l:'58%', t:'84%'},      // 按钮换到右下角
+    },
+    rule: {l:'9%', t:'57%', w:'16%', h:'1px'},
+  },
+  fabric: {
+    tone: 'dark', seq: '12 / 24', vmark: 'FABRIC',
+    title: '光泽会<br>放大体积', titleLong: '光泽这种东西，<br>会悄悄放大体积',
+    hook: '你骨架偏小，光泽留一处就够。', hookLong: '你骨架偏小。硬挺的面料会自己撑出形状；有光泽的会往外推边界。',
+    cta: '收进我的面料库',
+    base: 'linear-gradient(160deg,#EFEDE6 0%,#E7E5DB 100%)',
+    fogs: [{w:220,h:220,r:'-60px',t:'-50px',c:'rgba(206,196,172,.45)',a:'fog2 29s'}],
+    els: [
+      {l:'-6%', t:'4%',  w:'36%', h:'29%', rot:-5, bg:'#63685E', fiber:1, no:'01', d:'.3s'},
+      {l:'42%', t:'2%',  w:'31%', h:'24%', rot:6,  bg:'#8B9A82', fiber:1, sheen:1, no:'02', d:'1.4s'},
+      {l:'70%', t:'26%', w:'28%', h:'21%', rot:-8, bg:'#A9B2A0', fiber:1, no:'03', d:'2.6s'},
+    ],
+    text: {
+      seq: {l:'9%',  t:'7%',  w:'40%'},
+      tt:  {l:'30%', t:'52%', w:'62%'},    // 标题靠右下：因为视觉元素压在左上
+      hh:  {l:'30%', t:'74%', w:'52%'},
+      act: {l:'9%',  t:'88%'},             // 按钮在左下，与标题对角
+    },
+    rule: {l:'30%', t:'70%', w:'18%', h:'1px'},
+  },
+}
+
+let cur = 'palette', long = false, showGuide = false
+
+function render() {
+  const c = CONTENT[cur]
+  const P = document.getElementById('poster')
+  P.className = 'poster ' + c.tone
+  let h = `<div class="base" style="background:${c.base}"></div>`
+  ;(c.fogs || []).forEach(f => {
+    h += `<div class="fog" style="width:${f.w}px;height:${f.h}px;${f.l ? 'left:' + f.l : ''}${f.r ? 'right:' + f.r : ''};top:${f.t};background:radial-gradient(circle,${f.c},transparent 70%);animation:${f.a} ease-in-out infinite"></div>`
+  })
+  if (c.svg) {
+    h += `<svg viewBox="0 0 390 320" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;z-index:2">
+      <path d="M 36 100 Q 104 86 148 116 L 168 200" fill="none" stroke="rgba(238,240,236,.30)" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 5"/>
+      <path d="M 182 82 L 262 78 L 272 206" fill="none" stroke="#EEF0EC" stroke-width="2.4" stroke-linecap="round"/>
+      <line x1="262" y1="64" x2="262" y2="234" stroke="rgba(180,196,168,.6)" stroke-width="1" stroke-dasharray="3 4"/>
+    </svg>`
+  }
+  ;(c.els || []).forEach(e => {
+    h += `<div class="el" style="left:${e.l};top:${e.t};width:${e.w};height:${e.h};
+      transform:rotate(${e.rot}deg);background:${e.bg};z-index:5;animation-delay:${e.d};${e.fiber ? 'overflow:hidden;' : ''}">
+      ${e.no ? `<span class="no" style="color:rgba(40,48,36,.34)">${e.no}</span>` : ''}
+      ${e.fiber ? `<div style="position:absolute;inset:0;opacity:.5;background-image:${FIBER}"></div>` : ''}
+      ${e.sheen ? `<div class="sheen"></div>` : ''}
+    </div>`
+  })
+  h += `<div class="grain" style="${c.tone === 'light' ? 'opacity:.20' : ''}"></div>`
+
+  // 竖排边角标
+  h += `<div class="vmark" style="right:9px;top:16px">${c.vmark}</div>`
+
+  // 四个文字块，各自独立定位
+  const t = c.text, fs = long ? 20 : 22
+  if (c.rule) h += `<div class="rule" style="left:${c.rule.l};top:${c.rule.t};width:${c.rule.w};height:${c.rule.h}"></div>`
+  h += `<div class="tx seq" style="left:${t.seq.l};top:${t.seq.t};width:${t.seq.w}">${c.seq}</div>`
+  h += `<div class="tx tt" style="left:${t.tt.l};top:${t.tt.t};width:${t.tt.w};font-size:${fs}px">${long ? c.titleLong : c.title}</div>`
+  h += `<div class="tx hh" style="left:${t.hh.l};top:${t.hh.t};width:${t.hh.w}">${long ? c.hookLong : c.hook}</div>`
+  h += `<div class="tx" style="left:${t.act.l};top:${t.act.t}">
+      <span class="cta">${c.cta}</span>
+      <span class="lnk" style="margin-left:10px">今日页 ›</span>
+    </div>`
+
+  if (showGuide) {
+    h += Object.keys(t).map(k => {
+      const b = t[k]
+      return `<div style="position:absolute;left:${b.l};top:${b.t};width:${b.w || '30%'};height:26px;
+        border:1px dashed rgba(210,60,60,.85);z-index:30;pointer-events:none"></div>`
+    }).join('')
+  }
+  P.innerHTML = h
+}
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.btn')
+  if (!b) return
+  if (b.dataset.c) { cur = b.dataset.c; document.querySelectorAll('[data-c]').forEach(x => x.classList.toggle('on', x === b)); render() }
+  if (b.dataset.s) { document.getElementById('phone').dataset.size = b.dataset.s; document.querySelectorAll('[data-s]').forEach(x => x.classList.toggle('on', x === b)) }
+  if (b.dataset.t) { long = b.dataset.t === 'long'; document.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x === b)); render() }
+  if (b.id === 'gbtn') { showGuide = !showGuide; b.classList.toggle('on'); render() }
+})
+render()
+</script>
+</body>
+</html>

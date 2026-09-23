@@ -28,7 +28,9 @@ export default defineConfig(async (merge) => {
       patterns: [
         { from: 'src/assets/', to: 'dist/assets/' },
         // 微信开发者工具打开本目录时，tabBar 图标有时按项目根解析，不走 miniprogramRoot。
-        { from: 'src/assets/tabbar/', to: 'assets/tabbar/' },
+        // to 相对 outputRoot（dist），所以要 ../ 回到项目根；写 'assets/tabbar/' 会落到
+        // dist/assets/tabbar/，scripts/check.mjs 的项目根检查会因此报缺图标。
+        { from: 'src/assets/tabbar/', to: '../assets/tabbar/' },
         { from: 'src/sitemap.json', to: 'dist/sitemap.json' },
       ],
       options: {},

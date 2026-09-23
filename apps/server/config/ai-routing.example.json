@@ -285,6 +285,11 @@
       "policy": "quality_first",
       "primary": "aliyun/qwen3.8-flash"
     },
+    "daily_content": {
+      "policy": "quality_first",
+      "primary": "aliyun/qwen3.8-flash",
+      "max_cost_cny": 0.02
+    },
     "hair_edit": {
       "policy": "quality_first",
       "primary": "siliconflow/kwai-kolors-kolors",

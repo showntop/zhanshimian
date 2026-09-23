@@ -4,13 +4,14 @@
 // 数据纪律（新架构不变）：单次 /v1/home/bootstrap 聚合 + resourceCache 缓存优先；
 // 进行中 Operation 只经 useOperationPolling 观察，全部到终态后整页静默对账一次。
 // 图片一律走 SourceImage：角标按 source_kind 投影，不手动叠标、不回退内置图。
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import {
   ANALYSIS_FAIL_COPY,
   APP_NAME,
   APP_SLOGAN,
+  DAILY_COPY,
   ERROR_COPY,
   HOME_COPY,
   HOME_TITLE,
@@ -20,6 +21,8 @@ import {
   SCENES,
   greetingForNow,
   planSlotLabel,
+  readDressLockParams,
+  roamVariant,
   taskDoneText,
   trackEvent,
   type DisplayMedia,
@@ -27,11 +30,18 @@ import {
   type SceneCopy,
 } from '@zsm/core'
 import { qualityApi } from '../../app/api/quality'
+import { resolveBaseURL } from '../../config/runtime'
 import { peripherals } from '../../app/api/peripherals'
 import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
 import { useOperationPolling } from '../../app/operations/use-operation-polling'
+import { useDailyPick } from '../../features/daily/use-daily-pick'
 import { usePageShell } from '../../hooks/use-page-visibility'
 import AppHeader from '../../components/app-header'
+import DailyPoster from '../../components/daily-poster'
+import DailyMotion from '../../components/daily-motion'
+import DressShuffle from '../../components/dress-shuffle'
+import { useDressAssets } from '../../components/dress-shuffle/use-dress-assets'
+import { dressTargetFromLock } from '../../components/dress-shuffle/presets'
 import PrimaryButton from '../../components/primary-button'
 import SourceImage from '../../components/source-image'
 import ErrorState from '../../components/error-state'
@@ -44,6 +54,19 @@ const IN_FLIGHT = new Set(['accepted', 'running', 'retrying'])
 const RENDER_IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
 // 发型预览在途状态（HairPreview.state；诊断类是同步接口，没有跨页在途态可读）
 const HAIR_IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
+
+// ---------- 换装洗牌（dress variant，spec 2026-09-23） ----------
+// M3 服务端 dress_lock 未接：先用「装机种子 + 日期」稳定二选一（同人同天
+// 稳定、隔天切换），M3 后由 settle 脚本 kind 分发覆盖；收敛 target 同理走
+// 稳定本地派生。素材走 M4 CDN（未接线时 base 为空 → 预载必然失败 →
+// 回落 sketch 巡游顶位，行为安全）。开发者可用 storage 临时覆盖：
+//   zsm_dress_base = 素材基地址；zsm_dress_filter_off = '1'（模拟端不支持滤镜）
+const DRESS_VARIANT_KEY = 'zsm_dress_variant'
+const DRESS_BASE_KEY = 'zsm_dress_base'
+const DRESS_FILTER_OFF_KEY = 'zsm_dress_filter_off'
+// 等待期（脚本未到）的素材基地址：服务端 /assets/ 静态路由，与序列帧揭晓同源。
+// 收敛期以 dress_lock.assets.base 为准；storage 可覆盖（本地联调另一台源时用）。
+const DRESS_ASSET_BASE = `${resolveBaseURL()}/assets/daily/dress`
 
 // 工具卡文案在 HOME_COPY.tools（红线 5），这里只配 key → 路由
 const TOOL_PATHS: Record<(typeof HOME_COPY.tools)[number]['key'], string> = {
@@ -77,12 +100,22 @@ function isActive(operation: HomeBootstrap['active_operations'][number]): boolea
   return IN_FLIGHT.has(operation.status)
 }
 
-/** 今日语境日期（问候区的时间锚点，非装饰） */
-function todayLabel(): string {
-  const d = new Date()
-  const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()] ?? ''
-  return `${d.getMonth() + 1}月${d.getDate()}日 · 周${week}`
+/** 星期锚点（问候区右上角小注；月/日由巨号日期承担，不再重复） */
+function weekLabel(): string {
+  const week = ['日', '一', '二', '三', '四', '五', '六'][new Date().getDay()] ?? ''
+  return `周${week}`
 }
+
+// 报告入口的比例节奏条：宽度刻意不规则（编辑式排版的"破"），
+// 首段实、末段陶土橘破色、中段安静，条数 = 可提升点数（3~6，schema 上下界内）
+const ARCHIVE_BAR_SEGMENTS = [
+  { key: 'a', width: 88 },
+  { key: 'b', width: 36 },
+  { key: 'c', width: 64 },
+  { key: 'd', width: 28 },
+  { key: 'e', width: 52 },
+  { key: 'f', width: 44 },
+] as const
 
 const SceneTile = memo(function SceneTile({ scene }: { scene: SceneCopy }) {
   return (
@@ -220,6 +253,94 @@ export default function Home() {
   const featured = planSet ? [...planSet.variants].sort((a, b) => a.slot - b.slot)[0] : undefined
   const findingsCount = (report?.findings ?? []).length
 
+  // 每日内容：与今日页共用同一个状态机（服务端幂等保证同一天同一条），
+  // 首页只放海报（精简），点进去看完整；生成中不占首页空间。
+  const {
+    phase,
+    content: dailyContent,
+    bucketName: dailyBucketName,
+    saveCurrent,
+    roamScript,
+    settleScript,
+    reveal,
+  } = useDailyPick()
+  // 揭晓由收敛动画播完触发（reveal），不再写死 1.2s。
+  const dailyReady = phase === 'content'
+  const dailySettling = phase === 'settling'
+  // 生成中播巡游：这两段不给东西的话，等待期间首页这块是空的。
+  const dailyWaiting = phase === 'loading' || phase === 'waiting'
+  // gene 色板接入点：脚本是通用的、可缓存的，不携带用户隐私，
+  // 所以配色在渲染时由客户端注入（数据到位后传进来即可）。
+  const dailyPalette: string[] = []
+
+  // 换装洗牌 variant：等待期与收敛期都只信服务端脚本（hash(uid+date) 同一套
+  // 种子）。客户端不再本地另算——本地猜会整段猜错（明明是 dress 却走旧线）。
+  // 素材预载失败 → dress 整体退位，sketch 巡游 + 帧揭晓照常（spec §4）。
+  const dressEnv = useMemo(() => {
+    const read = (key: string): string => {
+      try {
+        return (Taro.getStorageSync(key) as string) || ''
+      } catch {
+        return ''
+      }
+    }
+    const now = new Date()
+    return {
+      dateKey: `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`,
+      base: read(DRESS_BASE_KEY) || DRESS_ASSET_BASE,
+      colorLocked: read(DRESS_FILTER_OFF_KEY) === '1',
+    }
+  }, [])
+  const dressRoamVariant = useMemo(
+    () => roamVariant(roamScript?.stages.find((stage) => stage.phase === 'roam')),
+    [roamScript],
+  )
+  // 记住服务端这次给的 variant：供 App 启动时（首页还没挂载）判断要不要预热
+  useEffect(() => {
+    if (!dressRoamVariant) return
+    try {
+      Taro.setStorageSync(DRESS_VARIANT_KEY, `${dressEnv.dateKey}|${dressRoamVariant}`)
+    } catch {
+      // 存不下就不存：本次会话内仍有 roam 脚本兜底
+    }
+  }, [dressRoamVariant, dressEnv.dateKey])
+  // 未知时不再本地猜：默认走洗牌（静态前奏），roam 脚本一到就校正。
+  // 此前本地 50% 猜成 sketch，会整段走旧线——「明明是 dress 却没有洗牌」的元凶。
+  const dressPredict = dressRoamVariant !== 'sketch'
+  const dressLock = useMemo(
+    () => readDressLockParams(settleScript?.stages.find((stage) => stage.kind === 'dress_lock')),
+    [settleScript],
+  )
+  // 词汇表对不上（客户端落后于服务端新值）→ null → 回落旧揭晓线
+  const dressLockTarget = useMemo(
+    () => (dressLock ? dressTargetFromLock(dressLock.target) : null),
+    [dressLock],
+  )
+  // 素材基地址以脚本下发为准（服务端可独立换源），本地常量只是开发覆盖
+  const dressBase = dressLock?.assets.base || dressEnv.base
+  const dressAssets = useDressAssets(dressBase, dressPredict || Boolean(dressLock))
+  // 预载中（pending）也走洗牌——停在它的静态前奏态。此前用 sketch 巡游顶位，
+  // 素材就绪后硬切成洗牌，开头会先窜一小段线稿。只有真失败才回落旧线。
+  const dressOnWaiting = dressPredict && !dressAssets.failed
+  const dressOnSettling = Boolean(dressLockTarget) && dressAssets.ready
+  const dressHold = !dressAssets.ready
+
+  // 海报角落编号用日期而非序号：序号是静态的，日期才有"每天换一张"的时间感
+  const todaySeq = useMemo(() => {
+    const now = new Date()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    return `${month}.${day}`
+  }, [])
+
+  const goToday = useCallback(() => {
+    void Taro.navigateTo({ url: '/pages/today/index' })
+  }, [])
+
+  const goReport = useCallback(() => {
+    void Taro.navigateTo({ url: `/pages/report/index?id=${encodeURIComponent(report?.id ?? '')}` })
+  }, [report?.id])
+
   // 方案 Tab 角标（与 PlansScreen 同一规则：在途受理 + 各套在途渲染）。
   // 首页是默认 tab、启动即挂载，方案 tab 懒挂载——首页不设的话，
   // 在首页等待生成的用户不点方案 tab 永远看不到红点。
@@ -252,11 +373,18 @@ export default function Home() {
           <View className={`home__greeting ${enter()}`}>
             <View className="home__greeting-top">
               <Text className="home__greeting-kicker">{APP_SLOGAN}</Text>
-              <Text className="home__greeting-date">{todayLabel()}</Text>
+              <Text className="home__greeting-week">{weekLabel()}</Text>
             </View>
-            <Text className="home__greeting-title display">
-              {hasReport ? `${greetingForNow()}，${HOME_COPY.returningTitle}` : HOME_TITLE}
-            </Text>
+            <View className="home__greeting-anchor">
+              <Text className="home__greeting-date serif">
+                {todaySeq.slice(0, 2)}
+                <Text className="home__greeting-dot">.</Text>
+                {todaySeq.slice(3)}
+              </Text>
+              <Text className="home__greeting-title display">
+                {hasReport ? `${greetingForNow()}，${HOME_COPY.returningTitle}` : HOME_TITLE}
+              </Text>
+            </View>
           </View>
 
           {!hasReport ? (
@@ -340,40 +468,113 @@ export default function Home() {
                   className="home__hero-img"
                   media={todayPlan.media}
                   anchor="top"
-                  frameAspect={200 / 260}
+                  frameAspect={232 / 344}
                 />
               </View>
             </View>
           ) : (
             <View>
-              <View
-                className="home__hero home__hero--report card--hero pressable"
-                onClick={() =>
-                  void Taro.navigateTo({ url: `/pages/report/index?id=${encodeURIComponent(report?.id ?? '')}` })
-                }
-              >
-                <View className="home__report-main">
-                  <View className={`home__hero-copy ${enter(1)}`}>
-                    <Text className="home__hero-eyebrow">{HOME_COPY.reportReady}</Text>
-                    <Text className="home__hero-title">{report?.priority_title}</Text>
-                    <Text className="home__hero-desc">{report?.priority_copy}</Text>
-                  </View>
-                  <View className="home__report-visual">
-                    <SourceImage
-                      className="home__report-image"
-                      media={report?.source_media.face.media}
-                      anchor="top"
-                      frameAspect={248 / 314}
-                    />
-                    <View className="home__report-shade" />
-                  </View>
+              {dailyReady && dailyContent && !dressOnSettling ? (
+                <View className={enter(1)}>
+                  <DailyPoster
+                    type={dailyContent.type}
+                    visual={dailyContent.visual}
+                    topic={dailyContent.topic}
+                    fitText={dailyContent.fitText}
+                    seq={todaySeq}
+                    saveLabel={DAILY_COPY.saveAction}
+                    onSave={saveCurrent}
+                    onOpen={goToday}
+                  />
                 </View>
-                <View className="home__report-action">
-                  <Text className="home__report-action-label">{HOME_COPY.viewReport}</Text>
-                  <Text className="home__report-action-meta">
-                    <Text className="home__report-action-count">{findingsCount}</Text>
-                    {HOME_COPY.findingsSuffix}
-                  </Text>
+              ) : dailySettling || (dailyReady && dressOnSettling) ? (
+                // 落地即保留：洗牌揭晓面板（人物 + 这一身）一直留在首页，
+                // 内容海报退到卡片下方的一行入口（产品流程仍可进今日页收下）。
+                <>
+                  <View
+                    className={`home__daily-waiting ${dressOnSettling ? 'home__daily-waiting--dress' : ''} ${enter(1)}`}
+                  >
+                    {dressOnSettling ? (
+                      <DressShuffle
+                        target={dressLockTarget ?? undefined}
+                        settling
+                        assetBase={dressBase}
+                        resolveAsset={dressAssets.resolve}
+                        hairAvailable={dressAssets.hairReady}
+                        colorLocked={dressEnv.colorLocked}
+                        onSettled={reveal}
+                      />
+                    ) : (
+                      <DailyMotion
+                        presentation={settleScript}
+                        phase="settling"
+                        palette={dailyPalette}
+                        seq={todaySeq}
+                        onSettled={reveal}
+                      />
+                    )}
+                  </View>
+                  {dailyReady && dailyContent && dressOnSettling ? (
+                    // 洗牌停下后的视线引导：面板落定 → 这条淡入（延迟 300ms）
+                    <View className="home__daily-entry home__daily-entry--in pressable" onClick={goToday}>
+                      <View className="home__daily-entry-copy">
+                        <Text className="home__daily-entry-label">
+                          {DAILY_COPY.dressContentLabel} · {dailyContent.topic}
+                        </Text>
+                        <Text className="home__daily-entry-hint">{DAILY_COPY.dressContentHint}</Text>
+                      </View>
+                      <Text className="home__daily-entry-link">{DAILY_COPY.dressContentLink}</Text>
+                    </View>
+                  ) : null}
+                </>
+              ) : dailyWaiting ? (
+                <View
+                  className={`home__daily-waiting ${dressOnWaiting ? 'home__daily-waiting--dress' : ''} ${enter(1)}`}
+                >
+                  {dressOnWaiting ? (
+                    <DressShuffle
+                      settling={false}
+                      hold={dressHold}
+                      assetBase={dressBase}
+                      resolveAsset={dressAssets.resolve}
+                      hairAvailable={dressAssets.hairReady}
+                      colorLocked={dressEnv.colorLocked}
+                    />
+                  ) : (
+                    <DailyMotion
+                      presentation={roamScript}
+                      phase="waiting"
+                      palette={dailyPalette}
+                      seq={todaySeq}
+                    />
+                  )}
+                </View>
+              ) : null}
+              {/* 报告退位：不再是首页主角，但入口保留，降级为一行。
+                  数字用不规则比例条做"进展感"隐喻——比孤立大数字更编辑式 */}
+              <View className="home__archive pressable" onClick={goReport}>
+                <Text className="home__archive-text">{HOME_COPY.viewReport}</Text>
+                <View className="home__archive-meta">
+                  {findingsCount > 0 ? (
+                    <View className="home__archive-bars">
+                      {ARCHIVE_BAR_SEGMENTS.slice(
+                        0,
+                        Math.min(findingsCount, ARCHIVE_BAR_SEGMENTS.length),
+                      ).map((segment, position) => (
+                        <View
+                          key={segment.key}
+                          className={
+                            `home__archive-bar` +
+                            `${position === 0 ? ' home__archive-bar--lead' : ''}` +
+                            `${position === Math.min(findingsCount, ARCHIVE_BAR_SEGMENTS.length) - 1 ? ' home__archive-bar--tail' : ''}`
+                          }
+                          style={{ width: `${segment.width}rpx` }}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                  <Text className="home__archive-num serif">{findingsCount}</Text>
+                  <Text className="home__archive-suffix">{HOME_COPY.findingsSuffix}</Text>
                 </View>
               </View>
             </View>

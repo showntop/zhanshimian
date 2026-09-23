@@ -137,7 +137,7 @@ func validateAIRouting(routing AIRoutingConfig) error {
 		"appearance_analysis": true, "photo_check": true, "outfit_diagnosis": true,
 		"purchase_diagnosis": true, "advisor_chat": true, "today_plan": true,
 		"photo_quality_check": true, "photo_identity_consistency": true, "report_evidence_verification": true,
-		"plan_set_generation": true, "plan_grounding_verification": true,
+		"plan_set_generation": true, "plan_grounding_verification": true, "daily_content": true,
 	}
 	assessmentMultiImageCapabilities := map[string]bool{
 		"photo_quality_check": true, "photo_identity_consistency": true,

@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>每日内容 · 视觉方向探索（三版）</title>
+<style>
+:root{
+  --bg:#F4F5F2; --ink:#202320; --ink2:#626862; --ink3:#686D67;
+  --moss:#587344; --moss-soft:#EDF1EA; --moss-deep:#39492E; --cream:#EEF0EC;
+  --line:rgba(55,62,52,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',sans-serif;
+  background:#E4E6E2;color:var(--ink);-webkit-font-smoothing:antialiased;padding:28px 24px 64px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-size:21px;font-weight:700;letter-spacing:-.3px}
+.sub{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.75;max-width:880px}
+.tabs{display:flex;gap:7px;margin:18px 0;flex-wrap:wrap}
+.tab{padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  color:var(--ink2);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--moss-deep);border-color:var(--moss-deep);color:var(--cream)}
+.main{display:flex;gap:30px;align-items:flex-start;flex-wrap:wrap}
+.stage{display:none;gap:30px;align-items:flex-start;flex-wrap:wrap}
+.stage.on{display:flex}
+
+.phone{width:375px;flex:0 0 375px;height:790px;border-radius:34px;overflow:hidden;position:relative;
+  display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(40,50,35,.22)}
+@media (max-width:1040px){.phone{flex:0 0 auto;width:375px}}
+.sb{height:44px;flex:0 0 44px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 22px;font-size:12px;font-weight:600;z-index:20;position:relative}
+.cap{display:flex;gap:4px;align-items:center}
+.cap i{width:4px;height:8px;border-radius:1px;background:currentColor;display:block;opacity:.85}
+.cap i:nth-child(4){height:6px;opacity:.4}
+.navbar{display:flex;align-items:center;gap:10px;padding:0 16px 10px;z-index:20;position:relative}
+.back{font-size:20px;line-height:1;opacity:.8}
+.navctx{font-size:12.5px;font-weight:600;opacity:.8}
+
+/* ============ A 色彩场 ============ */
+.a{background:#fff}
+.a .field{position:relative;height:352px;flex:0 0 352px;overflow:hidden;background:#E8EDE4}
+.a .blob{position:absolute;border-radius:50%;filter:blur(46px);opacity:.9}
+.a .b1{width:300px;height:300px;left:-60px;top:-70px;background:#C9D8BE;animation:drift1 16s ease-in-out infinite}
+.a .b2{width:260px;height:260px;right:-50px;top:20px;background:#E3DCC8;animation:drift2 19s ease-in-out infinite}
+.a .b3{width:240px;height:240px;left:60px;bottom:-80px;background:#D8DEE6;animation:drift3 22s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,30px) scale(1.12)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-34px,26px) scale(1.08)}}
+@keyframes drift3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(22px,-30px) scale(1.14)}}
+.a .grain{position:absolute;inset:0;opacity:.30;mix-blend-mode:overlay;
+  background-image:radial-gradient(rgba(255,255,255,.9) .5px,transparent .5px);background-size:3px 3px}
+.a .swatches{position:absolute;left:24px;right:24px;bottom:58px;display:flex;gap:10px;height:120px}
+.a .sw{flex:1;border-radius:14px;position:relative;overflow:hidden;
+  box-shadow:0 10px 26px rgba(40,50,35,.18);transition:transform .3s}
+.a .sw.pick{transform:translateY(-10px)}
+.a .sw .in{position:absolute;inset:0}
+.a .sw .lb{position:absolute;left:10px;bottom:9px;font-size:10px;font-weight:800;
+  color:rgba(32,35,32,.62);letter-spacing:.4px}
+.a .sw.dark .lb{color:rgba(255,255,255,.82)}
+.a .sheet{flex:1;background:#fff;border-radius:26px 26px 0 0;margin-top:-30px;z-index:10;
+  padding:26px 24px 24px;position:relative;overflow-y:auto}
+.a .eyebrow{font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--moss)}
+.a h2{margin-top:12px;font-size:29px;line-height:1.24;font-weight:700;letter-spacing:-.8px}
+.a .lead{margin-top:11px;font-size:13.5px;line-height:1.7;color:var(--ink2)}
+.a .fit{margin-top:18px;padding:15px 16px;border-radius:14px;background:var(--moss-soft);
+  font-size:13.5px;line-height:1.72;color:#2E3B25}
+.a .why{margin-top:13px;font-size:11.5px;line-height:1.65;color:var(--ink3)}
+.a .cta{margin-top:22px;height:50px;border-radius:999px;background:var(--moss);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.a .cta2{margin-top:9px;height:50px;border-radius:999px;border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;color:var(--ink2)}
+
+/* ============ B 编辑式 ============ */
+.b{background:#F7F7F4}
+.b .ed{flex:1;padding:8px 26px 24px;display:flex;flex-direction:column;overflow-y:auto}
+.b .rule{width:34px;height:3px;background:var(--moss)}
+.b .meta{margin-top:14px;font-size:11px;font-weight:700;letter-spacing:1.6px;color:var(--ink3);text-transform:uppercase}
+.b .num{margin-top:30px;font-size:72px;line-height:.86;font-weight:800;letter-spacing:-4px;color:#DCE0D8}
+.b h2{margin-top:-24px;font-size:42px;line-height:1.12;font-weight:800;letter-spacing:-2px}
+.b .lead{margin-top:22px;font-size:15px;line-height:1.7;color:var(--ink2);max-width:280px}
+.b .div{margin-top:30px;height:1px;background:var(--line)}
+.b .fit{margin-top:26px;font-size:14px;line-height:1.8;color:var(--ink)}
+.b .fit em{font-style:normal;font-weight:700;border-bottom:3px solid var(--moss-soft)}
+.b .why{margin-top:18px;font-size:11.5px;line-height:1.7;color:var(--ink3);padding-left:12px;
+  border-left:2px solid var(--moss-soft)}
+.b .foot{margin-top:auto;padding-top:26px;display:flex;align-items:center;justify-content:space-between}
+.b .cta{padding:14px 26px;border-radius:999px;background:var(--moss-deep);color:var(--cream);
+  font-size:13.5px;font-weight:700}
+.b .cta2{font-size:13px;font-weight:600;color:var(--ink3)}
+.b .sw-mini{margin-top:26px;display:flex;gap:6px;height:44px}
+.b .sw-mini i{flex:1;border-radius:6px}
+
+/* ============ C 暗场 ============ */
+.c{background:#20241F;color:var(--cream)}
+.c .dark{flex:1;position:relative;overflow-y:auto;padding:0 24px 24px}
+.c .glow{position:absolute;left:-40px;top:-60px;width:320px;height:320px;border-radius:50%;
+  background:radial-gradient(circle,rgba(142,154,131,.55) 0%,rgba(142,154,131,0) 68%);filter:blur(20px);
+  animation:pulse 7s ease-in-out infinite}
+.c .glow2{position:absolute;right:-70px;top:180px;width:280px;height:280px;border-radius:50%;
+  background:radial-gradient(circle,rgba(180,103,77,.34) 0%,rgba(180,103,77,0) 70%);filter:blur(24px);
+  animation:pulse 9s ease-in-out infinite reverse}
+@keyframes pulse{0%,100%{opacity:.85;transform:scale(1)}50%{opacity:1;transform:scale(1.14)}}
+.c .content{position:relative;z-index:5;padding-top:8px}
+.c .stag{display:inline-flex;padding:5px 12px;border-radius:999px;background:rgba(238,240,236,.10);
+  border:1px solid rgba(238,240,236,.22);font-size:10.5px;font-weight:700;letter-spacing:.6px;color:rgba(238,240,236,.82)}
+.c h2{margin-top:22px;font-size:34px;line-height:1.2;font-weight:700;letter-spacing:-1px;color:#fff}
+.c .lead{margin-top:13px;font-size:13.5px;line-height:1.72;color:rgba(238,240,236,.74)}
+.c .swatch{margin-top:26px;display:flex;gap:8px;height:96px}
+.c .swatch i{flex:1;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.34)}
+.c .fit{margin-top:24px;padding:16px;border-radius:14px;background:rgba(238,240,236,.08);
+  border:1px solid rgba(238,240,236,.14);font-size:13.5px;line-height:1.75;color:rgba(238,240,236,.94)}
+.c .why{margin-top:14px;font-size:11.5px;line-height:1.7;color:rgba(238,240,236,.52)}
+.c .cta{margin-top:26px;height:52px;border-radius:999px;background:var(--cream);color:var(--moss-deep);
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.c .cta2{margin-top:9px;height:50px;border-radius:999px;border:1px solid rgba(238,240,236,.24);
+  display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;color:rgba(238,240,236,.72)}
+
+/* ============ 首页卡（三向共用的小预览） ============ */
+.homecard{margin-top:18px;padding:12px;border-radius:14px;background:#fff;display:flex;gap:12px;
+  border:1px solid var(--line);box-shadow:0 3px 9px rgba(52,59,47,.06)}
+.homecard .hv{width:88px;height:88px;flex:0 0 88px;border-radius:11px;overflow:hidden;position:relative}
+.homecard .hc{flex:1;min-width:0;display:flex;flex-direction:column}
+.homecard .he{font-size:10px;font-weight:700;letter-spacing:.6px;color:var(--moss)}
+.homecard .ht{margin-top:4px;font-size:15px;font-weight:700;line-height:1.32}
+.homecard .hf{margin-top:5px;font-size:11px;line-height:1.55;color:var(--ink2);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.homecard .ha{margin-top:auto;font-size:11.5px;font-weight:700;color:var(--moss)}
+
+/* ============ 说明 ============ */
+.note{flex:1;min-width:290px;max-width:460px}
+.note h3{font-size:17px;font-weight:700}
+.note .sub2{font-size:12px;color:var(--moss);font-weight:600;margin:4px 0 14px}
+.note dl{border-top:1px solid var(--line);padding-top:12px}
+.note dt{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.4px;margin-top:12px}
+.note dt:first-child{margin-top:0}
+.note dd{font-size:12.5px;line-height:1.8;color:var(--ink);margin-top:3px}
+.warnline{margin-top:14px;padding:11px 13px;border-radius:10px;background:rgba(126,84,69,.08);
+  font-size:12px;line-height:1.7;color:#6A4B3E}
+.goodline{margin-top:12px;padding:11px 13px;border-radius:10px;background:rgba(88,115,68,.10);
+  font-size:12px;line-height:1.7;color:#3D5230}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>每日内容 · 视觉方向探索</h1>
+  <p class="sub">现状的问题：色块上写着 <code>flat-black</code> 这种开发者文字，一个形象产品却几乎没有色彩，
+    字号也压得保守。三版都在回答同一件事——<strong>怎么让这一条内容有视觉冲击力</strong>。</p>
+
+  <div class="tabs">
+    <button class="tab on" data-stage="a">A 色彩场</button>
+    <button class="tab" data-stage="b">B 编辑式</button>
+    <button class="tab" data-stage="c">C 暗场</button>
+  </div>
+
+  <div class="main">
+    <!-- ============ A ============ -->
+    <div class="stage on" id="stage-a">
+      <div class="phone a">
+        <div class="field">
+          <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+          <div class="grain"></div>
+          <div class="sb"><span>9:41</span><span class="cap"><i></i><i></i><i></i><i></i></span></div>
+          <div class="navbar"><span class="back">‹</span><span class="navctx">11月8日 · 18° 多云</span></div>
+          <div class="swatches">
+            <div class="sw pick"><div class="in" style="background:#FBFBF8"></div><div class="lb">本白 ✓</div></div>
+            <div class="sw"><div class="in" style="background:#F4F5F2"></div><div class="lb">冷白 ✓</div></div>
+            <div class="sw dark"><div class="in" style="background:#EFEADC"></div><div class="lb">米白 ×</div></div>
+            <div class="sw dark"><div class="in" style="background:#E8E1D2"></div><div class="lb">奶油 ×</div></div>
+          </div>
+        </div>
+        <div class="sheet">
+          <div class="eyebrow">今天这一条</div>
+          <h2>冬天的白，<br>不止一种</h2>
+          <p class="lead">本白、米白、奶油白——挂在架子上差不多，上身差很多。</p>
+          <div class="fit">你是冷调肤色。本白和冷白贴着皮肤，气色往上走；米白、奶油白里的黄调，会把冷皮衬得发闷。</div>
+          <div class="why">原理：白色也有色温。挑白和挑蓝一样，先看冷暖，再看明度。</div>
+          <div class="cta">收进我的色卡</div>
+          <div class="cta2">看看我穿这样 ›</div>
+        </div>
+      </div>
+
+      <div class="note">
+        <h3>A · 色彩场</h3>
+        <div class="sub2">视觉即主角，全屏出血 + 内容咬合</div>
+        <dl>
+          <dt>主打</dt><dd>色彩本身就是内容。形象产品的核心是色彩，现在它却缺席。</dd>
+          <dt>怎么做</dt><dd>上半屏是流动的色彩场（多层模糊色团，缓慢漂移），真正的色卡浮在场上、选中项抬起；
+            内容卡咬合上来 30px，形成层次。视觉不占位、不画框，直接出血到屏幕边缘。</dd>
+          <dt>首页卡</dt>
+          <dd><div class="homecard">
+            <div class="hv" style="background:linear-gradient(140deg,#C9D8BE,#E3DCC8 55%,#D8DEE6)"></div>
+            <div class="hc"><div class="he">今天这一条</div><div class="ht">冬天的白，不止一种</div>
+            <div class="hf">你是冷调肤色，本白比米白更衬气色</div><div class="ha">收进我的色卡</div></div>
+          </div></dd>
+          <dt>冲击力来源</dt><dd>色彩 + 动。每一类内容有专属色彩氛围：色彩类走色谱，版型类走形状，面料类走质感。</dd>
+        </dl>
+        <div class="goodline">成本零：全部 CSS 渐变与动画，无图片、无生成、不触 WebP 红线。</div>
+        <div class="warnline">风险：色团模糊在低端机上可能掉帧，需按 <code>prefers-reduced-motion</code> 归零，
+          且动效只做位移/缩放（不做 filter 动画）。</div>
+      </div>
+    </div>
+
+    <!-- ============ B ============ -->
+    <div class="stage" id="stage-b">
+      <div class="phone b">
+        <div class="sb"><span>9:41</span><span class="cap"><i></i><i></i><i></i><i></i></span></div>
+        <div class="navbar"><span class="back">‹</span><span class="navctx">色彩 · No.02</span></div>
+        <div class="ed">
+          <div class="rule"></div>
+          <div class="meta">11月8日 · 18° 多云 · 冬</div>
+          <div class="num">02</div>
+          <h2>全黑<br>并不自动<br>显瘦</h2>
+          <p class="lead">黑色显瘦这句话，只对了一半。</p>
+          <div class="sw-mini">
+            <i style="background:#2E332C"></i><i style="background:#3A4038"></i>
+            <i style="background:#525A4E"></i><i style="background:#6E7866"></i>
+          </div>
+          <div class="div"></div>
+          <div class="fit">你五官对比适中，撑得住全黑。但记得<em>给一个亮部</em>——领口、包或鞋，否则整体会闷。</div>
+          <div class="why">显瘦靠的是轮廓和材质的一致性，不是颜色的深浅。</div>
+          <div class="foot">
+            <div class="cta">收进我的配色库</div>
+            <div class="cta2">看看我穿这样 ›</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note">
+        <h3>B · 编辑式</h3>
+        <div class="sub2">排印即视觉，去掉一切装饰</div>
+        <dl>
+          <dt>主打</dt><dd>用字号和留白制造张力，而不是靠图形。像杂志内页，不像 App 卡片。</dd>
+          <dt>怎么做</dt><dd>72px 的浅色编号 "02" 压在标题后面，标题 42px 三行断开、字距收紧到 -2px；
+            视觉缩成一条 44px 的色带（不再是主角）；正文里关键词用下划线强调。</dd>
+          <dt>首页卡</dt>
+          <dd><div class="homecard">
+            <div class="hv" style="background:#F7F7F4;display:flex;align-items:center;justify-content:center">
+              <span style="font-size:30px;font-weight:800;color:#DCE0D8;letter-spacing:-2px">02</span></div>
+            <div class="hc"><div class="he">今天这一条 · 色彩</div><div class="ht">全黑并不自动显瘦</div>
+            <div class="hf">给一个亮部，否则整体会闷</div><div class="ha">收进我的配色库</div></div>
+          </div></dd>
+          <dt>冲击力来源</dt><dd>字重与留白。信息极少但极清楚，适合"每天一条"这种轻量内容。</dd>
+        </dl>
+        <div class="goodline">最克制、最耐看，也不会过时；实现最简单，纯排版无性能负担。</div>
+        <div class="warnline">风险：「震撼」程度最低——它靠品味而非冲击力。而且要严格执行才有高级感，
+          字号或留白松一点就垮。</div>
+      </div>
+    </div>
+
+    <!-- ============ C ============ -->
+    <div class="stage" id="stage-c">
+      <div class="phone c">
+        <div class="dark">
+          <div class="glow"></div><div class="glow2"></div>
+          <div class="sb" style="padding-left:0;padding-right:0"><span>9:41</span>
+            <span class="cap"><i></i><i></i><i></i><i></i></span></div>
+          <div class="navbar" style="padding-left:0;padding-right:0">
+            <span class="back">‹</span><span class="navctx">11月8日 · 18° 多云</span></div>
+          <div class="content">
+            <span class="stag">今天这一条 · 色彩 · No.02</span>
+            <h2>全黑<br>并不自动显瘦</h2>
+            <p class="lead">黑色显瘦这句话，只对了一半。</p>
+            <div class="swatch">
+              <i style="background:#151814"></i><i style="background:#2E332C"></i>
+              <i style="background:#525A4E"></i><i style="background:#8E9A83"></i>
+            </div>
+            <div class="fit">你五官对比适中，撑得住全黑。但记得给一个亮部——领口、包或鞋，否则整体会闷。</div>
+            <div class="why">显瘦靠的是轮廓和材质的一致性，不是颜色的深浅。</div>
+            <div class="cta">收进我的配色库</div>
+            <div class="cta2">看看我穿这样 ›</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note">
+        <h3>C · 暗场</h3>
+        <div class="sub2">深底发光，戏剧化</div>
+        <dl>
+          <dt>主打</dt><dd>用深底把色彩和照片推出来。浅底上柔和的色卡，在深底上是发光的。</dd>
+          <dt>怎么做</dt><dd>底色压到近黑（#20241F），两层发光色团缓慢呼吸；色卡在深底上对比强烈；
+            文字用 cream 而非纯白，保持品牌的冷调。</dd>
+          <dt>首页卡</dt>
+          <dd><div class="homecard" style="background:#20241F;border-color:rgba(238,240,236,.12)">
+            <div class="hv" style="background:#151814;display:flex;flex-direction:column;justify-content:flex-end;padding:6px;gap:3px">
+              <span style="display:block;height:8px;border-radius:3px;background:#8E9A83"></span>
+              <span style="display:block;height:8px;border-radius:3px;background:#525A4E"></span>
+              <span style="display:block;height:8px;border-radius:3px;background:#2E332C"></span>
+            </div>
+            <div class="hc"><div class="he" style="color:#8E9A83">今天这一条</div>
+            <div class="ht" style="color:#EEF0EC">全黑并不自动显瘦</div>
+            <div class="hf" style="color:rgba(238,240,236,.6)">给一个亮部，否则整体会闷</div>
+            <div class="ha" style="color:#A8B79A">收进我的配色库</div></div>
+          </div></dd>
+          <dt>冲击力来源</dt><dd>明暗对比。也是三版里最容易做出"高级感"的一版。</dd>
+        </dl>
+        <div class="warnline">风险最大：品牌现在是浅色清爽调（bg #F4F5F2 / moss 绿），
+          暗场会明显偏离。若只把今日页做暗，还要处理与首页、tabBar 的割裂。
+          <strong>这条需要你拍板要不要走。</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('.tab')
+  if (!t) return
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('on', b === t))
+  document.querySelectorAll('.stage').forEach((s) => s.classList.toggle('on', s.id === `stage-${t.dataset.stage}`))
+})
+</script>
+</body>
+</html>

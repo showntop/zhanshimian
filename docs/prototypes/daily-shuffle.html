@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>等待方式 · 候选洗牌（线稿造型 + 配色 + 比例）</title>
+<style>
+  :root{--ease:cubic-bezier(.2,.8,.2,1);}
+  *{box-sizing:border-box}
+  body{background:#E8E4DC;font-family:system-ui,-apple-system,PingFang SC;margin:0;padding:24px;
+       display:flex;flex-direction:column;align-items:center;gap:14px;color:#3F463C}
+  body.rm *{animation:none !important;transition:none !important}
+
+  .card-wrap{width:750px;height:560px;position:relative;overflow:hidden;border-radius:18px;
+        background:linear-gradient(160deg,#F5F2EC 0%,#E4DFD6 100%);
+        box-shadow:0 10px 48px rgba(0,0,0,.13);display:flex}
+
+  /* ---------- 左：线稿人物 ---------- */
+  .fig{width:336px;height:100%;position:relative}
+  .figstage{position:absolute;inset:0;overflow:hidden}
+  /* 颜色层（下） */
+  .paint{position:absolute;inset:0;z-index:1}
+  .z{position:absolute;inset:0;background:transparent;
+     -webkit-mask-size:100% 100%;mask-size:100% 100%;
+     -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+     -webkit-mask-position:center;mask-position:center;
+     transition:background .38s var(--ease)}
+  /* 线稿（上，multiply：白底透出下层颜色，黑线保留） */
+  .line{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+        object-position:var(--focus,50%) 50%;z-index:2;mix-blend-mode:multiply}
+  /* 比例线 */
+  .waist{position:absolute;left:4%;right:4%;height:2px;z-index:3;opacity:0;
+         background:linear-gradient(90deg,rgba(142,154,131,0),#8E9A83 14%,#8E9A83 86%,rgba(142,154,131,0));
+         box-shadow:0 0 12px rgba(142,154,131,.5);transition:opacity .3s var(--ease), top .4s var(--ease)}
+  .waist.on{opacity:.95}
+
+  /* ---------- 右：候选池 ---------- */
+  .pool{flex:1;position:relative;display:flex;flex-direction:column;padding:40px 30px 34px}
+  .dim-label{font-size:13px;letter-spacing:.2em;color:#8A9083;margin-bottom:6px;height:18px}
+  .grid{flex:1;position:relative}
+  .cand{position:absolute;left:0;top:0;border-radius:15px;background:#FFF;
+        border:1.5px solid #DED8CD;overflow:hidden;will-change:transform,filter;
+        transition:transform .2s var(--ease), filter .2s var(--ease),
+                   box-shadow .35s var(--ease), border-color .35s var(--ease)}
+  .cand .inner{width:100%;height:100%;border-radius:13px;overflow:hidden;background:#FFF;
+        transition:transform .34s var(--ease), opacity .34s var(--ease), filter .34s var(--ease)}
+  .cand .inner img{width:100%;height:100%;object-fit:cover}
+  .cand .inner svg{width:100%;height:100%;display:block}
+  .cand.pick{border-color:#8E9A83;box-shadow:0 14px 34px rgba(142,154,131,.32);z-index:5}
+  .cand.pick .inner{transform:scale(1.12)}
+  .cand.rest .inner{transform:scale(.9);opacity:.32;filter:saturate(.55)}
+  .cand.rest{border-color:#E4DFD6}
+
+  .chips{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;min-height:26px}
+  .chip{padding:5px 12px;border-radius:999px;background:#FFF;border:1px solid #DED8CD;
+        font-size:11px;letter-spacing:.1em;color:#6B7364;opacity:0;transform:translateY(6px);
+        transition:opacity .3s var(--ease), transform .3s var(--ease)}
+  .chip.on{opacity:1;transform:none}
+
+  .caption{position:absolute;left:36px;bottom:26px;z-index:9}
+  .caption .c1{font-size:23px;letter-spacing:.13em;color:#3F463C;transition:opacity .24s var(--ease)}
+  .caption .c2{margin-top:7px;font-size:11px;letter-spacing:.15em;color:#8A9083}
+  .badge{position:absolute;right:28px;top:22px;padding:6px 14px;border-radius:999px;font-size:12px;
+         letter-spacing:.12em;background:rgba(255,255,255,.9);color:#3F463C;z-index:9}
+
+  .reveal{position:absolute;inset:0;z-index:14;opacity:0;pointer-events:none;
+          display:flex;align-items:flex-end;background:linear-gradient(150deg,#3B4A2E 0%,#28331F 100%);
+          transition:opacity .55s var(--ease)}
+  .reveal.on{opacity:1}
+  .rv{padding:0 0 44px 42px;color:#F2EFE7}
+  .rvt{font-size:27px;letter-spacing:.12em}
+  .rvs{margin-top:10px;font-size:12px;letter-spacing:.16em;opacity:.72}
+
+  .ctl{display:flex;gap:14px;align-items:center;font-size:14px;flex-wrap:wrap;justify-content:center}
+  button,select{padding:7px 15px;border-radius:9px;border:1px solid #3F463C;background:transparent;
+                color:#3F463C;cursor:pointer;font-size:14px}
+  label{display:inline-flex;gap:6px;align-items:center}
+  .hud{opacity:.65;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+  <div class="card-wrap" id="card">
+    <!-- 左：线稿 + 上色 -->
+    <div class="fig">
+      <div class="figstage">
+        <div class="paint">
+          <i class="z" id="zTop"></i>
+          <i class="z" id="zBot"></i>
+        </div>
+        <img class="line" id="lineimg" src="assets/lineart/lineart-outfit.png">
+        <div class="waist" id="waist" style="top:52%"></div>
+      </div>
+    </div>
+
+    <!-- 右：候选池 -->
+    <div class="pool">
+      <div class="dim-label" id="dimLabel">在选造型</div>
+      <div class="grid" id="grid"></div>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="badge" id="badge">造型</div>
+    <div class="caption">
+      <div class="c1" id="c1">今天穿什么</div>
+      <div class="c2">正在为你搭配</div>
+    </div>
+    <div class="reveal" id="reveal">
+      <div class="rv"><div class="rvt">今天这一身</div><div class="rvs" id="rvs">搭配完成</div></div>
+    </div>
+  </div>
+
+  <div class="ctl">
+    <button id="replay">重播</button>
+    <select id="wait">
+      <option value="fast">秒回（&lt;3s）</option>
+      <option value="mid" selected>常规（3–15s）</option>
+      <option value="slow">长等（&gt;15s）</option>
+    </select>
+    <label>起始间隔 <input type="range" id="sp" min="50" max="180" step="5" value="70">
+      <span class="hud" id="spv">70ms</span></label>
+    <label>减速 <input type="range" id="dr" min="1.1" max="1.7" step="0.05" value="1.35">
+      <span class="hud" id="drv">1.35×</span></label>
+    <label><input type="checkbox" id="auto" checked> 循环</label>
+    <label><input type="checkbox" id="rm"> 减动效</label>
+    <span class="hud" id="hud"></span>
+  </div>
+
+<script>
+/* ================= 数据 ================= */
+/* 造型：直接用已生成的 4 张线稿（focus = 人物在图中的横向中心，用于裁切取景） */
+/* focus = object-position（图片某点对齐容器某点，不是“人物在图中的百分比”）
+   主图容器 336×560、缩略图 104×124，缩放比不同 → 两者取值也不同，已分别算好 */
+const LOOKS = [
+  {key:'outfit',   name:'针织+阔腿裤', focus:'10%', thumb:'0%'},
+  {key:'ratio',    name:'短上衣+高腰裤', focus:'2%',  thumb:'0%'},
+  {key:'fit',      name:'A字连衣裙',    focus:'20%', thumb:'5%'},
+  {key:'occasion', name:'西装叠穿',     focus:'0%',  thumb:'0%'},
+];
+const COLORS = [
+  {name:'燕麦', hex:'#D9D0C1'}, {name:'砖红', hex:'#B4553C'}, {name:'墨绿', hex:'#3F5340'},
+  {name:'藏蓝', hex:'#2F3E56'}, {name:'浅灰', hex:'#C6C4BE'}, {name:'驼色', hex:'#B08B5E'},
+];
+const WAISTS = [{name:'高腰', pct:46}, {name:'中腰', pct:52}, {name:'低腰', pct:58}];
+
+/* 本轮内容给出的答案（真实实现由服务端下发） */
+const TARGET = { look:0, color:1, waist:0 };
+
+const DIMS = [
+  { key:'look', label:'在选造型', badge:'造型', target:TARGET.look,
+    items: LOOKS.map(l=>({kind:'look', name:l.name, key:l.key, focus:l.focus})),
+    apply(it){
+      lineimg.src = 'assets/lineart/lineart-'+it.key+'.png';
+      lineimg.style.setProperty('--focus', it.focus);
+      const mu = k => 'url(assets/masks/'+it.key+'/'+k+'.png)';
+      zTop.style.webkitMaskImage = mu('top');  zTop.style.maskImage = mu('top');
+      zBot.style.webkitMaskImage = mu('bottom'); zBot.style.maskImage = mu('bottom');
+      curLook = it.key;
+      if (curColor) paintColor(curColor);
+    },
+    chip(it){ return '造型 · '+it.name; } },
+
+  { key:'color', label:'在选配色', badge:'配色', target:TARGET.color,
+    items: COLORS.map(c=>({kind:'swatch', name:c.name, hex:c.hex})),
+    apply(it){ paintColor(it.hex); },
+    chip(it){ return '配色 · '+it.name; } },
+
+  { key:'waist', label:'在调比例', badge:'比例', target:TARGET.waist,
+    items: WAISTS.map(w=>({kind:'rule', name:w.name, pct:w.pct})),
+    apply(it){ waist.style.top = it.pct+'%'; waist.classList.add('on'); },
+    chip(it){ return '比例 · '+it.name; } },
+];
+
+/* ================= DOM ================= */
+const card=document.getElementById('card'), grid=document.getElementById('grid');
+const dimLabel=document.getElementById('dimLabel'), chips=document.getElementById('chips');
+const c1=document.getElementById('c1'), badge=document.getElementById('badge');
+const lineimg=document.getElementById('lineimg'), zTop=document.getElementById('zTop'), zBot=document.getElementById('zBot');
+const waist=document.getElementById('waist'), reveal=document.getElementById('reveal'), rvs=document.getElementById('rvs');
+const sp=document.getElementById('sp'), dr=document.getElementById('dr');
+const auto=document.getElementById('auto'), rm=document.getElementById('rm'), waitSel=document.getElementById('wait');
+
+let curLook=null, curColor=null;
+function paintColor(hex){
+  curColor = hex;
+  zTop.style.background = hex;
+  zBot.style.background = hex;
+  zBot.style.filter = 'brightness(.88)';   // 下装压深，别跟上装连成一片
+}
+
+let timers=[]; const clear=()=>{timers.forEach(clearTimeout);timers=[];};
+const later=(fn,ms)=>timers.push(setTimeout(fn,ms));
+function setText(t){ c1.style.opacity=0; later(()=>{c1.textContent=t;c1.style.opacity=1;},130); }
+
+function innerHTML(it){
+  if(it.kind==='look')   return '<div class="inner"><img src="assets/lineart/lineart-'+it.key+
+                                '.png" style="object-position:'+it.thumb+' 32%"></div>';
+  if(it.kind==='swatch') return '<div class="inner" style="background:'+it.hex+'"></div>';
+  if(it.kind==='rule')   return '<div class="inner"><svg viewBox="0 0 100 240">'+
+      '<path d="M 34,22 C 34,13 40,9 50,9 C 60,9 66,13 66,22 L 71,64 C 73,96 71,128 68,158 L 63,222 L 37,222 L 32,158 C 29,128 27,96 29,64 Z" '+
+      'fill="#F5F2EB" stroke="#CFC8BA" stroke-width="2.6"/>'+
+      '<line x1="23" y1="'+(it.pct*2.4)+'" x2="77" y2="'+(it.pct*2.4)+
+      '" stroke="#8E9A83" stroke-width="5.5" stroke-linecap="round"/></svg></div>';
+  return '';
+}
+
+/* ---------- 网格：自适应列数，永远排满 ---------- */
+const CW=104, CH=124, GAP=16;
+let cards=[], pos=[], order=[];
+function buildGrid(items){
+  grid.innerHTML='';
+  const n=items.length, cols = n<=3 ? n : (n===4 ? 2 : 3);
+  const rows=Math.ceil(n/cols);
+  const gw=cols*CW+(cols-1)*GAP, gh=rows*CH+(rows-1)*GAP;
+  const W=grid.clientWidth||390, H=grid.clientHeight||300;
+  pos=[];
+  for(let i=0;i<n;i++) pos.push([ Math.round((W-gw)/2+(i%cols)*(CW+GAP)),
+                                  Math.round((H-gh)/2+Math.floor(i/cols)*(CH+GAP)) ]);
+  cards=items.map(it=>{ const d=document.createElement('div');
+    d.className='cand'; d.style.width=CW+'px'; d.style.height=CH+'px';
+    d.innerHTML=innerHTML(it); grid.appendChild(d); return d; });
+  order=[...Array(n).keys()];
+  render(0,0);
+}
+function render(rot, blur){
+  cards.forEach((c,i)=>{ const p=pos[order[i]];
+    const r=(rot&&rot[i])?rot[i]:0;
+    c.style.transform='translate('+p[0]+'px,'+p[1]+'px) rotate('+r+'deg)';
+    c.style.filter = blur ? 'blur('+blur+'px)' : 'none'; });
+}
+
+/* ---------- 洗牌 ---------- */
+function shuffle(dim, done){
+  const n=cards.length, decay=+dr.value;
+  let d=+sp.value, steps=0;
+  const step=()=>{
+    for(let i=n-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
+    const idx = (d>=330) ? dim.target : (steps % n);
+    // 关键：每跳一次就把「当前跳到的候选」实时套到人物上。
+    // 只在最后套一次的话，整段洗牌里左侧纹丝不动，就没有“快切变换”的感觉。
+    if(dim.items[idx]) dim.apply(dim.items[idx]);
+    const bl = d<110 ? 5.5 : (d<180 ? 3.5 : (d<250 ? 1.5 : 0));
+    render(cards.map(()=>(Math.random()*2-1)*7), bl);
+    steps++; d=Math.round(d*decay);
+    if(d>=330 || steps>16){
+      order=[...Array(n).keys()]; render(0,0);
+      later(()=>{
+        cards.forEach((c,i)=>{ c.classList.toggle('pick',i===dim.target);
+                               c.classList.toggle('rest',i!==dim.target); });
+        later(()=>{ dim.apply(dim.items[dim.target]); },170);
+        later(done,430);
+      },180);
+      return;
+    }
+    later(step,d);
+  };
+  step();
+}
+
+function run(){
+  clear();
+  reveal.classList.remove('on');
+  zTop.style.background='transparent'; zBot.style.background='transparent';
+  waist.classList.remove('on'); waist.style.top='52%';
+  chips.innerHTML=''; setText('今天穿什么');
+  curColor=null;
+
+  let t=0;
+  DIMS.forEach((dim,di)=>{
+    later(()=>{
+      badge.textContent=dim.badge; dimLabel.textContent=dim.label;
+      buildGrid(dim.items);
+      shuffle(dim, ()=>{
+        const it=dim.items[dim.target];
+        const c=document.createElement('div'); c.className='chip'; c.textContent=dim.chip(it);
+        chips.appendChild(c); later(()=>c.classList.add('on'),20);
+        if(di===DIMS.length-1){
+          later(()=>setText('今天这一身'),240);
+          later(()=>{
+            rvs.textContent = LOOKS[TARGET.look].name+' · '+COLORS[TARGET.color].name+' · '+WAISTS[TARGET.waist].name;
+            reveal.classList.add('on');
+          },900);
+        }
+      });
+    }, t);
+    t += 1300;
+  });
+}
+
+/* ---------- 控制 ---------- */
+const PRESETS={fast:{sp:55,dr:1.5}, mid:{sp:70,dr:1.35}, slow:{sp:85,dr:1.25}};
+function syncSliders(){ document.getElementById('spv').textContent=sp.value+'ms';
+                        document.getElementById('drv').textContent=(+dr.value).toFixed(2)+'×'; updHud(); }
+waitSel.onchange=e=>{ const p=PRESETS[e.target.value]; sp.value=p.sp; dr.value=p.dr; syncSliders(); run(); };
+sp.oninput=()=>syncSliders(); dr.oninput=()=>syncSliders();
+document.getElementById('replay').onclick=run;
+rm.onchange=()=>document.body.classList.toggle('rm', rm.checked);
+function updHud(){
+  let d=+sp.value, tot=0, n=0;
+  while(d<330 && n<16){ tot+=d; d=Math.round(d*(+dr.value)); n++; }
+  const per=(tot+180+430+170)/1000;
+  document.getElementById('hud').textContent='每维度 ≈'+per.toFixed(1)+'s（'+n+' 次换位）· 一轮 ≈'+(per*3+1.6).toFixed(1)+'s';
+}
+syncSliders();
+// 预加载线稿：洗牌快切时每跳都会换图，不预加载会闪白
+LOOKS.forEach(l=>{ const im=new Image(); im.src='assets/lineart/lineart-'+l.key+'.png'; });
+let iv=setInterval(()=>{ if(auto.checked) run(); }, 5600);
+card.addEventListener('mouseenter',()=>clearInterval(iv));
+card.addEventListener('mouseleave',()=>{clearInterval(iv);iv=setInterval(()=>{if(auto.checked)run();},5600);});
+run();
+</script>
+</body>
+</html>
