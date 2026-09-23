@@ -46,6 +46,11 @@ func (s *Service) Prepare(ctx context.Context, userID string, city string) (Prep
 	if err == nil {
 		result.CacheHit = true
 		result.Scenario = content.Category
+		// 命中也照样下发 roam 脚本（只用它带 variant）：客户端不播等待动画，
+		// 但要靠它提前预载换装素材——否则 generate 返回时才开始预载，3s 闸
+		// 来不及，收敛期只能回落序列帧揭晓，新动画永远上不了场。
+		roam := roamPresentation(userID, genDate, s.motionVariantOverride)
+		result.Presentation = &roam
 		return result, nil
 	}
 	// 未命中、以及 DB 异常，都照给巡游脚本：巡游与内容、与 DB 都无关，

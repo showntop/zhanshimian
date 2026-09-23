@@ -27,7 +27,10 @@ func TestPrepareShipsRoamScriptOnMiss(t *testing.T) {
 	}
 }
 
-// 命中缓存时不播巡游（重进不该重看等待动画），因此不下发脚本。
+// 命中缓存时不播巡游（重进不该重看等待动画），但仍下发 roam 脚本——
+// 只为带 params.variant：客户端据此提前预载换装素材。缓存命中的日子没有
+// 等待期，generate 一返回就进收敛，预载晚一步（3s 闸）就只能回落序列帧
+// 揭晓，洗牌永远上不了场。
 func TestPrepareSkipsScriptOnCacheHit(t *testing.T) {
 	content := newFakeContent(nil)
 	service := newService(t, fakeReader{}, fakeKnowledge{}, content, &fakeRuns{}, &fakeCollections{}, &fakePlanner{})
@@ -47,7 +50,13 @@ func TestPrepareSkipsScriptOnCacheHit(t *testing.T) {
 	if !hit.CacheHit {
 		t.Fatal("当天已有内容时应命中")
 	}
-	if hit.Presentation != nil {
-		t.Fatal("命中缓存不应下发巡游脚本")
+	if hit.Presentation == nil || len(hit.Presentation.Stages) != 1 {
+		t.Fatalf("命中缓存也要下发 roam 脚本（带 variant 供预载），got %#v", hit.Presentation)
+	}
+	if hit.Presentation.Stages[0].Phase != "roam" {
+		t.Fatalf("roam phase = %s", hit.Presentation.Stages[0].Phase)
+	}
+	if _, ok := hit.Presentation.Stages[0].Params["variant"]; !ok {
+		t.Fatal("roam 脚本必须带 variant，客户端靠它决定预载哪一套")
 	}
 }

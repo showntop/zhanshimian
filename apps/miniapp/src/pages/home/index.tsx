@@ -62,6 +62,7 @@ const HAIR_IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
 // 回落 sketch 巡游顶位，行为安全）。开发者可用 storage 临时覆盖：
 //   zsm_dress_base = 素材基地址；zsm_dress_filter_off = '1'（模拟端不支持滤镜）
 const DRESS_SEED_KEY = 'zsm_install_seed'
+const DRESS_VARIANT_KEY = 'zsm_dress_variant'
 const DRESS_BASE_KEY = 'zsm_dress_base'
 const DRESS_FILTER_OFF_KEY = 'zsm_dress_filter_off'
 // 等待期（脚本未到）的素材基地址：服务端 /assets/ 静态路由，与序列帧揭晓同源。
@@ -297,8 +298,16 @@ export default function Home() {
     }
     const now = new Date()
     const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+    // 上次服务端给的 variant（同天才认）：让下一次进页面在 prepare 返回前
+    // 就开始预载——缓存命中的日子没有等待期，generate 一返回就进收敛，
+    // 预载晚一步（3s 闸）就只能回落序列帧揭晓。
+    const lastVariant = read(DRESS_VARIANT_KEY)
     return {
       seedKey: `${seed}|${dateKey}`,
+      dateKey,
+      knownVariant: lastVariant.startsWith(`${dateKey}|`)
+        ? lastVariant.slice(dateKey.length + 1)
+        : '',
       base: read(DRESS_BASE_KEY) || DRESS_ASSET_BASE,
       colorLocked: read(DRESS_FILTER_OFF_KEY) === '1',
     }
@@ -308,9 +317,21 @@ export default function Home() {
     () => roamVariant(roamScript?.stages.find((stage) => stage.phase === 'roam')),
     [roamScript],
   )
+  // 记住服务端这次给的 variant：下次进页面（含缓存命中无等待期的日子）
+  // 在 prepare 返回前就按它预载
+  useEffect(() => {
+    if (!dressRoamVariant) return
+    try {
+      Taro.setStorageSync(DRESS_VARIANT_KEY, `${dressEnv.dateKey}|${dressRoamVariant}`)
+    } catch {
+      // 存不下就不存：本次会话内仍有 roam 脚本兜底
+    }
+  }, [dressRoamVariant, dressEnv.dateKey])
   const dressPredict =
     dressRoamVariant === 'dress' ||
-    (dressRoamVariant === '' && stableVariant(dressEnv.seedKey) === 'dress')
+    (dressRoamVariant === '' &&
+      (dressEnv.knownVariant === 'dress' ||
+        (dressEnv.knownVariant === '' && stableVariant(dressEnv.seedKey) === 'dress')))
   const dressLock = useMemo(
     () => readDressLockParams(settleScript?.stages.find((stage) => stage.kind === 'dress_lock')),
     [settleScript],

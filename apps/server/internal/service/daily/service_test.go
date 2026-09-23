@@ -270,6 +270,17 @@ func TestPrepareCacheHitWhenTodayContentExists(t *testing.T) {
 	if !result.CacheHit || result.Scenario != "color" {
 		t.Fatalf("result = %#v", result)
 	}
+	// 命中也下发 roam 脚本（只带 variant）：客户端靠它提前预载换装素材。
+	// 没有它，缓存命中的日子（无等待期）预载只能在 generate 返回后开始，
+	// 3s 闸来不及 → 收敛期回落序列帧揭晓，洗牌永远上不了场。
+	if result.Presentation == nil || len(result.Presentation.Stages) != 1 {
+		t.Fatalf("cache-hit prepare must carry the roam script, got %#v", result.Presentation)
+	}
+	// 等待期与收敛期必须是同一套种子（服务端 hash(uid+date)），一致性回归
+	// 在 variant_test.go 里用导出的 motionVariant 覆盖。
+	if got := result.Presentation.Stages[0].Params["variant"]; got != daily.MotionVariantSketch && got != daily.MotionVariantDress {
+		t.Fatalf("roam variant = %v", got)
+	}
 }
 
 func TestPrepareMissReturnsEmptyScenario(t *testing.T) {

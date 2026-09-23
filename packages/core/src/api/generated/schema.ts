@@ -1461,7 +1461,7 @@ export interface components {
             /** @description cache_hit=true 时为当日内容分类（信息性）；未命中为空串 */
             scenario: string;
             cache_hit: boolean;
-            /** @description 等待期（roam）脚本；未命中时才需要播 */
+            /** @description 等待期（roam）脚本；未命中时才需要播。命中当天内容时也会下发 （只带 params.variant），供客户端提前预载换装素材——缓存命中的 日子没有等待期，generate 一返回就进收敛，预载晚一步就只能回落 序列帧揭晓 */
             presentation?: components["schemas"]["DailyPresentation"];
         };
         DailyGenerateResult: {
