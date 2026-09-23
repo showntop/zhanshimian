@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>等待方式 · 换装洗牌（活性 croquis · 分层衣装 · 飞卡上身）</title>
+<style>
+  :root{
+    --ease:cubic-bezier(.2,.8,.2,1);
+    --snap:cubic-bezier(.3,1.45,.5,1);   /* 上身回弹：先过冲再落 */
+    --fly:cubic-bezier(.55,-.15,.25,1);  /* 飞卡：起步甩出去、终点收住 */
+    --ink:#3F463C; --sage:#8E9A83; --terra:#B4553C;
+    --paper:#F5F2EC;
+    --g:#D9D0C1; /* 衣服当前色：配色维度改它，fill 层直接吃 */
+  }
+  *{box-sizing:border-box}
+  body{background:#E8E4DC;font-family:system-ui,-apple-serif,PingFang SC;margin:0;padding:24px;
+       display:flex;flex-direction:column;align-items:center;gap:14px;color:var(--ink)}
+  body.rm *{animation:none !important;transition:none !important}
+
+  .card-wrap{width:750px;height:560px;position:relative;overflow:hidden;border-radius:18px;
+        background:linear-gradient(160deg,#F5F2EC 0%,#E4DFD6 100%);
+        box-shadow:0 10px 48px rgba(0,0,0,.13);display:flex}
+
+  /* ================= 左：试衣间（拱形壁龛 + 活性 croquis） ================= */
+  .fig{width:336px;height:100%;position:relative}
+  .arch{position:absolute;left:50%;top:36px;transform:translateX(-50%);
+        width:262px;height:486px;border:1.5px solid rgba(63,70,60,.22);
+        border-radius:131px 131px 14px 14px;
+        background:linear-gradient(170deg,#FBF9F4 0%,#EFECE3 100%)}
+  .arch::after{content:'DRESSING · TODAY';position:absolute;right:-24px;top:120px;
+        writing-mode:vertical-rl;font-size:9px;letter-spacing:.34em;color:rgba(63,70,60,.34)}
+  .figsvg{position:absolute;inset:0;z-index:2;width:100%;height:100%}
+  /* 衣料：fill 吃 --g（配色维度直接染，不走 mask）；缝线用衣色深一档 */
+  .gf{fill:var(--g,#D9D0C1)}
+  .gstroke{stroke:#423E35}
+  /* 重心微晃：脚踝为轴 ±0.5deg，3.8s 一轮——人活着，但别抢戏 */
+  .croquis{transform-origin:168px 505px;animation:sway 3.8s ease-in-out infinite}
+  @keyframes sway{0%,100%{transform:rotate(.45deg)}50%{transform:rotate(-.5deg)}}
+  .croquis.pop{animation:pop .5s var(--ease)}
+  @keyframes pop{0%{transform:rotate(0)}30%{transform:rotate(-1.6deg)}60%{transform:rotate(.9deg)}100%{transform:rotate(0)}}
+
+  /* 分层衣装：默认收起；上身 = 从肩部落下 + 过冲回弹；instant = 快切闪换（不演出） */
+  .garm{opacity:0;transform:scaleY(.66);transform-origin:168px 112px;
+        transition:opacity .26s var(--ease),transform .5s var(--snap)}
+  .garm.on{opacity:1;transform:none}
+  .instant .garm,.instant .coif{transition:none !important}
+  /* 发型同理，发根为轴 */
+  .coif{opacity:0;transform:scaleY(.6);transform-origin:170px 34px;
+        transition:opacity .24s var(--ease),transform .46s var(--snap)}
+  .coif.on{opacity:1;transform:none}
+  .hairmove{animation:hairswing 3.8s ease-in-out infinite;transform-origin:170px 40px}
+  @keyframes hairswing{0%,100%{transform:rotate(.7deg)}50%{transform:rotate(-.7deg)}}
+
+  /* 腰线（比例维度落在人物上） */
+  .waistband{opacity:0;transition:opacity .3s var(--ease),transform .5s var(--snap)}
+  .waistband.on{opacity:.95}
+
+  /* ================= 右：候选池 ================= */
+  .pool{flex:1;position:relative;display:flex;flex-direction:column;padding:40px 30px 34px}
+  .dim-label{font-size:13px;letter-spacing:.2em;color:#8A9083;margin-bottom:6px;height:18px}
+  .grid{flex:1;position:relative}
+  .cand{position:absolute;left:0;top:0;border-radius:15px;background:#FFF;
+        border:1.5px solid #DED8CD;overflow:hidden;will-change:transform,filter;
+        transition:transform .2s var(--ease),filter .2s var(--ease),
+                   box-shadow .35s var(--ease),border-color .35s var(--ease)}
+  .cand .inner{width:100%;height:100%;border-radius:13px;overflow:hidden;background:#FFF;
+        transition:transform .34s var(--ease),opacity .34s var(--ease),filter .34s var(--ease)}
+  .cand .inner svg{width:100%;height:100%;display:block}
+  .cand.pick{border-color:var(--sage);box-shadow:0 14px 34px rgba(142,154,131,.32);z-index:5}
+  .cand.pick .inner{transform:scale(1.12)}
+  .cand.rest .inner{transform:scale(.9);opacity:.32;filter:saturate(.55)}
+  .cand.rest{border-color:#E4DFD6}
+  .cand .tag{position:absolute;left:0;right:0;bottom:0;padding:3px 0 4px;text-align:center;
+        font-size:10px;letter-spacing:.08em;color:#6B7364;background:rgba(255,255,255,.88)}
+
+  /* 飞卡本体（WAAPI 驱动，只要一个壳） */
+  .flycard{position:absolute;z-index:20;border-radius:14px;background:#FFF;
+        border:1.5px solid var(--sage);box-shadow:0 16px 40px rgba(63,70,60,.28);overflow:hidden}
+  .flycard svg{width:100%;height:100%;display:block}
+  /* 落点涟漪 */
+  .ring{position:absolute;z-index:19;width:120px;height:120px;margin:-60px 0 0 -60px;
+        border-radius:50%;border:2px solid var(--sage);opacity:0;pointer-events:none}
+  .ring.go{animation:ring .6s var(--ease) forwards}
+  @keyframes ring{0%{transform:scale(.25);opacity:.9}100%{transform:scale(1.15);opacity:0}}
+
+  .chips{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;min-height:26px}
+  .chip{padding:5px 12px;border-radius:999px;background:#FFF;border:1px solid #DED8CD;
+        font-size:11px;letter-spacing:.1em;color:#6B7364;opacity:0;transform:translateY(6px);
+        transition:opacity .3s var(--ease),transform .3s var(--ease)}
+  .chip.on{opacity:1;transform:none}
+
+  .caption{position:absolute;left:36px;bottom:26px;z-index:9}
+  /* 人物穿到字幕区是常事：一圈纸色光晕保可读，别盖一块底板（要透气） */
+  .caption .c1{font-size:23px;letter-spacing:.13em;color:var(--ink);transition:opacity .24s var(--ease);
+        text-shadow:0 0 10px #F5F2EC,0 0 18px #F5F2EC,0 1px 3px rgba(245,242,236,.9)}
+  .caption .c2{margin-top:7px;font-size:11px;letter-spacing:.15em;color:#6B7364;
+        text-shadow:0 0 8px #F5F2EC,0 0 14px #F5F2EC}
+  .badge{position:absolute;right:28px;top:22px;padding:6px 14px;border-radius:999px;font-size:12px;
+        letter-spacing:.12em;background:rgba(255,255,255,.9);color:var(--ink);z-index:9}
+
+  /* ================= 揭晓：右栏变海报 + 盖章，左边穿着最终搭配的她一直亮着 ================= */
+  .reveal{position:absolute;top:0;bottom:0;right:0;width:414px;z-index:14;
+        transform:translateX(102%);transition:transform .55s var(--ease);
+        background:linear-gradient(155deg,#3B4A2E 0%,#28331F 100%);
+        display:flex;flex-direction:column;justify-content:flex-end;padding:0 36px 40px}
+  .reveal.on{transform:none}
+  .reveal .ghost{position:absolute;right:18px;top:24px;writing-mode:vertical-rl;
+        font-size:13px;letter-spacing:.5em;color:rgba(242,239,231,.28)}
+  .reveal .rvt{font-size:27px;letter-spacing:.12em;color:#F2EFE7}
+  .reveal .rvs{margin-top:10px;font-size:12px;letter-spacing:.16em;color:rgba(242,239,231,.72)}
+  .reveal .chips{margin-top:16px}
+  .reveal .chip{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#F2EFE7}
+  /* 印章：放大砸下 + 落定一沉。等了这么久，要有分量 */
+  .stamp{position:absolute;right:34px;bottom:36px;width:74px;height:74px;border-radius:10px;
+        border:3px solid rgba(240,225,215,.92);color:rgba(240,225,215,.95);
+        display:flex;align-items:center;justify-content:center;
+        font-size:24px;letter-spacing:.18em;writing-mode:vertical-rl;
+        transform:scale(1.9) rotate(-14deg);opacity:0}
+  .stamp.go{animation:stamp .5s cubic-bezier(.2,1.1,.3,1) .34s forwards}
+  @keyframes stamp{0%{transform:scale(1.9) rotate(-14deg);opacity:0}
+        62%{transform:scale(.94) rotate(-8deg);opacity:1}
+        100%{transform:scale(1) rotate(-8deg);opacity:1}}
+  .stamp::after{content:'';position:absolute;inset:4px;border:1px solid rgba(240,225,215,.5);border-radius:6px}
+
+  .ctl{display:flex;gap:14px;align-items:center;font-size:14px;flex-wrap:wrap;justify-content:center}
+  button,select{padding:7px 15px;border-radius:9px;border:1px solid var(--ink);background:transparent;
+        color:var(--ink);cursor:pointer;font-size:14px}
+  label{display:inline-flex;gap:6px;align-items:center}
+  .hud{opacity:.65;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+  <div class="card-wrap" id="card">
+
+    <!-- 左：试衣间 -->
+    <div class="fig">
+      <div class="arch"></div>
+      <svg class="figsvg" viewBox="0 0 336 560" fill="none">
+        <!-- ===== 身体（线稿，S 站姿：叉腰 · 出胯 · 高跟） ===== -->
+        <g class="croquis" id="croquis">
+          <!-- 后发（在身体后面） -->
+          <g id="hairRoot">
+            <g class="coif hairmove" id="hair-long">
+              <path d="M152,46 C146,68 148,96 150,126 C152,162 150,196 144,226 C152,236 163,236 170,230 C174,196 175,158 173,124 C172,96 172,68 170,48 Z" fill="#3B352B"/>
+              <path d="M154,44 C158,26 176,20 186,30 C194,38 196,50 192,60 C188,44 172,36 162,40 C158,42 155,42 154,44 Z" fill="#3B352B"/>
+              <path class="ln" d="M159,58 C155,84 153,112 155,140 C156,154 155,166 153,174" stroke="#2E2921" stroke-width="1.6"/>
+              <path class="ln" d="M186,60 C191,84 193,110 191,136 C190,150 191,162 193,172" stroke="#2E2921" stroke-width="1.6"/>
+            </g>
+            <g class="coif hairmove" id="hair-wave">
+              <path d="M152,46 C146,70 148,98 150,128 C152,164 150,198 143,224 C150,234 146,250 156,254 C162,242 156,232 164,228 C170,240 165,254 176,256 C182,242 175,234 172,228 C176,196 176,160 174,126 C173,98 173,68 170,48 Z" fill="#3B352B"/>
+              <path d="M154,44 C158,26 176,20 186,30 C194,38 196,50 192,60 C188,44 172,36 162,40 C158,42 155,42 154,44 Z" fill="#3B352B"/>
+              <path class="ln" d="M159,58 C154,84 152,112 155,138 C158,152 153,164 158,176 C162,186 158,196 154,204" stroke="#2E2921" stroke-width="1.6"/>
+              <path class="ln" d="M186,60 C191,86 193,112 190,138 C187,152 192,164 187,176" stroke="#2E2921" stroke-width="1.6"/>
+            </g>
+            <g class="coif hairmove" id="hair-bun">
+              <path d="M154,44 C158,26 176,20 186,30 C194,38 196,50 192,60 C188,44 172,36 162,40 C158,42 155,42 154,44 Z" fill="#3B352B"/>
+              <path d="M154,46 C150,64 152,80 158,90 L172,92 C176,80 176,64 172,48 Z" fill="#3B352B"/>
+              <circle cx="181" cy="27" r="11.5" fill="#3B352B"/>
+              <path class="ln" d="M174,22 C178,19 185,20 188,26" stroke="#2E2921" stroke-width="1.6"/>
+            </g>
+            <g class="coif hairmove" id="hair-bob">
+              <path d="M153,44 C147,66 148,84 154,96 C160,106 172,108 180,102 C188,96 192,84 191,66 C190,50 186,40 178,34 C168,26 156,30 153,44 Z" fill="#3B352B"/>
+              <path class="ln" d="M155,92 C160,98 168,100 175,97" stroke="#2E2921" stroke-width="1.6"/>
+            </g>
+          </g>
+
+          <!-- 身体线稿 -->
+          <g class="ln" stroke="#423E35" stroke-width="2.4" stroke-linecap="round">
+            <!-- 头 -->
+            <path d="M157,47 C155,33 163,24 172,24 C182,24 189,33 188,45 C187,56 181,66 173,69 C167,71 160,66 157,60 Z"/>
+            <path d="M163,46 C166,44 169,44 171,45" stroke-width="1.5"/>
+            <path d="M167,58 C169,59.5 171,59 172.5,57.5" stroke-width="1.5"/>
+            <!-- 颈 -->
+            <path d="M166,67 C167,75 164,83 160,89"/>
+            <path d="M178,67 C179,76 182,84 186,90"/>
+            <!-- 肩 → 胸 → 腰 -->
+            <path d="M160,89 C148,94 138,101 135,113 C132,127 139,141 147,152 C154,162 157,171 158,181"/>
+            <path d="M186,90 C198,95 207,103 209,117 C211,131 203,146 197,159 C192,168 190,176 190,184"/>
+            <path d="M150,132 C156,128 162,128 167,131" stroke-width="1.7"/>
+            <path d="M178,131 C183,128 189,129 194,133" stroke-width="1.7"/>
+            <!-- 胯（右顶出去 = S） -->
+            <path d="M158,181 C150,193 146,205 148,217 C150,229 158,237 167,241"/>
+            <path d="M190,184 C198,196 202,209 200,221 C198,233 190,241 181,245"/>
+            <path d="M167,241 C171,247 176,247 181,245"/>
+            <!-- 左腿（承重，直） -->
+            <path d="M165,242 C163,268 162,294 162,320 C162,348 163,376 164,404 C165,434 164,464 163,490"/>
+            <!-- 右腿（放松，微交叠） -->
+            <path d="M183,244 C186,270 188,296 187,322 C186,350 183,376 180,402 C177,430 176,456 176,488"/>
+            <!-- 脚：一撇一跟，别堆线 -->
+            <path d="M163,490 C162,499 157,505 149,508"/>
+            <path d="M154,509 L153,517"/>
+            <path d="M176,488 C177,497 182,503 190,506"/>
+            <path d="M186,507 L187,515"/>
+          </g>
+
+          <!-- ===== 分层衣装（fill 吃 --g：配色维度直接染，不再要 mask） ===== -->
+          <g id="garments">
+            <!-- A 字连衣裙 -->
+            <g class="garm" id="g-dress">
+              <path class="gf" d="M147,112 C160,106 176,104 195,108 C201,130 203,152 193,172 C188,188 184,202 187,220 C191,240 199,262 208,286 C190,292 158,292 128,282 C136,266 145,246 151,224 C156,206 158,190 155,176 C147,152 141,130 147,112 Z"/>
+              <path d="M156,112 C164,120 178,120 186,112 C180,105 162,105 156,112 Z" fill="#F7F4EC"/>
+              <path class="ln gstroke" d="M154,178 C168,184 182,182 192,172" stroke-width="1.8"/>
+              <path class="ln gstroke" d="M160,200 C158,228 152,254 146,272" stroke-width="1.5"/>
+              <path class="ln gstroke" d="M176,204 C176,232 176,258 178,278" stroke-width="1.5"/>
+              <path class="ln gstroke" d="M190,198 C192,224 196,250 200,270" stroke-width="1.5"/>
+            </g>
+            <!-- 针织上衣 -->
+            <g class="garm" id="g-knit">
+              <path class="gf" d="M145,114 C158,107 178,105 196,110 C202,126 203,146 200,164 C198,176 195,186 192,192 L150,196 C145,182 142,164 142,148 C142,134 142,122 145,114 Z"/>
+              <path d="M156,112 C164,119 178,119 186,111 C180,105 162,105 156,112 Z" fill="#F7F4EC"/>
+              <path class="gf" d="M145,114 C136,120 131,130 130,142 L144,150 C143,138 144,126 145,114 Z"/>
+              <path class="gf" d="M196,110 C205,116 210,127 211,140 L197,148 C198,134 197,120 196,110 Z"/>
+              <path class="ln gstroke" d="M151,188 L151,196 M158,189 L158,197 M165,190 L165,197" stroke-width="1.5"/>
+            </g>
+            <!-- 短上衣（露腰） -->
+            <g class="garm" id="g-crop">
+              <path class="gf" d="M146,114 C158,108 178,106 195,111 C200,124 201,138 199,152 L148,156 C144,142 143,126 146,114 Z"/>
+              <path d="M156,112 C164,119 178,119 186,111 C180,105 162,105 156,112 Z" fill="#F7F4EC"/>
+              <path class="gf" d="M146,114 C138,119 133,127 132,137 L146,144 C144,132 145,122 146,114 Z"/>
+              <path class="gf" d="M195,111 C203,116 208,125 209,136 L195,143 C196,131 195,120 195,111 Z"/>
+              <path class="ln gstroke" d="M148,152 L199,148" stroke-width="1.5"/>
+            </g>
+            <!-- 西装（垫肩 · 驳领 · 长至大腿） -->
+            <g class="garm" id="g-blazer">
+              <path class="gf" d="M141,104 C158,97 180,96 199,102 C207,124 208,146 203,164 C199,182 196,200 195,218 C196,244 196,272 196,302 L150,298 C150,270 152,240 154,208 C154,192 152,176 147,160 C140,142 136,122 141,104 Z"/>
+              <path class="gf" d="M141,104 C132,112 126,126 124,142 C122,158 124,172 128,184 L142,178 C138,166 137,152 139,138 C140,126 141,114 141,104 Z"/>
+              <path class="gf" d="M199,102 C209,110 216,125 218,142 C220,158 217,174 211,186 L197,180 C202,168 204,154 202,140 C201,126 200,112 199,102 Z"/>
+              <path d="M160,106 C163,124 168,146 172,164 C176,146 181,128 186,108 C178,104 168,104 160,106 Z" fill="#F7F4EC"/>
+              <path class="ln gstroke" d="M160,106 C163,124 168,146 172,164" stroke-width="1.8"/>
+              <path class="ln gstroke" d="M172,164 C176,146 181,128 186,108" stroke-width="1.8"/>
+              <circle cx="172" cy="168" r="2.2" fill="#423E35"/>
+              <path class="ln gstroke" d="M158,236 L170,238 M178,238 L188,239" stroke-width="1.5"/>
+            </g>
+            <!-- 阔腿裤（中腰，与针织/西装共用） -->
+            <g class="garm" id="g-pants-wide">
+              <path class="gf" d="M147,212 C163,218 182,217 200,210 L201,222 C183,229 164,230 146,223 Z"/>
+              <path class="gf" d="M146,222 C143,262 141,306 141,350 C141,398 142,448 143,494 L175,496 C174,448 173,398 172,350 C172,306 171,262 170,228 Z"/>
+              <path class="gf" d="M183,228 C184,264 185,304 185,346 C185,396 185,446 186,492 L214,488 C213,444 212,398 211,352 C210,308 208,266 205,224 Z"/>
+              <path class="ln gstroke" d="M157,240 C156,320 156,400 158,486" stroke-width="1.4"/>
+              <path class="ln gstroke" d="M199,242 C199,320 199,398 198,482" stroke-width="1.4"/>
+            </g>
+            <!-- 高腰直筒裤（与短上衣配） -->
+            <g class="garm" id="g-pants-high">
+              <path class="gf" d="M147,176 C164,183 183,182 200,174 L201,188 C183,196 164,197 146,190 Z"/>
+              <path class="gf" d="M150,190 C149,250 149,310 150,370 C151,424 152,464 152,494 L176,495 C175,452 174,400 174,348 C174,298 173,248 171,196 Z"/>
+              <path class="gf" d="M176,196 C177,248 178,300 178,350 C178,404 179,456 180,492 L202,488 C200,440 198,392 196,346 C194,302 192,252 190,186 Z"/>
+              <path class="ln gstroke" d="M161,214 C160,300 160,390 162,478" stroke-width="1.4"/>
+              <path class="ln gstroke" d="M188,212 C188,300 189,388 189,476" stroke-width="1.4"/>
+            </g>
+          </g>
+
+          <!-- 手臂：压在衣服上面（手要搭在衣料上，叉腰才成立） -->
+          <g class="ln" stroke="#423E35" stroke-width="2.4" stroke-linecap="round">
+            <!-- 左臂（垂放微弯） -->
+            <path d="M136,114 C128,131 124,150 126,167 C128,183 132,196 137,206"/>
+            <path d="M137,206 C136,214 139,221 144,223"/>
+            <!-- 右臂（叉腰） -->
+            <path d="M208,118 C219,130 226,145 223,159 C221,172 212,182 202,189"/>
+          </g>
+
+          <!-- 腰线（比例维度） -->
+          <g class="waistband" id="waistband" transform="translate(0,185)">
+            <path d="M92,0 L244,0" stroke="#8E9A83" stroke-width="2.6" stroke-linecap="round"/>
+            <path d="M92,-6 L92,6 M244,-6 L244,6" stroke="#8E9A83" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M104,0 L236,0" stroke="#8E9A83" stroke-width="1" opacity=".5"
+                  stroke-dasharray="2 6"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <!-- 右：候选池 -->
+    <div class="pool">
+      <div class="dim-label" id="dimLabel">在试造型</div>
+      <div class="grid" id="grid"></div>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="badge" id="badge">造型</div>
+    <div class="caption">
+      <div class="c1" id="c1">今天穿什么</div>
+      <div class="c2">正在为你搭配</div>
+    </div>
+
+    <!-- 揭晓：只盖右栏——最终搭配穿在她身上，别被文字盖掉 -->
+    <div class="reveal" id="reveal">
+      <div class="ghost">TODAY · ONE LOOK</div>
+      <div class="rvt">今天这一身</div>
+      <div class="rvs" id="rvs"></div>
+      <div class="chips" id="rchips"></div>
+      <div class="stamp" id="stamp">今日</div>
+    </div>
+  </div>
+
+  <div class="ctl">
+    <button id="replay">重播</button>
+    <select id="wait">
+      <option value="fast">秒回（&lt;3s）</option>
+      <option value="mid" selected>常规（3–15s）</option>
+      <option value="slow">长等（&gt;15s）</option>
+    </select>
+    <label>起始间隔 <input type="range" id="sp" min="50" max="180" step="5" value="70">
+      <span class="hud" id="spv">70ms</span></label>
+    <label>减速 <input type="range" id="dr" min="1.1" max="1.7" step="0.05" value="1.35">
+      <span class="hud" id="drv">1.35×</span></label>
+    <label><input type="checkbox" id="auto" checked> 循环</label>
+    <label><input type="checkbox" id="rm"> 减动效</label>
+    <span class="hud" id="hud"></span>
+  </div>
+
+<script>
+/* =====================================================================
+   换装洗牌：左侧一个活的 croquis 分层换装，右侧候选卡洗牌。
+   三个爽点：
+   ① 快切阶段整柜衣服在她身上闪换（试衣闪切）——洗牌不只是牌在动；
+   ② 选中的卡从牌堆飞到她身上，落点同时衣服「落下+回弹」+涟漪；
+   ③ 揭晓不盖人物：右栏变海报+盖章，她穿着最终搭配一直亮着。
+   ===================================================================== */
+
+/* ---------- 数据 ---------- */
+const LOOKS = [
+  {key:'dress',  name:'A字连衣裙',  layers:['g-dress']},
+  {key:'knit',   name:'针织+阔腿裤', layers:['g-knit','g-pants-wide']},
+  {key:'crop',   name:'短上衣+高腰裤', layers:['g-crop','g-pants-high']},
+  {key:'blazer', name:'西装叠穿',   layers:['g-blazer','g-pants-wide']},
+];
+const COLORS = [
+  {name:'燕麦', hex:'#D9D0C1'}, {name:'砖红', hex:'#B4553C'}, {name:'墨绿', hex:'#3F5340'},
+  {name:'藏蓝', hex:'#2F3E56'}, {name:'浅灰', hex:'#C6C4BE'}, {name:'驼色', hex:'#B08B5E'},
+];
+/* 腰线直接落在她的腰上（svg y）：夸张过的三档，动起来才看得清 */
+const WAISTS = [{name:'高腰', y:165}, {name:'中腰', y:185}, {name:'低腰', y:212}];
+const HAIRS = [
+  {key:'long', name:'长直发'}, {key:'wave', name:'大波浪'},
+  {key:'bun',  name:'丸子头'}, {key:'bob',  name:'齐耳短发'},
+];
+const TARGET = { look:0, color:1, waist:0, hair:1 };  /* 服务端下发的答案 */
+
+/* ---------- DOM ---------- */
+const $=id=>document.getElementById(id);
+const card=$('card'), grid=$('grid'), chips=$('chips'), dimLabel=$('dimLabel');
+const c1=$('c1'), badge=$('badge'), reveal=$('reveal'), rvs=$('rvs');
+const garments=$('garments'), hairRoot=$('hairRoot'), croquis=$('croquis'), waistband=$('waistband');
+const sp=$('sp'), dr=$('dr'), auto=$('auto'), rm=$('rm'), waitSel=$('wait');
+let curLook=null, curColor=null;
+
+let timers=[]; const clear=()=>{timers.forEach(clearTimeout);timers=[];};
+const later=(fn,ms)=>timers.push(setTimeout(fn,ms));
+function setText(t){ c1.style.opacity=0; later(()=>{c1.textContent=t;c1.style.opacity=1;},130); }
+
+/* ---------- 上身/换发 ----------
+   instant 由洗牌流程经 .instant 类统一管理（快切段全程开着），
+   这里只管切图层；最终「穿上」的那一下 = 类已移除 → 走落下+回弹的过渡 */
+function wearLook(key){
+  const layers=LOOKS.find(l=>l.key===key).layers;
+  garments.querySelectorAll('.garm').forEach(g=>
+    g.classList.toggle('on', layers.includes(g.id)));
+  curLook=key;
+  paintColor(curColor);   /* 换装保色 */
+}
+function wearHair(key){
+  hairRoot.querySelectorAll('.coif').forEach(h=>
+    h.classList.toggle('on', h.id==='hair-'+key));
+}
+function paintColor(hex){
+  curColor=hex;
+  document.querySelector('.figsvg').style.setProperty('--g', hex||'#D9D0C1');
+}
+function boop(){ croquis.classList.remove('pop'); void croquis.offsetWidth; croquis.classList.add('pop'); }
+
+/* ---------- 卡面（造型卡 = 衣服剪影本身，所见即所穿） ---------- */
+function innerHTML(it){
+  if(it.kind==='look'){
+    const map={dress:'M30,14 C40,10 60,10 70,13 C74,26 72,38 66,48 C62,58 62,70 68,84 C74,98 80,108 84,116 C70,121 46,121 30,116 C34,107 40,97 44,86 C48,74 48,60 44,50 C38,38 28,26 30,14 Z',
+      knit:'M30,14 C42,9 60,9 70,12 L68,44 L32,46 Z', crop:'M31,14 C43,9 61,9 70,12 L69,32 L32,34 Z',
+      blazer:'M28,13 C42,7 60,7 72,11 L78,34 L72,74 L30,72 L26,32 Z'};
+    const pants='M30,50 C30,72 29,96 30,118 L50,119 C50,96 50,72 50,52 Z M52,52 C52,74 52,98 53,118 L72,116 C71,94 70,70 69,50 Z';
+    const extra=(it.key==='knit'||it.key==='blazer')?pants:(it.key==='crop'
+      ?'M31,52 C31,74 31,98 32,118 L51,119 C51,96 51,72 50,53 Z M52,53 C52,75 53,99 54,117 L72,115 C71,93 70,69 69,51 Z':'');
+    return '<div class="inner"><svg viewBox="0 0 104 124">'+
+      '<path d="'+map[it.key]+'" fill="currentColor" color="#8E9A83" opacity=".85"/>'+
+      (extra?'<path d="'+extra+'" fill="currentColor" color="#8E9A83" opacity=".6"/>':'')+
+      '</svg></div><div class="tag">'+it.name+'</div>';
+  }
+  if(it.kind==='swatch') return '<div class="inner" style="background:'+it.hex+'"></div>'+
+      '<div class="tag">'+it.name+'</div>';
+  if(it.kind==='rule')
+    return '<div class="inner"><svg viewBox="0 0 100 124">'+
+      '<path d="M50,6 C38,6 30,14 30,26 L34,44 C37,60 36,76 33,92 L30,114 L70,114 L67,92 C64,76 63,60 66,44 L70,26 C70,14 62,6 50,6 Z" fill="#F5F2EB" stroke="#CFC8BA" stroke-width="2.4"/>'+
+      '<line x1="22" y1="'+(it.y*0.62)+'" x2="78" y2="'+(it.y*0.62)+'" stroke="#8E9A83" stroke-width="5" stroke-linecap="round"/>'+
+      '</svg></div><div class="tag">'+it.name+'</div>';
+  if(it.kind==='hair'){
+    const map={long:'M36,18 C28,34 30,56 32,80 C33,96 31,110 26,120 C38,124 48,120 50,112 C52,90 51,60 50,36 Z M36,18 C40,8 56,6 62,14 C68,22 66,34 60,38 C56,24 44,18 36,18 Z',
+      wave:'M36,18 C28,34 30,56 32,80 C33,96 28,108 24,118 C34,122 34,110 42,116 C46,122 44,110 52,116 C56,120 54,108 50,104 C52,80 51,56 50,36 Z M36,18 C40,8 56,6 62,14 C68,22 66,34 60,38 C56,24 44,18 36,18 Z',
+      bun:'M38,20 C42,8 58,6 64,14 C70,22 68,34 60,38 C56,24 44,18 38,20 Z M38,20 C33,32 35,48 40,58 L52,60 C56,48 55,32 52,22 Z',
+      bob:'M36,16 C29,32 30,48 36,58 C42,66 54,68 62,62 C70,55 72,42 70,28 C68,14 58,6 48,7 C43,8 38,10 36,16 Z'};
+    return '<div class="inner"><svg viewBox="0 0 104 124">'+
+      '<path d="'+map[it.key]+'" fill="currentColor" color="#3B352B"/></svg></div><div class="tag">'+it.name+'</div>';
+  }
+  return '';
+}
+
+/* ---------- 维度（apply 只在飞卡落点那一刻生效 = 因果可见） ---------- */
+const DIMS=[
+  {key:'look', label:'在试造型', badge:'造型', target:TARGET.look,
+   items:LOOKS.map(l=>({kind:'look',name:l.name,key:l.key})),
+   apply(it){ wearLook(it.key,false); }, chip:it=>'造型 · '+it.name},
+  {key:'color', label:'在调配色', badge:'配色', target:TARGET.color,
+   items:COLORS.map(c=>({kind:'swatch',name:c.name,hex:c.hex})),
+   apply(it){ paintColor(it.hex); boop(); }, chip:it=>'配色 · '+it.name},
+  {key:'waist', label:'在找腰线', badge:'比例', target:TARGET.waist,
+   items:WAISTS.map(w=>({kind:'rule',name:w.name,y:w.y})),
+   apply(it){ waistband.setAttribute('transform','translate(0,'+it.y+')');
+              waistband.classList.add('on'); boop(); }, chip:it=>'比例 · '+it.name},
+  {key:'hair', label:'在换发型', badge:'发型', target:TARGET.hair,
+   items:HAIRS.map(h=>({kind:'hair',name:h.name,key:h.key})),
+   apply(it){ wearHair(it.key,false); }, chip:it=>'发型 · '+it.name},
+];
+
+/* ---------- 网格（沿用：自适应列数永远排满） ---------- */
+const CW=104, CH=124, GAP=16;
+let cards=[], pos=[], order=[];
+function buildGrid(items){
+  grid.innerHTML='';
+  const n=items.length, cols=n<=3?n:(n===4?2:3), rows=Math.ceil(n/cols);
+  const gw=cols*CW+(cols-1)*GAP, gh=rows*CH+(rows-1)*GAP;
+  const W=grid.clientWidth||390, H=grid.clientHeight||300;
+  pos=[];
+  for(let i=0;i<n;i++) pos.push([Math.round((W-gw)/2+(i%cols)*(CW+GAP)),
+                                Math.round((H-gh)/2+Math.floor(i/cols)*(CH+GAP))]);
+  cards=items.map(it=>{ const d=document.createElement('div');
+    d.className='cand'; d.style.width=CW+'px'; d.style.height=CH+'px';
+    d.innerHTML=innerHTML(it); grid.appendChild(d); return d; });
+  order=[...Array(n).keys()];
+  render(0,0);
+}
+function render(rot,blur){
+  cards.forEach((c,i)=>{ const p=pos[order[i]];
+    const r=(rot&&rot[i])?rot[i]:0;
+    c.style.transform='translate('+p[0]+'px,'+p[1]+'px) rotate('+r+'deg)';
+    c.style.filter=blur?'blur('+blur+'px)':'none'; });
+}
+
+/* ---------- 洗牌：衰减跳位；快切段衣服跟着闪换（试衣闪切） ---------- */
+function shuffle(dim,done){
+  const n=cards.length, decay=+dr.value;
+  let d=+sp.value, steps=0;
+  garments.classList.add('instant'); hairRoot.classList.add('instant');
+  const step=()=>{
+    for(let i=n-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+    const idx=(d>=330)?dim.target:(steps%n);
+    /* 快切段：instant 闪切上身；最后一下留给飞卡落点演「穿上」 */
+    if(dim.items[idx]&&d<330){
+      if(dim.key==='look') wearLook(dim.items[idx].key);
+      if(dim.key==='hair') wearHair(dim.items[idx].key);
+      if(dim.key==='color') paintColor(dim.items[idx].hex);
+    }
+    const bl=d<110?5.5:(d<180?3.5:(d<250?1.5:0));
+    render(cards.map(()=>(Math.random()*2-1)*7),bl);
+    steps++; d=Math.round(d*decay);
+    if(d>=330||steps>16){
+      order=[...Array(n).keys()]; render(0,0);
+      /* 快切结束：撤掉 instant，最终上身才有过冲回弹 */
+      garments.classList.remove('instant'); hairRoot.classList.remove('instant');
+      later(()=>{
+        const pickI=dim.target;
+        cards.forEach((c,i)=>{c.classList.toggle('pick',i===pickI);
+                              c.classList.toggle('rest',i!==pickI);});
+        later(()=>flyCard(cards[pickI],dim,done),200);
+      },180);
+      return;
+    }
+    later(step,d);
+  };
+  step();
+}
+
+/* ---------- 飞卡上身：卡飞向她，落地即穿 + 涟漪 ---------- */
+function flyCard(el,dim,done){
+  const wrap=card.getBoundingClientRect(), r=el.getBoundingClientRect();
+  const cl=el.cloneNode(true); cl.className='flycard';
+  Object.assign(cl.style,{left:(r.left-wrap.left)+'px',top:(r.top-wrap.top)+'px',
+    width:r.width+'px',height:r.height+'px'});
+  /* 落点：她胸口（fig 列 1:1 对 svg 坐标） */
+  const dx=152-(r.left-wrap.left+r.width/2), dy=150-(r.top-wrap.top+r.height/2);
+  card.appendChild(cl);
+  /* 动画只管视觉；完成回调用 timer 驱动（onfinish 无头环境不可靠，小程序无 WAAPI） */
+  cl.animate([
+    {transform:'translate(0,0) rotate(0) scale(1)',opacity:1},
+    {transform:'translate('+dx*.2+'px,'+dy*.35+'px) rotate(6deg) scale(1.06)',opacity:1,offset:.3},
+    {transform:'translate('+dx+'px,'+dy+'px) rotate(-10deg) scale(.2)',opacity:.9}
+  ],{duration:460,easing:'cubic-bezier(.55,-.15,.25,1)',fill:'forwards'});
+  later(()=>{
+    cl.remove(); dim.apply(dim.items[dim.target]); ripple(152,150); later(done,320);
+  },480);
+}
+function ripple(x,y){
+  const ring=document.createElement('div'); ring.className='ring';
+  ring.style.left=x+'px'; ring.style.top=y+'px';
+  card.appendChild(ring); requestAnimationFrame(()=>ring.classList.add('go'));
+  later(()=>ring.remove(),700);
+}
+
+/* ---------- 主流程 ---------- */
+function run(){
+  clear();
+  reveal.classList.remove('on'); $('stamp').classList.remove('go');
+  $('rchips').innerHTML=''; chips.innerHTML='';
+  garments.classList.remove('instant'); hairRoot.classList.remove('instant');
+  garments.querySelectorAll('.garm').forEach(g=>g.classList.remove('on'));
+  hairRoot.querySelectorAll('.coif').forEach(h=>h.classList.remove('on'));
+  waistband.classList.remove('on');
+  curColor=null; paintColor(null); setText('今天穿什么');
+  let t=0;
+  DIMS.forEach((dim,di)=>{
+    later(()=>{
+      badge.textContent=dim.badge; dimLabel.textContent=dim.label;
+      buildGrid(dim.items);
+      shuffle(dim,()=>{
+        const it=dim.items[dim.target];
+        const c=document.createElement('div'); c.className='chip'; c.textContent=dim.chip(it);
+        chips.appendChild(c); later(()=>c.classList.add('on'),20);
+        if(di===DIMS.length-1){
+          later(()=>setText('今天这一身'),200);
+          later(()=>{
+            rvs.textContent='uplook · 为你搭好的一身';
+            const rc=$('rchips');
+            DIMS.forEach(d2=>{ const e=document.createElement('div'); e.className='chip';
+              e.textContent=d2.chip(d2.items[d2.target]); rc.appendChild(e);
+              later(()=>e.classList.add('on'),60); });
+            reveal.classList.add('on');
+            later(()=>$('stamp').classList.add('go'),340);
+          },820);
+        }
+      });
+    },t);
+    t+=1350;
+  });
+}
+
+/* ---------- 控制 ---------- */
+const PRESETS={fast:{sp:55,dr:1.5}, mid:{sp:70,dr:1.35}, slow:{sp:85,dr:1.25}};
+function syncSliders(){ $('spv').textContent=sp.value+'ms';
+  $('drv').textContent=(+dr.value).toFixed(2)+'×'; updHud(); }
+waitSel.onchange=e=>{const p=PRESETS[e.target.value];sp.value=p.sp;dr.value=p.dr;syncSliders();run();};
+sp.oninput=()=>syncSliders(); dr.oninput=()=>syncSliders();
+$('replay').onclick=run;
+rm.onchange=()=>document.body.classList.toggle('rm',rm.checked);
+function updHud(){
+  let d=+sp.value, tot=0, n=0;
+  while(d<330&&n<16){tot+=d;d=Math.round(d*(+dr.value));n++;}
+  const per=(tot+180+200+460+320)/1000;
+  $('hud').textContent='每维度 ≈'+per.toFixed(1)+'s（'+n+' 次换位）· 一轮 ≈'+(per*4+2.4).toFixed(1)+'s';
+}
+syncSliders();
+let iv=setInterval(()=>{if(auto.checked)run();},8600);
+card.addEventListener('mouseenter',()=>clearInterval(iv));
+card.addEventListener('mouseleave',()=>{clearInterval(iv);iv=setInterval(()=>{if(auto.checked)run();},8600);});
+run();
+</script>
+</body>
+</html>

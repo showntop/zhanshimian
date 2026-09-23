@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>等待方式 · 换装洗牌（彩色图 + 滤镜换色）</title>
+<style>
+  :root{
+    --ease:cubic-bezier(.2,.8,.2,1);
+    --snap:cubic-bezier(.3,1.45,.5,1);   /* 上身回弹：先过冲再落 */
+    --fly:cubic-bezier(.55,-.15,.25,1);  /* 飞卡：起步甩出去、终点收住 */
+    --ink:#3F463C; --sage:#8E9A83; --paper:#F5F2EC;
+  }
+  *{box-sizing:border-box}
+  body{background:#E8E4DC;font-family:system-ui,-apple-serif,PingFang SC;margin:0;padding:24px;
+       display:flex;flex-direction:column;align-items:center;gap:14px;color:var(--ink)}
+  body.rm *{animation:none !important;transition:none !important}
+
+  .card-wrap{width:750px;height:560px;position:relative;overflow:hidden;border-radius:18px;
+        background:linear-gradient(160deg,#F5F2EC 0%,#E4DFD6 100%);
+        box-shadow:0 10px 48px rgba(0,0,0,.13);display:flex}
+
+  /* ============ 左：试衣间（拱形壁龛 + 彩色 croquis） ============ */
+  .fig{width:336px;height:100%;position:relative}
+  .arch{position:absolute;left:50%;top:36px;transform:translateX(-50%);
+        width:262px;height:486px;border:1.5px solid rgba(63,70,60,.22);
+        border-radius:131px 131px 14px 14px;
+        background:linear-gradient(170deg,#FBF9F4 0%,#EFECE3 100%)}
+  .arch::after{content:'DRESSING · TODAY';position:absolute;right:-24px;top:120px;
+        writing-mode:vertical-rl;font-size:9px;letter-spacing:.34em;color:rgba(63,70,60,.34)}
+  .figstage{position:absolute;inset:0;overflow:hidden;z-index:2;
+        transform-origin:168px 505px;animation:sway 3.8s ease-in-out infinite}
+  @keyframes sway{0%,100%{transform:rotate(.45deg)}50%{transform:rotate(-.5deg)}}
+  .figstage.pop{animation:pop .5s var(--ease)}
+  @keyframes pop{0%{transform:rotate(0)}30%{transform:rotate(-1.6deg)}60%{transform:rotate(.9deg)}100%{transform:rotate(0)}}
+
+  /* 彩色人物图：白底走 multiply 融进壁龛；换色 = filter，快切段关过渡 */
+  .line{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+        object-position:var(--focus,50%) 50%;z-index:2;mix-blend-mode:multiply;
+        transition:filter .38s var(--ease)}
+  .figstage.instant .line{transition:none}
+
+  /* 腰线（比例维度） */
+  .waist{position:absolute;left:4%;right:4%;height:2px;z-index:3;opacity:0;
+         background:linear-gradient(90deg,rgba(142,154,131,0),#8E9A83 14%,#8E9A83 86%,rgba(142,154,131,0));
+         box-shadow:0 0 12px rgba(142,154,131,.5);
+         transition:opacity .3s var(--ease),top .4s var(--snap)}
+  .waist.on{opacity:.95}
+
+  /* ============ 右：候选池 ============ */
+  .pool{flex:1;position:relative;display:flex;flex-direction:column;padding:40px 30px 34px}
+  .dim-label{font-size:13px;letter-spacing:.2em;color:#8A9083;margin-bottom:6px;height:18px}
+  .grid{flex:1;position:relative}
+  .cand{position:absolute;left:0;top:0;border-radius:15px;background:#FFF;
+        border:1.5px solid #DED8CD;overflow:hidden;will-change:transform,filter;
+        transition:transform .2s var(--ease),filter .2s var(--ease),
+                   box-shadow .35s var(--ease),border-color .35s var(--ease)}
+  .cand .inner{width:100%;height:100%;border-radius:13px;overflow:hidden;background:#FFF;
+        transition:transform .34s var(--ease),opacity .34s var(--ease),filter .34s var(--ease)}
+  .cand .inner img{width:100%;height:100%;object-fit:cover}
+  .cand .inner svg{width:100%;height:100%;display:block}
+  .cand.pick{border-color:var(--sage);box-shadow:0 14px 34px rgba(142,154,131,.32);z-index:5}
+  .cand.pick .inner{transform:scale(1.12)}
+  .cand.rest .inner{transform:scale(.9);opacity:.32;filter:saturate(.55)}
+  .cand.rest{border-color:#E4DFD6}
+  .cand .tag{position:absolute;left:0;right:0;bottom:0;padding:3px 0 4px;text-align:center;
+        font-size:10px;letter-spacing:.08em;color:#6B7364;background:rgba(255,255,255,.88)}
+
+  .flycard{position:absolute;z-index:20;border-radius:14px;background:#FFF;
+        border:1.5px solid var(--sage);box-shadow:0 16px 40px rgba(63,70,60,.28);overflow:hidden}
+  .flycard svg,.flycard img{width:100%;height:100%;display:block;object-fit:cover}
+  .ring{position:absolute;z-index:19;width:120px;height:120px;margin:-60px 0 0 -60px;
+        border-radius:50%;border:2px solid var(--sage);opacity:0;pointer-events:none}
+  .ring.go{animation:ring .6s var(--ease) forwards}
+  @keyframes ring{0%{transform:scale(.25);opacity:.9}100%{transform:scale(1.15);opacity:0}}
+
+  .chips{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;min-height:26px}
+  .chip{padding:5px 12px;border-radius:999px;background:#FFF;border:1px solid #DED8CD;
+        font-size:11px;letter-spacing:.1em;color:#6B7364;opacity:0;transform:translateY(6px);
+        transition:opacity .3s var(--ease),transform .3s var(--ease)}
+  .chip.on{opacity:1;transform:none}
+
+  .caption{position:absolute;left:36px;bottom:26px;z-index:9}
+  .caption .c1{font-size:23px;letter-spacing:.13em;color:var(--ink);transition:opacity .24s var(--ease);
+        text-shadow:0 0 10px #F5F2EC,0 0 18px #F5F2EC,0 1px 3px rgba(245,242,236,.9)}
+  .caption .c2{margin-top:7px;font-size:11px;letter-spacing:.15em;color:#6B7364;
+        text-shadow:0 0 8px #F5F2EC,0 0 14px #F5F2EC}
+  .badge{position:absolute;right:28px;top:22px;padding:6px 14px;border-radius:999px;font-size:12px;
+        letter-spacing:.12em;background:rgba(255,255,255,.9);color:var(--ink);z-index:9}
+
+  /* ============ 揭晓：右栏变海报 + 盖章；人物穿最终搭配一直亮着 ============ */
+  .reveal{position:absolute;top:0;bottom:0;right:0;width:414px;z-index:14;
+        transform:translateX(102%);transition:transform .55s var(--ease);
+        background:linear-gradient(155deg,#3B4A2E 0%,#28331F 100%);
+        display:flex;flex-direction:column;justify-content:flex-end;padding:0 36px 40px}
+  .reveal.on{transform:none}
+  .reveal .ghost{position:absolute;right:18px;top:24px;writing-mode:vertical-rl;
+        font-size:13px;letter-spacing:.5em;color:rgba(242,239,231,.28)}
+  .reveal .rvt{font-size:27px;letter-spacing:.12em;color:#F2EFE7}
+  .reveal .rvs{margin-top:10px;font-size:12px;letter-spacing:.16em;color:rgba(242,239,231,.72)}
+  .reveal .chips{margin-top:16px}
+  .reveal .chip{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#F2EFE7}
+  .stamp{position:absolute;right:34px;bottom:36px;width:74px;height:74px;border-radius:10px;
+        border:3px solid rgba(240,225,215,.92);color:rgba(240,225,215,.95);
+        display:flex;align-items:center;justify-content:center;
+        font-size:24px;letter-spacing:.18em;writing-mode:vertical-rl;
+        transform:scale(1.9) rotate(-14deg);opacity:0}
+  .stamp.go{animation:stamp .5s cubic-bezier(.2,1.1,.3,1) .34s forwards}
+  @keyframes stamp{0%{transform:scale(1.9) rotate(-14deg);opacity:0}
+        62%{transform:scale(.94) rotate(-8deg);opacity:1}
+        100%{transform:scale(1) rotate(-8deg);opacity:1}}
+  .stamp::after{content:'';position:absolute;inset:4px;border:1px solid rgba(240,225,215,.5);border-radius:6px}
+
+  .ctl{display:flex;gap:14px;align-items:center;font-size:14px;flex-wrap:wrap;justify-content:center}
+  button,select{padding:7px 15px;border-radius:9px;border:1px solid var(--ink);background:transparent;
+        color:var(--ink);cursor:pointer;font-size:14px}
+  label{display:inline-flex;gap:6px;align-items:center}
+  .hud{opacity:.65;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+  <div class="card-wrap" id="card">
+
+    <!-- 左：试衣间 -->
+    <div class="fig">
+      <div class="arch"></div>
+      <div class="figstage" id="figstage">
+        <img class="line" id="lineimg" src="assets/color/outfit.png">
+        <div class="waist" id="waist" style="top:52%"></div>
+      </div>
+    </div>
+
+    <!-- 右：候选池 -->
+    <div class="pool">
+      <div class="dim-label" id="dimLabel">在试造型</div>
+      <div class="grid" id="grid"></div>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="badge" id="badge">造型</div>
+    <div class="caption">
+      <div class="c1" id="c1">今天穿什么</div>
+      <div class="c2">正在为你搭配</div>
+    </div>
+
+    <div class="reveal" id="reveal">
+      <div class="ghost">TODAY · ONE LOOK</div>
+      <div class="rvt">今天这一身</div>
+      <div class="rvs" id="rvs"></div>
+      <div class="chips" id="rchips"></div>
+      <div class="stamp" id="stamp">今日</div>
+    </div>
+  </div>
+
+  <div class="ctl">
+    <button id="replay">重播</button>
+    <select id="wait">
+      <option value="fast">秒回（&lt;3s）</option>
+      <option value="mid" selected>常规（3–15s）</option>
+      <option value="slow">长等（&gt;15s）</option>
+    </select>
+    <label>起始间隔 <input type="range" id="sp" min="50" max="180" step="5" value="70">
+      <span class="hud" id="spv">70ms</span></label>
+    <label>减速 <input type="range" id="dr" min="1.1" max="1.7" step="0.05" value="1.35">
+      <span class="hud" id="drv">1.35×</span></label>
+    <label><input type="checkbox" id="auto" checked> 循环</label>
+    <label><input type="checkbox" id="rm"> 减动效</label>
+    <span class="hud" id="hud"></span>
+  </div>
+
+<script>
+/* =====================================================================
+   换装洗牌 · 彩色图 + 滤镜换色架构（2026-09-23，mask 染色退役）：
+   · 造型/发型 = 整图换（assets/color/ 下 8 张上色 croquis，基准砖红）
+   · 配色     = CSS filter 从砖红派生（人物是单色线稿风，滤镜几乎只动服装）
+   · 比例     = 腰线 overlay（无素材）
+   素材规范与出图 runbook：docs/daily-dressup-assets-spec.md
+   ===================================================================== */
+
+const LOOKS = [
+  {key:'outfit',   name:'针织+阔腿裤',  focus:'48%'},
+  {key:'ratio',    name:'短上衣+高腰裤', focus:'48%'},
+  {key:'fit',      name:'A字连衣裙',    focus:'48%'},
+  {key:'occasion', name:'西装叠穿',     focus:'48%'},
+  {key:'look-shirt-skirt',  name:'衬衫+半裙',  focus:'48%'},
+  {key:'look-hoodie-jeans', name:'卫衣+牛仔裤', focus:'48%'},
+  {key:'look-coat',         name:'毛呢大衣',   focus:'48%'},
+  {key:'look-trench',       name:'风衣+围巾',  focus:'48%'},
+];/* 基准色=砖红（母版原色，filter:none）。滤镜只保留 brightness≥1 的颜色
+   ——brightness<1 会把白背景压灰（multiply 下出现灰框），深色四张走专属
+   生图（src 指定），到位前暂用白安全的中间调滤镜顶位 */
+const COLORS = [
+  {name:'燕麦', hex:'#D9D0C1', filter:'hue-rotate(35deg) saturate(.1) brightness(2.2)'},
+  {name:'砖红', hex:'#B4553C', filter:'none'},
+  {name:'墨绿', hex:'#3F5340', filter:'hue-rotate(98deg) saturate(.9) brightness(.82)'},
+  {name:'藏蓝', hex:'#2F3E56', filter:'hue-rotate(200deg) saturate(.85) brightness(.8)'},
+  {name:'浅灰', hex:'#C6C4BE', filter:'hue-rotate(80deg) saturate(.1) brightness(2.15)'},
+  {name:'驼色', hex:'#B08B5E', filter:'hue-rotate(30deg) saturate(.45) brightness(1.5)'},
+  {name:'雾蓝', hex:'#8FA6B8', filter:'hue-rotate(230deg) saturate(.25) brightness(1.6)'},
+  {name:'酒红', hex:'#7B2D35', filter:'hue-rotate(-21deg) saturate(1.05) brightness(.72)'},
+  {name:'橄榄', hex:'#75754B', filter:'hue-rotate(60deg) saturate(.35) brightness(1.2)'},
+  {name:'炭灰', hex:'#3A3D42', filter:'hue-rotate(170deg) saturate(.45) brightness(.55)'},
+  {name:'奶油白', hex:'#F1EAD8', filter:'hue-rotate(50deg) saturate(.1) brightness(2.5)'},
+  {name:'粉棕', hex:'#C08A82', filter:'hue-rotate(355deg) saturate(.35) brightness(1.55)'},
+];
+const WAISTS = [{name:'高腰', pct:46}, {name:'中腰', pct:52}, {name:'低腰', pct:58}];
+const HAIRS = [
+  {key:'wave', name:'大波浪'}, {key:'bun', name:'丸子头'},
+  {key:'bob',  name:'齐耳短发'}, {key:'long', name:'长直发'},
+];
+const TARGET = { look:0, color:1, waist:0, hair:0 };  /* 服务端下发的答案 */
+
+const $=id=>document.getElementById(id);
+const card=$('card'), grid=$('grid'), chips=$('chips'), dimLabel=$('dimLabel');
+const c1=$('c1'), badge=$('badge'), reveal=$('reveal'), rvs=$('rvs');
+const lineimg=$('lineimg'), waist=$('waist');
+const figstage=$('figstage');
+const sp=$('sp'), dr=$('dr'), auto=$('auto'), rm=$('rm'), waitSel=$('wait');
+let curColorIdx=1;
+
+let timers=[]; const clear=()=>{timers.forEach(clearTimeout);timers=[];};
+const later=(fn,ms)=>timers.push(setTimeout(fn,ms));
+function setText(t){ c1.style.opacity=0; later(()=>{c1.textContent=t;c1.style.opacity=1;},130); }
+function boop(){ figstage.classList.remove('pop'); void figstage.offsetWidth; figstage.classList.add('pop'); }
+
+/* ---------- 上身 / 换色 / 换发 ---------- */
+function wearLook(key){
+  const L=LOOKS.find(l=>l.key===key);
+  lineimg.src='assets/color/'+key+'.png';
+  figstage.style.setProperty('--focus', L.focus);  /* 线稿式取景：图与层共用 */
+  curLookKey=key;
+  applyColor(curColorIdx);   /* 换装保色 */
+}
+function wearHair(key){
+  lineimg.src='assets/color/outfit-'+key+'.png';
+  figstage.style.setProperty('--focus', '48%');
+}
+function applyColor(idx){
+  curColorIdx=idx;
+  lineimg.style.filter=COLORS[idx].filter;  /* 透明底图：滤镜不再影响背景 */
+}
+
+/* ---------- 卡面（专用裁切素材：所见即所穿） ---------- */
+function innerHTML(it){
+  if(it.kind==='look') return '<div class="inner"><img src="assets/color/card-'+it.key+
+        '.jpg"></div><div class="tag">'+it.name+'</div>';
+  if(it.kind==='swatch') return '<div class="inner" style="background:'+it.hex+'"></div>'+
+        '<div class="tag">'+it.name+'</div>';
+  if(it.kind==='rule') return '<div class="inner"><img src="assets/color/card-rule-v2.jpg"></div>'+
+        '<div class="tag">'+it.name+'</div>';
+  if(it.kind==='hair') return '<div class="inner"><img src="assets/color/card-outfit-'+it.key+
+        '.jpg"></div><div class="tag">'+it.name+'</div>';
+  return '';
+}
+
+/* ---------- 维度（library=全量库；每轮由 buildRunDims 抽随机子集入池） ---------- */
+const FLY={look:[160,150], color:[160,150], waist:[168,300], hair:[168,64]};
+const DIMS=[
+  {key:'look', label:'在试造型', badge:'造型', kind:'look', library:LOOKS, poolSize:4, target:TARGET.look,
+   apply(it){ wearLook(it.key); boop(); }, chip:it=>'造型 · '+it.name},
+  {key:'color', label:'在调配色', badge:'配色', kind:'swatch', library:COLORS, poolSize:5, target:TARGET.color,
+   apply(it){ applyColor(COLORS.findIndex(c=>c.name===it.name)); boop(); },
+   chip:it=>'配色 · '+it.name},
+  {key:'waist', label:'在找腰线', badge:'比例', kind:'rule', library:WAISTS, poolSize:3, target:TARGET.waist,
+   apply(it){ waist.style.top=it.pct+'%'; waist.classList.add('on'); boop(); },
+   chip:it=>'比例 · '+it.name},
+  {key:'hair', label:'在换发型', badge:'发型', kind:'hair', library:HAIRS, poolSize:3, target:TARGET.hair,
+   apply(it){ wearHair(it.key); boop(); }, chip:it=>'发型 · '+it.name},
+];
+
+/* 每轮随机子集：target 保底入池，池内顺序也洗（反单调的核心机制） */
+function pickPool(library, n, targetIdx){
+  n=Math.min(n, library.length);
+  const rest=[...library.keys()].filter(i=>i!==targetIdx);
+  for(let i=rest.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[rest[i],rest[j]]=[rest[j],rest[i]];}
+  const pool=rest.slice(0,n-1); pool.push(targetIdx);
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  return pool;
+}
+function buildRunDims(){
+  const dims=DIMS.slice();
+  for(let i=dims.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[dims[i],dims[j]]=[dims[j],dims[i]];}
+  /* 调试钩子：#hair / #color / #look / #waist 强制该维度先手 */
+  const force=location.hash.slice(1);
+  const di=dims.findIndex(d=>d.key===force);
+  if(di>0){ const [d]=dims.splice(di,1); dims.unshift(d); }
+  return dims.map(dim=>{
+    const items=pickPool(dim.library,dim.poolSize,dim.target)
+      .map(i=>({...dim.library[i], kind:dim.kind}));
+    return {...dim, items, target:items.findIndex(it=>it.name===dim.library[dim.target].name)};
+  });
+}
+
+/* ---------- 网格（自适应列数，永远排满） ---------- */
+const CW=104, CH=124, GAP=16;
+let cards=[], pos=[], order=[];
+function buildGrid(items){
+  grid.innerHTML='';
+  const n=items.length, cols=n<=3?n:(n===4?2:3), rows=Math.ceil(n/cols);
+  const gw=cols*CW+(cols-1)*GAP, gh=rows*CH+(rows-1)*GAP;
+  const W=grid.clientWidth||390, H=grid.clientHeight||300;
+  pos=[];
+  for(let i=0;i<n;i++) pos.push([Math.round((W-gw)/2+(i%cols)*(CW+GAP)),
+                                Math.round((H-gh)/2+Math.floor(i/cols)*(CH+GAP))]);
+  cards=items.map(it=>{ const d=document.createElement('div');
+    d.className='cand'; d.style.width=CW+'px'; d.style.height=CH+'px';
+    d.innerHTML=innerHTML(it); grid.appendChild(d); return d; });
+  order=[...Array(n).keys()];
+  render(0,0);
+}
+function render(rot,blur){
+  cards.forEach((c,i)=>{ const p=pos[order[i]];
+    const r=(rot&&rot[i])?rot[i]:0;
+    c.style.transform='translate('+p[0]+'px,'+p[1]+'px) rotate('+r+'deg)';
+    c.style.filter=blur?'blur('+blur+'px)':'none'; });
+}
+
+/* ---------- 洗牌：衰减跳位；快切段人物跟着闪换（试衣/闪染） ---------- */
+function shuffle(dim,done){
+  const n=cards.length, decay=+dr.value;
+  let d=+sp.value, steps=0;
+  figstage.classList.add('instant');
+  const step=()=>{
+    for(let i=n-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+    const idx=(d>=330)?dim.target:(steps%n);
+    if(dim.items[idx]&&d<330){
+      if(dim.key==='look') wearLook(dim.items[idx].key);
+      if(dim.key==='color') applyColor(COLORS.indexOf(COLORS.find(c=>c.name===dim.items[idx].name)));
+      if(dim.key==='hair') wearHair(dim.items[idx].key);
+    }
+    const bl=d<110?5.5:(d<180?3.5:(d<250?1.5:0));
+    render(cards.map(()=>(Math.random()*2-1)*7),bl);
+    steps++; d=Math.round(d*decay);
+    if(d>=330||steps>16){
+      order=[...Array(n).keys()]; render(0,0);
+      figstage.classList.remove('instant');   /* 撤掉快切：最终上身才有过渡 */
+      later(()=>{
+        const pickI=dim.target;
+        cards.forEach((c,i)=>{c.classList.toggle('pick',i===pickI);
+                              c.classList.toggle('rest',i!==pickI);});
+        later(()=>flyCard(cards[pickI],dim,done),200);
+      },180);
+      return;
+    }
+    later(step,d);
+  };
+  step();
+}
+
+/* ---------- 飞卡上身 ---------- */
+function flyCard(el,dim,done){
+  const wrap=card.getBoundingClientRect(), r=el.getBoundingClientRect();
+  const cl=el.cloneNode(true); cl.className='flycard';
+  Object.assign(cl.style,{left:(r.left-wrap.left)+'px',top:(r.top-wrap.top)+'px',
+    width:r.width+'px',height:r.height+'px'});
+  const [tx,ty]=FLY[dim.key];
+  const dx=tx-(r.left-wrap.left+r.width/2), dy=ty-(r.top-wrap.top+r.height/2);
+  card.appendChild(cl);
+  /* 动画只管视觉；完成回调用 timer 驱动（onfinish 无头环境不可靠，小程序无 WAAPI） */
+  cl.animate([
+    {transform:'translate(0,0) rotate(0) scale(1)',opacity:1},
+    {transform:'translate('+dx*.2+'px,'+dy*.35+'px) rotate(6deg) scale(1.06)',opacity:1,offset:.3},
+    {transform:'translate('+dx+'px,'+dy+'px) rotate(-10deg) scale(.2)',opacity:.9}
+  ],{duration:460,easing:'cubic-bezier(.55,-.15,.25,1)',fill:'forwards'});
+  later(()=>{
+    cl.remove(); dim.apply(dim.items[dim.target]); ripple(tx,ty); later(done,320);
+  },480);
+}
+function ripple(x,y){
+  const ring=document.createElement('div'); ring.className='ring';
+  ring.style.left=x+'px'; ring.style.top=y+'px';
+  card.appendChild(ring); requestAnimationFrame(()=>ring.classList.add('go'));
+  later(()=>ring.remove(),700);
+}
+
+/* ---------- 主流程 ---------- */
+function run(){
+  clear();
+  reveal.classList.remove('on'); $('stamp').classList.remove('go');
+  $('rchips').innerHTML=''; chips.innerHTML='';
+  hairslotCheckNothing();
+  waist.classList.remove('on'); waist.style.top='52%';
+  curColorIdx=1; applyColor(1); setText('今天穿什么');
+  wearLook(LOOKS[0].key);           /* 起手有衣，不裸开 */
+  const dims=buildRunDims();        /* 每轮随机子集 + 维度顺序打乱 */
+  let t=0;
+  dims.forEach((dim,di)=>{
+    later(()=>{
+      badge.textContent=dim.badge; dimLabel.textContent=dim.label;
+      buildGrid(dim.items);
+      shuffle(dim,()=>{
+        const it=dim.items[dim.target];
+        const c=document.createElement('div'); c.className='chip'; c.textContent=dim.chip(it);
+        chips.appendChild(c); later(()=>c.classList.add('on'),20);
+        if(di===DIMS.length-1){
+          later(()=>setText('今天这一身'),200);
+          later(()=>{
+            rvs.textContent='uplook · 为你搭好的一身';
+            const rc=$('rchips');
+            dims.forEach(d2=>{ const e=document.createElement('div'); e.className='chip';
+              e.textContent=d2.chip(d2.items[d2.target]); rc.appendChild(e);
+              later(()=>e.classList.add('on'),60); });
+            reveal.classList.add('on');
+            later(()=>$('stamp').classList.add('go'),340);
+          },820);
+        }
+      });
+    },t);
+    t+=1350;
+  });
+}
+function hairslotCheckNothing(){ /* 彩色架构下发型素材必有，降级位退役 */ }
+
+/* ---------- 控制 ---------- */
+const PRESETS={fast:{sp:55,dr:1.5}, mid:{sp:70,dr:1.35}, slow:{sp:85,dr:1.25}};
+function syncSliders(){ $('spv').textContent=sp.value+'ms';
+  $('drv').textContent=(+dr.value).toFixed(2)+'×'; updHud(); }
+waitSel.onchange=e=>{const p=PRESETS[e.target.value];sp.value=p.sp;dr.value=p.dr;syncSliders();run();};
+sp.oninput=()=>syncSliders(); dr.oninput=()=>syncSliders();
+$('replay').onclick=run;
+rm.onchange=()=>document.body.classList.toggle('rm',rm.checked);
+function updHud(){
+  let d=+sp.value, tot=0, n=0;
+  while(d<330&&n<16){tot+=d;d=Math.round(d*(+dr.value));n++;}
+  const per=(tot+180+200+460+320)/1000;
+  $('hud').textContent='每维度 ≈'+per.toFixed(1)+'s · 一轮 ≈'+(per*4+2.4).toFixed(1)+'s · 每轮随机子集';
+}
+syncSliders();
+LOOKS.forEach(l=>{ const im=new Image(); im.src='assets/color/'+l.key+'.png'; });
+HAIRS.forEach(h=>{ const im=new Image(); im.src='assets/color/outfit-'+h.key+'.png'; });
+let iv=setInterval(()=>{if(auto.checked)run();},8600);
+card.addEventListener('mouseenter',()=>clearInterval(iv));
+card.addEventListener('mouseleave',()=>{clearInterval(iv);iv=setInterval(()=>{if(auto.checked)run();},8600);});
+run();
+</script>
+</body>
+</html>
