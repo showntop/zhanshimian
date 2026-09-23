@@ -1486,7 +1486,7 @@ export interface components {
              * @enum {string}
              */
             phase: "roam" | "settle" | "reveal";
-            /** @description 能力名（sketch_tour / frames / roam_tour / converge / sweep / develop …）。sketch_tour=巡游主题逐笔画出（params.themes）； frames=序列帧揭晓（params.urls + interval_ms + hold_ms，逐帧播完 定格再揭晓海报）。 */
+            /** @description 能力名（sketch_tour / frames / roam_tour / converge / sweep / develop / dress_lock …）。sketch_tour=巡游主题逐笔画出（params.themes）； frames=序列帧揭晓（params.urls + interval_ms + hold_ms，逐帧播完 定格再揭晓海报）；dress_lock=换装洗牌收敛（params.target 四维 语义值 look/color/waist/hair + params.pace + params.assets.base）， 客户端不认识时按既有纪律回落，不空白。 */
             kind: string;
             /** @description converge 用：形态渲染器名（outfit_blocks / ratio_blocks / swatch_bars / silhouette_shape …）。变体空间由它自己定义。 */
             form?: string;

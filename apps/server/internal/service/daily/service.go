@@ -51,6 +51,9 @@ type Service struct {
 	// forceRegen 调试开关（DAILY_FORCE_REGEN，非生产）：跳过当日幂等，
 	// 每次都实时重生成 + 覆盖当天记录。
 	forceRegen bool
+	// motionVariantOverride 动画方案覆盖（DAILY_MOTION_VARIANT）：
+	// sketch=灰度关停回旧线；dress=全量放量；空串=按 hash(uid+date) 分流。
+	motionVariantOverride string
 }
 
 // New 组装每日内容服务。planner/weather 可后装（未装时生成直接走兜底）。
@@ -84,6 +87,12 @@ func (s *Service) WithForceRegen(enabled bool) *Service {
 	return s
 }
 
+// WithMotionVariant 配置动画方案覆盖（DAILY_MOTION_VARIANT，灰度/紧急开关）。
+func (s *Service) WithMotionVariant(override string) *Service {
+	s.motionVariantOverride = override
+	return s
+}
+
 // today 生成日期一律按 Asia/Shanghai：跨零点时用 UTC 会把「今天」算成前一天。
 func (s *Service) today() string {
 	now := s.clock.Now()
@@ -105,7 +114,15 @@ func (s *Service) Generate(ctx context.Context, userID string, city string) (res
 		if err != nil || result.Content.ID == "" || result.Presentation != nil {
 			return
 		}
-		presentation := settlePresentation(result.Content, int(time.Since(started).Milliseconds()), s.assetBase)
+		elapsed := int(time.Since(started).Milliseconds())
+		// variant=dress 且素材基地址就绪 → 换装洗牌收敛（dress_lock）。
+		// assetBase 为空时 dress 素材必然加载不出，回落旧线（不空转）。
+		if motionVariant(result.Content.UserID, genDate, s.motionVariantOverride) == MotionVariantDress && s.assetBase != "" {
+			presentation := dressLockPresentation(result.Content, elapsed, s.assetBase)
+			result.Presentation = &presentation
+			return
+		}
+		presentation := settlePresentation(result.Content, elapsed, s.assetBase)
 		result.Presentation = &presentation
 	}()
 
