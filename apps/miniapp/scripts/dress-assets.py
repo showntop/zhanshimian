@@ -64,6 +64,16 @@ DEFAULT_WIDTH = 1500  # 人物显示区 750×560rpx 的 2 倍
 DEFAULT_COLORS = 256
 SIZE_BUDGET_KB = 350  # spec §3 单张预算
 
+# ---------- 包内首帧（bundle） ----------
+# 4 张 hero 人物图 + 核心卡进小程序主包：首次进入也零网络，弱网/断网都能
+# 立刻出人物、能洗牌（其余 look 与发型仍走 CDN + 本地缓存）。
+# 尺寸 1200×896：人物在屏上最大约 245×692px（3x dpr），1200 宽仍富余。
+# 160 色：扁平插画，与 256 色肉眼无差，体积再省 27%。
+BUNDLE_DIR = ROOT / "apps" / "miniapp" / "src" / "assets" / "dress"
+BUNDLE_WIDTH = 1200
+BUNDLE_COLORS = 160
+BUNDLE_LOOK_KEYS = ["outfit", "ratio", "fit", "occasion"]
+
 
 def white_to_alpha(rgb: np.ndarray) -> np.ndarray:
     """白底 → 透明：alpha 由 min 通道线性映射，并把颜色从白底 un-blend（防暗边）。"""
@@ -89,10 +99,24 @@ def process_figure(src_path: Path, out_path: Path, width: int, colors: int) -> i
     return out_path.stat().st_size
 
 
+def build_bundle(cards: list[str]) -> list[int]:
+    """包内首帧：4 张 hero 人物图（1200 宽/160 色）+ 核心卡直通。"""
+    BUNDLE_DIR.mkdir(parents=True, exist_ok=True)
+    sizes = []
+    for key in BUNDLE_LOOK_KEYS:
+        src = SRC / LOOK_SOURCES[key]
+        dst = BUNDLE_DIR / f"{key}.png"
+        sizes.append(process_figure(src, dst, BUNDLE_WIDTH, BUNDLE_COLORS))
+    for name in cards:
+        shutil.copyfile(CARDS / name, BUNDLE_DIR / name)
+    return sizes
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--width", type=int, default=DEFAULT_WIDTH)
     parser.add_argument("--colors", type=int, default=DEFAULT_COLORS)
+    parser.add_argument("--bundle", action="store_true", help="同时产出包内首帧素材")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -128,6 +152,14 @@ def main() -> None:
 
     if over:
         print(f"\n{len(over)} 张超预算：考虑 --colors 128 或 --width 1350")
+
+    if args.bundle:
+        bundle_cards = [f"card-{key}-v2.jpg" for key in BUNDLE_LOOK_KEYS] + ["card-rule-v2.jpg"]
+        print(f"\n包内首帧 → {BUNDLE_DIR}")
+        for key, size in zip(BUNDLE_LOOK_KEYS, build_bundle(bundle_cards)):
+            print(f"  {key}.png{' ' * 26}{size // 1024:5d}KB")
+        for name in bundle_cards:
+            print(f"  {name:32s}{(BUNDLE_DIR / name).stat().st_size // 1024:5d}KB")
     print("完成")
 
 

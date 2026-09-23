@@ -27,6 +27,27 @@ const HAIR_KEYS = HAIRS.map((h) => h.key)
 const figureUrl = (base: string, key: string) => `${base}/color/${key}.png`
 const cardUrl = (base: string, key: string) => `${base}/color/card-${key}-v2.jpg`
 
+// ---------- 包内首帧（bundle） ----------
+// 4 张 hero 人物图 + 核心卡随包发布：首次进入也零网络，弱网/断网立刻能洗牌。
+// 产物来自 dress-assets.py --bundle（1200 宽 / 160 色，合计 264KB）。
+// 注：AGENTS 有「包内资产只发 JPEG」的硬规则，这里是有意例外——人物需要
+// 透明通道（不依赖 mix-blend-mode 合成），且同分辨率下 160 色调色板 PNG 与
+// JPEG 体积相同（38KB），没有体积代价。
+const BUNDLED: Record<string, string> = {}
+for (const key of ['outfit', 'ratio', 'fit', 'occasion']) {
+  BUNDLED[`/color/${key}.png`] = `/assets/dress/${key}.png`
+  BUNDLED[`/color/card-${key}-v2.jpg`] = `/assets/dress/card-${key}-v2.jpg`
+}
+BUNDLED['/color/card-rule-v2.jpg'] = '/assets/dress/card-rule-v2.jpg'
+
+/** 远端 URL 命中的包内素材（可直接渲染，无需网络） */
+function bundledFor(url: string): string | null {
+  for (const suffix in BUNDLED) {
+    if (url.endsWith(suffix)) return BUNDLED[suffix] ?? null
+  }
+  return null
+}
+
 /** 本地缓存索引：远端 URL → 本地文件路径（storage 持久化） */
 const CACHE_KEY = 'zsm_dress_assets_v1'
 const localOf = new Map<string, string>()
@@ -65,11 +86,23 @@ function localUsable(path: string): boolean {
   }
 }
 
-/** 优先返回本地文件路径；未缓存时返回远端 URL（渲染同时触发下载） */
+/** 本地缓存可用（已下载且文件还在） */
+function cachedUsable(url: string): boolean {
+  const local = localOf.get(url)
+  return Boolean(local && localUsable(local))
+}
+
+/** 无需网络即可渲染：本地缓存 > 包内首帧 */
+function available(url: string): boolean {
+  return cachedUsable(url) || bundledFor(url) !== null
+}
+
+/** 优先本地缓存 → 包内首帧 → 远端 URL（渲染同时触发下载） */
 export function resolveDressAsset(url: string): string {
   loadCache()
   const local = localOf.get(url)
-  return local && localUsable(local) ? local : url
+  if (local && localUsable(local)) return local
+  return bundledFor(url) ?? url
 }
 
 async function preloadOne(url: string): Promise<void> {
@@ -122,13 +155,10 @@ function hairUrls(base: string): string[] {
   ]
 }
 
-const allCached = (urls: string[]) => urls.every((u) => {
-  const local = localOf.get(u)
-  return Boolean(local && localUsable(local))
-})
+const allCached = (urls: string[]) => urls.every((u) => available(u))
 
 async function runPool(urls: string[], withLocalSave: boolean): Promise<void> {
-  const queue = urls.filter((u) => !allCached([u]))
+  const queue = urls.filter((u) => !available(u))
   const workers = Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
     for (;;) {
       const url = queue.shift()
