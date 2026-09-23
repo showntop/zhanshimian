@@ -41,7 +41,7 @@ import DailyPoster from '../../components/daily-poster'
 import DailyMotion from '../../components/daily-motion'
 import DressShuffle from '../../components/dress-shuffle'
 import { useDressAssets } from '../../components/dress-shuffle/use-dress-assets'
-import { dressTargetFromLock, stableVariant } from '../../components/dress-shuffle/presets'
+import { dressTargetFromLock } from '../../components/dress-shuffle/presets'
 import PrimaryButton from '../../components/primary-button'
 import SourceImage from '../../components/source-image'
 import ErrorState from '../../components/error-state'
@@ -61,7 +61,6 @@ const HAIR_IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
 // 稳定本地派生。素材走 M4 CDN（未接线时 base 为空 → 预载必然失败 →
 // 回落 sketch 巡游顶位，行为安全）。开发者可用 storage 临时覆盖：
 //   zsm_dress_base = 素材基地址；zsm_dress_filter_off = '1'（模拟端不支持滤镜）
-const DRESS_SEED_KEY = 'zsm_install_seed'
 const DRESS_VARIANT_KEY = 'zsm_dress_variant'
 const DRESS_BASE_KEY = 'zsm_dress_base'
 const DRESS_FILTER_OFF_KEY = 'zsm_dress_filter_off'
@@ -274,11 +273,9 @@ export default function Home() {
   // 所以配色在渲染时由客户端注入（数据到位后传进来即可）。
   const dailyPalette: string[] = []
 
-  // 换装洗牌 variant：等待期与收敛期都以服务端脚本为准——两端同一套种子
-  // （hash(uid+date)），否则各算一套会出现「等待播旧巡游、收敛才切洗牌」的
-  // 混搭，而且等待期不预载时收敛期来不及（预载有 3s 闸）。旧服务端不下发
-  // variant 字段时才用本地预测兜底。素材预载失败 → dress 整体退位，
-  // sketch 巡游 + 帧揭晓照常（spec §4 降级矩阵）。
+  // 换装洗牌 variant：等待期与收敛期都只信服务端脚本（hash(uid+date) 同一套
+  // 种子）。客户端不再本地另算——本地猜会整段猜错（明明是 dress 却走旧线）。
+  // 素材预载失败 → dress 整体退位，sketch 巡游 + 帧揭晓照常（spec §4）。
   const dressEnv = useMemo(() => {
     const read = (key: string): string => {
       try {
@@ -287,38 +284,18 @@ export default function Home() {
         return ''
       }
     }
-    let seed = read(DRESS_SEED_KEY)
-    if (!seed) {
-      seed = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`
-      try {
-        Taro.setStorageSync(DRESS_SEED_KEY, seed)
-      } catch {
-        // 存不进去：本次会话内仍稳定（重装级偶发，不影响演示）
-      }
-    }
     const now = new Date()
-    const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
-    // 上次服务端给的 variant（同天才认）：让下一次进页面在 prepare 返回前
-    // 就开始预载——缓存命中的日子没有等待期，generate 一返回就进收敛，
-    // 预载晚一步（3s 闸）就只能回落序列帧揭晓。
-    const lastVariant = read(DRESS_VARIANT_KEY)
     return {
-      seedKey: `${seed}|${dateKey}`,
-      dateKey,
-      knownVariant: lastVariant.startsWith(`${dateKey}|`)
-        ? lastVariant.slice(dateKey.length + 1)
-        : '',
+      dateKey: `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`,
       base: read(DRESS_BASE_KEY) || DRESS_ASSET_BASE,
       colorLocked: read(DRESS_FILTER_OFF_KEY) === '1',
     }
   }, [])
-  // 等待期方案：roam 脚本的 variant 优先；空串（旧服务端）= 本地预测兜底
   const dressRoamVariant = useMemo(
     () => roamVariant(roamScript?.stages.find((stage) => stage.phase === 'roam')),
     [roamScript],
   )
-  // 记住服务端这次给的 variant：下次进页面（含缓存命中无等待期的日子）
-  // 在 prepare 返回前就按它预载
+  // 记住服务端这次给的 variant：供 App 启动时（首页还没挂载）判断要不要预热
   useEffect(() => {
     if (!dressRoamVariant) return
     try {
@@ -327,11 +304,9 @@ export default function Home() {
       // 存不下就不存：本次会话内仍有 roam 脚本兜底
     }
   }, [dressRoamVariant, dressEnv.dateKey])
-  const dressPredict =
-    dressRoamVariant === 'dress' ||
-    (dressRoamVariant === '' &&
-      (dressEnv.knownVariant === 'dress' ||
-        (dressEnv.knownVariant === '' && stableVariant(dressEnv.seedKey) === 'dress')))
+  // 未知时不再本地猜：默认走洗牌（静态前奏），roam 脚本一到就校正。
+  // 此前本地 50% 猜成 sketch，会整段走旧线——「明明是 dress 却没有洗牌」的元凶。
+  const dressPredict = dressRoamVariant !== 'sketch'
   const dressLock = useMemo(
     () => readDressLockParams(settleScript?.stages.find((stage) => stage.kind === 'dress_lock')),
     [settleScript],
@@ -524,6 +499,7 @@ export default function Home() {
                         target={dressLockTarget ?? undefined}
                         settling
                         assetBase={dressBase}
+                        resolveAsset={dressAssets.resolve}
                         hairAvailable={dressAssets.hairReady}
                         colorLocked={dressEnv.colorLocked}
                         onSettled={reveal}
@@ -560,6 +536,7 @@ export default function Home() {
                       settling={false}
                       hold={dressHold}
                       assetBase={dressBase}
+                      resolveAsset={dressAssets.resolve}
                       hairAvailable={dressAssets.hairReady}
                       colorLocked={dressEnv.colorLocked}
                     />

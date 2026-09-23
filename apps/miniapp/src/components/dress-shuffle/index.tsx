@@ -15,6 +15,7 @@
 // 见设计文档 §4 降级矩阵）。
 
 import { useEffect, useRef, useState } from 'react'
+import Taro from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import { DAILY_COPY } from '@zsm/core'
 import {
@@ -74,6 +75,8 @@ export interface DressShuffleProps {
   assetBase?: string
   /** 素材未就绪：停在洗牌自己的静态前奏（壁龛 + 骨架卡位），不洗牌、不顶旧巡游 */
   hold?: boolean
+  /** 远端路径 → 可直接渲染的地址（本地缓存优先；不传则直接用远端） */
+  resolveAsset?: (url: string) => string
   /** 发型素材就绪（use-dress-assets 懒加载结果）；false 时发型维度不入池 */
   hairAvailable?: boolean
   /** 端不支持 CSS filter（M1 渲染探测）→ 换色维度锁基准砖红（spec §4） */
@@ -97,11 +100,13 @@ export default function DressShuffle({
   settling,
   assetBase = '',
   hold = false,
+  resolveAsset,
   hairAvailable = true,
   colorLocked = false,
   reduced = false,
   onSettled,
 }: DressShuffleProps) {
+  const toUrl = resolveAsset ?? ((url: string) => url)
   const [figure, setFigure] = useState<FigureState>(INITIAL_FIGURE)
   const [pool, setPool] = useState<PoolState | null>(null)
   const [head, setHead] = useState<{ label: string; badge: string }>({ label: '今天穿什么', badge: '造型' })
@@ -115,8 +120,22 @@ export default function DressShuffle({
   const [pop, setPop] = useState(false)
   const [caption, setCaption] = useState<string>(DAILY_COPY.dressCaptionIdle)
   const [round, setRound] = useState(0)
+  // 低端机能力位（一次性探测）：benchmarkLevel 是微信给的机器档位，
+  // 低于阈值就关掉运动模糊这类离屏合成开销；探测失败按「支持」处理。
+  const lowEndRef = useRef(false)
+  const probedRef = useRef(false)
   const settledRef = useRef(false)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+
+  if (!probedRef.current) {
+    probedRef.current = true
+    try {
+      const info = Taro.getSystemInfoSync() as { benchmarkLevel?: number }
+      lowEndRef.current = typeof info.benchmarkLevel === 'number' && info.benchmarkLevel > 0 && info.benchmarkLevel < 8
+    } catch {
+      lowEndRef.current = false
+    }
+  }
 
   const later = (fn: () => void, ms: number) => {
     timersRef.current.push(setTimeout(fn, ms))
@@ -126,8 +145,9 @@ export default function DressShuffle({
     timersRef.current = []
   }
 
-  const asset = (p: string) => `${assetBase}/color/${p}`
-  const cardAsset = (key: string) => `${assetBase}/color/card-${key}-v2.jpg`
+  // 本地缓存优先：弱网/断网时人物与卡面走本地文件，不会空白
+  const asset = (p: string) => toUrl(`${assetBase}/color/${p}`)
+  const cardAsset = (key: string) => toUrl(`${assetBase}/color/card-${key}-v2.jpg`)
 
   // ---------- 应用候选到人物 ----------
   const applyItem = (dim: RunDim, item: ShuffleItem) => {
@@ -168,9 +188,12 @@ export default function DressShuffle({
   ]
 
   // ---------- 单维度洗牌驱动 ----------
+  // 步长下限 46ms：30ms 一步是 33fps，低端机上「快切」会变成明显的卡顿，
+  // 而洗牌的爽感来自「快而不卡」，不是「步频高」。低端机同时关掉运动模糊
+  // （blur 要离屏合成，是这一屏最贵的一项）。
   const runDim = (dim: RunDim, accel: boolean, done: () => void) => {
-    const base = accel ? 30 : 70
-    const decay = accel ? 1.18 : 1.35
+    const base = accel ? 46 : 78
+    const decay = accel ? 1.22 : 1.35
     const pickAt = 330
     let d = base
     let steps = 0
@@ -184,7 +207,7 @@ export default function DressShuffle({
         order[i] = at(order, j)
         order[j] = a
       }
-      const blur = d < 110 ? 5.5 : d < 180 ? 3.5 : d < 250 ? 1.5 : 0
+      const blur = lowEndRef.current || reduced ? 0 : d < 110 ? 5.5 : d < 180 ? 3.5 : d < 250 ? 1.5 : 0
       setPool({ dim, items: dim.items, order, blur, picked: false })
       const idx = d >= pickAt ? dim.target : steps % n
       // 快切段：候选实时上身（试衣闪切/闪染）

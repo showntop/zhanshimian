@@ -266,6 +266,8 @@
   border: 2rpx solid #ded8cd;
   overflow: hidden;
   transition: transform 0.2s ease-out, opacity 0.34s ease-out;
+  // 洗牌每一步都在改 transform：提前提到合成层，避免每步重排
+  will-change: transform;
 }
 .ds__cand--pick {
   border-color: #8e9a83;
