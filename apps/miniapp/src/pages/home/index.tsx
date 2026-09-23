@@ -499,7 +499,7 @@ export default function Home() {
             </View>
           ) : (
             <View>
-              {dailyReady && dailyContent ? (
+              {dailyReady && dailyContent && !dressOnSettling ? (
                 <View className={enter(1)}>
                   <DailyPoster
                     type={dailyContent.type}
@@ -512,29 +512,44 @@ export default function Home() {
                     onOpen={goToday}
                   />
                 </View>
-              ) : dailySettling ? (
-                <View className={`home__daily-waiting ${enter(1)}`}>
-                  {dressOnSettling ? (
-                    <DressShuffle
-                      target={dressLockTarget ?? undefined}
-                      settling
-                      assetBase={dressBase}
-                      hairAvailable={dressAssets.hairReady}
-                      colorLocked={dressEnv.colorLocked}
-                      onSettled={reveal}
-                    />
-                  ) : (
-                    <DailyMotion
-                      presentation={settleScript}
-                      phase="settling"
-                      palette={dailyPalette}
-                      seq={todaySeq}
-                      onSettled={reveal}
-                    />
-                  )}
-                </View>
+              ) : dailySettling || (dailyReady && dressOnSettling) ? (
+                // 落地即保留：洗牌揭晓面板（人物 + 这一身）一直留在首页，
+                // 内容海报退到卡片下方的一行入口（产品流程仍可进今日页收下）。
+                <>
+                  <View
+                    className={`home__daily-waiting ${dressOnSettling ? 'home__daily-waiting--dress' : ''} ${enter(1)}`}
+                  >
+                    {dressOnSettling ? (
+                      <DressShuffle
+                        target={dressLockTarget ?? undefined}
+                        settling
+                        assetBase={dressBase}
+                        hairAvailable={dressAssets.hairReady}
+                        colorLocked={dressEnv.colorLocked}
+                        onSettled={reveal}
+                      />
+                    ) : (
+                      <DailyMotion
+                        presentation={settleScript}
+                        phase="settling"
+                        palette={dailyPalette}
+                        seq={todaySeq}
+                        onSettled={reveal}
+                      />
+                    )}
+                  </View>
+                  {dailyReady && dailyContent && dressOnSettling ? (
+                    <View className="home__daily-entry pressable" onClick={goToday}>
+                      <Text className="home__daily-entry-label">{DAILY_COPY.dressContentLabel}</Text>
+                      <Text className="home__daily-entry-topic">{dailyContent.topic}</Text>
+                      <Text className="home__daily-entry-link">{DAILY_COPY.dressContentLink}</Text>
+                    </View>
+                  ) : null}
+                </>
               ) : dailyWaiting ? (
-                <View className={`home__daily-waiting ${enter(1)}`}>
+                <View
+                  className={`home__daily-waiting ${dressOnWaiting ? 'home__daily-waiting--dress' : ''} ${enter(1)}`}
+                >
                   {dressOnWaiting ? (
                     <DressShuffle
                       settling={false}

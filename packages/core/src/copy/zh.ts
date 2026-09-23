@@ -365,6 +365,9 @@ export const DAILY_COPY = {
   dressRevealSub: 'uplook · 为你搭好的一身',
   dressRevealGhost: 'TODAY · ONE LOOK',
   dressStamp: '今日',
+  // 洗牌落地后：内容海报退到卡片下方的一行入口（内容主入口仍在今日页）
+  dressContentLabel: '今日内容',
+  dressContentLink: '看今天这一讲 ›',
   // 巡游内置主题：巡游是通用内容，不该等网络才有——prepare 没回来时（首屏
   // loading）也要立刻有东西可播，否则等待期会退成「一个圆圈」，像卡住了。
   // 服务端脚本到达后覆盖这份；form 名要与 daily-motion/forms.tsx 的注册表对上。

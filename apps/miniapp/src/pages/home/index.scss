@@ -453,6 +453,42 @@ $clay: #c4693b;
     overflow: hidden;
   }
 
+  // 换装洗牌卡是 750×560（原型尺寸），比通用动画区高 40rpx——
+  // 沿用 520 会把卡底（含盖章）裁掉，落地保留时尤其明显。
+  &--dress {
+    height: 560rpx;
+  }
+
+  // 洗牌落地保留时，内容海报退到卡片下方的一行入口（主入口仍在今日页）
+  &__daily-entry {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+    margin-top: 20rpx;
+    padding: 12rpx 6rpx;
+  }
+
+  &__daily-entry-label {
+    font-size: 26rpx;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  &__daily-entry-topic {
+    flex: 1;
+    font-size: 24rpx;
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__daily-entry-link {
+    font-size: 24rpx;
+    font-weight: 600;
+    color: var(--moss);
+  }
+
   // 报告退位：不再是首页主角，入口降级为一行
   // 进展感锚点 = 不规则比例条 + 衬线数字 + 小后缀（编辑式"数据注脚"）
   &__archive {
