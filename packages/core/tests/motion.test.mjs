@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   planConverge,
   readConvergeParams,
+  readDressLockParams,
   reducedPlan,
   planDuration,
   roamThemes,
@@ -145,4 +146,46 @@ test('序列帧参数：正常解析 + 缺字段防御 + 空值返回 null', () 
   assert.equal(readFramesParams({ phase: 'settle', kind: 'frames', params: {} }), null)
   assert.equal(readFramesParams({ phase: 'settle', kind: 'frames', params: { urls: [] } }), null)
   assert.equal(readFramesParams({ phase: 'settle', kind: 'frames', params: { urls: 'nope' } }), null)
+})
+
+// ---------- dress_lock ----------
+
+test('dress_lock：完整参数解析出语义 target 与素材位', () => {
+  const stage = {
+    phase: 'settle',
+    kind: 'dress_lock',
+    params: {
+      target: { look: 'outfit', color: '砖红', waist: '高腰', hair: 'wave' },
+      pace: 'slow',
+      assets: { base: 'https://cdn.example.com', version: '20260923' },
+    },
+  }
+  const parsed = readDressLockParams(stage)
+  assert.deepEqual(parsed?.target, { look: 'outfit', color: '砖红', waist: '高腰', hair: 'wave' })
+  assert.equal(parsed?.pace, 'slow')
+  assert.equal(parsed?.assets.base, 'https://cdn.example.com')
+})
+
+test('dress_lock：缺语义值 / kind 不对 / 无参数一律 null（回落旧揭晓线）', () => {
+  assert.equal(readDressLockParams({ phase: 'settle', kind: 'frames', params: {} }), null)
+  assert.equal(readDressLockParams({ phase: 'settle', kind: 'dress_lock' }), null)
+  assert.equal(readDressLockParams(undefined), null)
+  assert.equal(
+    readDressLockParams({
+      phase: 'settle',
+      kind: 'dress_lock',
+      params: { target: { look: 'outfit', color: '', waist: '高腰', hair: 'wave' } },
+    }),
+    null,
+  )
+})
+
+test('dress_lock：pace 缺省回落 normal，assets 缺省空串', () => {
+  const parsed = readDressLockParams({
+    phase: 'settle',
+    kind: 'dress_lock',
+    params: { target: { look: 'ratio', color: '砖红', waist: '低腰', hair: 'bob' } },
+  })
+  assert.equal(parsed?.pace, 'normal')
+  assert.deepEqual(parsed?.assets, { base: '', version: '' })
 })

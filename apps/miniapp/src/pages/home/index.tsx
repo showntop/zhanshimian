@@ -21,6 +21,7 @@ import {
   SCENES,
   greetingForNow,
   planSlotLabel,
+  readDressLockParams,
   taskDoneText,
   trackEvent,
   type DisplayMedia,
@@ -28,6 +29,7 @@ import {
   type SceneCopy,
 } from '@zsm/core'
 import { qualityApi } from '../../app/api/quality'
+import { resolveBaseURL } from '../../config/runtime'
 import { peripherals } from '../../app/api/peripherals'
 import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
 import { useOperationPolling } from '../../app/operations/use-operation-polling'
@@ -36,6 +38,9 @@ import { usePageShell } from '../../hooks/use-page-visibility'
 import AppHeader from '../../components/app-header'
 import DailyPoster from '../../components/daily-poster'
 import DailyMotion from '../../components/daily-motion'
+import DressShuffle from '../../components/dress-shuffle'
+import { useDressAssets } from '../../components/dress-shuffle/use-dress-assets'
+import { dressTargetFromLock, stableVariant } from '../../components/dress-shuffle/presets'
 import PrimaryButton from '../../components/primary-button'
 import SourceImage from '../../components/source-image'
 import ErrorState from '../../components/error-state'
@@ -48,6 +53,19 @@ const IN_FLIGHT = new Set(['accepted', 'running', 'retrying'])
 const RENDER_IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
 // 发型预览在途状态（HairPreview.state；诊断类是同步接口，没有跨页在途态可读）
 const HAIR_IN_FLIGHT = new Set(['queued', 'generating', 'checking'])
+
+// ---------- 换装洗牌（dress variant，spec 2026-09-23） ----------
+// M3 服务端 dress_lock 未接：先用「装机种子 + 日期」稳定二选一（同人同天
+// 稳定、隔天切换），M3 后由 settle 脚本 kind 分发覆盖；收敛 target 同理走
+// 稳定本地派生。素材走 M4 CDN（未接线时 base 为空 → 预载必然失败 →
+// 回落 sketch 巡游顶位，行为安全）。开发者可用 storage 临时覆盖：
+//   zsm_dress_base = 素材基地址；zsm_dress_filter_off = '1'（模拟端不支持滤镜）
+const DRESS_SEED_KEY = 'zsm_install_seed'
+const DRESS_BASE_KEY = 'zsm_dress_base'
+const DRESS_FILTER_OFF_KEY = 'zsm_dress_filter_off'
+// 等待期（脚本未到）的素材基地址：服务端 /assets/ 静态路由，与序列帧揭晓同源。
+// 收敛期以 dress_lock.assets.base 为准；storage 可覆盖（本地联调另一台源时用）。
+const DRESS_ASSET_BASE = `${resolveBaseURL()}/assets/daily/dress`
 
 // 工具卡文案在 HOME_COPY.tools（红线 5），这里只配 key → 路由
 const TOOL_PATHS: Record<(typeof HOME_COPY.tools)[number]['key'], string> = {
@@ -254,6 +272,52 @@ export default function Home() {
   // 所以配色在渲染时由客户端注入（数据到位后传进来即可）。
   const dailyPalette: string[] = []
 
+  // 换装洗牌 variant：收敛期以服务端脚本为准（settle 脚本 kind=dress_lock，
+  // 服务端 hash(uid+date) 分流）；等待期脚本未到（prepare 不带 variant，
+  // spec §1），用装机种子+日期本地预测先行——预测只影响等待期视觉，与收敛
+  // 真相不一致也只是两段换了套皮，不空白。素材预载失败 → dress 整体退位，
+  // sketch 巡游 + 帧揭晓照常（spec §4 降级矩阵）。
+  const dressEnv = useMemo(() => {
+    const read = (key: string): string => {
+      try {
+        return (Taro.getStorageSync(key) as string) || ''
+      } catch {
+        return ''
+      }
+    }
+    let seed = read(DRESS_SEED_KEY)
+    if (!seed) {
+      seed = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+      try {
+        Taro.setStorageSync(DRESS_SEED_KEY, seed)
+      } catch {
+        // 存不进去：本次会话内仍稳定（重装级偶发，不影响演示）
+      }
+    }
+    const now = new Date()
+    const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+    return {
+      seedKey: `${seed}|${dateKey}`,
+      base: read(DRESS_BASE_KEY) || DRESS_ASSET_BASE,
+      colorLocked: read(DRESS_FILTER_OFF_KEY) === '1',
+    }
+  }, [])
+  const dressPredict = stableVariant(dressEnv.seedKey) === 'dress'
+  const dressLock = useMemo(
+    () => readDressLockParams(settleScript?.stages.find((stage) => stage.kind === 'dress_lock')),
+    [settleScript],
+  )
+  // 词汇表对不上（客户端落后于服务端新值）→ null → 回落旧揭晓线
+  const dressLockTarget = useMemo(
+    () => (dressLock ? dressTargetFromLock(dressLock.target) : null),
+    [dressLock],
+  )
+  // 素材基地址以脚本下发为准（服务端可独立换源），本地常量只是开发覆盖
+  const dressBase = dressLock?.assets.base || dressEnv.base
+  const dressAssets = useDressAssets(dressBase, dressPredict || Boolean(dressLock))
+  const dressOnWaiting = dressPredict && dressAssets.ready
+  const dressOnSettling = Boolean(dressLockTarget) && dressAssets.ready
+
   // 海报角落编号用日期而非序号：序号是静态的，日期才有"每天换一张"的时间感
   const todaySeq = useMemo(() => {
     const now = new Date()
@@ -418,22 +482,42 @@ export default function Home() {
                 </View>
               ) : dailySettling ? (
                 <View className={`home__daily-waiting ${enter(1)}`}>
-                  <DailyMotion
-                    presentation={settleScript}
-                    phase="settling"
-                    palette={dailyPalette}
-                    seq={todaySeq}
-                    onSettled={reveal}
-                  />
+                  {dressOnSettling ? (
+                    <DressShuffle
+                      target={dressLockTarget ?? undefined}
+                      settling
+                      assetBase={dressBase}
+                      hairAvailable={dressAssets.hairReady}
+                      colorLocked={dressEnv.colorLocked}
+                      onSettled={reveal}
+                    />
+                  ) : (
+                    <DailyMotion
+                      presentation={settleScript}
+                      phase="settling"
+                      palette={dailyPalette}
+                      seq={todaySeq}
+                      onSettled={reveal}
+                    />
+                  )}
                 </View>
               ) : dailyWaiting ? (
                 <View className={`home__daily-waiting ${enter(1)}`}>
-                  <DailyMotion
-                    presentation={roamScript}
-                    phase="waiting"
-                    palette={dailyPalette}
-                    seq={todaySeq}
-                  />
+                  {dressOnWaiting ? (
+                    <DressShuffle
+                      settling={false}
+                      assetBase={dressBase}
+                      hairAvailable={dressAssets.hairReady}
+                      colorLocked={dressEnv.colorLocked}
+                    />
+                  ) : (
+                    <DailyMotion
+                      presentation={roamScript}
+                      phase="waiting"
+                      palette={dailyPalette}
+                      seq={todaySeq}
+                    />
+                  )}
                 </View>
               ) : null}
               {/* 报告退位：不再是首页主角，但入口保留，降级为一行。

@@ -1,0 +1,277 @@
+// 换装洗牌样式：原型 daily-dressup-asset.html 的 CSS px → rpx（750 设计宽 1:1）。
+// 禁裸 px（check.mjs 门禁）；keyframes 命名加 ds- 前缀防冲突。
+
+.ds {
+  width: 750rpx;
+  height: 560rpx;
+  position: relative;
+  overflow: hidden;
+  border-radius: 18rpx;
+  background: linear-gradient(160deg, #f5f2ec 0%, #e4dfd6 100%);
+  box-shadow: 0 10rpx 48rpx rgba(0, 0, 0, 0.13);
+  display: flex;
+}
+
+// ---------- 左：试衣间 ----------
+.ds__fig {
+  width: 336rpx;
+  height: 560rpx;
+  position: relative;
+}
+
+.ds__arch {
+  position: absolute;
+  left: 50%;
+  top: 36rpx;
+  transform: translateX(-50%);
+  width: 262rpx;
+  height: 486rpx;
+  border: 2rpx solid rgba(63, 70, 60, 0.22);
+  border-radius: 131rpx 131rpx 14rpx 14rpx;
+  background: linear-gradient(170deg, #fbf9f4 0%, #efece3 100%);
+}
+
+.ds__clip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 336rpx;
+  height: 560rpx;
+  overflow: hidden;
+  z-index: 2;
+}
+
+// 彩色人物图：白底走 multiply 融进壁龛；换色 = filter（透明底不受影响）
+.ds__figure {
+  width: 750rpx;
+  height: 560rpx;
+  margin-left: -199rpx;
+  mix-blend-mode: multiply;
+  transition: filter 0.38s ease-out;
+}
+
+.ds__waist {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  height: 2rpx;
+  z-index: 3;
+  opacity: 0.95;
+  background: linear-gradient(
+    90deg,
+    rgba(142, 154, 131, 0),
+    #8e9a83 14%,
+    #8e9a83 86%,
+    rgba(142, 154, 131, 0)
+  );
+  box-shadow: 0 0 12rpx rgba(142, 154, 131, 0.5);
+}
+
+.ds__caption {
+  position: absolute;
+  left: 36rpx;
+  bottom: 26rpx;
+  z-index: 9;
+}
+.ds__caption-main {
+  font-size: 23rpx;
+  letter-spacing: 0.13em;
+  color: #3f463c;
+  text-shadow: 0 0 10rpx #f5f2ec, 0 0 18rpx #f5f2ec;
+}
+.ds__caption-sub {
+  margin-top: 7rpx;
+  font-size: 11rpx;
+  letter-spacing: 0.15em;
+  color: #6b7364;
+  text-shadow: 0 0 8rpx #f5f2ec;
+}
+
+// 盖章「今日」
+.ds__stamp {
+  position: absolute;
+  right: 34rpx;
+  bottom: 36rpx;
+  width: 74rpx;
+  height: 74rpx;
+  border-radius: 10rpx;
+  border: 3rpx solid rgba(240, 225, 215, 0.92);
+  color: rgba(240, 225, 215, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  letter-spacing: 0.18em;
+  writing-mode: vertical-rl;
+  background: rgba(40, 51, 31, 0.4);
+  animation: ds-stamp 0.5s cubic-bezier(0.2, 1.1, 0.3, 1) both;
+}
+@keyframes ds-stamp {
+  0% {
+    transform: scale(1.9) rotate(-14deg);
+    opacity: 0;
+  }
+  62% {
+    transform: scale(0.94) rotate(-8deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(-8deg);
+    opacity: 1;
+  }
+}
+
+// ---------- 右：候选池 ----------
+.ds__pool {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 40rpx 30rpx 34rpx;
+}
+.ds__pool-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6rpx;
+  height: 36rpx;
+}
+.ds__dim-label {
+  font-size: 13rpx;
+  letter-spacing: 0.2em;
+  color: #8a9083;
+}
+.ds__badge {
+  font-size: 12rpx;
+  letter-spacing: 0.12em;
+  background: rgba(255, 255, 255, 0.9);
+  color: #3f463c;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+}
+
+.ds__grid {
+  flex: 1;
+  position: relative;
+}
+
+.ds__cand {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 104rpx;
+  height: 124rpx;
+  border-radius: 15rpx;
+  background: #fff;
+  border: 2rpx solid #ded8cd;
+  overflow: hidden;
+  transition: transform 0.2s ease-out, opacity 0.34s ease-out;
+}
+.ds__cand--pick {
+  border-color: #8e9a83;
+  box-shadow: 0 14rpx 34rpx rgba(142, 154, 131, 0.32);
+  z-index: 5;
+}
+.ds__cand--rest {
+  opacity: 0.32;
+}
+.ds__cand-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 13rpx;
+  overflow: hidden;
+  background: #fff;
+}
+.ds__cand-img {
+  width: 100%;
+  height: 100%;
+}
+.ds__swatch {
+  width: 100%;
+  height: 100%;
+}
+.ds__tag {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 3rpx 0 4rpx;
+  text-align: center;
+  font-size: 10rpx;
+  letter-spacing: 0.08em;
+  color: #6b7364;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+// ---------- 飞卡 ----------
+.ds__fly {
+  position: absolute;
+  z-index: 20;
+  width: 104rpx;
+  height: 124rpx;
+  border-radius: 14rpx;
+  background: #fff;
+  border: 2rpx solid #8e9a83;
+  box-shadow: 0 16rpx 40rpx rgba(63, 70, 60, 0.28);
+  overflow: hidden;
+  transition: transform 0.46s cubic-bezier(0.55, -0.15, 0.25, 1), opacity 0.46s ease-out;
+}
+.ds__fly--go {
+  opacity: 0.9;
+}
+.ds__fly-img {
+  width: 100%;
+  height: 100%;
+}
+.ds__ring {
+  position: absolute;
+  z-index: 19;
+  width: 120rpx;
+  height: 120rpx;
+  margin-left: -60rpx;
+  margin-top: -60rpx;
+  border-radius: 50%;
+  border: 2rpx solid #8e9a83;
+  animation: ds-ring 0.6s ease-out forwards;
+}
+@keyframes ds-ring {
+  0% {
+    transform: scale(0.25);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+// ---------- chips ----------
+.ds__chips {
+  display: flex;
+  gap: 9rpx;
+  flex-wrap: wrap;
+  margin-top: 14rpx;
+  min-height: 26rpx;
+}
+.ds__chip {
+  padding: 5rpx 12rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  border: 1rpx solid #ded8cd;
+  font-size: 11rpx;
+  letter-spacing: 0.1em;
+  color: #6b7364;
+}
+
+// prefers-reduced-motion 归零（AGENTS 动效规约）：动画停帧、元素保持可见。
+// 洗牌状态机本身的减动效降级（四张 target 卡直出 + 盖章）由组件 reduced 分支承担。
+@media (prefers-reduced-motion: reduce) {
+  .ds__figure,
+  .ds__cand,
+  .ds__fly,
+  .ds__ring,
+  .ds__stamp {
+    animation: none !important;
+    transition: none !important;
+  }
+}

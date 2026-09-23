@@ -106,6 +106,54 @@ export function readFramesParams(stage: MotionStage | undefined): FramesParams |
   }
 }
 
+// ---------- 换装洗牌收敛（dress_lock） ----------
+
+/** 四维 target：服务端下发的语义值（与洗牌库共享词汇表，不是索引） */
+export interface DressLockTarget {
+  look: string
+  color: string
+  waist: string
+  hair: string
+}
+
+export interface DressLockParams {
+  target: DressLockTarget
+  /** 等得越久揭晓越隆重（服务端按耗时定档） */
+  pace: 'normal' | 'slow'
+  /** 素材基地址 + 清单版本（客户端预载/预热缓存用） */
+  assets: { base: string; version: string }
+}
+
+/**
+ * dress_lock 参数；解析不出（kind 不对 / 语义值缺失）返回 null，
+ * 播放器据此回落旧揭晓线——协议问题不能变成空屏。
+ */
+export function readDressLockParams(stage: MotionStage | undefined): DressLockParams | null {
+  if (stage?.kind !== 'dress_lock') return null
+  const params = stage.params
+  if (!params) return null
+  const raw = params.target
+  if (!raw || typeof raw !== 'object') return null
+  const str = (value: unknown): string => (typeof value === 'string' && value !== '' ? value : '')
+  const target: DressLockTarget = {
+    look: str((raw as Record<string, unknown>).look),
+    color: str((raw as Record<string, unknown>).color),
+    waist: str((raw as Record<string, unknown>).waist),
+    hair: str((raw as Record<string, unknown>).hair),
+  }
+  if (!target.look || !target.color || !target.waist || !target.hair) return null
+  const assets = params.assets
+  const assetsRaw = assets && typeof assets === 'object' ? (assets as Record<string, unknown>) : {}
+  return {
+    target,
+    pace: params.pace === 'slow' ? 'slow' : 'normal',
+    assets: {
+      base: typeof assetsRaw.base === 'string' ? assetsRaw.base : '',
+      version: typeof assetsRaw.version === 'string' ? assetsRaw.version : '',
+    },
+  }
+}
+
 // ---------- 收敛 ----------
 
 export interface ConvergeAxis {
