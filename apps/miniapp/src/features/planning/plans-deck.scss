@@ -58,6 +58,27 @@
     font-size: 24rpx;
   }
 
+  // 新一轮制作中 chip：与「往期」徽标同位同形，加 spinner 表示在途
+  &__next-chip {
+    display: flex;
+    align-items: center;
+    gap: 10rpx;
+    padding: 4rpx 18rpx;
+    border-radius: 999rpx;
+    background: var(--moss-soft);
+  }
+
+  &__next-spin {
+    width: 20rpx;
+    height: 20rpx;
+  }
+
+  &__next-text {
+    font-size: 22rpx;
+    font-weight: 600;
+    color: var(--moss-deep);
+  }
+
   // 「往期 N ›」入口：压在进度条右端，主色弱强调
   &__history-entry {
     flex-shrink: 0;
@@ -425,6 +446,13 @@
     position: relative;
   }
 
+  // aspectFill 的图需要确定高：.source-image 自身是 auto 高，
+  // 不铺满相框的话内部 height:100% 解析为 0，缩略图只剩苔绿底
+  &__strip-img {
+    position: absolute;
+    inset: 0;
+  }
+
   &__strip-empty {
     position: absolute;
     inset: 0;
@@ -448,14 +476,43 @@
     text-overflow: ellipsis;
   }
 
-  &__skipped-toggle {
-    align-self: flex-start;
+  // 结算分组条：喜欢/跳过各一条，计数在组头上；跳过组头可点收起/展开
+  &__result-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6rpx;
+  }
+
+  &__result-group--toggle {
+    // 可点的组头给热区兜底（组头字小，24rpx 行高不够 44px 热区）
+    padding: 10rpx 0;
+  }
+
+  &__result-group-label {
+    font-size: 26rpx;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  &__result-group-caret {
+    font-size: 22rpx;
+    color: var(--ink-3);
+  }
+
+  &__result-history {
+    align-self: center;
     font-size: 24rpx;
   }
 
   &__regen {
     align-self: center;
     font-size: 26rpx;
+
+    // 新一轮已在路上：同位文字但去掉链接感（不可点）
+    &--pending {
+      color: var(--ink-3);
+    }
   }
 
   // 桌上那张碎纸片：纯装饰（没有照片、不是方案卡），只为让纸堆显得

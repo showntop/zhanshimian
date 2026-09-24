@@ -23,12 +23,12 @@ import PrimaryButton from '../../components/primary-button'
 import {
   briefFingerprint,
   createIdempotencyKey,
-  planSetRetryMarkerKey,
   planSetSceneKey,
   sceneBriefPrefill,
   sceneBriefRequest,
   sceneFields,
 } from './model'
+import { clearPlanSetRetryMark, hasPlanSetRetryMark } from '../../app/plan-set-retry'
 import './index.scss'
 
 const PLANS_TAB = '/pages/plans/index'
@@ -153,14 +153,14 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
       // 固定键配改过的答案会被服务端判 409（相同幂等键已被用于不同请求）。
       // 例外必须换新键：上次受理终态 failed（同键 24h 内重放同一份失败），
       // 以及 refresh（每次强制重出都是新任务，重放旧 202 会把新任务吞掉）。
-      const retryKey = planSetRetryMarkerKey(scene)
-      const fresh = refresh || Boolean(resourceCache.read<string>(retryKey))
+      // 失败标记落 Storage：重启后重发也不能撞回旧键（见 app/plan-set-retry.ts）。
+      const fresh = refresh || hasPlanSetRetryMark(scene)
       const baseKey = `plan-set:${reportId}:${scene}:${briefFingerprint(answers)}`
       const start = await qualityApi.createPlanSet(
         body,
         fresh ? createIdempotencyKey(baseKey) : baseKey,
       )
-      if (fresh) resourceCache.remove(retryKey)
+      if (fresh) clearPlanSetRetryMark(scene)
       if (start.accepted) {
         // 方案 tab 常驻、受理窗内方案集还没落库：场景经侧信道留给它，
         // 规划失败时「重新生成」才知道回到哪个场合

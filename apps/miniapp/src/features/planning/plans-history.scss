@@ -78,4 +78,14 @@
     font-size: 20rpx;
     color: var(--moss);
   }
+
+  // 集级状态标注：制作中（在途）/ 未生成（failed），与喜欢数同位互斥
+  &__status {
+    font-size: 20rpx;
+    color: var(--moss-deep);
+
+    &--failed {
+      color: var(--ink-3);
+    }
+  }
 }

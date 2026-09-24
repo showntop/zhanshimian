@@ -27,7 +27,11 @@ export default function PlansHistory({ sets, activeSetId, onSelect }: PlansHisto
       <ScrollView className="plans-history__row" scrollX enhanced showScrollbar={false}>
         {sets.map((set) => {
           const liked = set.variants.filter((variant) => variant.decision?.decision === 'like').length
+          const skipped = set.variants.filter((variant) => variant.decision?.decision === 'skip').length
           const active = set.id === activeSetId
+          // 集级状态标注：制作中/未生成的集不再装死缩略图无解释
+          const inFlight = set.state === 'planning' || set.state === 'rendering'
+          const failed = set.state === 'failed'
           return (
             <View
               key={set.id}
@@ -53,9 +57,16 @@ export default function PlansHistory({ sets, activeSetId, onSelect }: PlansHisto
               </View>
               <View className="plans-history__meta">
                 <Text className="plans-history__date">{dateLabel(set)}</Text>
-                {liked > 0 ? (
+                {inFlight ? (
+                  <Text className="plans-history__status">{PLANNING_COPY.tabInFlightSuffix}</Text>
+                ) : failed ? (
+                  <Text className="plans-history__status plans-history__status--failed">{PLANNING_COPY.renderThumbFailed}</Text>
+                ) : liked > 0 || skipped > 0 ? (
+                  // 每轮的情况：喜欢几个、跳过几个，一眼对比轮次
                   <Text className="plans-history__likes">
-                    ♥ {liked} {PLANNING_COPY.historyLikeCount}
+                    {liked > 0 ? `♥ ${liked}` : ''}
+                    {liked > 0 && skipped > 0 ? ' · ' : ''}
+                    {skipped > 0 ? `✕ ${skipped}` : ''}
                   </Text>
                 ) : null}
               </View>

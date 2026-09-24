@@ -316,15 +316,6 @@ export function serializePlanSetPending(ticket: Omit<PlanSetPendingTicket, 'at'>
 }
 
 /**
- * 重试标记的缓存 key：记录「这个场景固定幂等键的受理已到终态 failed」。
- * 24h 内重放固定键只会拿回同一份失败，下一次主动生成必须换新幂等键；
- * 新受理成功（或复用到已发布方案集）后由发起方清掉。
- */
-export function planSetRetryMarkerKey(scene: string): string {
-  return `plan-set-retry:${scene}`
-}
-
-/**
  * Brief 答案 → 幂等键指纹。服务端幂等按「键 + 请求体指纹」判重：
  * 固定键配改过的答案会吃 409（相同幂等键已被用于不同请求），
  * 所以键里带答案指纹——同答案重发同键（双击/重放安全），改答案即新键。
@@ -471,10 +462,14 @@ export function undoCard(stack: DecisionStack): DecisionStack {
   return { cards, cursor: index, history: stack.history.slice(0, -1) }
 }
 
-/** 结算视图：按决策先后返回做出该态度的方案列表。 */
+/**
+ * 结算视图：返回做出该态度的方案列表。
+ * 按卡上的决策过滤而不是走 history——重进页面时服务端恢复的已决卡
+ * 推进了 cursor 却不入 history（服务端历史不可撤销），只看 history
+ * 会把已喜欢/已跳过的全部漏成空态。
+ */
 export function decidedCards(stack: DecisionStack, decision: DecisionKind): PlanVariant[] {
-  return stack.history
-    .map((index) => stack.cards[index])
-    .filter((card): card is DecisionCard => card !== undefined && card.decision === decision)
+  return stack.cards
+    .filter((card) => card.decision === decision)
     .map((card) => card.variant)
 }

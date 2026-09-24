@@ -25,6 +25,7 @@ import { PublicApiError } from '../../app/api/result'
 import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
 import { takePlanSetHandoff, type PlanSetHandoff } from '../../app/plan-set-handoff'
 import { clearPlanSetPending, readPlanSetPending, writePlanSetPending } from '../../app/plan-set-pending'
+import { clearPlanSetRetryMark, hasPlanSetRetryMark, markPlanSetRetry } from '../../app/plan-set-retry'
 import { useOperationPolling } from '../../app/operations/use-operation-polling'
 import { useShowOnce } from '../../hooks/use-page-visibility'
 import { handleBillingError } from '../../services/billing'
@@ -46,8 +47,8 @@ import {
   deckOrder,
   decideCard,
   inFlightPlanSetOperationIds,
+  isStackEnded,
   planProgressView,
-  planSetRetryMarkerKey,
   planSetSceneKey,
   planSetView,
   topCard,
@@ -172,9 +173,27 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     }
   }, [])
 
+  /** 往期列表对账：新集发布只走 refreshPlanSet，不刷列表——结果页的
+      「往期 N 轮」入口和弹层都靠这份列表，陈旧就会少报甚至消失。 */
+  const refreshSets = useCallback(async () => {
+    const current = reportRef.current
+    if (!current) return
+    try {
+      const list = await qualityApi.listPlanSets(current.id, sceneRef.current as PlanSet['scene'])
+      setSets([...list].sort((a, b) => b.created_at.localeCompare(a.created_at)))
+    } catch {
+      // 列表刷新失败不打扰已渲染内容：入口少报一轮，下次对账补上
+    }
+  }, [])
+
+  // 当前集换身份（新集发布 / 装回往期 / 切场景）就对账一次往期列表
+  const currentSetId = planSet?.id ?? ''
+  useEffect(() => {
+    if (currentSetId) void refreshSets()
+  }, [currentSetId, refreshSets])
+
   /** 在途方案集受理对账：bootstrap.active_operations 是唯一事实来源。 */
-  const refreshInFlightOps = useCallback(async () => {
-    const boot = await qualityApi.getHomeBootstrap().catch(() => null)
+  const refreshInFlightOps = useCallback(async () => {    const boot = await qualityApi.getHomeBootstrap().catch(() => null)
     setActivePlanSetOps(inFlightPlanSetOperationIds(boot?.active_operations ?? []))
     return boot
   }, [])
@@ -194,8 +213,29 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     // 既不能认领（无法确认还在途），也不能据此清回执
     if (inFlightIds.length === 0) return false
     if (!inFlightIds.includes(ticket.operationId)) {
-      // 服务端不再把它算在途：这份回执已经过期，清掉免得下次还来问
+      // 服务端不再把它算在途：回执到这里该清了。但「不在途」有两种——
+      // 落定成功（已发布的集由 latest 列表逻辑顶上来，无需处理），以及
+      // **在用户离开期间失败**（active_operations 不含 failed，任务在
+      // 后台 worker 上永久失败正是这种）。不问一次终态就清回执，
+      // 失败就是无声的：用户回来只看到旧方案/空态，没有任何提示。
       clearPlanSetPending()
+      void qualityApi
+        .getOperation(ticket.operationId)
+        .then((op) => {
+          if (op.status !== 'failed' && op.status !== 'cancelled' && op.status !== 'superseded') return
+          const scene = ticket.scene || 'general'
+          // 失败摆到受理归属的场景；标记换新键（同键会重放这份失败）
+          markPlanSetRetry(scene)
+          acceptSceneRef.current = scene
+          setAcceptFailed(op.public_message || PLANNING_COPY.retryFailedBody)
+          // 用户可能停在有旧方案集的场景（失败卡没有版面）：toast 兜底
+          void Taro.showToast({
+            title: op.public_message || PLANNING_COPY.retryFailedBody,
+            icon: 'none',
+            duration: 3500,
+          })
+        })
+        .catch(() => {})
       return false
     }
     setAcceptOperationId(ticket.operationId)
@@ -397,13 +437,13 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       if (accept) clearPlanSetPending()
       if (accept && (accept.status === 'failed' || accept.status === 'cancelled' || accept.status === 'superseded')) {
         // 固定幂等键 24h 内只会重放同一份失败：记下场景，
-        // 下次发起换新键（Brief 页与 generateGeneral 读同一个标记）。
-        // 场景优先取受理归属 ref（planSetId 可能已被切场景改写）
+        // 下次发起换新键（Brief 页与 generateGeneral 读同一个标记；
+        // 标记落 Storage——重启后重发也不能撞回旧键）
         const failedScene =
           acceptSceneRef.current ||
           resourceCache.read<string>(planSetSceneKey(planSetIdRef.current)) ||
           'general'
-        resourceCache.write(planSetRetryMarkerKey(failedScene), '1')
+        markPlanSetRetry(failedScene)
         setAcceptFailed(accept.public_message || PLANNING_COPY.retryFailedBody)
         setAcceptPending(false)
         return
@@ -514,8 +554,7 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     try {
       // 换新键的两种情况：上次受理终态 failed（同键 24h 内重放同一份失败）、
       // refresh 强制重出（每次都是新任务，重放旧 202 会把新任务吞掉）；其余同键保幂等。
-      const retryKey = planSetRetryMarkerKey('general')
-      const fresh = refresh || Boolean(resourceCache.read<string>(retryKey))
+      const fresh = refresh || hasPlanSetRetryMark('general')
       const baseKey = `plan-set:${report.id}:${briefFingerprint(GENERAL_BRIEF)}`
       const start = await qualityApi.createPlanSet(
         {
@@ -526,7 +565,7 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         },
         fresh ? createIdempotencyKey(baseKey) : baseKey,
       )
-      if (fresh) resourceCache.remove(retryKey)
+      if (fresh) clearPlanSetRetryMark('general')
       if (start.accepted) {
         resourceCache.write(resourceKey('operation', start.operation.id), start.operation)
         setAcceptOperationId(start.operation.id)
@@ -891,8 +930,12 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
   }
 
   // ---------- 卡堆决策台 + 往期方案区 ----------
+  // 新一轮受理在途、屏上还是上一份已发布集：制作中态，不算往期浏览——
+  // 此时「最新」还没发布，「回到最新」链接本身就是错的
+  const regenerating =
+    acceptInFlight && acceptSceneRef.current === scene && planSet?.id !== acceptPlanSetIdRef.current
   // 当前集在往期列表里不再是第一份 → 往期浏览态（徽标 + 回到最新）。
-  const viewingPast = sets.length > 0 && planSetId !== sets[0]?.id
+  const viewingPast = !regenerating && sets.length > 0 && planSetId !== sets[0]?.id
 
   return (
     <View className="plans">
@@ -902,9 +945,9 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         <Text className="plans__inflight-banner">{PLANNING_COPY.inFlightBanner}</Text>
       ) : null}
 
-      {/* 当前场景有在途受理但屏上还是旧方案集（重新设计提交后切走又切回）：
-          内容继续可读，进度行钉在内容上方，不静默 */}
-      {acceptInFlight && acceptSceneRef.current === scene && planSet?.id !== acceptPlanSetIdRef.current ? (
+      {/* 当前场景有在途受理但屏上还是旧方案集：未看完的卡堆挤一屏预算，
+          只给细横幅不给高卡（已看完的结算态走上面 atelierCard） */}
+      {regenerating && !isStackEnded(stack) ? (
         <View className="plans__generating">
           <View className="plans__generating-spin spinner" />
           <Text className="plans__generating-text">{PLANNING_COPY.sceneGenerating}</Text>
@@ -922,11 +965,15 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         sceneEmptyCard
       ) : (
         <>
+          {/* 新一轮制作中 + 旧轮已看完：纸样台卡置顶，旧轮结算结果原样在下
+             （结算视图矮，加卡不破一屏；未看完时不加高卡，保持细横幅） */}
+          {regenerating && isStackEnded(stack) ? atelierCard : null}
           <PlansDeck
             stack={stack}
             variants={variants}
             fallbackMedia={leftMedia}
             pastBadge={viewingPast}
+            generatingNext={regenerating}
             pastCount={Math.max(0, sets.length - 1)}
             hintVisible={deckHint}
             retryingId={retryingId}

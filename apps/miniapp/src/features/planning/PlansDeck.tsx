@@ -73,6 +73,8 @@ interface PlansDeckProps {
   /** 渲染未就绪卡的占位照片（方案集绑定的用户原本照），没有就退苔绿浅底。 */
   fallbackMedia: DisplayMedia | null
   pastBadge: boolean
+  /** 新一轮受理在途、屏上是上一轮：进度行给「制作中」chip，结算区改口「上一轮」。 */
+  generatingNext: boolean
   /** 其他方案集数量（含往期）：>0 时进度行右侧出现「往期 N ›」入口。 */
   pastCount: number
   hintVisible: boolean
@@ -94,6 +96,7 @@ export default function PlansDeck({
   variants,
   fallbackMedia,
   pastBadge,
+  generatingNext,
   pastCount,
   hintVisible,
   retryingId,
@@ -250,7 +253,7 @@ export default function PlansDeck({
       >
         <View className="plans-deck__strip-photo">
           {render.kind === 'ready' ? (
-            <SourceImage media={render.media} mode="aspectFill" />
+            <SourceImage className="plans-deck__strip-img" media={render.media} mode="aspectFill" />
           ) : (
             <View className="plans-deck__strip-empty">
               <Text className="plans-deck__strip-empty-text">
@@ -274,6 +277,12 @@ export default function PlansDeck({
             <Text className="plans-deck__past-badge">{PLANNING_COPY.historyBadge}</Text>
             <TextLink className="plans-deck__back-latest" text={PLANNING_COPY.historyBackLatest} onClick={onBackToLatest} />
           </>
+        ) : generatingNext ? (
+          // 新一轮在途：chip 替代「往期/回到最新」——此时"最新"还没发布
+          <View className="plans-deck__next-chip">
+            <View className="plans-deck__next-spin spinner" />
+            <Text className="plans-deck__next-text">{PLANNING_COPY.nextRoundGenerating}</Text>
+          </View>
         ) : (
           <>
             <Text className="plans-deck__round">
@@ -300,7 +309,15 @@ export default function PlansDeck({
 
       {ended ? (
         <View className="plans-deck__result fade-up">
-          <Text className="plans-deck__result-title">{PLANNING_COPY.resultLikedTitle}</Text>
+          <Text className="plans-deck__result-title">
+            {generatingNext ? PLANNING_COPY.resultPrevTitle : PLANNING_COPY.resultLikedTitle}
+          </Text>
+          {/* 喜欢组：组头带计数，空了才说空态 */}
+          <View className="plans-deck__result-group">
+            <Text className="plans-deck__result-group-label">
+              ♥ {PLANNING_COPY.resultLikedGroup} {liked.length}
+            </Text>
+          </View>
           {liked.length === 0 ? (
             <Text className="plans-deck__result-empty">{PLANNING_COPY.resultLikedEmpty}</Text>
           ) : (
@@ -308,13 +325,18 @@ export default function PlansDeck({
               {liked.map((variant) => stripCard(variant))}
             </ScrollView>
           )}
+          {/* 跳过组：计数徽标常驻（收着也知道有几张），点组头收起/展开 */}
           {skipped.length > 0 ? (
             <>
-              <TextLink
-                className="plans-deck__skipped-toggle"
-                text={PLANNING_COPY.resultSkippedLink}
+              <View
+                className="plans-deck__result-group plans-deck__result-group--toggle pressable"
                 onClick={() => setShowSkipped(!showSkipped)}
-              />
+              >
+                <Text className="plans-deck__result-group-label">
+                  ✕ {PLANNING_COPY.resultSkippedGroup} {skipped.length}
+                </Text>
+                <Text className="plans-deck__result-group-caret">{showSkipped ? '收起' : '展开'}</Text>
+              </View>
               {showSkipped ? (
                 <ScrollView className="plans-deck__strip" scrollX enhanced showScrollbar={false}>
                   {skipped.map((variant) => stripCard(variant))}
@@ -322,7 +344,21 @@ export default function PlansDeck({
               ) : null}
             </>
           ) : null}
-          <TextLink className="plans-deck__regen" text={PLANNING_COPY.resultRegenerate} onClick={onRegenerate} />
+          {/* 往期轮次入口：进度行的「往期 N ›」在结果态容易被略过，
+              结果区里再给一次——历次生成了几轮、每轮情况从这进 */}
+          {pastCount > 0 ? (
+            <TextLink
+              className="plans-deck__result-history"
+              text={`${PLANNING_COPY.historyEntry} ${pastCount} ${PLANNING_COPY.historyRoundUnit} ›`}
+              onClick={onOpenHistory}
+            />
+          ) : null}
+          {/* 新一轮已在路上：不给可点的「生成新的一轮」，防重复提交的入口 */}
+          {generatingNext ? (
+            <Text className="plans-deck__regen plans-deck__regen--pending">{PLANNING_COPY.nextRoundGenerating}</Text>
+          ) : (
+            <TextLink className="plans-deck__regen" text={PLANNING_COPY.resultRegenerate} onClick={onRegenerate} />
+          )}
         </View>
       ) : (
         <>
