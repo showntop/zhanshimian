@@ -24,6 +24,7 @@ import { qualityApi } from '../../app/api/quality'
 import { PublicApiError } from '../../app/api/result'
 import { resourceCache, resourceKey } from '../../app/cache/resource-cache'
 import { takePlanSetHandoff, type PlanSetHandoff } from '../../app/plan-set-handoff'
+import { clearPlanSetPending, readPlanSetPending, writePlanSetPending } from '../../app/plan-set-pending'
 import { useOperationPolling } from '../../app/operations/use-operation-polling'
 import { useShowOnce } from '../../hooks/use-page-visibility'
 import { handleBillingError } from '../../services/billing'
@@ -178,6 +179,36 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     return boot
   }, [])
 
+  /**
+   * 认领在途受理（冷进入专用）：进程重启后内存交接条与受理归属 ref 全没了，
+   * bootstrap 只说「有个方案集在制作中」，不说它属于哪个场景。回执补上场景与
+   * 方案集 id，让在途受理能被摆回它的场景——纸样台进度动画与「不给生成按钮」
+   * 都靠这一次认领。是否在途只认服务端在途清单，回执不参与事实判断。
+   */
+  const claimPendingAccept = useCallback((inFlightIds: readonly string[]): boolean => {
+    // 已经盯上了一份受理（交接条/路由/本次已认领）：不抢
+    if (acceptOperationIdRef.current && acceptPendingRef.current) return false
+    const ticket = readPlanSetPending()
+    if (!ticket) return false
+    // 这次对账没拿到在途清单（bootstrap 里 getHomeBootstrap 被 catch）：
+    // 既不能认领（无法确认还在途），也不能据此清回执
+    if (inFlightIds.length === 0) return false
+    if (!inFlightIds.includes(ticket.operationId)) {
+      // 服务端不再把它算在途：这份回执已经过期，清掉免得下次还来问
+      clearPlanSetPending()
+      return false
+    }
+    setAcceptOperationId(ticket.operationId)
+    setAcceptPending(true)
+    setPlanSetId(ticket.planSetId)
+    const claimedScene = ticket.scene || 'general'
+    acceptSceneRef.current = claimedScene
+    acceptPlanSetIdRef.current = ticket.planSetId
+    if (ticket.scene) setScene(ticket.scene)
+    setBootstrapped(true)
+    return true
+  }, [])
+
   /** Tab 入口：先问当前报告，再列 general 的方案集；报告都没有时区分"在分析"与"未建档"。
    *  background=true 是回 tab 的后台对账：已渲染内容（含空态）保留到响应到达，不闪骨架。 */
   const bootstrap = useCallback(async (background = false) => {
@@ -187,7 +218,9 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         qualityApi.getCurrentReport(),
         qualityApi.getHomeBootstrap().catch(() => null),
       ])
-      setActivePlanSetOps(inFlightPlanSetOperationIds(boot?.active_operations ?? []))
+      const inFlight = inFlightPlanSetOperationIds(boot?.active_operations ?? [])
+      setActivePlanSetOps(inFlight)
+      const claimed = claimPendingAccept(inFlight)
       if (!current) {
         setAnalyzingOperationId(analyzingAssessmentOperationId(boot?.active_operations ?? []))
         setReport(null)
@@ -198,7 +231,9 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       const list = await qualityApi.listPlanSets(current.id, 'general')
       setSets([...list].sort((a, b) => b.created_at.localeCompare(a.created_at)))
       const latest = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
-      if (latest) {
+      // 认领成功 = 用户在等一份还没发布的集：不许把上一份已发布集顶到前台，
+      // 那会把纸样台的进度动画换成旧方案（和受理刚提交时看到的不一样）
+      if (latest && !claimed) {
         setPlanSetId(latest.id)
         setPlanSet(latest)
         await refreshPlanSet(latest.id)
@@ -208,7 +243,7 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       setFailed(true)
       setBootstrapped(true)
     }
-  }, [refreshPlanSet])
+  }, [claimPendingAccept, refreshPlanSet])
 
   /** 交接条落地：清失败、换受理 id、高亮跟随受理时写入的侧信道场景。 */
   const applyHandoff = useCallback(
@@ -224,11 +259,24 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       setBootstrapped(true)
       const handoffScene = resourceCache.read<string>(planSetSceneKey(next.planSetId))
       if (handoffScene) setScene(handoffScene)
+      // general 不写场景侧信道（没有 Brief 页），没读到就是 general；
+      // 留空会让受理在途的纸样台落在别的分支上（进度动画不展示）
+      const acceptScene = handoffScene || 'general'
       // 受理在途才记场景与归属 id；200 复用（没有任务在跑）不算受理
-      acceptSceneRef.current = next.operationId ? handoffScene ?? '' : ''
+      acceptSceneRef.current = next.operationId ? acceptScene : ''
       acceptPlanSetIdRef.current = next.operationId ? next.planSetId : ''
-      // 200 复用（没有任务在跑）：立刻对账展示已发布集
-      if (!next.operationId) void refreshPlanSet(next.planSetId)
+      if (next.operationId) {
+        // 回执：跨进程重启也能把这份在途受理认领回它的场景
+        writePlanSetPending({
+          operationId: next.operationId,
+          planSetId: next.planSetId,
+          scene: acceptScene,
+        })
+        return
+      }
+      // 200 复用（没有任务在跑）：清回执 + 立刻对账展示已发布集
+      clearPlanSetPending()
+      void refreshPlanSet(next.planSetId)
     },
     [refreshPlanSet],
   )
@@ -345,6 +393,8 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       // 把公开失败文案直接上屏，给「重新生成」而不是误导性的网络错误。
       const acceptId = acceptOperationIdRef.current
       const accept = acceptId ? operations.find((op) => op.id === acceptId) : undefined
+      // 受理已到终态（成功或失败）：回执作废，别让下次冷启动认领一份已完成的受理
+      if (accept) clearPlanSetPending()
       if (accept && (accept.status === 'failed' || accept.status === 'cancelled' || accept.status === 'superseded')) {
         // 固定幂等键 24h 内只会重放同一份失败：记下场景，
         // 下次发起换新键（Brief 页与 generateGeneral 读同一个标记）。
@@ -484,6 +534,12 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         acceptSceneRef.current = 'general'
         acceptPlanSetIdRef.current = start.data.id
         setPlanSetId(start.data.id)
+        // 回执：退出小程序再进来时，这份受理还能被认领回 general 场景
+        writePlanSetPending({
+          operationId: start.operation.id,
+          planSetId: start.data.id,
+          scene: 'general',
+        })
       } else {
         // 复用已发布方案集：没有任务在跑，旧的受理 id 必须清掉，
         // 否则轮询会盯上那份已终态的 operation 把失败卡又顶回来
@@ -492,6 +548,7 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         acceptSceneRef.current = ''
         acceptPlanSetIdRef.current = ''
         setPlanSetId(start.planSet.id)
+        clearPlanSetPending()
       }
       setBootstrapped(true)
     } catch (error) {
@@ -727,9 +784,43 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     )
   }
 
+  // 生成中的视觉 = 纸样台：竖裁缝尺 + 三条参差版型条 + 出血宋体「3」
+  // （构图/配色/数字规律见 index.scss .plans__atelier 注释）
+  const atelierCard = (
+    <View className="plans__scene-empty plans__scene-empty--atelier">
+      <View className="plans__atelier">
+        <View className="plans__atelier-gauge">
+          <Text className="plans__atelier-no plans__atelier-no--1">01</Text>
+          <Text className="plans__atelier-no plans__atelier-no--2">02</Text>
+          <Text className="plans__atelier-no plans__atelier-no--3">03</Text>
+        </View>
+        <Text className="plans__atelier-numeral">3</Text>
+        <View className="plans__atelier-needle" />
+        <View className="plans__atelier-slots">
+          <View className="plans__atelier-slot plans__atelier-slot--1">
+            <View className="plans__atelier-fill" />
+            <View className="plans__atelier-stitch" />
+          </View>
+          <View className="plans__atelier-slot plans__atelier-slot--2">
+            <View className="plans__atelier-fill" />
+            <View className="plans__atelier-stitch" />
+          </View>
+          <View className="plans__atelier-slot plans__atelier-slot--3">
+            <View className="plans__atelier-fill" />
+            <View className="plans__atelier-stitch" />
+          </View>
+        </View>
+      </View>
+      <View className="plans__atelier-foot">
+        <View className="plans__atelier-rule" />
+        <Text className="plans__atelier-text">{PLANNING_COPY.sceneGenerating}</Text>
+      </View>
+    </View>
+  )
+
   // 已建档但当前场景还没有方案集：保留场景 tab，只替换内容区——
-  // 受理失败的给失败卡（公开文案 + 重新生成），受理中的给生成中行，
-  // 切换中的给骨架，其余给该场景的空态卡（含「生成形象方案」）。
+  // 受理失败的给失败卡（公开文案 + 重新生成），在途的给纸样台进度动画，
+  // 切换中的给骨架，其余才给该场景的空态卡（含「生成形象方案」）。
   if (!planSet) {
     return (
       <View className="plans">
@@ -745,40 +836,15 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
           </View>
         ) : acceptInFlight && acceptSceneRef.current === scene ? (
           // 生成中只归受理所属的场景：别的场景走空态/骨架，
-          // 在途受理由 foreignPlanSetOps 的横幅提示。
-          // 视觉 = 纸样台：竖裁缝尺 + 三条参差版型条 + 出血宋体「3」
-          // （构图/配色/数字规律见 index.scss .plans__atelier 注释）
-          <View className="plans__scene-empty plans__scene-empty--atelier">
-            <View className="plans__atelier">
-              <View className="plans__atelier-gauge">
-                <Text className="plans__atelier-no plans__atelier-no--1">01</Text>
-                <Text className="plans__atelier-no plans__atelier-no--2">02</Text>
-                <Text className="plans__atelier-no plans__atelier-no--3">03</Text>
-              </View>
-              <Text className="plans__atelier-numeral">3</Text>
-              <View className="plans__atelier-needle" />
-              <View className="plans__atelier-slots">
-                <View className="plans__atelier-slot plans__atelier-slot--1">
-                  <View className="plans__atelier-fill" />
-                  <View className="plans__atelier-stitch" />
-                </View>
-                <View className="plans__atelier-slot plans__atelier-slot--2">
-                  <View className="plans__atelier-fill" />
-                  <View className="plans__atelier-stitch" />
-                </View>
-                <View className="plans__atelier-slot plans__atelier-slot--3">
-                  <View className="plans__atelier-fill" />
-                  <View className="plans__atelier-stitch" />
-                </View>
-              </View>
-            </View>
-            <View className="plans__atelier-foot">
-              <View className="plans__atelier-rule" />
-              <Text className="plans__atelier-text">{PLANNING_COPY.sceneGenerating}</Text>
-            </View>
-          </View>
+          // 认不出归属的在途受理由下面的兜底分支接住。
+          atelierCard
         ) : planSetId || switching ? (
           <Skeleton rows={3} />
+        ) : foreignPlanSetOps.length > 0 ? (
+          // 服务端确实有方案集在制作中，只是认不出它属于哪个场景（换设备 /
+          // 清了缓存，回执不在了）：给纸样台而不是空态卡——空态卡上的「生成」
+          // 会把用户引向重复提交。落定后 refreshInFlightOps 清空，空态卡自己回来。
+          atelierCard
         ) : (
           sceneEmptyCard
         )}

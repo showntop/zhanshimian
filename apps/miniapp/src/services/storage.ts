@@ -17,6 +17,10 @@ export const STORAGE_KEYS = {
   // 服务端「我的手册」接口就绪前暂存本地；就绪后必须移除，改由服务端持有。
   // 不进 UI_PREFERENCE_KEYS：它是用户数据，不该被 UI schema 版本变化清掉。
   dailySaves: 'zsm_daily_saves',
+  // 方案集受理在途回执（operation id + 方案集 id + 场景）。服务端 active_operations
+  // 不带场景，进程重启后方案 tab 认不出在途受理属于哪个场景。回执带 2h TTL，
+  // 只补展示所需的归属，是否在途仍只认服务端（见 app/plan-set-pending）。
+  planSetPending: 'zsm_plan_set_pending',
 } as const
 
 /** UI 偏好 key：schema 版本变化时只清这些，不迁移任何业务值。 */

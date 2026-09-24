@@ -265,6 +265,57 @@ export function planSetSceneKey(planSetId: string): string {
 }
 
 /**
+ * 受理在途回执：只补两样服务端不带、只影响展示的归属信息（场景 + 方案集 id）。
+ *
+ * 为什么需要它：bootstrap 的 active_operations 只有 id/kind/status。进程重启后
+ * 内存里的交接条与受理归属 ref 全部消失，方案 tab 只认得「有个方案集在制作中」，
+ * 认不出它属于哪个场景——进度动画退化成一行文字横幅，空态卡上的生成按钮也回来了。
+ *
+ * 它不参与事实判断：是否在途一律以服务端（active_operations / operation）为准，
+ * 回执只负责把「已在途的那一个」摆回它的场景上。
+ */
+export interface PlanSetPendingTicket {
+  operationId: string
+  planSetId: string
+  scene: string
+  /** 写入时刻（毫秒）。超过 PLAN_SET_PENDING_TTL_MS 一律作废 */
+  at: number
+}
+
+/** 回执有效期：受理窗通常 1-2 分钟，2 小时是「同一次使用」的上界——过期就是过期待办。 */
+export const PLAN_SET_PENDING_TTL_MS = 2 * 60 * 60 * 1000
+
+/** 回执反序列化：结构不对 / 缺字段 / 过期一律当没有——宁可不给，不给错的。 */
+export function parsePlanSetPending(raw: string, now: number): PlanSetPendingTicket | null {
+  if (!raw) return null
+  let value: unknown
+  try {
+    value = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const { operationId, planSetId, scene, at } = record
+  if (typeof operationId !== 'string' || !operationId) return null
+  if (typeof planSetId !== 'string' || !planSetId) return null
+  if (typeof at !== 'number' || !Number.isFinite(at)) return null
+  // 时钟被改到未来（at > now 超过一个 TTL）同样作废
+  if (Math.abs(now - at) > PLAN_SET_PENDING_TTL_MS) return null
+  return {
+    operationId,
+    planSetId,
+    scene: typeof scene === 'string' ? scene : '',
+    at,
+  }
+}
+
+/** 回执序列化：写入时刻由这里盖，调用方不传时间。 */
+export function serializePlanSetPending(ticket: Omit<PlanSetPendingTicket, 'at'>): string {
+  return JSON.stringify({ ...ticket, at: Date.now() })
+}
+
+/**
  * 重试标记的缓存 key：记录「这个场景固定幂等键的受理已到终态 failed」。
  * 24h 内重放固定键只会拿回同一份失败，下一次主动生成必须换新幂等键；
  * 新受理成功（或复用到已发布方案集）后由发起方清掉。

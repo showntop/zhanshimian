@@ -13,6 +13,8 @@ import {
   decideCard,
   inFlightPlanSetOperationIds,
   isStackEnded,
+  parsePlanSetPending,
+  PLAN_SET_PENDING_TTL_MS,
   planProgressView,
   planSetView,
   sceneBriefPrefill,
@@ -287,6 +289,28 @@ test('analyzingAssessmentOperationId finds the in-flight analysis the plans empt
   assert.equal(analyzingAssessmentOperationId([]), '')
   // 终态（失败/完成）不算在途：失败允许重拍，完成该去报告
   assert.equal(analyzingAssessmentOperationId(ops.slice(3)), '')
+})
+
+test('pending accept ticket: only well-formed and still-fresh tickets parse', () => {
+  const now = 1_700_000_000_000
+  const ticket = { operationId: 'op-1', planSetId: 'ps-1', scene: 'interview', at: now }
+  const raw = JSON.stringify(ticket)
+  assert.deepEqual(parsePlanSetPending(raw, now), ticket)
+  // 空 / 坏 JSON / 缺字段：一律当没有回执，绝不拿半份回执去认领
+  assert.equal(parsePlanSetPending('', now), null)
+  assert.equal(parsePlanSetPending('{oops', now), null)
+  assert.equal(parsePlanSetPending(JSON.stringify({ operationId: 'op-1', planSetId: 'ps-1' }), now), null)
+  assert.equal(parsePlanSetPending(JSON.stringify({ operationId: '', planSetId: 'ps-1', at: now }), now), null)
+  assert.equal(parsePlanSetPending(JSON.stringify({ operationId: 'op-1', planSetId: '', at: now }), now), null)
+  // 过期（以及时钟被改到未来）的回执作废：明天的冷启动不该看见今天的待办
+  const stale = JSON.stringify({ ...ticket, at: now - PLAN_SET_PENDING_TTL_MS - 1 })
+  assert.equal(parsePlanSetPending(stale, now), null)
+  const future = JSON.stringify({ ...ticket, at: now + PLAN_SET_PENDING_TTL_MS + 1 })
+  assert.equal(parsePlanSetPending(future, now), null)
+  // TTL 内的边界仍然有效
+  assert.deepEqual(parsePlanSetPending(JSON.stringify({ ...ticket, at: now - PLAN_SET_PENDING_TTL_MS + 1 }), now).operationId, 'op-1')
+  // 场景缺失（general 不写侧信道）时留空，由调用方退 general
+  assert.equal(parsePlanSetPending(JSON.stringify({ operationId: 'op-1', planSetId: 'ps-1', at: now }), now).scene, '')
 })
 
 test('a published brief prefills the scene brief page, table-checked field by field', () => {
