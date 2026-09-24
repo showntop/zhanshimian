@@ -192,6 +192,7 @@ func (s *Service) callPlanner(ctx context.Context, gctx generateContext, hint st
 		GeneText:       gctx.GeneText,
 		HistoryText:    gctx.HistoryText,
 		InterestText:   gctx.InterestText,
+		FindingsText:   gctx.FindingsText,
 		ReferenceFacts: gctx.ReferenceFacts,
 		RetryHint:      hint,
 	}
@@ -202,6 +203,7 @@ func (s *Service) callPlanner(ctx context.Context, gctx generateContext, hint st
 // dedupe_key 带日期：同一用户同一天只生成一条，跨天可以再推同类内容。
 func buildContent(userID string, genDate string, gctx generateContext, output ContentOutput) domain.DailyContent {
 	visual, _ := buildVisual(output.Visual)
+	lock := output.Lock
 	return domain.DailyContent{
 		UserID:    userID,
 		GenDate:   genDate,
@@ -211,6 +213,7 @@ func buildContent(userID string, genDate string, gctx generateContext, output Co
 		FitText:   output.Fit,
 		Why:       output.Why,
 		Visual:    visual,
+		Lock:      &lock,
 		FactIDs:   gctx.referenceIDs,
 		Source:    SourceGenerated,
 		ModelKey:  output.ModelKey,

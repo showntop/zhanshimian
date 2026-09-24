@@ -84,6 +84,13 @@ export interface DressShuffleProps {
   reduced?: boolean
   /** 收敛轮盖章完成 → 父组件揭晓海报 */
   onSettled?: () => void
+  /** 当天建议的选题与导语：揭晓后直接在面板里亮出来（建议与定格同屏，不再另起引导行） */
+  topic?: string
+  lead?: string
+  /** 建议归格（color/fit/.../hair/makeup/accessory）：决定面板标题（讲发型不叫「今天这一身」） */
+  category?: string
+  /** 面板底部的一行行动入口（如「看今日详情 ›」）；整卡点击由外层承担 */
+  cta?: string
 }
 
 interface PoolState {
@@ -105,6 +112,10 @@ export default function DressShuffle({
   colorLocked = false,
   reduced = false,
   onSettled,
+  topic,
+  lead,
+  category,
+  cta,
 }: DressShuffleProps) {
   const toUrl = resolveAsset ?? ((url: string) => url)
   const [figure, setFigure] = useState<FigureState>(INITIAL_FIGURE)
@@ -364,10 +375,13 @@ export default function DressShuffle({
             {figure.waist != null ? <View className="ds__waist" style={{ top: `${figure.waist}%` }} /> : null}
           </View>
         </View>
-        <View className="ds__caption">
-          <View className="ds__caption-main">{caption}</View>
-          <View className="ds__caption-sub">{DAILY_COPY.dressCaptionSub}</View>
-        </View>
+        {/* 揭晓后左下 caption 隐藏：「今天这一身」只在右栏面板出现一次 */}
+        {!revealed ? (
+          <View className="ds__caption">
+            <View className="ds__caption-main">{caption}</View>
+            <View className="ds__caption-sub">{DAILY_COPY.dressCaptionSub}</View>
+          </View>
+        ) : null}
       </View>
 
       <View className="ds__pool">
@@ -428,11 +442,19 @@ export default function DressShuffle({
         </View>
       </View>
 
-      {/* 揭晓：右栏变海报（原型 .reveal），人物保持亮着；盖章在面板内 */}
+      {/* 揭晓：右栏变海报（原型 .reveal），人物保持亮着。
+          「今日」章右上、竖排英文右缘下段，各占一角；建议正文垂直居中 */}
       <View className={`ds__reveal${revealed ? ' ds__reveal--on' : ''}`}>
         <Text className="ds__reveal-ghost">{DAILY_COPY.dressRevealGhost}</Text>
-        <View className="ds__reveal-title">{DAILY_COPY.dressRevealTitle}</View>
-        <View className="ds__reveal-sub">{DAILY_COPY.dressRevealSub}</View>
+        {topic ? <Text className="ds__reveal-topic">{topic}</Text> : null}
+        <View className="ds__reveal-title">
+          {(category && DAILY_COPY.dressRevealTitleByCategory[category]) || DAILY_COPY.dressRevealTitle}
+        </View>
+        {lead ? (
+          <View className="ds__reveal-lead">{lead}</View>
+        ) : (
+          <View className="ds__reveal-sub">{DAILY_COPY.dressRevealSub}</View>
+        )}
         <View className="ds__reveal-chips">
           {chips.map((c) => (
             <Text key={`r-${c}`} className="ds__chip ds__chip--dark">
@@ -440,6 +462,7 @@ export default function DressShuffle({
             </Text>
           ))}
         </View>
+        {cta ? <Text className="ds__reveal-cta">{cta}</Text> : null}
         {stamp ? <View className="ds__stamp">{DAILY_COPY.dressStamp}</View> : null}
       </View>
 

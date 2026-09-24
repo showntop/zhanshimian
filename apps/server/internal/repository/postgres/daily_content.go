@@ -21,7 +21,7 @@ var _ daily.ContentStore = (*Store)(nil)
 
 const dailyContentSelectSQL = `
 	SELECT id::text, COALESCE(user_id::text,''), gen_date::text, category, topic, lead, fit_text, why,
-	       visual, fact_ids, source, model_key, dedupe_key, created_at
+	       visual, COALESCE(lock, '{}'::jsonb), fact_ids, source, model_key, dedupe_key, created_at
 	FROM daily_content`
 
 func (s *Store) TodayContent(ctx context.Context, userID string, genDate string) (domain.DailyContent, error) {
@@ -108,15 +108,19 @@ func (s *Store) SaveContent(ctx context.Context, content domain.DailyContent) (d
 	if content.Visual.Spec == nil {
 		visual = []byte(`{}`)
 	}
+	lock, err := marshalLock(content.Lock)
+	if err != nil {
+		return content, err
+	}
 	var id string
 	var createdAt time.Time
 	err = s.pool.QueryRow(ctx, `
-		INSERT INTO daily_content(user_id, gen_date, category, topic, lead, fit_text, why, visual, fact_ids, source, model_key, dedupe_key)
-		VALUES (NULLIF($1,'')::uuid, $2::date, $3, $4, $5, $6, $7, $8, $9::uuid[], $10, $11, $12)
+		INSERT INTO daily_content(user_id, gen_date, category, topic, lead, fit_text, why, visual, lock, fact_ids, source, model_key, dedupe_key)
+		VALUES (NULLIF($1,'')::uuid, $2::date, $3, $4, $5, $6, $7, $8, $9, $10::uuid[], $11, $12, $13)
 		ON CONFLICT (user_id, gen_date) WHERE user_id IS NOT NULL DO NOTHING
 		RETURNING id::text, created_at`,
 		content.UserID, content.GenDate, content.Category, content.Topic, content.Lead, content.FitText,
-		content.Why, visual, normalizeIDs(content.FactIDs), content.Source, content.ModelKey, content.DedupeKey,
+		content.Why, visual, lock, normalizeIDs(content.FactIDs), content.Source, content.ModelKey, content.DedupeKey,
 	).Scan(&id, &createdAt)
 	if err == nil {
 		content.ID = id
@@ -144,19 +148,23 @@ func (s *Store) ReplaceContent(ctx context.Context, content domain.DailyContent)
 	if content.Visual.Spec == nil {
 		visual = []byte(`{}`)
 	}
+	lock, err := marshalLock(content.Lock)
+	if err != nil {
+		return content, err
+	}
 	var id string
 	var createdAt time.Time
 	err = s.pool.QueryRow(ctx, `
-		INSERT INTO daily_content(user_id, gen_date, category, topic, lead, fit_text, why, visual, fact_ids, source, model_key, dedupe_key)
-		VALUES (NULLIF($1,'')::uuid, $2::date, $3, $4, $5, $6, $7, $8, $9::uuid[], $10, $11, $12)
+		INSERT INTO daily_content(user_id, gen_date, category, topic, lead, fit_text, why, visual, lock, fact_ids, source, model_key, dedupe_key)
+		VALUES (NULLIF($1,'')::uuid, $2::date, $3, $4, $5, $6, $7, $8, $9, $10::uuid[], $11, $12, $13)
 		ON CONFLICT (user_id, gen_date) WHERE user_id IS NOT NULL DO UPDATE SET
 			category=EXCLUDED.category, topic=EXCLUDED.topic, lead=EXCLUDED.lead,
-			fit_text=EXCLUDED.fit_text, why=EXCLUDED.why, visual=EXCLUDED.visual,
+			fit_text=EXCLUDED.fit_text, why=EXCLUDED.why, visual=EXCLUDED.visual, lock=EXCLUDED.lock,
 			fact_ids=EXCLUDED.fact_ids, source=EXCLUDED.source,
 			model_key=EXCLUDED.model_key, dedupe_key=EXCLUDED.dedupe_key
 		RETURNING id::text, created_at`,
 		content.UserID, content.GenDate, content.Category, content.Topic, content.Lead, content.FitText,
-		content.Why, visual, normalizeIDs(content.FactIDs), content.Source, content.ModelKey, content.DedupeKey,
+		content.Why, visual, lock, normalizeIDs(content.FactIDs), content.Source, content.ModelKey, content.DedupeKey,
 	).Scan(&id, &createdAt)
 	if err != nil {
 		return content, mapNotFound(err)
@@ -178,16 +186,34 @@ type dailyContentRow interface {
 	Scan(dest ...any) error
 }
 
+// marshalLock 定格参数落库：全空时存 NULL（区分「没有」与「全回退」）。
+func marshalLock(lock *domain.ContentLock) ([]byte, error) {
+	if lock == nil || (lock.Look == "" && lock.Color == "" && lock.Waist == "" && lock.Hair == "") {
+		return nil, nil
+	}
+	return json.Marshal(lock)
+}
+
 func scanDailyContentRows(row dailyContentRow) (domain.DailyContent, error) {
 	var content domain.DailyContent
 	var visualRaw []byte
+	var lockRaw []byte
 	err := row.Scan(
 		&content.ID, &content.UserID, &content.GenDate, &content.Category, &content.Topic,
-		&content.Lead, &content.FitText, &content.Why, &visualRaw, &content.FactIDs,
+		&content.Lead, &content.FitText, &content.Why, &visualRaw, &lockRaw, &content.FactIDs,
 		&content.Source, &content.ModelKey, &content.DedupeKey, &content.CreatedAt,
 	)
 	if err != nil {
 		return content, err
+	}
+	if len(lockRaw) > 0 {
+		var lock domain.ContentLock
+		if err := json.Unmarshal(lockRaw, &lock); err != nil {
+			return content, err
+		}
+		if lock.Look != "" || lock.Color != "" || lock.Waist != "" || lock.Hair != "" {
+			content.Lock = &lock
+		}
 	}
 	spec := map[string]any{}
 	if len(visualRaw) > 0 {

@@ -8,7 +8,8 @@
  *  - 禁业务 Storage key；主闭环页面不得 import api/cache/operations/storage 层
  *  - 轮询唯一入口：createOperationPolling 只许出现在 use-operation-polling；
  *    useTaskPolling/createTaskPolling 全仓禁止
- * 全仓规则（路由↔目录、页面三件套、资产存在性、组件 config、体积）由 run() 执行。
+ * 全仓规则（路由↔目录、页面三件套、资产存在性、组件 config、体积、
+ * dist 顶层标识符与微信沙箱保留名冲突）由 run() 执行。
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -22,6 +23,18 @@ const dist = join(appRoot, 'dist')
 const MAIN_LOOP_ROUTES = ['capture', 'analysis', 'report', 'scene', 'plans', 'plan', 'checklist', 'feedback']
 const OPERATION_WRAPPER = 'app/operations/use-operation-polling'
 const NUMERIC_NAME = /(?:count|total|num|number|length|size|index|idx|done|remain|remaining)s?$/i
+
+/**
+ * 微信 appservice 沙箱已注入的同名全局（window 属性）。dist 顶层再声明同名
+ * const/let/class 会直接 SyntaxError（"Identifier 'frames' has already been
+ * declared"），页面模块注册失败 → "module 'pages/xx/index.js' is not defined"。
+ * 典型来源：import './frames.scss' 被打成顶层 `const frames = ""`。
+ */
+const SANDBOX_RESERVED = new Set([
+  'frames', 'window', 'document', 'self', 'top', 'parent', 'location', 'navigator',
+  'history', 'screen', 'localStorage', 'sessionStorage', 'alert', 'confirm', 'prompt',
+  'name', 'status', 'length', 'origin', 'closed', 'opener', 'event', 'external',
+])
 
 /** 单文件规则：返回违例文案数组（已带 file:line）。path 用仓内相对形式。 */
 export function checkSourceFile(path, source) {
@@ -236,6 +249,20 @@ if (existsSync(dist)) {
   }
 } else {
   notes.push('dist 不存在：跳过 3/4 的 dist 侧检查（先执行 build:weapp）')
+}
+
+// ---- 7. dist 顶层标识符不得撞微信沙箱保留名 ----
+if (existsSync(dist)) {
+  for (const full of walk(dist)) {
+    if (!full.endsWith('.js')) continue
+    const rel = relative(dist, full).replace(/\\/g, '/')
+    readFileSync(full, 'utf8').split('\n').forEach((line, i) => {
+      const m = /^(?:const|let|var|class|function)\s+([A-Za-z_$][\w$]*)/.exec(line)
+      if (m && SANDBOX_RESERVED.has(m[1])) {
+        problems.push(`dist 顶层标识符撞微信沙箱保留名 ${m[1]}（页面会 SyntaxError）: ${rel}:${i + 1}`)
+      }
+    })
+  }
 }
 
 // ---- 8. 主包体积 ----

@@ -33,6 +33,8 @@ type generateContext struct {
 	ReferenceFacts []ReferenceFact
 	// referenceIDs 参考事实的 ID（落 fact_ids，审计：给了模型什么）。
 	referenceIDs []string
+	// FindingsText 近期报告的可提升点摘要（无报告为空）。
+	FindingsText string
 }
 
 // Prepare 纯缓存探测（一次 DB 读）：当天已生成 → cache_hit=true、
@@ -73,6 +75,8 @@ func (s *Service) buildContext(ctx context.Context, userID string, genDate strin
 
 	if grounding, err := s.reader.ReadDailyGrounding(ctx, userID); err == nil {
 		gctx.GeneText = geneText(deriveGene(grounding))
+		// 报告要点：让每日选题与「可提升点」有引导关系。读不到就空着（缺哪块讲哪块）。
+		gctx.FindingsText = findingsText(grounding.Findings)
 	}
 
 	// 近期已推：prompt 历史（去重主机制）+ topic 去重闸共用。
@@ -182,6 +186,15 @@ func historyText(recent []domain.DailyContent) string {
 		lines = append(lines, content.Topic+"（"+categoryLabel(content.Category)+"）")
 	}
 	return "近 14 天已推过：" + strings.Join(lines, "、") + "。今天必须换一个新主题，不要换措辞重复其中任何一条。"
+}
+
+// findingsText 报告要点拼串：只取标签与建议（中性），限条数防 prompt 膨胀。
+func findingsText(findings []string) string {
+	const maxFindings = 6
+	if len(findings) > maxFindings {
+		findings = findings[:maxFindings]
+	}
+	return strings.Join(findings, "；")
 }
 
 func categoryLabel(category string) string {

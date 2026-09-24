@@ -34,9 +34,11 @@ const (
 
 // Grounding 生成所需的稳定特征。V1 只从用户资料派生（身高/体重），
 // 不依赖用户当天穿什么——这是「不臆想」的结构性保证。
+// Findings 近期报告的可提升点（已整理成中性短句；无报告为 nil）。
 type Grounding struct {
 	HeightCM int
 	WeightKG *float64
+	Findings []string
 }
 
 // Weather 今日语境（复用服务端既有天气 provider）。
@@ -142,6 +144,8 @@ type ContentRequest struct {
 	HistoryText string
 	// InterestText 收藏信号：用户对什么感兴趣。
 	InterestText string
+	// FindingsText 近期报告的可提升点（中性描述；无报告为空）。
+	FindingsText string
 	// ReferenceFacts 检索到的参考事实（可用可不用）。
 	ReferenceFacts []ReferenceFact
 	// RetryHint 校验失败后的修正提示（只重试一次）。
@@ -149,6 +153,7 @@ type ContentRequest struct {
 }
 
 // ContentOutput 生成结果（未校验）。Category 由模型自报（手册各格或 general）。
+// Lock 与建议同源的洗牌定格参数（词表校验在 validateOutput）。
 type ContentOutput struct {
 	Topic         string
 	Lead          string
@@ -156,6 +161,7 @@ type ContentOutput struct {
 	Why           string
 	Category      string
 	Visual        VisualDraft
+	Lock          domain.ContentLock
 	ModelKey      string
 	LatencyMS     int
 	EstimatedCost *float64

@@ -74,6 +74,8 @@ export interface DailyPickState {
   reveal: () => void
   reloadSaves: () => void
   saveCurrent: () => void
+  /** 离线空态的重试入口：重跑整个状态机（prepare → generate） */
+  reload: () => void
 }
 
 function toView(generate: {
@@ -282,6 +284,7 @@ export function useDailyPick(): DailyPickState {
     reveal,
     reloadSaves,
     saveCurrent,
+    reload: run,
   }
 }
 

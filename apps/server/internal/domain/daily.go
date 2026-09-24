@@ -116,6 +116,16 @@ type ContentVisual struct {
 	Alt      string         `json:"alt"`
 }
 
+// ContentLock 换装洗牌的定格参数（语义值，词表在 service/daily）。
+// 与内容同源：由生成建议的同一次 LLM 调用产出，落库随行——
+// 「定格的那套必须就是建议本身」。任何一维为空都允许（服务端按维回退稳定随机）。
+type ContentLock struct {
+	Look  string `json:"look,omitempty"`
+	Color string `json:"color,omitempty"`
+	Waist string `json:"waist,omitempty"`
+	Hair  string `json:"hair,omitempty"`
+}
+
 // DailyContent 每天每用户一条；user_id 为空的行是公共兜底池条目。
 type DailyContent struct {
 	ID        string        `json:"id"`
@@ -127,6 +137,8 @@ type DailyContent struct {
 	FitText   string        `json:"fit_text"`
 	Why       string        `json:"why"`
 	Visual    ContentVisual `json:"visual"`
+	// Lock 与建议同源的洗牌定格参数（可空：兜底池条目没有它）。
+	Lock      *ContentLock  `json:"lock,omitempty"`
 	FactIDs   []string      `json:"fact_ids"`
 	Source    string        `json:"source"`
 	ModelKey  string        `json:"model_key,omitempty"`

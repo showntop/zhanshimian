@@ -16,58 +16,15 @@ $clay: #c4693b;
   &__greeting {
     display: flex;
     flex-direction: column;
-    gap: 10rpx;
     // 导航下净距 = spacer 24rpx + 此处 4rpx ≈ 旧线 28rpx；
     // 各页顶距统一收在 spacer，页面根节点不再自叠
     padding: 4rpx 8rpx 36rpx;
 
-    &-top {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-    }
-
-    &-kicker {
-      color: var(--ink-2);
-      font-size: 24rpx;
-      font-weight: 600;
-      letter-spacing: 0;
-    }
-
-    &-week {
-      font-size: 22rpx;
-      color: var(--ink-3);
-    }
-
-    // 编辑式锚点：巨号衬线日期居左，问候语沉到右下角对齐日期基线——
-    // 一屏第一眼的"杂志页眉"，替代旧版左对齐小字堆叠
-    &-anchor {
-      display: flex;
-      align-items: flex-end;
-      gap: 24rpx;
-      margin-top: 14rpx;
-    }
-
-    &-date {
-      flex-shrink: 0;
-      font-size: 104rpx;
-      line-height: 0.92;
-      letter-spacing: -3rpx;
-      color: var(--moss-deep);
-      font-variant-numeric: tabular-nums;
-    }
-
-    // 句读破色：整屏最小的一粒陶土橘，给巨号日期一个停顿
-    &-dot {
-      color: $clay;
-    }
-
+    // 头部只留一句问候：品牌标语挪进导航 wordmark 后（uplook · 今天最好看），
+    // 巨号日期退场——「每天一条」的时间锚点由海报角落的日期编号承担
     &-title {
-      flex: 1;
-      min-width: 0;
-      padding: 0 0 10rpx;
-      margin: 0;
       font-size: 36rpx;
+      line-height: 1.4;
     }
   }
 
@@ -459,56 +416,52 @@ $clay: #c4693b;
     height: 560rpx;
   }
 
-  // 洗牌落地保留时，内容海报退到卡片下方的引导条（主入口仍在今日页）。
-  // 有边界 + 副提示 + 箭头，比单纯一行更像「下一步」；面板落定后淡入。
-  &__daily-entry {
+  // 引导行已删：建议正文（选题+导语+行动入口）直接进洗牌揭晓面板（dress-shuffle），
+  // 整卡承担点击——首页这一屏只剩一个主入口。
+
+  // 离线且无缓存：占住海报位（与巡游区同宽出血），静默文案 + 重试。
+  // 错误态与内容不同屏（红线 4），所以它只在内容确实缺席时出现。
+  &__daily-offline {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16rpx;
-    margin-top: 24rpx;
-    padding: 20rpx 24rpx;
-    border: 2rpx solid var(--line, rgba(63, 70, 60, 0.14));
-    border-radius: 18rpx;
-    background: var(--paper, #fff);
+    margin-left: -32rpx;
+    margin-right: -32rpx;
+    min-height: 200rpx;
+    padding: 24rpx 32rpx;
+    border-radius: 24rpx;
+    background: var(--moss-soft);
   }
 
-  &__daily-entry--in {
-    animation: home-entry-in 0.42s ease-out 0.3s both;
-  }
-
-  &__daily-entry-copy {
+  &__daily-offline-copy {
     display: flex;
     flex-direction: column;
     gap: 6rpx;
     min-width: 0;
   }
 
-  &__daily-entry-label {
+  &__daily-offline-title {
     font-size: 26rpx;
     font-weight: 700;
     color: var(--ink);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 460rpx;
   }
 
-  &__daily-entry-hint {
+  &__daily-offline-body {
     font-size: 22rpx;
+    line-height: 1.5;
     color: var(--ink-3);
   }
 
-  &__daily-entry-link {
+  &__daily-offline-retry {
     flex-shrink: 0;
     font-size: 25rpx;
     font-weight: 700;
     color: var(--moss);
-    animation: home-entry-nudge 2.6s ease-in-out 1s infinite;
   }
 
-  // 报告退位：不再是首页主角，入口降级为一行
-  // 进展感锚点 = 不规则比例条 + 衬线数字 + 小后缀（编辑式"数据注脚"）
+  // 报告退位：不再是首页主角，入口降级为一行。
+  // 只留衬线数字 + 小后缀（原「不规则比例条」已删：条形会被读成评分/进度，红线 1）
   &__archive {
     display: flex;
     align-items: center;
@@ -527,29 +480,6 @@ $clay: #c4693b;
     display: flex;
     align-items: center;
     gap: 6rpx;
-  }
-
-  // 比例节奏条：宽度刻意不规则（88/36/64/28/52/44rpx），条数=可提升点数；
-  // 首段 moss-deep 定调、中段安静、末段陶土橘破色收尾
-  &__archive-bars {
-    display: flex;
-    align-items: center;
-    gap: 6rpx;
-    margin-right: 12rpx;
-  }
-
-  &__archive-bar {
-    height: 8rpx;
-    border-radius: 999rpx;
-    background: var(--disabled);
-
-    &--lead {
-      background: var(--moss-deep);
-    }
-
-    &--tail {
-      background: $clay;
-    }
   }
 
   &__archive-num {
@@ -583,17 +513,17 @@ $clay: #c4693b;
     overflow: hidden;
     background: var(--moss-soft);
 
-    // 不对称双卡：outfit 略宽压住视觉重心，purchase 窄一档并下沉错位 + 右下单角拱——
-    // 等宽并排是"货架"，错位才是"版面"
+    // 不对称双卡：outfit 略宽压住视觉重心 + purchase 右下单角拱。
+    // 不再做高度错位：错位卡顶在主卡通栏直边下、尺度又小（曾试 28/56rpx），
+    // 读不成"刻意摆的"只会读成凹了一块；主卡已是不对称锚点，配角安静对齐
     &--outfit {
       flex: 1.32;
       background: #e8e4e6;
     }
 
     &--purchase {
-      margin-top: 28rpx;
       border-radius: var(--radius-lg) var(--radius-lg) 64rpx var(--radius-lg);
-      background: #ede7db;
+      background: #e2e6ea;
     }
 
     &-copy {
@@ -620,8 +550,9 @@ $clay: #c4693b;
     // 填掉左上半区的空白，不占信息层级
     &-watermark {
       position: absolute;
-      top: 14rpx;
-      left: 26rpx;
+      // 避开主卡左上拱弧（128rpx 圆弧在 y=36 处要求 x≥40，原位会被裁掉一角）
+      top: 36rpx;
+      left: 48rpx;
       z-index: 1;
       width: 148rpx;
       height: 148rpx;
@@ -638,8 +569,9 @@ $clay: #c4693b;
       height: 238rpx;
       justify-content: flex-end;
       padding: 32rpx 46% 30rpx 28rpx;
-      // 右上 128rpx 大拱角：工具区的不对称签名，照片随卡缘裁切自然入拱
-      border-radius: var(--radius-lg) 128rpx var(--radius-lg) var(--radius-lg);
+      // 左上 128rpx 大拱角：拱落在文字侧留白区，右缘照片完整矩形入镜
+      // （拱在照片侧会裁掉画面一角；与今日造型 hero 的顶左拱形窗同向同族）
+      border-radius: 128rpx var(--radius-lg) var(--radius-lg) var(--radius-lg);
       background: #d9e2d1;
       isolation: isolate;
 
@@ -709,17 +641,23 @@ $clay: #c4693b;
       }
     }
 
+    // 徽章：文档流内 chip，不再绝对定位——主卡右上 128rpx 拱角会裁掉
+    // top/right 定位的角标（「推荐」「生成中」都被切过一半）
     &-badge {
-      position: absolute;
-      top: 12rpx;
-      right: 12rpx;
-      z-index: 5;
+      flex-shrink: 0;
       padding: 4rpx 12rpx;
       border-radius: 999rpx;
       background: var(--surface-strong);
       color: var(--moss);
       font-size: 20rpx;
       font-weight: 650;
+      white-space: nowrap;
+
+      // 小卡浮动位：列内自排序到右上角，标题/描述在下方占满整行不与之相挤
+      &--float {
+        order: -1;
+        align-self: flex-end;
+      }
 
       // 实时任务态：moss 实底 + 轻呼吸，区别于静态「推荐」标
       &--live {
@@ -1036,28 +974,6 @@ $clay: #c4693b;
   }
 }
 
-@keyframes home-entry-in {
-  from {
-    opacity: 0;
-    transform: translateY(10rpx);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-// 箭头轻推：视线引导，幅度刻意很小（不做“跳来跳去”的召唤）
-@keyframes home-entry-nudge {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  50% {
-    transform: translateX(6rpx);
-  }
-}
-
 @keyframes home-badge-live {
   0%,
   100% {
@@ -1072,13 +988,5 @@ $clay: #c4693b;
 @media (prefers-reduced-motion: reduce) {
   .home__tool-badge--live {
     animation: none;
-  }
-
-  // 引导条必须可见：只停动画，不做位移/透明
-  .home__daily-entry--in,
-  .home__daily-entry-link {
-    animation: none;
-    opacity: 1;
-    transform: none;
   }
 }

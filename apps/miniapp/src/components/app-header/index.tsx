@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
-import { APP_NAME } from '@zsm/core'
+import { APP_NAME, APP_SLOGAN } from '@zsm/core'
 import './index.scss'
 
 const BRAND_MARK = '/assets/brand/app-icon-mark.png'
@@ -103,6 +103,8 @@ export default function AppHeader({ title, back, transparent, onPhoto, onBack, r
                   <Text className="app-header__wordmark-up">{WORDMARK_UP}</Text>
                   <Text className="app-header__wordmark-look">{WORDMARK_LOOK}</Text>
                 </View>
+                {/* 品牌标语进导航（原首页 kicker 行已撤）；返回态不显示品牌，自然不带 */}
+                <Text className="app-header__slogan">· {APP_SLOGAN}</Text>
               </View>
             )}
           </View>

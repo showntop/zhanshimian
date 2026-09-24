@@ -10,7 +10,6 @@ import { Image, Text, View } from '@tarojs/components'
 import {
   ANALYSIS_FAIL_COPY,
   APP_NAME,
-  APP_SLOGAN,
   DAILY_COPY,
   ERROR_COPY,
   HOME_COPY,
@@ -100,22 +99,8 @@ function isActive(operation: HomeBootstrap['active_operations'][number]): boolea
   return IN_FLIGHT.has(operation.status)
 }
 
-/** 星期锚点（问候区右上角小注；月/日由巨号日期承担，不再重复） */
-function weekLabel(): string {
-  const week = ['日', '一', '二', '三', '四', '五', '六'][new Date().getDay()] ?? ''
-  return `周${week}`
-}
-
-// 报告入口的比例节奏条：宽度刻意不规则（编辑式排版的"破"），
-// 首段实、末段陶土橘破色、中段安静，条数 = 可提升点数（3~6，schema 上下界内）
-const ARCHIVE_BAR_SEGMENTS = [
-  { key: 'a', width: 88 },
-  { key: 'b', width: 36 },
-  { key: 'c', width: 64 },
-  { key: 'd', width: 28 },
-  { key: 'e', width: 52 },
-  { key: 'f', width: 44 },
-] as const
+// 报告入口行：衬线数字 + 小后缀。原「不规则比例条」已删——条形会被读成
+// 评分/进度（产品红线 1：不打分），只留数字注脚。
 
 const SceneTile = memo(function SceneTile({ scene }: { scene: SceneCopy }) {
   return (
@@ -260,15 +245,19 @@ export default function Home() {
     content: dailyContent,
     bucketName: dailyBucketName,
     saveCurrent,
+    reload: reloadDaily,
     roamScript,
     settleScript,
     reveal,
   } = useDailyPick()
   // 揭晓由收敛动画播完触发（reveal），不再写死 1.2s。
-  const dailyReady = phase === 'content'
+  // offline 有缓存内容也照常呈现海报（today 页同策略）——否则离线时海报位直接消失。
+  const dailyReady = phase === 'content' || (phase === 'offline' && Boolean(dailyContent))
   const dailySettling = phase === 'settling'
   // 生成中播巡游：这两段不给东西的话，等待期间首页这块是空的。
   const dailyWaiting = phase === 'loading' || phase === 'waiting'
+  // 离线且无缓存：不空屏，给静默文案 + 重试动作（红线 4；文案与今日页同款）
+  const dailyOfflineEmpty = phase === 'offline' && !dailyContent
   // gene 色板接入点：脚本是通用的、可缓存的，不携带用户隐私，
   // 所以配色在渲染时由客户端注入（数据到位后传进来即可）。
   const dailyPalette: string[] = []
@@ -371,20 +360,9 @@ export default function Home() {
       ) : (
         <View className="home">
           <View className={`home__greeting ${enter()}`}>
-            <View className="home__greeting-top">
-              <Text className="home__greeting-kicker">{APP_SLOGAN}</Text>
-              <Text className="home__greeting-week">{weekLabel()}</Text>
-            </View>
-            <View className="home__greeting-anchor">
-              <Text className="home__greeting-date serif">
-                {todaySeq.slice(0, 2)}
-                <Text className="home__greeting-dot">.</Text>
-                {todaySeq.slice(3)}
-              </Text>
-              <Text className="home__greeting-title display">
-                {hasReport ? `${greetingForNow()}，${HOME_COPY.returningTitle}` : HOME_TITLE}
-              </Text>
-            </View>
+            <Text className="home__greeting-title display">
+              {hasReport ? `${greetingForNow()}，${HOME_COPY.returningTitle}` : HOME_TITLE}
+            </Text>
           </View>
 
           {!hasReport ? (
@@ -488,45 +466,38 @@ export default function Home() {
                   />
                 </View>
               ) : dailySettling || (dailyReady && dressOnSettling) ? (
-                // 落地即保留：洗牌揭晓面板（人物 + 这一身）一直留在首页，
-                // 内容海报退到卡片下方的一行入口（产品流程仍可进今日页收下）。
-                <>
-                  <View
-                    className={`home__daily-waiting ${dressOnSettling ? 'home__daily-waiting--dress' : ''} ${enter(1)}`}
-                  >
-                    {dressOnSettling ? (
-                      <DressShuffle
-                        target={dressLockTarget ?? undefined}
-                        settling
-                        assetBase={dressBase}
-                        resolveAsset={dressAssets.resolve}
-                        hairAvailable={dressAssets.hairReady}
-                        colorLocked={dressEnv.colorLocked}
-                        onSettled={reveal}
-                      />
-                    ) : (
-                      <DailyMotion
-                        presentation={settleScript}
-                        phase="settling"
-                        palette={dailyPalette}
-                        seq={todaySeq}
-                        onSettled={reveal}
-                      />
-                    )}
-                  </View>
-                  {dailyReady && dailyContent && dressOnSettling ? (
-                    // 洗牌停下后的视线引导：面板落定 → 这条淡入（延迟 300ms）
-                    <View className="home__daily-entry home__daily-entry--in pressable" onClick={goToday}>
-                      <View className="home__daily-entry-copy">
-                        <Text className="home__daily-entry-label">
-                          {DAILY_COPY.dressContentLabel} · {dailyContent.topic}
-                        </Text>
-                        <Text className="home__daily-entry-hint">{DAILY_COPY.dressContentHint}</Text>
-                      </View>
-                      <Text className="home__daily-entry-link">{DAILY_COPY.dressContentLink}</Text>
-                    </View>
-                  ) : null}
-                </>
+                // 落地即保留：洗牌揭晓面板（人物 + 这一身 + 建议正文）一直留在首页，
+                // 整卡就是进今日页的主入口（内容就绪才可点；洗牌播放中点了没反应）。
+                <View
+                  className={`home__daily-waiting ${dressOnSettling ? 'home__daily-waiting--dress' : ''} ${enter(1)} ${
+                    dailyReady && dailyContent && dressOnSettling ? 'pressable' : ''
+                  }`}
+                  onClick={dailyReady && dailyContent && dressOnSettling ? goToday : undefined}
+                >
+                  {dressOnSettling ? (
+                    <DressShuffle
+                      target={dressLockTarget ?? undefined}
+                      settling
+                      assetBase={dressBase}
+                      resolveAsset={dressAssets.resolve}
+                      hairAvailable={dressAssets.hairReady}
+                      colorLocked={dressEnv.colorLocked}
+                      onSettled={reveal}
+                      topic={dailyContent?.topic}
+                      lead={dailyContent?.lead}
+                      category={dailyContent?.asset}
+                      cta={dailyReady && dailyContent ? DAILY_COPY.dressContentLink : undefined}
+                    />
+                  ) : (
+                    <DailyMotion
+                      presentation={settleScript}
+                      phase="settling"
+                      palette={dailyPalette}
+                      seq={todaySeq}
+                      onSettled={reveal}
+                    />
+                  )}
+                </View>
               ) : dailyWaiting ? (
                 <View
                   className={`home__daily-waiting ${dressOnWaiting ? 'home__daily-waiting--dress' : ''} ${enter(1)}`}
@@ -549,30 +520,25 @@ export default function Home() {
                     />
                   )}
                 </View>
+              ) : dailyOfflineEmpty ? (
+                <View className={`home__daily-offline ${enter(1)}`}>
+                  <View className="home__daily-offline-copy">
+                    <Text className="home__daily-offline-title">{DAILY_COPY.offlineTitle}</Text>
+                    <Text className="home__daily-offline-body">{DAILY_COPY.offlineBody}</Text>
+                  </View>
+                  <Text
+                    className="home__daily-offline-retry pressable"
+                    onClick={() => void reloadDaily()}
+                  >
+                    {DAILY_COPY.retryAction}
+                  </Text>
+                </View>
               ) : null}
               {/* 报告退位：不再是首页主角，但入口保留，降级为一行。
-                  数字用不规则比例条做"进展感"隐喻——比孤立大数字更编辑式 */}
+                  只留衬线数字注脚——条形会被读成评分/进度，红线 1 不打分 */}
               <View className="home__archive pressable" onClick={goReport}>
                 <Text className="home__archive-text">{HOME_COPY.viewReport}</Text>
                 <View className="home__archive-meta">
-                  {findingsCount > 0 ? (
-                    <View className="home__archive-bars">
-                      {ARCHIVE_BAR_SEGMENTS.slice(
-                        0,
-                        Math.min(findingsCount, ARCHIVE_BAR_SEGMENTS.length),
-                      ).map((segment, position) => (
-                        <View
-                          key={segment.key}
-                          className={
-                            `home__archive-bar` +
-                            `${position === 0 ? ' home__archive-bar--lead' : ''}` +
-                            `${position === Math.min(findingsCount, ARCHIVE_BAR_SEGMENTS.length) - 1 ? ' home__archive-bar--tail' : ''}`
-                          }
-                          style={{ width: `${segment.width}rpx` }}
-                        />
-                      ))}
-                    </View>
-                  ) : null}
                   <Text className="home__archive-num serif">{findingsCount}</Text>
                   <Text className="home__archive-suffix">{HOME_COPY.findingsSuffix}</Text>
                 </View>
@@ -587,18 +553,34 @@ export default function Home() {
             </View>
             <View className="home__tools">
               {HOME_COPY.tools.map((tool) => {
-                // live 徽章覆盖静态 badge：hair 在途「生成中」（呼吸样式）；
-                // outfit/purchase 有上次诊断给「查看结果」（同步诊断没有跨页在途态）
+                // live 徽章覆盖静态 badge：hair 在途「生成中」（呼吸样式）、有历史效果
+                // 「查看效果」（卡面已直出最近图）；outfit/purchase 有上次诊断给
+                // 「查看结果」（同步诊断没有跨页在途态）
                 const liveBadge =
                   tool.key === 'hair' && hairActive
                     ? HOME_COPY.toolLiveHair
-                    : tool.key === 'outfit' && outfitReady
-                      ? OUTFIT_COPY.lastResult
-                      : tool.key === 'purchase' && purchaseReady
-                        ? PURCHASE_COPY.lastResult
-                        : ''
+                    : tool.key === 'hair' && hairLatestMedia
+                      ? HOME_COPY.toolHairResult
+                      : tool.key === 'outfit' && outfitReady
+                        ? OUTFIT_COPY.lastResult
+                        : tool.key === 'purchase' && purchaseReady
+                          ? PURCHASE_COPY.lastResult
+                          : ''
                 const badge = liveBadge || tool.badge
                 const toolIcon = TOOL_ICONS[tool.key]
+                // 徽章是文档流内 chip：主卡挂标题行尾（绝对定位会被右上 128rpx 拱角
+                // 裁掉），小卡 --float 排到列首右上、标题在下方占满整行（窄卡不与标题挤一行）
+                const badgeNode = badge ? (
+                  <Text
+                    className={
+                      `home__tool-badge` +
+                      `${tool.key === 'hair' ? '' : ' home__tool-badge--float'}` +
+                      `${liveBadge === HOME_COPY.toolLiveHair ? ' home__tool-badge--live' : ''}`
+                    }
+                  >
+                    {badge}
+                  </Text>
+                ) : null
                 return (
                   <View
                     key={tool.key}
@@ -626,6 +608,7 @@ export default function Home() {
                           />
                         ) : null}
                         <Text className="home__tool-name">{tool.label}</Text>
+                        {tool.key === 'hair' ? badgeNode : null}
                       </View>
                       <Text className="home__tool-desc">{tool.desc}</Text>
                     </View>
@@ -652,13 +635,7 @@ export default function Home() {
                         )}
                       </View>
                     ) : null}
-                    {badge ? (
-                      <Text
-                        className={`home__tool-badge ${liveBadge === HOME_COPY.toolLiveHair ? 'home__tool-badge--live' : ''}`}
-                      >
-                        {badge}
-                      </Text>
-                    ) : null}
+                    {tool.key !== 'hair' ? badgeNode : null}
                   </View>
                 )
               })}

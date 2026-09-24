@@ -92,6 +92,15 @@
     white-space: nowrap;
   }
 
+  // 品牌标语：wordmark 后的小字注脚（首页 kicker 行撤除后挪到这里）
+  &__slogan {
+    margin-left: 12rpx;
+    font-size: 22rpx;
+    letter-spacing: 0.06em;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+
   &__wordmark-up,
   &__wordmark-look {
     font-size: 32rpx;

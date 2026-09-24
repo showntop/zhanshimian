@@ -5,7 +5,7 @@
 //
 // 当前能力注册表：
 //   sketch_tour（roam）  → Canvas 草图巡游（sketch.tsx，零素材、可循环）
-//   frames（settle）     → 序列帧揭晓（frames.tsx，线稿→成形→定格）
+//   frames（settle）     → 序列帧揭晓（frames-reveal.tsx，线稿→成形→定格）
 //   roam_tour / converge → 旧 CSS 形态动画（forms.tsx；服务端不再下发，
 //                          留作协议兼容与无素材时的服务端兜底）
 //
@@ -29,7 +29,7 @@ import {
 } from '@zsm/core'
 import { formOf, resolveAxisValue, variantCountsOf, type FormSpec } from './forms'
 import SketchTour, { FORM_CATEGORY, type SketchTheme } from './sketch'
-import FramesReveal from './frames'
+import FramesReveal from './frames-reveal'
 import './index.scss'
 
 interface DailyMotionProps {

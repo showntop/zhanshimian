@@ -327,6 +327,8 @@ export const HOME_COPY = {
   ],
   // 工具卡实时徽章：在途任务覆盖静态 badge（live 样式）；「上次结果」沿用各工具自己的 lastResult 文案
   toolLiveHair: '生成中',
+  // 发型卡历史结果徽章：卡面已直出最近效果图，徽章只补「可点开看」的语义
+  toolHairResult: '查看效果',
   scenesTitle: '按场合开始',
   sceneReadyNote: '已复用你的形象档案，不会再要照片',
   recentTitle: '最近方案',
@@ -362,6 +364,13 @@ export const DAILY_COPY = {
   dressCaptionSub: '正在为你搭配',
   dressCaptionSettled: '今天这一身',
   dressRevealTitle: '今天这一身',
+  // 揭晓面板标题按内容归格切换：讲发型/妆容/配饰的日子不硬套「今天这一身」；
+  // 未列出的归格（穿着类）走 dressRevealTitle 兜底
+  dressRevealTitleByCategory: {
+    hair: '今天的发型方向',
+    makeup: '今天的妆容要点',
+    accessory: '今天的配饰选法',
+  } as Record<string, string>,
   dressRevealSub: 'uplook · 为你搭好的一身',
   dressRevealGhost: 'TODAY · ONE LOOK',
   dressStamp: '今日',

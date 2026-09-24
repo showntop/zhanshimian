@@ -19,27 +19,30 @@
   position: relative;
 }
 
-// 镜框：原型 262×486 对瘦人物（宽高比 0.35）左右各空 53rpx，像「框大人小」。
-// 收窄到 216×500（top 30、顶圆角 108）后，人物四周留白 20~26rpx，像一面立镜。
+// 镜框：330×528（top 20，底 548）——按「框必须明显大于人」定尺寸，留足容错：
+// 人物宽 184 + 两侧各 73rpx 余量，脚上留 88rpx 地面。之前几版框比人小、
+// 底线横在腿上的根源是框的尺寸贴着人算，没有冗余。填充也比卡片底色亮一档，
+// 让镜面本身可辨认（此前框几乎隐形，人才显得像浮在画外）。
 .ds__arch {
   position: absolute;
   left: 50%;
-  top: 30rpx;
+  top: 20rpx;
   transform: translateX(-50%);
-  width: 216rpx;
-  height: 500rpx;
-  border: 2rpx solid rgba(63, 70, 60, 0.22);
-  border-radius: 108rpx 108rpx 14rpx 14rpx;
-  background: linear-gradient(170deg, #fbf9f4 0%, #efece3 100%);
+  width: 330rpx;
+  height: 528rpx;
+  border: 2rpx solid rgba(63, 70, 60, 0.26);
+  border-radius: 165rpx 165rpx 16rpx 16rpx;
+  background: linear-gradient(170deg, #fdfcf8 0%, #f3f0e7 100%);
 }
 
+// clip 不再裁切（overflow visible）：破框的前提是人物能越出栏边界
 .ds__clip {
   position: absolute;
   left: 0;
   top: 0;
   width: 336rpx;
   height: 560rpx;
-  overflow: hidden;
+  overflow: visible;
   z-index: 2;
 }
 
@@ -78,18 +81,20 @@
 }
 
 // 彩色人物图：白底走 multiply 融进壁龛；换色 = filter（透明底不受影响）。
-// 对位解算（8 张 look / 4 张发型素材构图统一：人物宽/图宽 0.252、高/图高 0.951、
-// 中心 x 0.487）：
-//   原型「图铺 750 宽 + focus 48%」→ 人物 189×533，上下溢出拱门、左右各空 36。
-//   这里按镜框内边距反解：目标人物高 500-2×20=460 → 图高 460/0.951≈484、
-//   图宽 484×1500/1120≈648；水平让人物中心对镜框中心（168）→ 图左 = 168-0.487×648 ≈ -147；
-//   垂直让人物顶落在镜框顶+20（50）→ 图顶 = 50-0.0214×484 ≈ 40。
+// 对位常数实测自 1500×1120 素材（2026-09-24 重测：人物宽/图宽 0.295
+// 〔含叉腰肘+裙摆〕、高/图高 0.944、中心 x 0.498、顶 y 0.012）。
+//   目标人物高 440（拱 528，留 88rpx 容错余量）：发顶 y≈62、脚 y≈502——
+//   图高 440/0.944≈466、图宽 466×1500/1120≈624；
+//   水平：图左 = 168-0.498×624 ≈ -143（图中线对镜中线 168）；
+//   垂直：图顶 = 56 → 人在镜中落位：发顶 y≈62、脚 y≈502（框底 548，脚下 46rpx）。
+//   只动这一个值即可让人在框内上下移动（镜框、卡面都不动）；±14rpx 是「一点点」的量级。
+//   人物宽 0.295×624≈184，两侧各距框边 73rpx——即使素材有 ±10% 误差也不出框。
 .ds__figure {
   position: absolute;
-  left: -147rpx;
-  top: 40rpx;
-  width: 648rpx;
-  height: 484rpx;
+  left: -143rpx;
+  top: 56rpx;
+  width: 624rpx;
+  height: 466rpx;
   mix-blend-mode: multiply;
   transition: filter 0.38s ease-out;
 }
@@ -114,33 +119,33 @@
 .ds__caption {
   position: absolute;
   left: 36rpx;
-  bottom: 26rpx;
+  bottom: 44rpx;
   z-index: 9;
 }
 .ds__caption-main {
-  font-size: 23rpx;
-  letter-spacing: 0.13em;
+  font-size: 28rpx;
+  letter-spacing: 0.1em;
   color: #3f463c;
   text-shadow: 0 0 10rpx #f5f2ec, 0 0 18rpx #f5f2ec;
 }
 .ds__caption-sub {
-  margin-top: 7rpx;
-  font-size: 11rpx;
-  letter-spacing: 0.15em;
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  letter-spacing: 0.1em;
   color: #6b7364;
   text-shadow: 0 0 8rpx #f5f2ec;
 }
 
-// 盖章「今日」：在揭晓面板右下（原型 .stamp 是 .reveal 的子元素）
+// 盖章「今日」：右上角（传统印章位），朱红油泥色——全卡唯一的红（5% 预算）
 .ds__stamp {
   position: absolute;
-  right: 34rpx;
-  bottom: 36rpx;
-  width: 74rpx;
-  height: 74rpx;
+  right: 28rpx;
+  top: 28rpx;
+  width: 70rpx;
+  height: 70rpx;
   border-radius: 10rpx;
-  border: 3rpx solid rgba(240, 225, 215, 0.92);
-  color: rgba(240, 225, 215, 0.95);
+  border: 3rpx solid rgba(176, 81, 47, 0.85);
+  color: rgba(176, 81, 47, 0.92);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -156,11 +161,15 @@
   right: 8rpx;
   top: 8rpx;
   bottom: 8rpx;
-  border: 2rpx solid rgba(240, 225, 215, 0.5);
+  border: 2rpx solid rgba(176, 81, 47, 0.45);
   border-radius: 6rpx;
 }
 
 // ---------- 揭晓：右栏变海报（原型 .reveal） ----------
+// 色彩纪律（80/15/5）：没有面板色块——底色与卡片是同一张渐变（接缝消失，
+// 文字与人物同处一个空间），深绿只以排印（标题/小注/竖排英文）、chips 描边、
+// 胶囊按钮出现（~15%）；朱红印章与人物裙色是仅有的重点色（~5%）。
+// 内容顶部与人物肩线对齐（padding-top 130 ≈ 拱顶下 100）：左右同高起笔，才融。
 .ds__reveal {
   position: absolute;
   top: 0;
@@ -170,41 +179,71 @@
   z-index: 14;
   transform: translateX(102%);
   transition: transform 0.55s cubic-bezier(0.2, 1, 0.3, 1);
-  background: linear-gradient(155deg, #3b4a2e 0%, #28331f 100%);
+  background: linear-gradient(160deg, #f5f2ec 0%, #e4dfd6 100%);
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  padding: 0 36rpx 40rpx;
+  justify-content: flex-start;
+  padding: 130rpx 36rpx 0;
 }
 .ds__reveal--on {
   transform: none;
 }
+// 竖排英文：右缘下段，editorial 注脚；半透明退到底层
 .ds__reveal-ghost {
   position: absolute;
-  right: 18rpx;
-  top: 24rpx;
+  right: 20rpx;
+  bottom: 32rpx;
   writing-mode: vertical-rl;
   font-size: 13rpx;
   letter-spacing: 0.5em;
-  color: rgba(242, 239, 231, 0.28);
+  color: rgba(63, 70, 60, 0.3);
 }
 .ds__reveal-title {
-  font-size: 27rpx;
-  letter-spacing: 0.12em;
-  color: #f2efe7;
+  font-size: 34rpx;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: #2e3a23;
 }
 .ds__reveal-sub {
   margin-top: 10rpx;
-  font-size: 12rpx;
-  letter-spacing: 0.16em;
-  color: rgba(242, 239, 231, 0.72);
+  font-size: 20rpx;
+  letter-spacing: 0.1em;
+  color: rgba(63, 70, 60, 0.66);
+}
+// 选题小注 + 建议导语：落定态的建议正文（服务端生成，≤44 字，限 3 行）
+.ds__reveal-topic {
+  margin-bottom: 8rpx;
+  font-size: 20rpx;
+  letter-spacing: 0.12em;
+  color: rgba(90, 125, 74, 0.9);
+}
+.ds__reveal-lead {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: rgba(63, 70, 60, 0.92);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+// 行动入口：唯一的深绿实色块（15% 预算花在这）
+.ds__reveal-cta {
+  align-self: flex-start;
+  margin-top: 22rpx;
+  padding: 10rpx 26rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f2efe7;
+  background: #3b4a2e;
+  border-radius: 999rpx;
 }
 .ds__reveal-chips {
   display: flex;
-  gap: 9rpx;
+  gap: 10rpx;
   flex-wrap: wrap;
-  margin-top: 16rpx;
-  padding-right: 90rpx;
+  margin-top: 20rpx;
 }
 @keyframes ds-stamp {
   0% {
@@ -227,26 +266,26 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 40rpx 30rpx 34rpx;
+  padding: 40rpx 30rpx 44rpx;
 }
 .ds__pool-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 6rpx;
-  height: 36rpx;
+  height: 44rpx;
 }
 .ds__dim-label {
-  font-size: 13rpx;
-  letter-spacing: 0.2em;
-  color: #8a9083;
+  font-size: 22rpx;
+  letter-spacing: 0.14em;
+  color: #6b7364;
 }
 .ds__badge {
-  font-size: 12rpx;
-  letter-spacing: 0.12em;
+  font-size: 20rpx;
+  letter-spacing: 0.08em;
   background: rgba(255, 255, 255, 0.9);
   color: #3f463c;
-  padding: 6rpx 14rpx;
+  padding: 6rpx 18rpx;
   border-radius: 999rpx;
 }
 
@@ -314,10 +353,10 @@
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 3rpx 0 4rpx;
+  padding: 3rpx 0 5rpx;
   text-align: center;
-  font-size: 10rpx;
-  letter-spacing: 0.08em;
+  font-size: 18rpx;
+  letter-spacing: 0.04em;
   color: #6b7364;
   background: rgba(255, 255, 255, 0.88);
 }
@@ -373,19 +412,23 @@
   min-height: 26rpx;
 }
 .ds__chip {
-  padding: 5rpx 12rpx;
+  padding: 6rpx 16rpx;
   border-radius: 999rpx;
   background: #fff;
   border: 1rpx solid #ded8cd;
-  font-size: 11rpx;
-  letter-spacing: 0.1em;
+  font-size: 20rpx;
+  letter-spacing: 0.06em;
   color: #6b7364;
 }
 
+// 揭晓面板的 chips：绿描边空心（deep 绿是排印色，不再垫深底）
 .ds__chip--dark {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.25);
-  color: #f2efe7;
+  padding: 6rpx 16rpx;
+  font-size: 20rpx;
+  letter-spacing: 0.06em;
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(90, 125, 74, 0.45);
+  color: #4a5540;
 }
 
 // prefers-reduced-motion 归零（AGENTS 动效规约）：动画停帧、元素保持可见。

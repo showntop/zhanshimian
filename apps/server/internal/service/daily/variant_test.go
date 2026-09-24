@@ -49,7 +49,7 @@ func TestLookOfCategorySemanticMapping(t *testing.T) {
 	}
 	// 其余分类走稳定随机：仍必须在词汇表内，且同 seed 固定
 	inLib := false
-	for _, key := range dressLookKeys {
+	for _, key := range DressLookKeys {
 		if lookOfCategory("general", "u1|2026-09-23") == key {
 			inLib = true
 		}
@@ -94,7 +94,7 @@ func TestDressLockPresentation(t *testing.T) {
 	color, _ := target["color"].(string)
 	waist, _ := target["waist"].(string)
 	hair, _ := target["hair"].(string)
-	if !inLib(color, dressColorNames) || !inLib(waist, dressWaistNames) || !inLib(hair, dressHairKeys) {
+	if !inLib(color, DressColorNames) || !inLib(waist, DressWaistNames) || !inLib(hair, DressHairKeys) {
 		t.Fatalf("target values must stay in shared vocabulary: %v", target)
 	}
 	if stage.Params["pace"] != "normal" {
@@ -116,6 +116,24 @@ func TestDressLockPresentation(t *testing.T) {
 	wantBase := "https://cdn.example.com/assets/daily/dress"
 	if !ok || assets["base"] != wantBase || assets["version"] != dressAssetsVersion {
 		t.Fatalf("assets must be %q + version %s, got %v", wantBase, dressAssetsVersion, stage.Params["assets"])
+	}
+}
+
+// 定格参数必须与建议同源：content.Lock 逐维优先；越权取值逐维回退
+// （category 就近归类 / hash 稳定随机），绝不输出词表外的值。
+func TestDressLockUsesContentLockPerDim(t *testing.T) {
+	content := domain.DailyContent{
+		UserID:   "user-1",
+		GenDate:  "2026-09-23",
+		Category: "proportion",
+		Lock:     &domain.ContentLock{Look: "look-coat", Color: "墨绿", Waist: "高腰", Hair: "不存在的发型"},
+	}
+	target := dressLockPresentation(content, 2000, "").Stages[0].Params["target"].(map[string]any)
+	if target["look"] != "look-coat" || target["color"] != "墨绿" || target["waist"] != "高腰" {
+		t.Fatalf("valid lock dims must win: %v", target)
+	}
+	if !inList(DressHairKeys, target["hair"].(string)) {
+		t.Fatalf("invalid lock dim must fall back into vocabulary: %v", target["hair"])
 	}
 }
 

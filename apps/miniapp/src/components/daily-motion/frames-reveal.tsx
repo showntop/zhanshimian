@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, View } from '@tarojs/components'
 import type { FramesParams } from '@zsm/core'
-import './frames.scss'
+import './frames-reveal.scss'
 
 interface FramesRevealProps {
   params: FramesParams

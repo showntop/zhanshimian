@@ -23,6 +23,7 @@ var (
 	errBlacklist = errors.New("blacklist_hit")
 	errCategory  = errors.New("category_invalid")
 	errDuplicate = errors.New("topic_duplicate")
+	errLock      = errors.New("lock_invalid")
 )
 
 const (
@@ -47,6 +48,9 @@ func validateOutput(output ContentOutput, recentTopics []string) []error {
 		problems = append(problems, err)
 	}
 	if err := validateDuplicate(output, recentTopics); err != nil {
+		problems = append(problems, err)
+	}
+	if err := validateLock(output); err != nil {
 		problems = append(problems, err)
 	}
 	if _, err := buildVisual(output.Visual); err != nil {
@@ -105,6 +109,20 @@ func validateCategory(output ContentOutput) error {
 		}
 	}
 	return fmt.Errorf("%w: 分类 %q 不在手册分格内", errCategory, output.Category)
+}
+
+// validateLock 定格参数闸：每一维必须在与客户端洗牌库共享的词表内
+//（ValidLockValue 与 provider 共用一份词表）；空维允许（服务端按维回退）。
+func validateLock(output ContentOutput) error {
+	lock := output.Lock
+	for dim, value := range map[string]string{
+		"look": lock.Look, "color": lock.Color, "waist": lock.Waist, "hair": lock.Hair,
+	} {
+		if !ValidLockValue(dim, value) {
+			return fmt.Errorf("%w: %s 维取值 %q 不在词表内", errLock, dim, value)
+		}
+	}
+	return nil
 }
 
 // validateDuplicate topic 去重闸：与近期已推 topic 规范化比对
@@ -245,6 +263,8 @@ func retryHint(problems []error) string {
 			parts = append(parts, "- topic 与近期已推的重复，请换一个全新的主题。")
 		case errors.Is(problem, errCategory):
 			parts = append(parts, "- category 必须是 color/fit/proportion/fabric/occasion/howto/outfit/hair/makeup/accessory/general 之一。")
+		case errors.Is(problem, errLock):
+			parts = append(parts, "- lock 定格参数每一维必须从给定词表里选（空字符串=放弃该维），取值要贴合建议内容。")
 		case errors.Is(problem, errStructure):
 			parts = append(parts, "- 结构不合法："+problem.Error()+"（字段必填、长度不超限、视觉参数完整）。")
 		default:

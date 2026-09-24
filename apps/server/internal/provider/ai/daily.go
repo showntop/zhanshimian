@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/zhanshimian/server/internal/domain"
 	"github.com/zhanshimian/server/internal/service/daily"
 )
 
@@ -53,6 +54,14 @@ func (p *StructuredDailyContentPlanner) Generate(ctx context.Context, input dail
 		ModelKey:  result.Meta.ModelKey,
 		LatencyMS: result.Meta.LatencyMS,
 	}
+	if payload.Lock != nil {
+		output.Lock = domain.ContentLock{
+			Look:  strings.TrimSpace(payload.Lock.Look),
+			Color: strings.TrimSpace(payload.Lock.Color),
+			Waist: strings.TrimSpace(payload.Lock.Waist),
+			Hair:  strings.TrimSpace(payload.Lock.Hair),
+		}
+	}
 	output.Visual = daily.VisualDraft{
 		Modality: payload.Visual.Modality,
 		Kind:     payload.Visual.Kind,
@@ -88,7 +97,15 @@ type dailyContentPayload struct {
 	Fit      string                    `json:"fit"`
 	Why      string                    `json:"why"`
 	Category string                    `json:"category"`
+	Lock     *dailyContentLockPayload  `json:"lock"`
 	Visual   dailyContentVisualPayload `json:"visual"`
+}
+
+type dailyContentLockPayload struct {
+	Look  string `json:"look"`
+	Color string `json:"color"`
+	Waist string `json:"waist"`
+	Hair  string `json:"hair"`
 }
 
 type dailyContentVisualPayload struct {
@@ -126,6 +143,18 @@ func validateDailyContentPayload(data []byte) error {
 	default:
 		return fmt.Errorf("daily content provider output has invalid category %q", payload.Category)
 	}
+	// lock 必填：每一维都要在共享词表内（与客户端洗牌库同一份），空串=放弃该维。
+	if payload.Lock == nil {
+		return fmt.Errorf("daily content provider output is missing lock")
+	}
+	lock := *payload.Lock
+	for dim, value := range map[string]string{
+		"look": lock.Look, "color": lock.Color, "waist": lock.Waist, "hair": lock.Hair,
+	} {
+		if !daily.ValidLockValue(dim, strings.TrimSpace(value)) {
+			return fmt.Errorf("daily content provider output has invalid lock %s %q", dim, value)
+		}
+	}
 	switch payload.Visual.Modality {
 	case "swatch", "compare", "diagram":
 	default:
@@ -136,7 +165,7 @@ func validateDailyContentPayload(data []byte) error {
 
 func dailyContentSchema() map[string]any {
 	return map[string]any{"type": "object", "additionalProperties": false,
-		"required": []string{"topic", "lead", "fit", "why", "category", "visual"},
+		"required": []string{"topic", "lead", "fit", "why", "category", "lock", "visual"},
 		"properties": map[string]any{
 			"topic": map[string]any{"type": "string", "minLength": 1, "maxLength": 24},
 			"lead":  map[string]any{"type": "string", "minLength": 1, "maxLength": 60},
@@ -144,6 +173,15 @@ func dailyContentSchema() map[string]any {
 			"why":   map[string]any{"type": "string", "minLength": 1, "maxLength": 60},
 			"category": map[string]any{"type": "string",
 				"enum": []string{"color", "fit", "proportion", "fabric", "occasion", "howto", "outfit", "hair", "makeup", "accessory", "general"}},
+			// lock：换装洗牌的定格参数，取值域与客户端洗牌库同一份词表。
+			"lock": map[string]any{"type": "object", "additionalProperties": false,
+				"required": []string{"look", "color", "waist", "hair"},
+				"properties": map[string]any{
+					"look":  map[string]any{"type": "string", "enum": daily.DressLookKeys},
+					"color": map[string]any{"type": "string", "enum": daily.DressColorNames},
+					"waist": map[string]any{"type": "string", "enum": daily.DressWaistNames},
+					"hair":  map[string]any{"type": "string", "enum": daily.DressHairKeys},
+				}},
 			"visual": map[string]any{"type": "object", "additionalProperties": false,
 				"required": []string{"modality", "alt"},
 				"properties": map[string]any{
@@ -194,6 +232,9 @@ func dailyContentPrompt(input daily.ContentRequest) string {
 	if input.HistoryText != "" {
 		parts = append(parts, "【近期已推】"+input.HistoryText)
 	}
+	if input.FindingsText != "" {
+		parts = append(parts, "【近期报告要点】"+input.FindingsText+"。这是形象档案里的可提升点，选题可以贴，但不必每次都围着它转。")
+	}
 	if len(input.ReferenceFacts) > 0 {
 		lines := make([]string, 0, len(input.ReferenceFacts))
 		for _, fact := range input.ReferenceFacts {
@@ -205,7 +246,7 @@ func dailyContentPrompt(input daily.ContentRequest) string {
 		}
 		parts = append(parts, "【参考观点】以下是可以参考的专业事实，可用可不用，观点要自己消化：\n"+strings.Join(lines, "\n"))
 	}
-	parts = append(parts, "【输出】一条完整的今日建议：topic（≤12字，杂志式选题）、lead（≤40字导语）、fit（≤60字，结合用户特征的适配说明）、why（≤40字，一句原理）、category（按内容主体归格：color/fit/proportion/fabric/occasion/howto/outfit 讲穿着，hair=发型方向、makeup=妆容要点、accessory=鞋包首饰的选法与呼应，确实跨格才用 general）、visual（swatch/compare/diagram 之一，给出可程序化绘制的参数）。今天必须是一个新主题，也不必总停在穿着上——发型、妆容、配饰同样是今天的候选角度。")
+	parts = append(parts, "【输出】一条完整的今日建议：topic（≤12字，杂志式选题）、lead（≤40字导语）、fit（≤60字，结合用户特征的适配说明）、why（≤40字，一句原理）、category（按内容主体归格：color/fit/proportion/fabric/occasion/howto/outfit 讲穿着，hair=发型方向、makeup=妆容要点、accessory=鞋包首饰的选法与呼应，确实跨格才用 general）、lock（换装动画的定格参数，必须与建议同源：look 从词表里选与建议最贴的一套造型，color 选建议里实际讲到的颜色（讲颜色必选；其他角度选与内容最呼应的一色），waist 按建议里的腰线说法选 高腰/中腰/低腰，hair 按建议里的发型方向选；某一维确实沾不上边就填空字符串）、visual（swatch/compare/diagram 之一，给出可程序化绘制的参数）。今天必须是一个新主题，也不必总停在穿着上——发型、妆容、配饰同样是今天的候选角度。")
 	if input.RetryHint != "" {
 		parts = append(parts, "【修正提示】"+input.RetryHint)
 	}

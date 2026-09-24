@@ -36,5 +36,36 @@ func (s *Store) ReadDailyGrounding(ctx context.Context, userID string) (daily.Gr
 			}
 		}
 	}
+	// 报告要点（可提升点的中性短句）：没有报告不是错误，空着继续。
+	findings, err := s.readLatestFindingsText(ctx, userID)
+	if err == nil {
+		grounding.Findings = findings
+	}
 	return grounding, nil
+}
+
+// readLatestFindingsText 最近一次报告的可提升点，整理成给模型的中性短句
+//（标签 + 建议）。只读不评判：报告本身已过形象顾问审，原文转述。
+func (s *Store) readLatestFindingsText(ctx context.Context, userID string) ([]string, error) {
+	var reportID string
+	if err := s.pool.QueryRow(ctx, `
+		SELECT id::text FROM reports
+		WHERE user_id=$1::uuid ORDER BY created_at DESC LIMIT 1`, userID).Scan(&reportID); err != nil {
+		return nil, err
+	}
+	rows, err := s.readReportFindings(ctx, userID, reportID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(rows))
+	for _, f := range rows {
+		line := f.Label
+		if f.Recommendation != "" {
+			line += "，建议：" + f.Recommendation
+		}
+		if line != "" {
+			out = append(out, line)
+		}
+	}
+	return out, nil
 }
