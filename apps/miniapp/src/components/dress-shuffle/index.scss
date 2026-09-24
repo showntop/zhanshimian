@@ -9,9 +9,9 @@
   height: 560rpx;
   position: relative;
   overflow: hidden;
-  border-radius: 18rpx;
+  // 与外层 .home__daily-waiting / 全局 --radius-lg 对齐（原 18rpx 与 24rpx 双圆角嵌套）
+  border-radius: 24rpx;
   background: linear-gradient(160deg, #f6f3ed 0%, #e6e1d7 100%);
-  box-shadow: 0 10rpx 48rpx rgba(0, 0, 0, 0.13);
 }
 
 // ---------- 人物层（满卡，压在文字之下） ----------
@@ -212,7 +212,7 @@
 .ds__reveal-rule {
   width: 64rpx;
   height: 3rpx;
-  margin-top: 18rpx;
+  margin-top: 16rpx;
   background: rgba(90, 125, 74, 0.45);
 }
 .ds__reveal-sub {
@@ -223,7 +223,7 @@
 }
 // 正文：建议导语（服务端生成，≤44 字，限 3 行）
 .ds__reveal-lead {
-  margin-top: 14rpx;
+  margin-top: 16rpx;
   font-size: 22rpx;
   line-height: 1.66;
   color: rgba(63, 70, 60, 0.92);
@@ -240,9 +240,9 @@
   align-items: center;
   justify-content: center;
   align-self: flex-start;
-  margin-top: 20rpx;
-  padding: 14rpx 32rpx;
-  font-size: 22rpx;
+  margin-top: 24rpx;
+  padding: 16rpx 34rpx;
+  font-size: 24rpx;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.06em;
@@ -253,8 +253,8 @@
 .ds__reveal-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 10rpx 26rpx;
-  margin-top: 22rpx;
+  gap: 8rpx 22rpx;
+  margin-top: 18rpx;
 }
 // 右下角大号衬线日期：editorial 主视觉（「今日」的印章语义由它承担）
 .ds__index {
@@ -480,15 +480,15 @@
 .ds__chip {
   display: flex;
   align-items: baseline;
-  gap: 8rpx;
+  gap: 6rpx;
 }
 .ds__chip-label {
-  font-size: 19rpx;
+  font-size: 20rpx;
   letter-spacing: 0.1em;
   color: rgba(90, 125, 74, 0.92);
 }
 .ds__chip-value {
-  font-size: 21rpx;
+  font-size: 22rpx;
   font-weight: 600;
   color: #3f463c;
 }

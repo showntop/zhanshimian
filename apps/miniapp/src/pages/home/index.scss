@@ -32,16 +32,17 @@ $clay: #c4693b;
   &__section {
     display: flex;
     flex-direction: column;
-    padding-top: 64rpx;
+    // 64 → 56：海报/工具卡信息密度高，分区过大时中部出现空带；仍保 density 3 的舒展
+    padding-top: 56rpx;
   }
 
   &__section-head {
     display: flex;
     flex-direction: column;
-    padding: 0 5rpx;
+    padding: 0 6rpx;
 
     .section-title {
-      margin: 0 0 14rpx;
+      margin: 0 0 12rpx;
       font-size: 32rpx;
     }
 
@@ -466,8 +467,8 @@ $clay: #c4693b;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 20rpx;
-    padding: 12rpx 6rpx;
+    margin-top: 24rpx;
+    padding: 16rpx 6rpx;
   }
 
   &__archive-text {
@@ -478,19 +479,19 @@ $clay: #c4693b;
 
   &__archive-meta {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 6rpx;
   }
 
   &__archive-num {
     color: var(--moss-deep);
-    font-size: 36rpx;
-    font-weight: 750;
+    font-size: 30rpx;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
 
   &__archive-suffix {
-    font-size: 21rpx;
+    font-size: 22rpx;
     color: var(--ink-3);
   }
 
@@ -801,7 +802,7 @@ $clay: #c4693b;
 
   &__scene-note {
     margin-top: 18rpx;
-    padding: 0 5rpx;
+    padding: 0 6rpx;
     font-size: 20rpx;
     color: var(--moss);
   }
@@ -809,7 +810,7 @@ $clay: #c4693b;
   // 方案集规划中的轻量入口（新线能力，旧线无对应物；按 scene-note 的安静权重处理）
   &__planning {
     align-self: flex-start;
-    padding: 0 5rpx;
+    padding: 0 6rpx;
     font-size: 22rpx;
     color: var(--moss);
     text-decoration: underline;
