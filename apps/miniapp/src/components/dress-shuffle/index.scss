@@ -1,56 +1,52 @@
 // 换装洗牌样式：原型 daily-dressup-asset.html 的 CSS px → rpx（750 设计宽 1:1）。
 // 禁裸 px（check.mjs 门禁）；keyframes 命名加 ds- 前缀防冲突。
 
+// 融合式构图（2026-09-24 参考稿）：不再是「左右两栏」——人物是整张画面的
+// 主体（放大、右侧出血、无相框），文字以图层方式压在画面左侧。
+// .ds 只做画布：relative + 裁边。
 .ds {
   width: 750rpx;
   height: 560rpx;
   position: relative;
   overflow: hidden;
   border-radius: 18rpx;
-  background: linear-gradient(160deg, #f5f2ec 0%, #e4dfd6 100%);
+  background: linear-gradient(160deg, #f6f3ed 0%, #e6e1d7 100%);
   box-shadow: 0 10rpx 48rpx rgba(0, 0, 0, 0.13);
-  display: flex;
 }
 
-// ---------- 左：试衣间 ----------
+// ---------- 人物层（满卡，压在文字之下） ----------
 .ds__fig {
-  width: 336rpx;
-  height: 560rpx;
-  position: relative;
+  position: absolute;
+  inset: 0;
 }
 
-// 镜框：330×528（top 20，底 548）——按「框必须明显大于人」定尺寸，留足容错：
-// 人物宽 184 + 两侧各 73rpx 余量，脚上留 88rpx 地面。之前几版框比人小、
-// 底线横在腿上的根源是框的尺寸贴着人算，没有冗余。填充也比卡片底色亮一档，
-// 让镜面本身可辨认（此前框几乎隐形，人才显得像浮在画外）。
+// 背景软形：一块偏右、向上出画的浅拱，只做「人在光里」的底，不是镜框——
+// 参照稿的淡色花瓣形；不描边、不裁人。
 .ds__arch {
   position: absolute;
-  left: 50%;
-  top: 20rpx;
-  transform: translateX(-50%);
-  width: 330rpx;
-  height: 528rpx;
-  border: 2rpx solid rgba(63, 70, 60, 0.26);
-  border-radius: 165rpx 165rpx 16rpx 16rpx;
-  background: linear-gradient(170deg, #fdfcf8 0%, #f3f0e7 100%);
+  left: 300rpx;
+  top: -160rpx;
+  width: 620rpx;
+  height: 700rpx;
+  border-radius: 50% 50% 12rpx 12rpx / 42% 42% 12rpx 12rpx;
+  background: linear-gradient(175deg, #fcfaf5 0%, #f2ede3 100%);
 }
 
-// clip 不再裁切（overflow visible）：破框的前提是人物能越出栏边界
+// 人物不再被任何容器裁切
 .ds__clip {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: 336rpx;
-  height: 560rpx;
+  inset: 0;
   overflow: visible;
   z-index: 2;
 }
 
-// 摆身舞台：常驻微摆（sway）+ 上身一次性摆身（pop）；原型 transform-origin:168 505
+// 摆身舞台：常驻微摆（sway）+ 上身一次性摆身（pop）。
+// 支点移到人物身上（人物中心 x≈588、支点落在卡底），大图摆动才像「呼吸」，
+// 而不是整张插图在摇晃。
 .ds__figstage {
   position: absolute;
   inset: 0;
-  transform-origin: 168rpx 520rpx;
+  transform-origin: 588rpx 556rpx;
   animation: ds-sway 3.8s ease-in-out infinite;
 }
 .ds__figstage--pop {
@@ -80,29 +76,28 @@
   }
 }
 
-// 彩色人物图：白底走 multiply 融进壁龛；换色 = filter（透明底不受影响）。
-// 对位常数实测自 1500×1120 素材（2026-09-24 重测：人物宽/图宽 0.295
-// 〔含叉腰肘+裙摆〕、高/图高 0.944、中心 x 0.498、顶 y 0.012）。
-//   目标人物高 440（拱 528，留 88rpx 容错余量）：发顶 y≈62、脚 y≈502——
-//   图高 440/0.944≈466、图宽 466×1500/1120≈624；
-//   水平：图左 = 168-0.498×624 ≈ -143（图中线对镜中线 168）；
-//   垂直：图顶 = 56 → 人在镜中落位：发顶 y≈62、脚 y≈502（框底 548，脚下 46rpx）。
-//   只动这一个值即可让人在框内上下移动（镜框、卡面都不动）；±14rpx 是「一点点」的量级。
-//   人物宽 0.295×624≈184，两侧各距框边 73rpx——即使素材有 ±10% 误差也不出框。
+// 彩色人物图：白底走 multiply 融进底色（白底即透明）；换色 = filter。
+// 对位常数实测自 1500×1120 素材（人物宽/图宽 0.295〔含叉腰肘+裙摆〕、
+// 高/图高 0.944、中心 x 0.498、顶 y 0.012）。
+// 融合式尺寸（人物是画面主体）：图 1100×821 →
+//   人物宽 0.295×1100≈325、高 0.944×821≈775（超出卡高 560，裙摆出下边）；
+//   人物中心 x = 40+0.498×1100 ≈ 588 → 身体落在 x≈426~750，右侧出血贴边；
+//   发顶 y = 30+0.012×821 ≈ 40（贴卡顶留一口气）。
 .ds__figure {
   position: absolute;
-  left: -143rpx;
-  top: 56rpx;
-  width: 624rpx;
-  height: 466rpx;
+  left: 40rpx;
+  top: 30rpx;
+  width: 1100rpx;
+  height: 821rpx;
   mix-blend-mode: multiply;
   transition: filter 0.38s ease-out;
 }
 
+// 腰线只在人物身上：62%~92% 正是她腰区（此前 4%~96% 是左栏坐标，已失效）
 .ds__waist {
   position: absolute;
-  left: 4%;
-  right: 4%;
+  left: 62%;
+  right: 8%;
   height: 2rpx;
   z-index: 3;
   opacity: 0.95;
@@ -116,124 +111,140 @@
   box-shadow: 0 0 12rpx rgba(142, 154, 131, 0.5);
 }
 
+// caption 移到左上角，做 editorial 小标注（左侧竖线 + 小字），
+// 与参照稿的 TODAY'S FOCUS 同一位置关系；不再压在人身上
 .ds__caption {
   position: absolute;
   left: 36rpx;
-  bottom: 44rpx;
+  top: 40rpx;
   z-index: 9;
+  padding-left: 18rpx;
 }
-.ds__caption-main {
-  font-size: 28rpx;
-  letter-spacing: 0.1em;
-  color: #3f463c;
-  text-shadow: 0 0 10rpx #f5f2ec, 0 0 18rpx #f5f2ec;
-}
-.ds__caption-sub {
-  margin-top: 6rpx;
-  font-size: 20rpx;
-  letter-spacing: 0.1em;
-  color: #6b7364;
-  text-shadow: 0 0 8rpx #f5f2ec;
-}
-
-// 盖章「今日」：右上角（传统印章位），朱红油泥色——全卡唯一的红（5% 预算）
-.ds__stamp {
-  position: absolute;
-  right: 28rpx;
-  top: 28rpx;
-  width: 70rpx;
-  height: 70rpx;
-  border-radius: 10rpx;
-  border: 3rpx solid rgba(176, 81, 47, 0.85);
-  color: rgba(176, 81, 47, 0.92);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24rpx;
-  letter-spacing: 0.18em;
-  writing-mode: vertical-rl;
-  animation: ds-stamp 0.5s cubic-bezier(0.2, 1.1, 0.3, 1) both;
-}
-.ds__stamp::after {
+.ds__caption::before {
   content: '';
   position: absolute;
-  left: 8rpx;
-  right: 8rpx;
-  top: 8rpx;
-  bottom: 8rpx;
-  border: 2rpx solid rgba(176, 81, 47, 0.45);
-  border-radius: 6rpx;
+  left: 0;
+  top: 6rpx;
+  bottom: 6rpx;
+  width: 4rpx;
+  background: #5a7d4a;
+}
+.ds__caption-main {
+  font-size: 24rpx;
+  letter-spacing: 0.16em;
+  color: #3f463c;
+}
+.ds__caption-sub {
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  letter-spacing: 0.08em;
+  color: #6b7364;
 }
 
-// ---------- 揭晓：右栏变海报（原型 .reveal） ----------
-// 色彩纪律（80/15/5）：没有面板色块——底色与卡片是同一张渐变（接缝消失，
-// 文字与人物同处一个空间），深绿只以排印（标题/小注/竖排英文）、chips 描边、
-// 胶囊按钮出现（~15%）；朱红印章与人物裙色是仅有的重点色（~5%）。
-// 内容顶部与人物肩线对齐（padding-top 130 ≈ 拱顶下 100）：左右同高起笔，才融。
+// ---------- 揭晓：文字层压在人物之上（融合式，无面板） ----------
+// 不再有遮罩色块——文字直接落在卡面上，与人物同处一个空间。
+// 层级照参照稿：小标注（竖线）→ 大标题 → 细线 → 正文 → 标注行 → 胶囊按钮，
+// 右下角一枚大号衬线日期数字（editorial 主视觉）。深绿只出现在文字与按钮（~15%）。
+// 候选池同时淡出，把画面让给人物。
 .ds__reveal {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 414rpx;
+  inset: 0;
   z-index: 14;
-  transform: translateX(102%);
-  transition: transform 0.55s cubic-bezier(0.2, 1, 0.3, 1);
-  background: linear-gradient(160deg, #f5f2ec 0%, #e4dfd6 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.42s ease-out;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  padding: 130rpx 36rpx 0;
+  // 左栏内容整体上移：小标注落在人物肩线稍上，最坏情况（标题两行 + 导语三行
+  // + 标注两行）也给按钮留出底部余量。改内容量级时优先动这里。
+  padding: 96rpx 0 0 36rpx;
 }
 .ds__reveal--on {
-  transform: none;
+  opacity: 1;
 }
-// 竖排英文：右缘下段，editorial 注脚；半透明退到底层
+// 左侧内容列宽：给人物让出右侧 2/3
+.ds__reveal-topic,
+.ds__reveal-title,
+.ds__reveal-rule,
+.ds__reveal-lead,
+.ds__reveal-sub,
+.ds__reveal-chips,
+.ds__reveal-cta {
+  width: 368rpx;
+}
+// 竖排英文：右上角起（参照稿 TODAY LOOK 的位置），压在人物肩上做注脚
 .ds__reveal-ghost {
   position: absolute;
   right: 20rpx;
-  bottom: 32rpx;
+  top: 92rpx;
   writing-mode: vertical-rl;
   font-size: 13rpx;
   letter-spacing: 0.5em;
-  color: rgba(63, 70, 60, 0.3);
+  color: rgba(63, 70, 60, 0.34);
 }
+// 小标注：竖线 + 小字（今天这一身 / 今天的发型方向）
+.ds__reveal-topic {
+  position: relative;
+  padding-left: 18rpx;
+  font-size: 22rpx;
+  letter-spacing: 0.16em;
+  color: #3f463c;
+}
+.ds__reveal-topic::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4rpx;
+  bottom: 4rpx;
+  width: 4rpx;
+  background: #5a7d4a;
+}
+// 大标题 = 当天建议的选题（≤12 字，最多两行）
 .ds__reveal-title {
-  font-size: 34rpx;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  margin-top: 14rpx;
+  font-size: 38rpx;
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: 0.02em;
   color: #2e3a23;
 }
+// 细线：标题与正文之间的停顿（编辑式分隔，不做容器边框）
+.ds__reveal-rule {
+  width: 64rpx;
+  height: 3rpx;
+  margin-top: 18rpx;
+  background: rgba(90, 125, 74, 0.45);
+}
 .ds__reveal-sub {
-  margin-top: 10rpx;
+  margin-top: 14rpx;
   font-size: 20rpx;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: rgba(63, 70, 60, 0.66);
 }
-// 选题小注 + 建议导语：落定态的建议正文（服务端生成，≤44 字，限 3 行）
-.ds__reveal-topic {
-  margin-bottom: 8rpx;
-  font-size: 20rpx;
-  letter-spacing: 0.12em;
-  color: rgba(90, 125, 74, 0.9);
-}
+// 正文：建议导语（服务端生成，≤44 字，限 3 行）
 .ds__reveal-lead {
-  margin-top: 12rpx;
+  margin-top: 14rpx;
   font-size: 22rpx;
-  line-height: 1.6;
+  line-height: 1.66;
   color: rgba(63, 70, 60, 0.92);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   overflow: hidden;
 }
-// 行动入口：唯一的深绿实色块（15% 预算花在这）
+// 行动入口：唯一的深绿实色块（15% 预算花在这）。
+// 必须 display:flex —— Text 默认是行内元素，行内盒不计垂直 padding，
+// 胶囊底边会被行盒切掉（上一版按钮「下半截被切」的根因）。
 .ds__reveal-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   align-self: flex-start;
-  margin-top: 22rpx;
-  padding: 10rpx 26rpx;
+  margin-top: 20rpx;
+  padding: 14rpx 32rpx;
   font-size: 22rpx;
   font-weight: 700;
+  line-height: 1.2;
   letter-spacing: 0.06em;
   color: #f2efe7;
   background: #3b4a2e;
@@ -241,32 +252,83 @@
 }
 .ds__reveal-chips {
   display: flex;
-  gap: 10rpx;
   flex-wrap: wrap;
-  margin-top: 20rpx;
+  gap: 10rpx 26rpx;
+  margin-top: 22rpx;
 }
-@keyframes ds-stamp {
-  0% {
-    transform: scale(1.9) rotate(-14deg);
-    opacity: 0;
-  }
-  62% {
-    transform: scale(0.94) rotate(-8deg);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1) rotate(-8deg);
-    opacity: 1;
-  }
-}
-
-// ---------- 右：候选池 ----------
-.ds__pool {
-  flex: 1;
-  position: relative;
+// 右下角大号衬线日期：editorial 主视觉（「今日」的印章语义由它承担）
+.ds__index {
+  position: absolute;
+  right: 44rpx;
+  bottom: 44rpx;
   display: flex;
   flex-direction: column;
-  padding: 40rpx 30rpx 44rpx;
+  align-items: flex-end;
+}
+.ds__index-num {
+  font-size: 96rpx;
+  line-height: 0.9;
+  letter-spacing: -2rpx;
+  color: #2e3a23;
+  font-variant-numeric: tabular-nums;
+}
+.ds__index-label {
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  letter-spacing: 0.16em;
+  color: rgba(63, 70, 60, 0.6);
+}
+
+// 入场：逐级上浮（层级顺序即阅读顺序），幅度刻意小
+@keyframes ds-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14rpx);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ds__reveal--on .ds__reveal-topic {
+  animation: ds-rise 0.5s ease-out both;
+}
+.ds__reveal--on .ds__reveal-title {
+  animation: ds-rise 0.5s ease-out 0.08s both;
+}
+.ds__reveal--on .ds__reveal-rule {
+  animation: ds-rise 0.5s ease-out 0.14s both;
+}
+.ds__reveal--on .ds__reveal-lead,
+.ds__reveal--on .ds__reveal-sub {
+  animation: ds-rise 0.5s ease-out 0.2s both;
+}
+.ds__reveal--on .ds__reveal-chips {
+  animation: ds-rise 0.5s ease-out 0.28s both;
+}
+.ds__reveal--on .ds__reveal-cta {
+  animation: ds-rise 0.5s ease-out 0.36s both;
+}
+.ds__reveal--on .ds__index {
+  animation: ds-rise 0.6s ease-out 0.3s both;
+}
+
+// ---------- 候选池：左侧浮动块（不再占右半栏） ----------
+// 人物占据画面右侧主体，池子改为左侧一块「工作台」，与人物错位不重叠
+//（人物身体从 x≈426 起，池子 24~414）。揭晓时淡出，把画面让给人物 + 文字。
+.ds__pool {
+  position: absolute;
+  left: 24rpx;
+  top: 128rpx;
+  width: 390rpx;
+  height: 396rpx;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  transition: opacity 0.42s ease-out;
+}
+.ds__pool--out {
+  opacity: 0;
 }
 .ds__pool-head {
   display: flex;
@@ -289,9 +351,11 @@
   border-radius: 999rpx;
 }
 
+// 网格盒必须固定 390×300：poolPos/idlePos 的坐标是按这个盒子解算的
 .ds__grid {
-  flex: 1;
   position: relative;
+  width: 390rpx;
+  height: 300rpx;
 }
 
 .ds__cand {
@@ -403,44 +467,53 @@
   }
 }
 
-// ---------- chips ----------
+// ---------- chips：标注行（不是胶囊标签） ----------
+// 参照稿的注释式写法：维度（绿·小字）+ 取值（墨·中字）+ ↑（朱红重点色）。
+// 胶囊底会把画面切碎，annotation 不会——这是「融合感」的一部分。
 .ds__chips {
   display: flex;
-  gap: 9rpx;
   flex-wrap: wrap;
+  gap: 10rpx 26rpx;
   margin-top: 14rpx;
-  min-height: 26rpx;
+  min-height: 28rpx;
 }
 .ds__chip {
-  padding: 6rpx 16rpx;
-  border-radius: 999rpx;
-  background: #fff;
-  border: 1rpx solid #ded8cd;
-  font-size: 20rpx;
-  letter-spacing: 0.06em;
-  color: #6b7364;
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
 }
-
-// 揭晓面板的 chips：绿描边空心（deep 绿是排印色，不再垫深底）
-.ds__chip--dark {
-  padding: 6rpx 16rpx;
-  font-size: 20rpx;
-  letter-spacing: 0.06em;
-  background: rgba(255, 255, 255, 0.6);
-  border-color: rgba(90, 125, 74, 0.45);
-  color: #4a5540;
+.ds__chip-label {
+  font-size: 19rpx;
+  letter-spacing: 0.1em;
+  color: rgba(90, 125, 74, 0.92);
+}
+.ds__chip-value {
+  font-size: 21rpx;
+  font-weight: 600;
+  color: #3f463c;
+}
+.ds__chip-arrow {
+  font-size: 18rpx;
+  color: rgba(176, 81, 47, 0.9);
 }
 
 // prefers-reduced-motion 归零（AGENTS 动效规约）：动画停帧、元素保持可见。
-// 洗牌状态机本身的减动效降级（四张 target 卡直出 + 揭晓面板直接就位）由组件 reduced 分支承担。
+// 洗牌状态机本身的减动效降级（四张 target 卡直出 + 揭晓文字直接就位）由组件 reduced 分支承担。
 @media (prefers-reduced-motion: reduce) {
   .ds__figure,
   .ds__figstage,
   .ds__cand,
   .ds__fly,
   .ds__ring,
-  .ds__stamp,
-  .ds__reveal {
+  .ds__reveal,
+  .ds__reveal-topic,
+  .ds__reveal-title,
+  .ds__reveal-rule,
+  .ds__reveal-lead,
+  .ds__reveal-sub,
+  .ds__reveal-chips,
+  .ds__reveal-cta,
+  .ds__index {
     animation: none !important;
     transition: none !important;
   }

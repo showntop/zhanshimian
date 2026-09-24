@@ -486,6 +486,7 @@ export default function Home() {
                       topic={dailyContent?.topic}
                       lead={dailyContent?.lead}
                       category={dailyContent?.asset}
+                      seq={todaySeq}
                       cta={dailyReady && dailyContent ? DAILY_COPY.dressContentLink : undefined}
                     />
                   ) : (

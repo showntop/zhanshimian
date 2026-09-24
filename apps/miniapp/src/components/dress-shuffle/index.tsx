@@ -37,21 +37,22 @@ const LOOKS_IDX: Record<string, number> = Object.fromEntries(LOOKS.map((l, i) =>
 const COLOR_IDX: Record<string, number> = Object.fromEntries(COLORS.map((c, i) => [c.name, i]))
 const HAIR_IDX: Record<string, number> = Object.fromEntries(HAIRS.map((h, i) => [h.key, i]))
 
+// 飞卡落点 = 人物身上的部位（融合式构图下人物在画面右侧：身体 x≈426~750，
+// 头 y≈40~150、腰 y≈330）。旧坐标是左栏坐标，已随构图作废。
 const FLY: Record<DimKey, [number, number]> = {
-  look: [160, 150],
-  color: [160, 150],
-  waist: [168, 300],
-  hair: [168, 64],
+  look: [576, 300],
+  color: [612, 236],
+  waist: [578, 344],
+  hair: [586, 110],
 }
 const FLY_MS = 460
 const FLY_MS_ACCEL = 260
 const SETTLE_HOLD_MS = 1100
 
 // 收敛结束 → 揭晓的时序（原型 daily-dressup-asset.html 的 run() 尾部）：
-// caption 先变「今天这一身」，820ms 后面板从右滑入，再 340ms 盖章。
+// caption 先变「今天这一身」，820ms 后文字层淡入（层级逐级上浮）。
 const CAPTION_SETTLE_MS = 200
 const REVEAL_IN_MS = 820
-const STAMP_DELAY_MS = 340
 /** 面板停留（原型停在面板上；我们随后交棒给内容海报，留足看清的时间） */
 const REVEAL_HOLD_MS = 1600
 
@@ -89,6 +90,8 @@ export interface DressShuffleProps {
   lead?: string
   /** 建议归格（color/fit/.../hair/makeup/accessory）：决定面板标题（讲发型不叫「今天这一身」） */
   category?: string
+  /** 当天日期编号（MM.DD）：右下角大号衬线数字（editorial 主视觉 + 「今日」语义） */
+  seq?: string
   /** 面板底部的一行行动入口（如「看今日详情 ›」）；整卡点击由外层承担 */
   cta?: string
 }
@@ -115,6 +118,7 @@ export default function DressShuffle({
   topic,
   lead,
   category,
+  seq,
   cta,
 }: DressShuffleProps) {
   const toUrl = resolveAsset ?? ((url: string) => url)
@@ -124,7 +128,6 @@ export default function DressShuffle({
   const [chips, setChips] = useState<string[]>([])
   const [fly, setFly] = useState<{ item: ShuffleItem; dim: DimKey; from: [number, number]; go: boolean } | null>(null)
   const [ring, setRing] = useState<[number, number] | null>(null)
-  const [stamp, setStamp] = useState(false)
   /** 揭晓面板滑入（原型：右栏变海报，人物保持亮着） */
   const [revealed, setRevealed] = useState(false)
   /** 上身时的一次性摆身（pop），与常驻 sway 叠加 */
@@ -255,6 +258,19 @@ export default function DressShuffle({
       later(done, accel ? 140 : 300)
     }, accel ? FLY_MS_ACCEL : FLY_MS)
   }
+  // 标注行渲染：chips 串形如「造型 · 衬衫+半裙」——拆成 维度（绿）+ 取值 + ↑（朱红）
+  const renderChip = (chip: string) => {
+    const cut = chip.indexOf(' · ')
+    const label = cut >= 0 ? chip.slice(0, cut) : ''
+    const value = cut >= 0 ? chip.slice(cut + 3) : chip
+    return (
+      <View key={chip} className="ds__chip">
+        {label ? <Text className="ds__chip-label">{label}</Text> : null}
+        <Text className="ds__chip-value">{value}</Text>
+        <Text className="ds__chip-arrow">↑</Text>
+      </View>
+    )
+  }
   const CHIP_LABEL: Record<DimKey, string> = {
     look: '造型 · ',
     color: '配色 · ',
@@ -285,7 +301,6 @@ export default function DressShuffle({
   useEffect(() => {
     if (settling || reduced || hold) return
     setChips([])
-    setStamp(false)
     setRevealed(false)
     setCaption(DAILY_COPY.dressCaptionIdle)
     setFigure({ ...INITIAL_FIGURE })
@@ -318,7 +333,6 @@ export default function DressShuffle({
       setCaption(DAILY_COPY.dressCaptionSettled)
       later(() => {
         setRevealed(true)
-        setStamp(true)
         later(() => {
           if (!settledRef.current) {
             settledRef.current = true
@@ -337,7 +351,6 @@ export default function DressShuffle({
       later(() => setCaption(DAILY_COPY.dressCaptionSettled), CAPTION_SETTLE_MS)
       later(() => {
         setRevealed(true)
-        later(() => setStamp(true), STAMP_DELAY_MS)
         later(() => {
           if (!settledRef.current) {
             settledRef.current = true
@@ -384,7 +397,8 @@ export default function DressShuffle({
         ) : null}
       </View>
 
-      <View className="ds__pool">
+      {/* 揭晓时池子淡出（不卸载：淡出更干净），把画面让给人物与文字 */}
+      <View className={`ds__pool${revealed ? ' ds__pool--out' : ''}`}>
         <View className="ds__pool-head">
           <Text className="ds__dim-label">{head.label}</Text>
           <Text className="ds__badge">{head.badge}</Text>
@@ -433,37 +447,32 @@ export default function DressShuffle({
                 })
               : null}
         </View>
-        <View className="ds__chips">
-          {chips.map((c, i) => (
-            <Text key={c} className="ds__chip">
-              {c}
-            </Text>
-          ))}
-        </View>
+        <View className="ds__chips">{chips.map(renderChip)}</View>
       </View>
 
-      {/* 揭晓：右栏变海报（原型 .reveal），人物保持亮着。
-          「今日」章右上、竖排英文右缘下段，各占一角；建议正文垂直居中 */}
+      {/* 揭晓：文字层压在人物之上（无面板、同底色），层级照参照稿——
+          小标注（竖线）→ 大标题（当天选题）→ 细线 → 正文 → 标注行 → 胶囊按钮，
+          右下角大号衬线日期数字；竖排英文压在人物肩侧做注脚 */}
       <View className={`ds__reveal${revealed ? ' ds__reveal--on' : ''}`}>
         <Text className="ds__reveal-ghost">{DAILY_COPY.dressRevealGhost}</Text>
-        {topic ? <Text className="ds__reveal-topic">{topic}</Text> : null}
-        <View className="ds__reveal-title">
+        <View className="ds__reveal-topic">
           {(category && DAILY_COPY.dressRevealTitleByCategory[category]) || DAILY_COPY.dressRevealTitle}
         </View>
+        {topic ? <View className="ds__reveal-title">{topic}</View> : null}
+        <View className="ds__reveal-rule" />
         {lead ? (
           <View className="ds__reveal-lead">{lead}</View>
         ) : (
           <View className="ds__reveal-sub">{DAILY_COPY.dressRevealSub}</View>
         )}
-        <View className="ds__reveal-chips">
-          {chips.map((c) => (
-            <Text key={`r-${c}`} className="ds__chip ds__chip--dark">
-              {c}
-            </Text>
-          ))}
-        </View>
+        <View className="ds__reveal-chips">{chips.map(renderChip)}</View>
         {cta ? <Text className="ds__reveal-cta">{cta}</Text> : null}
-        {stamp ? <View className="ds__stamp">{DAILY_COPY.dressStamp}</View> : null}
+        {seq ? (
+          <View className="ds__index">
+            <Text className="ds__index-num serif">{seq.slice(3)}</Text>
+            <Text className="ds__index-label">{DAILY_COPY.dressStamp}</Text>
+          </View>
+        ) : null}
       </View>
 
       {fly ? (
