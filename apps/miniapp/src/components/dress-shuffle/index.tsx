@@ -515,23 +515,22 @@ export default function DressShuffle({
           <View className="ds__reveal-sub">{DAILY_COPY.dressRevealSub}</View>
         )}
         <View className="ds__reveal-chips">{view.chips.map(renderChip)}</View>
-        {/* 中段：内容靠上、按钮靠底，这一段把中间的空档接住。
-            三片小布样 + 一段锈铜缝线——纸样车间的语言（缝线与卡堆针脚同源）。
-            弹性占位：标题/导语都占两行的最坏栈里它会收起，绝不挤掉按钮 */}
-        <View className="ds__reveal-mid">
-          <View className="ds__reveal-fabrics">
-            <View className="ds__reveal-fabric ds__reveal-fabric--1" />
-            <View className="ds__reveal-fabric ds__reveal-fabric--2" />
-            <View className="ds__reveal-fabric ds__reveal-fabric--3" />
-          </View>
-          <View className="ds__reveal-mid-stitch" />
-        </View>
-        {/* 行动行 = 按钮 + 弹性细线。揭晓后左栏只剩文字栈，比洗牌期的候选池
-            空得多；细线把按钮右侧的空档接住，是这一栏的「落款」。
-            刻意与按钮同行——卡高预算只剩 ~30rpx，往下加行会把按钮裁掉 */}
+        {/* 行动区 = 布样行 + 按钮，包在 fit-content 的列里互相居中：
+            布样永远对按钮同轴（列宽 = 按钮宽，布样在列内水平居中）。
+            margin-top:auto 把整组顶到卡底；空间不足时 auto margin 先归零，
+            配合 flex-shrink:0 按钮不会被压扁贴底（此前「按钮与卡底重合」的教训） */}
         {view.cta || seq ? (
-          <View className="ds__reveal-cta-row">
-            {view.cta ? <Text className="ds__reveal-cta">{view.cta}</Text> : null}
+          <View className="ds__reveal-actions">
+            <View className="ds__reveal-fabrics">
+              <View className="ds__reveal-fabric ds__reveal-fabric--1" />
+              <View className="ds__reveal-fabric ds__reveal-fabric--2" />
+              <View className="ds__reveal-fabric ds__reveal-fabric--3" />
+            </View>
+            {view.cta ? (
+              <View className="ds__reveal-cta-row">
+                <Text className="ds__reveal-cta">{view.cta}</Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
         {seq ? (

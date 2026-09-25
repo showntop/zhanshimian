@@ -160,7 +160,9 @@
   // 回到自然文流（标注行跟在导语后，不锚底）。垂直预算＝560 卡高 − 上下 padding。
   // 最坏栈（标题两行 + 导语两行 + 标注两行 + 按钮行）≈423rpx，可用 464rpx，
   // 余量 ~40rpx 给真机字体度量差（此前 554/560 贴边，低端机仍会被裁半行）。
-  padding: 64rpx 0 32rpx 36rpx;
+  // 底部 40rpx：CTA 胶囊与卡底的呼吸位——用户系统字号放大时文字栈会整体变高，
+  // 这个 padding 是按钮不贴底的最后防线（配合 CTA 行 flex-shrink: 0）。
+  padding: 64rpx 0 64rpx 36rpx;
 }
 .ds__reveal--on {
   opacity: 1;
@@ -171,11 +173,9 @@
 .ds__reveal-rule,
 .ds__reveal-lead,
 .ds__reveal-sub,
-.ds__reveal-chips,
-.ds__reveal-cta-row {
+.ds__reveal-chips {
   width: 368rpx;
-}
-// 竖排英文：右上角起（参照稿 TODAY LOOK 的位置），压在人物肩上做注脚
+}// 竖排英文：右上角起（参照稿 TODAY LOOK 的位置），压在人物肩上做注脚
 .ds__reveal-ghost {
   position: absolute;
   right: 20rpx;
@@ -241,15 +241,31 @@
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
-// 行动行：按钮 + 弹性细线（与按钮同行，不占垂直预算）。
-// 必须 display:flex —— Text 默认是行内元素，行内盒不计垂直 padding，
+// 行动区：布样行 + 按钮的一组。fit-content 让列宽收成按钮宽（fit-content 在
+// 微信基础库 2.9+/主流机型均支持），布样在列内居中即对按钮居中。
+// margin-top:auto 顶到卡底；flex-shrink:0 保证文字栈吃紧时按钮高度不被压缩
+// （此前「按钮与卡底重合」的根因就是 CTA 行被 flex 压扁）。
+.ds__reveal-actions {
+  margin-top: auto;
+  align-self: flex-start;
+  width: fit-content;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28rpx;
+  flex-shrink: 0;
+}
+// 行动行：必须 display:flex —— Text 默认是行内元素，行内盒不计垂直 padding，
 // 胶囊底边会被行盒切掉（上一版按钮「下半截被切」的根因）。
 .ds__reveal-cta-row {
   display: flex;
   align-items: center;
-  gap: 18rpx;
-  width: 368rpx;
-  margin-top: 20rpx;
+  width: fit-content;
+}
+.ds__reveal-fabrics {
+  display: flex;
+  align-items: flex-end;
+  gap: 8rpx;
 }
 .ds__reveal-cta {
   flex: none;
@@ -271,23 +287,7 @@
   height: 1rpx;
   background: rgba(63, 70, 60, 0.22);
 }
-// 中段填充：内容靠上、按钮靠底（flex:1 把按钮顶到卡底），中间这块是
-// 裁缝桌上的「布样 + 缝线」。最坏栈（标题/导语都两行）时整段收起，不挤按钮。
-.ds__reveal-mid {
-  flex: 1 1 auto;
-  min-height: 0;
-  width: 368rpx;
-  display: flex;
-  align-items: flex-end;
-  gap: 12rpx;
-  padding-top: 20rpx;
-  overflow: hidden;
-}
-.ds__reveal-fabrics {
-  display: flex;
-  align-items: flex-end;
-  gap: 8rpx;
-}
+// 标注行：跟在导语后的自然文流（锚底方案会让中间空一大条，已回退）
 .ds__reveal-fabric {
   width: 36rpx;
   height: 24rpx;
@@ -302,14 +302,6 @@
 }
 .ds__reveal-fabric--3 {
   background: rgba(196, 98, 45, 0.26);
-}
-// 缝线：锈铜虚线（与洗牌卡堆的针脚同一颜色语言），只走在左栏宽度内
-.ds__reveal-mid-stitch {
-  flex: 1;
-  min-width: 0;
-  height: 0;
-  border-top: 2rpx dashed rgba(196, 98, 45, 0.34);
-  margin-bottom: 11rpx;
 }
 // 标注行：跟在导语后的自然文流（锚底方案会让中间空一大条，已回退）
 // ds-rise 已不再逐级驱动（见上方注释），留给整体一次淡入
