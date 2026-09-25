@@ -398,6 +398,15 @@ export const DAILY_COPY = {
   handbookEntry: '我的手册',
   handbookEntryDesc: '收下的每一条，都在这里',
   seeItAction: '看看我穿这样 ›',
+  // 今日页行动行：把「试试」从看的动作升级为做的动作（进今日造型页）
+  trySuggestions: '试试这些建议',
+  // 今日造型状态行的三态文案
+  tryonReady: '今日造型 · 已生成',
+  tryonWorking: '正在搭配今天的一身',
+  tryonEmpty: '去搭配今天的一身',
+  // 试试页历史条
+  tryHistoryTitle: '最近试过',
+  tryHistoryEmpty: '试过的造型会留在这里',
   // 按钮统一「收下」：分类名里的"场合 / 技巧"组合成「收进我的场合」会拗口。
   // 分类在手册里呈现，toast 补一句「已收进 · 颜色」。
   saveAction: '收下',
@@ -808,6 +817,10 @@ export const PLANNING_COPY = {
   // 坞内缩略图的无图占位（重试在 hero 相框的状态区，小图里只如实标状态）
   renderThumbFailed: '未生成',
   renderThumbUnavailable: '暂不可用',
+  // 缩略图上的就地重试 chip + 结算区失败汇总
+  renderThumbRetry: '重试',
+  resultRenderFailedNote: '形象图没有生成，文字方案不受影响',
+  resultRetryAll: '重试生成',
   // 列表为空 / 加载失败
   generalEmptyTitle: '还没有形象方案',
   generalEmptyBody: '顾问读完了你的报告，三套造型照着就能穿。',
@@ -847,15 +860,22 @@ export const PLANNING_COPY = {
   deckHint: '左滑跳过 · 右滑喜欢',
   deckRoundPrefix: '本轮',
   deckRoundSuffix: '套',
-  resultLikedTitle: '这一轮你喜欢',
   resultLikedEmpty: '这轮没有留下喜欢的方案',
-  resultSkippedLink: '再看看跳过的',
+  // 结算区分组条：喜欢/跳过各成一组，计数上组头，跳过默认收起
+  resultLikedGroup: '喜欢',
+  resultSkippedGroup: '跳过',
+  // 新一轮受理在途：进度行 chip（替换此间的「往期/回到最新」）
+  nextRoundGenerating: '新一轮制作中',
   resultRegenerate: '生成新的一轮',
+  // 受理失败后的结算区链接：警示色，点击弹原因 + 重新生成
+  resultRegenFailed: '生成失败',
+  cancelText: '取消',
   historyTitle: '往期方案',
   historyEntry: '往期',
   historyBadge: '往期',
   historyBackLatest: '回到最新',
-  historyLikeCount: '个喜欢',
+  // 结果区内的往期入口：「往期 2 轮 ›」
+  historyRoundUnit: '轮',
   deckDecisionFailed: '这条态度没有保存成功，请重试'
 } as const
 
