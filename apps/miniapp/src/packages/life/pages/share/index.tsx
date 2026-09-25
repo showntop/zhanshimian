@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro, { useLoad, useShareAppMessage } from '@tarojs/taro'
 import { Button, Text, View } from '@tarojs/components'
-import { APP_NAME, trackEvent, type Share, type ShareView } from '@zsm/core'
+import { APP_NAME, SHARE_COPY, trackEvent, type Share, type ShareView } from '@zsm/core'
 import { usePageShell } from '../../../../hooks/use-page-visibility'
 import { peripherals } from '../../../../app/api/peripherals'
 import AppHeader from '../../../../components/app-header'
@@ -92,6 +92,18 @@ export default function SharePage() {
 
   const revoke = async () => {
     if (!share || !('id' in share) || !share.id) return
+    // 撤销是一击永久失效、没有回头路的动作，而它恰好紧贴在大按钮下方——
+    // 误触一下链接就没了。先问一句再做。
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Taro.showModal({
+        title: SHARE_COPY.revokeConfirmTitle,
+        content: SHARE_COPY.revokeConfirmBody,
+        confirmText: SHARE_COPY.revokeConfirmAction,
+        success: (res) => resolve(Boolean(res.confirm)),
+        fail: () => resolve(false),
+      })
+    })
+    if (!confirmed) return
     try {
       await peripherals.revokeShare(share.id)
       Taro.showToast({ title: '已撤销，链接即刻失效', icon: 'success' })

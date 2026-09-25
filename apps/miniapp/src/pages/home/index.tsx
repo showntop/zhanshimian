@@ -19,7 +19,7 @@ import {
   PURCHASE_COPY,
   SCENES,
   greetingForNow,
-  planSlotLabel,
+  projectDisplayMedia,
   readDressLockParams,
   roamVariant,
   taskDoneText,
@@ -97,6 +97,13 @@ const LIFE = [
 
 function isActive(operation: HomeBootstrap['active_operations'][number]): boolean {
   return IN_FLIGHT.has(operation.status)
+}
+
+/** 媒体存在但签名已过期（URL 还挂着，投影却必然判不可用） */
+function mediaExpired(media: DisplayMedia | null | undefined): boolean {
+  if (!media?.asset_id) return false
+  const at = Date.parse(media.url_expires_at)
+  return Number.isFinite(at) && at <= Date.now()
 }
 
 // 报告入口行：衬线数字 + 小后缀。原「不规则比例条」已删——条形会被读成
@@ -235,7 +242,33 @@ export default function Home() {
   const planning = (boot?.active_operations ?? []).find(
     (operation) => operation.kind === 'plan_set' && isActive(operation),
   )
-  const featured = planSet ? [...planSet.variants].sort((a, b) => a.slot - b.slot)[0] : undefined
+  // 最近方案续看：优先挑「形象图已就绪」的一套（渲染中/失败的不配上首页），
+  // 都没图就退回 slot 最小的一套（无图时卡片不摆「图片暂不可用」的空框）
+  const featured = useMemo(() => {
+    if (!planSet) return undefined
+    const bySlot = [...planSet.variants].sort((a, b) => a.slot - b.slot)
+    return (
+      bySlot.find((variant) => projectDisplayMedia(variant.render?.media ?? null) !== null) ??
+      bySlot[0]
+    )
+  }, [planSet])
+  const featuredHasRender = featured
+    ? projectDisplayMedia(featured.render?.media ?? null) !== null
+    : false
+  // 签名 URL 过期（服务端 ASSET_URL_TTL 900s）：长时间停在首页时缓存里的 URL
+  // 会悄悄失效，投影判定不可用 → 卡片变成空框。这里检测到过期就静默重拉一次
+  // bootstrap 换新签名（详情页是现拉现签，所以那里一直有图）。
+  const featuredExpired = featured
+    ? mediaExpired(featured.render?.media ?? null)
+    : false
+  const resignedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!featuredExpired || !featured) return
+    const mark = `${featured.id}:${featured.render?.media?.asset_id ?? ''}`
+    if (resignedRef.current === mark) return
+    resignedRef.current = mark
+    void load(true)
+  }, [featuredExpired, featured, load])
   const findingsCount = (report?.findings ?? []).length
 
   // 每日内容：与今日页共用同一个状态机（服务端幂等保证同一天同一条），
@@ -430,29 +463,29 @@ export default function Home() {
                 <Text className="home__hero-note">{HOME_COPY.photoPrivacy}</Text>
               </View>
             </View>
-          ) : todayPlan ? (
-            <View>
-              <View
-                className="home__hero home__hero--today home__hero--photo card--hero pressable halo"
-                onClick={() => void Taro.navigateTo({ url: '/packages/life/pages/today/index' })}
-              >
-                <View className={`home__hero-copy ${enter(1)}`}>
-                  <Text className="home__hero-eyebrow">{HOME_COPY.todayEyebrow}</Text>
-                  <Text className="home__hero-title">{todayPlan.title}</Text>
-                  <Text className="home__hero-desc">{todayPlan.summary}</Text>
-                  <Text className="home__hero-link">{HOME_COPY.emptyTodayLink}</Text>
-                </View>
-                <SourceImage
-                  className="home__hero-img"
-                  media={todayPlan.media}
-                  anchor="top"
-                  frameAspect={232 / 344}
-                />
-              </View>
-            </View>
           ) : (
             <View>
-              {dailyReady && dailyContent && !dressOnSettling ? (
+              {/* 有今日造型时顶部换成这张卡。报告入口不能挂在卡的分支里——
+                  否则最活跃的用户（天天生成造型的那批）反而看不到通往报告的路。 */}
+              {todayPlan ? (
+                <View
+                  className="home__hero home__hero--today home__hero--photo card--hero pressable halo"
+                  onClick={() => void Taro.navigateTo({ url: '/packages/life/pages/today/index' })}
+                >
+                  <View className={`home__hero-copy ${enter(1)}`}>
+                    <Text className="home__hero-eyebrow">{HOME_COPY.todayEyebrow}</Text>
+                    <Text className="home__hero-title">{todayPlan.title}</Text>
+                    <Text className="home__hero-desc">{todayPlan.summary}</Text>
+                    <Text className="home__hero-link">{HOME_COPY.emptyTodayLink}</Text>
+                  </View>
+                  <SourceImage
+                    className="home__hero-img"
+                    media={todayPlan.media}
+                    anchor="top"
+                    frameAspect={232 / 344}
+                  />
+                </View>
+              ) : dailyReady && dailyContent && !dressOnSettling ? (
                 <View className={enter(1)}>
                   <DailyPoster
                     type={dailyContent.type}
@@ -536,6 +569,8 @@ export default function Home() {
                 </View>
               ) : null}
               {/* 报告退位：不再是首页主角，但入口保留，降级为一行。
+                  常驻在卡片下方——不管今天显示的是今日造型卡、今日海报还是等待态，
+                  只要有报告就都能走到报告页。
                   只留衬线数字注脚——条形会被读成评分/进度，红线 1 不打分 */}
               <View className="home__archive pressable" onClick={goReport}>
                 <Text className="home__archive-text">{HOME_COPY.viewReport}</Text>
@@ -673,15 +708,19 @@ export default function Home() {
                 }
               >
                 <View className="home__recent-visual">
-                  <SourceImage
-                    className="home__recent-img"
-                    media={featured.render.media}
-                    anchor="top"
-                    frameAspect={120 / 150}
-                  />
+                  /* 只用真实媒体：没拿到就不画任何图（示例图会把内置参考位
+                     读成用户自己的效果图，已撤回） */
+                  {featuredHasRender ? (
+                    <SourceImage
+                      className="home__recent-img"
+                      media={featured.render.media}
+                      anchor="top"
+                      frameAspect={120 / 150}
+                    />
+                  ) : null}
                 </View>
                 <View className={`home__recent-copy ${enter(3)}`}>
-                  <Text className="home__recent-name">{planSlotLabel(featured.name, featured.slot)}</Text>
+                  <Text className="home__recent-name">{featured.name}</Text>
                   <Text className="home__recent-why">{featured.rationale}</Text>
                   <Text className="home__recent-link">{HOME_COPY.continuePlan}</Text>
                 </View>

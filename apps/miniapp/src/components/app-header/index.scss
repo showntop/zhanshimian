@@ -55,12 +55,14 @@
     justify-content: flex-end;
   }
 
+  // 返回键是全站每个页面都在的控件，也是单手握持时最难够到的位置
+  // （左上角）。64rpx（32px）远低于 44px 标准，这里补到 token 的热区下限。
   &__back {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 64rpx;
-    height: 64rpx;
+    width: var(--touch-target, 88rpx);
+    height: var(--touch-target, 88rpx);
     border-radius: 999rpx;
     background: var(--surface-strong);
     border: 1rpx solid var(--line);

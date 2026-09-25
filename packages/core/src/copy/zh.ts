@@ -358,6 +358,8 @@ export const DAILY_COPY = {
   // 今日页刊头（手写体刊名）+ 「为什么值得试试」白卡标题
   pageTitle: '今日建议',
   whyTitle: '为什么值得试试',
+  // 视觉区角落的手写英文批注（纯装饰，与 dressRevealGhost 同一语言）
+  stageGhost: 'Better Style Today',
   // 等待动画：巡游的文案优先用服务端随脚本下发的那份（改文案不用发版）；
   // 收敛这两句是过程状态，与具体分类无关，所以留在客户端。
   motionSettling: '在为你挑',
@@ -426,6 +428,15 @@ export const DAILY_COPY = {
   emptyBody: '内容池在当前条件下没有合适的条目。宁可不推，也不凑数。',
   handbookEmptyTitle: '手册还是空的',
   handbookEmptyBody: '收下今天这一条，手册就开始变厚了。',
+  // 拉取失败且本地也没有缓存：必须给错误态——空态会被读成「你一条都没收过」
+  handbookLoadFailed: '手册没有加载成功，请重试',
+  // 离线降级：本地有缓存时照常呈现，但要说清「这不是最新的」并给重试出口
+  handbookStaleTitle: '没连上，现在看的是手机里存的那份',
+  handbookStaleAction: '重新加载 ›',
+  // 「移出」是破坏性动作且热区只有 15px：先问一句，别让误触变成丢内容
+  removeConfirmTitle: '移出手册',
+  removeConfirmBody: '移出后这条就不在手册里了，想留可以再收一次。',
+  removeConfirmAction: '移出',
   // 手册的分类：去掉"库"字、用两个字的常用词，不用"色卡 / 廓形"这类专业词。
   // 「色卡」和「配色库」用户分不清，合并为「颜色」。
   bucketNames: {
@@ -696,6 +707,12 @@ export const HAIR_COPY = {
   resultNote: '只改了发型；五官、妆容、服装和背景保持原样',
   // 方向卡的参考图来源说明（红线 2：角标不上屏，CTA 下保留文字来源说明）
   referenceNote: '方向图为内置示例；效果预览基于你的照片生成',
+  // 目录里没有内置参考图时这一行也要有话说：不能因为条件不满足就整行消失
+  resultSourceNote: '效果预览由 AI 基于上面的照片生成',
+  // 示例结果必须可辨识：走 createDemoMedia 的是服务端示例人脸，不是用户自己的脸，
+  // 而它和自己照片生成的结果在界面上长得一模一样
+  demoMark: '效果示例',
+  demoResultNote: '这张用的是示例人脸，不是你的脸；传一张正脸照才看得到你自己的效果',
   // 卡面状态：用「生成没生成」区分，不用来源标识——已生成＝你自己的效果图（点了回放），
   // 未生成＝内置参考图（点了才生成）。来源统一由 referenceNote 交代。
   slotDone: '已生成',
@@ -730,12 +747,22 @@ export const HAIR_COPY = {
   customTooLong: '描述最多 40 个字'
 } as const
 
+export const SHARE_COPY = {
+  // 撤销是一击永久失效、没有回头路的动作，必须拦一下再问
+  revokeConfirmTitle: '撤销分享',
+  revokeConfirmBody: '撤销后这条链接立刻失效，已经收到的人也打不开了。',
+  revokeConfirmAction: '撤销'
+} as const
+
 export const ADVISOR_COPY = {
   title: '形象助手',
   emptyTitle: '有什么形象问题，直接问',
   emptyDesc: '我会结合你的档案、今日方案和衣橱给建议。',
   placeholder: '问点什么…',
-  send: '发送'
+  send: '发送',
+  // 恢复失败只提示一行：聊天还能用，整页报错会把本来可用的输入一起挡住。
+  // 也不能落到空态——「有什么形象问题，直接问」会被读成「你从没问过」。
+  historyFailed: '之前的对话没取到，不影响你现在继续问'
 } as const
 
 export const CHECKLIST_COPY = {
@@ -764,7 +791,9 @@ export const CHECKLIST_COPY = {
 // ---------- 衣橱（只放新增文案；页面既有字符串的迁移归页面自己的任务） ----------
 export const WARDROBE_COPY = {
   // 服务端可能下发 items=null 的组合：归一成空数组后的空态，必须带下一步动作
-  outfitEmpty: '这次组合没有配上单品，点这里去添加单品 ›'
+  outfitEmpty: '这次组合没有配上单品，点这里去添加单品 ›',
+  // 拉取失败必须给错误态：空态会被读成「你还没有单品」，而不是「没取到」
+  loadFailed: '衣橱没有加载成功，请重试'
 } as const
 
 export const PLAN_DETAIL_COPY = {
@@ -847,6 +876,8 @@ export const PLANNING_COPY = {
   ctaNoteDemo: '当前为效果示例，接入真实图像模型后展示本人效果',
   // 场景空态里的生成中行 / 切场景载入行
   sceneGenerating: '正在从你的报告生成三套方案，通常需要 1-2 分钟',
+  // 纸样台（受理在途）等待态：底层已做了跨会话认领，界面要兑现成一句话
+  atelierLeaveNote: '可以离开，做好会帮你留着',
   sceneLoading: '正在载入该场合的方案…',
   planOfPrefix: '第',
   planOfSuffix: '套',
@@ -915,6 +946,10 @@ export const SCENE_BRIEF_COPY = {
   reuseBadge: '复用档案',
   lede: '补充几个选择，约 30 秒。不会重复索要照片和身体数据。',
   generateAction: '生成方案',
+  // 场合驱动型用户常常是临时来找方案（面试在半小时后），逐题选完很慢。
+  // 但这一下**只预填、不提交**：直接提交等于把人推进 1-2 分钟等待，而他还没看到
+  // 自己被填了什么、也没机会改。预填之后自己点「生成方案」，多的只是一下点击。
+  useRecommendedAction: '按推荐帮我填好',
   needArchiveTitle: '还没有形象报告',
   needArchiveBody: '生成场合方案前，需要先完成形象分析。',
   needArchiveAction: '去形象分析',
@@ -935,6 +970,8 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'when',
           label: '什么时候需要',
+          // 「就用推荐设置」用这题的默认值：场合驱动型用户基本都是今天就要用
+          recommended: 'today',
           options: [
             { value: 'today', label: '今天' },
             { value: 'three_days', label: '3 天内' },
@@ -945,6 +982,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'format',
           label: '面试形式',
+          recommended: 'video',
           options: [
             { value: 'onsite', label: '线下面试' },
             { value: 'video', label: '视频面试' },
@@ -954,6 +992,8 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'preparation',
           label: '准备方式',
+          // 推荐取「最低负担」：只用现有衣橱，现在就能照着做
+          recommended: 'closet',
           options: [
             { value: 'closet', label: '只用现有衣橱' },
             { value: 'key_piece', label: '补一件关键单品' },
@@ -963,6 +1003,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'impression',
           label: '最想呈现',
+          recommended: 'reliable',
           options: [
             { value: 'energetic', label: '更有精神' },
             { value: 'reliable', label: '更可信' },
@@ -978,6 +1019,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'role',
           label: '你的角色',
+          recommended: 'guest',
           options: [
             { value: 'guest', label: '普通宾客' },
             { value: 'bridal_party', label: '伴娘 / 伴郎' },
@@ -988,6 +1030,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'timing',
           label: '婚礼时段',
+          recommended: 'dinner',
           options: [
             { value: 'lunch', label: '午间' },
             { value: 'afternoon', label: '下午' },
@@ -998,6 +1041,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'dress_code',
           label: '婚礼风格',
+          recommended: 'elegant',
           options: [
             { value: 'relaxed', label: '轻松婚礼' },
             { value: 'elegant', label: '得体优雅' },
@@ -1007,6 +1051,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'impression',
           label: '最想呈现',
+          recommended: 'natural',
           options: [
             { value: 'energetic', label: '更有精神' },
             { value: 'reliable', label: '更可信' },
@@ -1022,6 +1067,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'activity',
           label: '约会活动',
+          recommended: 'dinner',
           options: [
             { value: 'coffee', label: '咖啡 / 散步' },
             { value: 'dinner', label: '正餐' },
@@ -1032,6 +1078,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'timing',
           label: '什么时候',
+          recommended: 'evening',
           options: [
             { value: 'afternoon', label: '下午' },
             { value: 'evening', label: '傍晚' },
@@ -1042,6 +1089,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'preparation',
           label: '准备方式',
+          recommended: 'closet',
           options: [
             { value: 'closet', label: '只用现有衣橱' },
             { value: 'key_piece', label: '补一件关键单品' },
@@ -1051,6 +1099,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'impression',
           label: '最想呈现',
+          recommended: 'natural',
           options: [
             { value: 'natural', label: '更自然' },
             { value: 'memorable', label: '有记忆点' },
@@ -1065,6 +1114,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'activity',
           label: '今天主要做',
+          recommended: 'office',
           options: [
             { value: 'office', label: '上班' },
             { value: 'weekend', label: '周末休息' },
@@ -1075,6 +1125,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'weather',
           label: '所处环境',
+          recommended: 'air_conditioned',
           options: [
             { value: 'air_conditioned', label: '室内空调为主' },
             { value: 'walking', label: '户外行走为主' },
@@ -1085,6 +1136,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'preparation',
           label: '准备方式',
+          recommended: 'closet',
           options: [
             { value: 'closet', label: '只用现有衣橱' },
             { value: 'key_piece', label: '补一件关键单品' },
@@ -1094,6 +1146,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'impression',
           label: '最想呈现',
+          recommended: 'natural',
           options: [
             { value: 'natural', label: '更自然' },
             { value: 'energetic', label: '更有精神' },
@@ -1108,6 +1161,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'activity',
           label: '聚会类型',
+          recommended: 'dinner',
           options: [
             { value: 'friends', label: '朋友局' },
             { value: 'dinner', label: '聚餐' },
@@ -1118,6 +1172,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'timing',
           label: '什么时候',
+          recommended: 'evening',
           options: [
             { value: 'afternoon', label: '下午' },
             { value: 'evening', label: '傍晚' },
@@ -1128,6 +1183,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'preparation',
           label: '准备方式',
+          recommended: 'closet',
           options: [
             { value: 'closet', label: '只用现有衣橱' },
             { value: 'key_piece', label: '补一件关键单品' },
@@ -1137,6 +1193,7 @@ export const SCENE_BRIEF_COPY = {
         {
           key: 'impression',
           label: '最想呈现',
+          recommended: 'natural',
           options: [
             { value: 'natural', label: '更自然' },
             { value: 'memorable', label: '有记忆点' },

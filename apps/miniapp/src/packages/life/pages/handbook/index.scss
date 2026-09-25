@@ -101,16 +101,50 @@
     overflow: hidden;
   }
 
+  // 「移出」的热区原本只有约 15px 高：撑到标准热区（视觉大小不变），
+  // 并和正文之间留出横向间隔，避免误触
   &__item-remove {
     flex: 0 0 auto;
     display: flex;
-    align-items: flex-start;
-    padding: 4rpx 0 0;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--touch-target, 88rpx);
+    min-width: var(--touch-target, 88rpx);
+    margin: -24rpx -12rpx -24rpx 0;
   }
 
   &__item-remove-text {
     font-size: 22rpx;
     color: var(--ink-3);
+  }
+
+  // ---------- 离线降级条：缓存照常看，但必须说清不是最新的，并给重试出口 ----------
+  &__stale {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16rpx;
+    margin-bottom: 20rpx;
+    padding: 0 24rpx;
+    min-height: 88rpx;
+    border-radius: 16rpx;
+    background: var(--moss-soft);
+    border: 1rpx solid var(--line);
+  }
+
+  &__stale-text {
+    flex: 1;
+    min-width: 0;
+    font-size: 24rpx;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+
+  &__stale-action {
+    flex: 0 0 auto;
+    font-size: 24rpx;
+    font-weight: 700;
+    color: var(--moss);
   }
 
   // ---------- 空态 ----------

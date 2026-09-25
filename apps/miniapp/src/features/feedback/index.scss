@@ -96,7 +96,13 @@
     gap: 24rpx;
   }
 
+  // 「添加实拍」原先只有一行 25rpx 文字（≈12px 高），是全站最小的可点元素。
+  // 撑到标准热区——文字大小不变，只是手指更容易点中。
   &__photo-action {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-target, 88rpx);
+    padding-right: 24rpx;
     font-size: 25rpx;
     font-weight: 600;
     color: var(--moss);

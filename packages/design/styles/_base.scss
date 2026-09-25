@@ -251,6 +251,17 @@ button::after {
   transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+// 可点区域最小 44px：--touch-target 一直写在 token 里却从没被引用过，全站
+// 于是没有一处真的达到 44px。这里用最小高度兜底——只撑热区，不改视觉尺寸。
+//
+// 只作用于 view。文字链（text）如果在 flex 容器里会被块级化，照样吃到 min-height
+// ——「我的」页的「编辑」和「查看最近报告」就是这么被撑成 88rpx 的，整块 hero 因此
+// 失衡。文字链不适用任何全局规则：它们要么真行内（min-height 无效），
+// 要么是 flex 项（一加就撑高），只能逐处判断补内边距。
+view.pressable {
+  min-height: var(--touch-target, 88rpx);
+}
+
 .pressable:active {
   transform: scale(0.985);
   opacity: 0.88;

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
-import { trackEvent, WARDROBE_COPY, type WardrobeItem, type WardrobeOutfit } from '@zsm/core'
+import { ERROR_COPY, trackEvent, WARDROBE_COPY, type WardrobeItem, type WardrobeOutfit } from '@zsm/core'
 import { usePageShell } from '../../../../hooks/use-page-visibility'
 import { peripherals } from '../../../../app/api/peripherals'
 import { mediaUpload } from '../../../../app/api/client'
@@ -16,6 +16,7 @@ import BottomSheet from '../../../../components/bottom-sheet'
 import Pill from '../../../../components/pill'
 import Skeleton from '../../../../components/skeleton'
 import EmptyState from '../../../../components/empty-state'
+import ErrorState from '../../../../components/error-state'
 import './index.scss'
 
 const MAX_ITEMS = 8
@@ -33,6 +34,9 @@ export default function Wardrobe() {
   const [outfit, setOutfit] = useState<WardrobeOutfit | null>(null)
   const [category, setCategory] = useState('all')
   const [loading, setLoading] = useState(true)
+  // 拉取失败单独记一档：没有它，请求 reject 后 items 仍是 []，界面会落到
+  // 「衣橱还是空的」——用户读到的就是「我没录过东西」，而不是「没取到」
+  const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ name: '', category: 'top', color: '' })
@@ -45,6 +49,9 @@ export default function Wardrobe() {
     setLoading(true)
     try {
       setItems(await peripherals.listWardrobeItems())
+      setFailed(false)
+    } catch {
+      setFailed(true)
     } finally {
       setLoading(false)
     }
@@ -140,6 +147,20 @@ export default function Wardrobe() {
       <View className={pageClass}>
         <AppHeader title="衣橱" back />
         <Skeleton rows={4} />
+      </View>
+    )
+  }
+
+  // 一条都没取到才整页报错；有内容时（比如写操作后的重拉失败）照常显示列表
+  if (failed && items.length === 0) {
+    return (
+      <View className={pageClass}>
+        <AppHeader title="衣橱" back />
+        <ErrorState
+          title={WARDROBE_COPY.loadFailed}
+          retryText={ERROR_COPY.retryAction}
+          onRetry={() => void load()}
+        />
       </View>
     )
   }

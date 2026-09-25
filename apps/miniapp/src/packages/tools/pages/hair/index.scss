@@ -69,6 +69,13 @@
     background: var(--badge);
     color: var(--on-photo);
     font-size: 18rpx;
+
+    // 示例结果角标：压在「原本」角标下方，避免长按对比时两层叠在一起
+    &--demo {
+      top: 244rpx;
+      background: var(--scrim-heavy);
+      font-weight: 700;
+    }
   }
 
   // ---------- S0 输入透明化：将用的照片 + 换一张 ----------

@@ -387,6 +387,9 @@ export default function Hair() {
   const directionName = customActive ? customText : activeDirection?.name ?? ''
   const styleName = preview?.style_name || directionName
   const hasResult = preview?.state === 'ready' && Boolean(preview?.media)
+  // 示例人脸生成的结果：source_media 上带着 demo_example（服务端对 createDemoMedia
+  // 的强制标记）。它和自己照片生成的结果在界面上长得一模一样，必须显式区分。
+  const previewIsDemo = preview?.source_media?.source_kind === 'demo_example'
   const generating = running
   const failed = preview?.state === 'failed' || preview?.state === 'unavailable'
   // 主按钮要说实话：没有照片可按（档案未回或没现拍）时，点它发生的是「选照片」
@@ -541,6 +544,12 @@ export default function Hair() {
                     <Text>{HAIR_COPY.holdOriginal}</Text>
                   </View>
                 ) : null}
+                {/* 示例人脸生成的结果：界面上和自己照片生成的完全一样，必须标出来 */}
+                {previewIsDemo ? (
+                  <View className="hair__badge hair__badge--demo">
+                    <Text>{HAIR_COPY.demoMark}</Text>
+                  </View>
+                ) : null}
               </View>
               </>
             ) : preview?.source_media ? (
@@ -676,12 +685,17 @@ export default function Hair() {
               </View>
             </ScrollView>
 
-            {/* 参考图来源说明（红线 2：角标不上屏，来源由这行文字承担）。
-                两态用同一个条件：这一行出现/消失会让 hero（唯一可伸缩项）变高变矮，
-                切换时照片就跳一下 */}
-            {directions.some((opt) => opt.slug) ? (
-              <Text className="hair__ref-note">{HAIR_COPY.referenceNote}</Text>
-            ) : null}
+            {/* 来源说明（红线 2：角标不上屏，来源由这行文字承担）。
+                常驻，不再随条件出现/消失：这一行一消失，hero（唯一可伸缩项）
+                就会变高变矮，切换时照片跳一下；而且目录全换成服务端下发后，
+                旧条件会让它整行静默消失。文案按当前这张图到底是什么来取。 */}
+            <Text className="hair__ref-note">
+              {previewIsDemo
+                ? HAIR_COPY.demoResultNote
+                : directions.some((opt) => opt.slug)
+                  ? HAIR_COPY.referenceNote
+                  : HAIR_COPY.resultSourceNote}
+            </Text>
 
             {/* 主按钮与选择态同一位置（内联，按钮下不再挂链接） */}
             <View className={`hair__foot hair__foot--inline ${enter(3)}`}>
@@ -815,10 +829,12 @@ export default function Hair() {
               </View>
             ) : null}
 
-            {/* 与结果态同位同条件：这一行的出现/消失会改变 hero（唯一可伸缩项）的高度 */}
-            {directions.some((opt) => opt.slug) ? (
-              <Text className="hair__ref-note">{HAIR_COPY.referenceNote}</Text>
-            ) : null}
+            {/* 与结果态同位、同样常驻：这一行出现/消失会改变 hero（唯一可伸缩项）的高度 */}
+            <Text className="hair__ref-note">
+              {directions.some((opt) => opt.slug)
+                ? HAIR_COPY.referenceNote
+                : HAIR_COPY.resultSourceNote}
+            </Text>
 
             <View className={`hair__foot hair__foot--inline ${enter(3)}`}>
               <PrimaryButton

@@ -25,6 +25,21 @@
     padding: 8rpx 0 calc(240rpx + env(safe-area-inset-bottom));
   }
 
+  // 恢复失败提示：一行说明，不挡输入
+  &__notice {
+    margin: 0 0 20rpx;
+    padding: 18rpx 24rpx;
+    border-radius: 16rpx;
+    background: var(--moss-soft);
+    border: 1rpx solid var(--line);
+  }
+
+  &__notice-text {
+    font-size: 24rpx;
+    line-height: 1.55;
+    color: var(--ink-2);
+  }
+
   &__empty {
     display: flex;
     flex-direction: column;

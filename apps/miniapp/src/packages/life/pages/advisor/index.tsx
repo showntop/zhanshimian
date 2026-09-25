@@ -16,6 +16,8 @@ export default function Advisor() {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  // 会话恢复失败 ≠ 没有会话：落到空态会被读成「你从没问过」，所以单独提示一行
+  const [historyFailed, setHistoryFailed] = useState(false)
   const [scrollKey, setScrollKey] = useState('')
   const { pageClass, enter } = usePageShell(loaded, 'page--advisor', 'advisor')
 
@@ -23,8 +25,11 @@ export default function Advisor() {
   const restore = useCallback(async () => {
     try {
       setMessages(await peripherals.listAdvisorMessages())
+      setHistoryFailed(false)
     } catch {
-      /* 首次使用还没有会话：保持空态 */
+      // 首次使用还没有会话、和真的取不到，走的是同一个分支——所以这里只记「没取到」，
+      // 由界面决定怎么表达：聊天还能用，就不整页报错，只在对话区上方提示一行。
+      setHistoryFailed(true)
     } finally {
       setLoaded(true)
     }
@@ -96,6 +101,12 @@ export default function Advisor() {
       <AppHeader title={ADVISOR_COPY.title} back />
       <View className="adv">
         <ScrollView className="adv__list" scrollY scrollIntoView={scrollKey || undefined} enhanced showScrollbar={false}>
+          {/* 恢复失败：只提示一行，不整页报错——输入框还能用，挡住就是白损失 */}
+          {historyFailed ? (
+            <View className={`adv__notice ${enter()}`}>
+              <Text className="adv__notice-text">{ADVISOR_COPY.historyFailed}</Text>
+            </View>
+          ) : null}
           {!loaded ? null : messages.length === 0 ? (
             <View className={`adv__empty ${enter()}`}>
               <Text className="adv__empty-title">{ADVISOR_COPY.emptyTitle}</Text>

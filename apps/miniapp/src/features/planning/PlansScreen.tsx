@@ -833,6 +833,20 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
 
   // 生成中的视觉 = 纸样台：竖裁缝尺 + 三条参差版型条 + 出血宋体「3」
   // （构图/配色/数字规律见 index.scss .plans__atelier 注释）
+  //
+  // 真实进度：服务端给了（且 >0）就按它走——三条版型条各占三分之一，阶段句用服务端
+  // 那句；拿不到就退回纯循环动画。**绝不因为没有快照就编一个 0% 出来装忙。**
+  const atelierSnapshot = planProgressView(
+    operations.filter((operation) => operation.id === acceptOperationId),
+  )
+  const atelierPercent = atelierSnapshot && atelierSnapshot.percent > 0 ? atelierSnapshot.percent : null
+  const atelierStage = atelierSnapshot ? atelierSnapshot.stageLine : ''
+  // 第 index 条版型条填到多少（0–1）：整体进度按三等分落在这三条上，保留原来的错峰观感
+  const atelierSlotScale = (index: number): number => {
+    if (atelierPercent === null) return 0
+    const span = 100 / 3
+    return Math.max(0, Math.min(1, (atelierPercent - index * span) / span))
+  }
   const atelierCard = (
     <View className="plans__scene-empty plans__scene-empty--atelier">
       <View className="plans__atelier">
@@ -845,22 +859,40 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         <View className="plans__atelier-needle" />
         <View className="plans__atelier-slots">
           <View className="plans__atelier-slot plans__atelier-slot--1">
-            <View className="plans__atelier-fill" />
+            <View
+              className={`plans__atelier-fill ${atelierPercent === null ? '' : 'plans__atelier-fill--real'}`}
+              style={atelierPercent === null ? undefined : { transform: `scaleX(${atelierSlotScale(0)})` }}
+            />
             <View className="plans__atelier-stitch" />
           </View>
           <View className="plans__atelier-slot plans__atelier-slot--2">
-            <View className="plans__atelier-fill" />
+            <View
+              className={`plans__atelier-fill ${atelierPercent === null ? '' : 'plans__atelier-fill--real'}`}
+              style={atelierPercent === null ? undefined : { transform: `scaleX(${atelierSlotScale(1)})` }}
+            />
             <View className="plans__atelier-stitch" />
           </View>
           <View className="plans__atelier-slot plans__atelier-slot--3">
-            <View className="plans__atelier-fill" />
+            <View
+              className={`plans__atelier-fill ${atelierPercent === null ? '' : 'plans__atelier-fill--real'}`}
+              style={atelierPercent === null ? undefined : { transform: `scaleX(${atelierSlotScale(2)})` }}
+            />
             <View className="plans__atelier-stitch" />
           </View>
         </View>
       </View>
       <View className="plans__atelier-foot">
         <View className="plans__atelier-rule" />
-        <Text className="plans__atelier-text">{PLANNING_COPY.sceneGenerating}</Text>
+        <Text className="plans__atelier-text">{atelierStage || PLANNING_COPY.sceneGenerating}</Text>
+        {atelierPercent === null ? null : (
+          <Text className="plans__atelier-percent">{atelierPercent}%</Text>
+        )}
+      </View>
+      {/* 等待期的出口与承诺：跨会话认领（writePlanSetPending / claimPendingAccept）
+          底层已经做了，界面上必须把「可以离开」这句话说出来，否则用户会以为卡住 */}
+      <View className="plans__atelier-leave">
+        <Text className="plans__atelier-leave-text">{PLANNING_COPY.atelierLeaveNote}</Text>
+        <TextLink text={PLANNING_COPY.wander} onClick={() => void Taro.switchTab({ url: HOME_ROUTE })} />
       </View>
     </View>
   )

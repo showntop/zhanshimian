@@ -3,6 +3,8 @@
   display: flex;
   flex-direction: column;
   gap: 28rpx;
+  // 给吸底页脚留位（按钮 + 一行说明 + 安全区）
+  padding-bottom: 240rpx;
 
   // ---------- 进度 ----------
   &__progress {
@@ -133,12 +135,21 @@
   }
 
   // ---------- 页脚 ----------
+  // 吸底：出门前要勾 6–8 项，勾完还要滚到底才能点「完成执行」是最常见的掉点。
+  // 层级压在底部弹层（z-200）与看图（z-300）之下，不挡它们
   &__foot {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 14rpx;
-    padding-top: 8rpx;
+    padding: 16rpx var(--page-gutter) calc(16rpx + env(safe-area-inset-bottom));
+    background: var(--bg);
+    border-top: 1rpx solid var(--line);
   }
 
   &__foot-note {

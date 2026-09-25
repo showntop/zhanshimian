@@ -46,5 +46,17 @@
     &::after { border: none; }
   }
   &__share-text { color: var(--cream); font-size: 30rpx; font-weight: 600; }
-  &__revoke { font-size: 22rpx; color: var(--danger); text-decoration: underline; }
+  // 撤销：破坏性动作，热区原本只有 22rpx 一行（≈11px）且紧贴大按钮下方。
+  // 撑到标准热区，并在它与按钮之间留出间隔，降低误触。
+  &__revoke {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--touch-target, 88rpx);
+    padding: 0 24rpx;
+    margin-top: 8rpx;
+    font-size: 24rpx;
+    color: var(--danger);
+    text-decoration: underline;
+  }
 }

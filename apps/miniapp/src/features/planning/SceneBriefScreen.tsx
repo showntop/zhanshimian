@@ -1,7 +1,7 @@
 // 场合 Brief：单页几问，答案只活在组件 state 与 POST body 里。
 // 修改答案重新提交会创建一份新的方案集（服务端按幂等键与内容决定复用或受理），
 // 本地不存任何 Brief——存了就成了会过期的第二份答案。
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import {
@@ -117,6 +117,21 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
     setAnswers((prev) => ({ ...prev, [key]: value }))
   }
 
+  // 「按推荐帮我填好」：每题都在文案表里标了推荐值。任一题缺推荐值（或值已不在
+  // 当前选项表里）就整体不出现——半套答案比没有更糟。
+  const recommended = useMemo(() => {
+    if (!fields) return null
+    const next: Record<string, string> = {}
+    for (const field of fields) {
+      const value = 'recommended' in field ? field.recommended : undefined
+      if (!value) return null
+      if (!field.options.some((option) => option.value === value)) return null
+      next[field.key] = value
+    }
+    return next
+  }, [fields])
+
+  // override：走「就用推荐设置」时直接带这批答案提交，不等下一次渲染
   const submit = async () => {
     if (!reportId || busy) return
     // 没答完：主按钮是禁用态（点击被组件挡下），点它的人不知道为什么没反应——
@@ -179,6 +194,15 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
     } finally {
       setBusy(false)
     }
+  }
+
+  // 只预填，不提交：直接提交会把人推进 1-2 分钟等待，而他还没看到自己被填了什么。
+  // 预填完自己点「生成方案」，多的只是一下点击，换来的是能看清、能改。
+  const applyRecommended = () => {
+    if (!recommended) return
+    setAnswers(recommended)
+    // 填完把「未选」标记收掉，不然刚填的题上还挂着红标
+    setShowMissing(false)
   }
 
   if (!fields) {
@@ -263,20 +287,30 @@ export default function SceneBriefScreen({ scene }: SceneBriefScreenProps) {
         </View>
       ))}
 
-      {/* 未答完时按钮是禁用态，点击被组件挡下会变成「点了没反应」——
+      {/* 提交区吸底：填完 4 题还要滑到底才能提交，小屏上按钮直接掉出首屏。
+          未答完时按钮是禁用态，点击被组件挡下会变成「点了没反应」——
           包一层接管这次点击，把原因说出来（答完的点击照常走按钮） */}
-      <View
-        className="scene-brief__foot fade-up delay-3"
-        onClick={() => {
-          if (!busy && !complete) void submit()
-        }}
-      >
-        <PrimaryButton
-          text={SCENE_BRIEF_COPY.generateAction}
-          disabled={!complete}
-          loading={busy}
-          onClick={() => void submit()}
-        />
+      <View className="scene-brief__foot fade-up delay-3">
+        <View
+          className="scene-brief__foot-main"
+          onClick={() => {
+            if (!busy && !complete) void submit()
+          }}
+        >
+          <PrimaryButton
+            text={SCENE_BRIEF_COPY.generateAction}
+            disabled={!complete}
+            loading={busy}
+            onClick={() => void submit()}
+          />
+        </View>
+        {/* 全部答完就不再出现：那时它的作用（帮你选）已经没意义，
+            再点反而会覆盖用户自己挑的答案 */}
+        {recommended && !complete ? (
+          <Text className="scene-brief__recommended pressable" onClick={applyRecommended}>
+            {SCENE_BRIEF_COPY.useRecommendedAction}
+          </Text>
+        ) : null}
       </View>
     </View>
   )

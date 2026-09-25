@@ -688,6 +688,11 @@
       opacity: 0.92;
       background: var(--moss-deep);
       animation: plans-atelier-fill 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+
+      // 服务端给了真实进度：停掉循环动画，改由内联 transform 驱动（仍是合成层）
+      &--real {
+        animation: none;
+      }
     }
 
     // 针脚：锈铜虚线向右走针，10rpx 实 / 24rpx 循环（transform 位移，GPU 合成）
@@ -727,6 +732,31 @@
       font-size: 26rpx;
       line-height: 1.7;
       color: var(--ink);
+    }
+
+    // 真实进度百分比：没有快照时整块不渲染，绝不显示一个编出来的 0%
+    &-percent {
+      flex: none;
+      font-size: 26rpx;
+      font-weight: 700;
+      line-height: 1.7;
+      color: var(--moss-deep);
+      font-variant-numeric: tabular-nums;
+    }
+
+    // 等待期的出口：先说「可以离开」，再给一条去首页的路
+    &-leave {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4rpx;
+      padding: 20rpx 24rpx 0 72rpx;
+    }
+
+    &-leave-text {
+      font-size: 22rpx;
+      line-height: 1.6;
+      color: var(--ink-3);
     }
   }
 
@@ -1230,6 +1260,8 @@
   display: flex;
   flex-direction: column;
   gap: 28rpx;
+  // 给吸底提交区留位：按钮 + 「用推荐设置」一行 + 安全区
+  padding-bottom: 240rpx;
 
   &--loading {
     align-items: center;
@@ -1298,7 +1330,30 @@
     gap: 12rpx;
   }
 
+  // 提交区吸底：场合驱动型用户常是临时来找方案，不能让他滑到底才提交
   &__foot {
-    padding-top: 8rpx;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14rpx;
+    padding: 16rpx var(--page-gutter) calc(16rpx + env(safe-area-inset-bottom));
+    background: var(--bg);
+    border-top: 1rpx solid var(--line);
+  }
+
+  &__foot-main {
+    width: 100%;
+  }
+
+  &__recommended {
+    font-size: 25rpx;
+    font-weight: 600;
+    color: var(--moss-deep);
+    text-decoration: underline;
   }
 }

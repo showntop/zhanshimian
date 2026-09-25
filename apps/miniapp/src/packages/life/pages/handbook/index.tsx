@@ -10,6 +10,7 @@ import Taro, { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import {
   DAILY_COPY,
+  ERROR_COPY,
   dailyBucketName,
   dailyTypeName,
   type CollectionCategory,
@@ -20,6 +21,7 @@ import { readSaves, removeSave, type DailySave } from '../../../../features/dail
 import { usePageShell } from '../../../../hooks/use-page-visibility'
 import AppHeader from '../../../../components/app-header'
 import DailyVisual from '../../../../components/daily-visual'
+import ErrorState from '../../../../components/error-state'
 import './index.scss'
 
 // 与服务端 allCategories 同序（含 general）；general 是归不进其余各格的综合内容，排最后。
@@ -86,6 +88,8 @@ export default function Handbook() {
   const [items, setItems] = useState<HandbookItem[]>([])
   const [offline, setOffline] = useState(false)
   const [loading, setLoading] = useState(true)
+  // 连本地缓存也没有 → 不能显示「手册还是空的」（那会被读成「你一条都没收过」）
+  const [failed, setFailed] = useState(false)
   const { pageClass, enter } = usePageShell(true, '', 'handbook')
 
   const load = useCallback(async () => {
@@ -97,14 +101,16 @@ export default function Handbook() {
           .filter((item): item is HandbookItem => item !== null),
       )
       setOffline(false)
+      setFailed(false)
     } catch {
       // 手册拉取失败 → 本地缓存兜底并标注「离线」（方案 §3.3）
-      setItems(
-        readSaves()
-          .map(fromLocalSave)
-          .filter((item): item is HandbookItem => item !== null),
-      )
+      const cached = readSaves()
+        .map(fromLocalSave)
+        .filter((item): item is HandbookItem => item !== null)
+      setItems(cached)
       setOffline(true)
+      // 缓存也是空 = 用户眼前没有任何内容，此时必须说「没取到」而不是「你是空的」
+      setFailed(cached.length === 0)
     } finally {
       setLoading(false)
     }
@@ -130,10 +136,20 @@ export default function Handbook() {
   }, [items])
 
   const onRemove = (item: HandbookItem) => {
-    // 本地立即移出 + 服务端尽力删除（幂等 204），失败下次进入对账
-    setItems((prev) => prev.filter((prevItem) => prevItem.key !== item.key))
-    removeSave(item.key)
-    Taro.showToast({ title: '已移出手册', icon: 'none' })
+    // 「移出」是破坏性动作，而它的热区只有 15px 左右——先问一句，别让误触变成丢内容
+    Taro.showModal({
+      title: DAILY_COPY.removeConfirmTitle,
+      content: DAILY_COPY.removeConfirmBody,
+      confirmText: DAILY_COPY.removeConfirmAction,
+      confirmColor: '#9B4B45',
+      success: (res) => {
+        if (!res.confirm) return
+        // 本地立即移出 + 服务端尽力删除（幂等 204），失败下次进入对账
+        setItems((prev) => prev.filter((prevItem) => prevItem.key !== item.key))
+        removeSave(item.key)
+        Taro.showToast({ title: '已移出手册', icon: 'none' })
+      },
+    })
   }
 
   const goToday = () => {
@@ -146,12 +162,16 @@ export default function Handbook() {
       <View className="hb">
         <View className={`hb__head ${enter()}`}>
           <Text className="hb__title">{DAILY_COPY.handbookTitle}</Text>
-          <Text className="hb__count">
-            {offline ? '离线缓存' : `已收 ${items.length} 条`}
-          </Text>
+          <Text className="hb__count">{items.length > 0 ? `已收 ${items.length} 条` : ''}</Text>
         </View>
 
-        {loading ? null : groups.length === 0 ? (
+        {loading ? null : failed ? (
+          <ErrorState
+            title={DAILY_COPY.handbookLoadFailed}
+            retryText={ERROR_COPY.retryAction}
+            onRetry={() => void load()}
+          />
+        ) : groups.length === 0 ? (
           <View className="hb__empty">
             <Text className="hb__empty-title">{DAILY_COPY.handbookEmptyTitle}</Text>
             <Text className="hb__empty-body">{DAILY_COPY.handbookEmptyBody}</Text>
@@ -160,29 +180,38 @@ export default function Handbook() {
             </View>
           </View>
         ) : (
-          groups.map((group) => (
-            <View key={group.bucket} className="hb__group">
-              <View className="hb__group-head">
-                <Text className="hb__group-name">{group.name}</Text>
-                <Text className="hb__group-n">{group.items.length}</Text>
+          <>
+            {/* 离线降级：缓存照常看，但必须说清「这不是最新的」并给重试出口 */}
+            {offline ? (
+              <View className="hb__stale pressable" onClick={() => void load()}>
+                <Text className="hb__stale-text">{DAILY_COPY.handbookStaleTitle}</Text>
+                <Text className="hb__stale-action">{DAILY_COPY.handbookStaleAction}</Text>
               </View>
-              {group.items.map((item) => (
-                <View key={item.key} className="hb__item">
-                  <View className="hb__item-visual">
-                    <DailyVisual visual={item.visual} />
-                  </View>
-                  <View className="hb__item-copy">
-                    <Text className="hb__item-type">{dailyTypeName(item.type)}</Text>
-                    <Text className="hb__item-topic">{item.topic}</Text>
-                    <Text className="hb__item-fit">{item.fitText}</Text>
-                  </View>
-                  <View className="hb__item-remove" onClick={() => onRemove(item)}>
-                    <Text className="hb__item-remove-text">移出</Text>
-                  </View>
+            ) : null}
+            {groups.map((group) => (
+              <View key={group.bucket} className="hb__group">
+                <View className="hb__group-head">
+                  <Text className="hb__group-name">{group.name}</Text>
+                  <Text className="hb__group-n">{group.items.length}</Text>
                 </View>
-              ))}
-            </View>
-          ))
+                {group.items.map((item) => (
+                  <View key={item.key} className="hb__item">
+                    <View className="hb__item-visual">
+                      <DailyVisual visual={item.visual} />
+                    </View>
+                    <View className="hb__item-copy">
+                      <Text className="hb__item-type">{dailyTypeName(item.type)}</Text>
+                      <Text className="hb__item-topic">{item.topic}</Text>
+                      <Text className="hb__item-fit">{item.fitText}</Text>
+                    </View>
+                    <View className="hb__item-remove" onClick={() => onRemove(item)}>
+                      <Text className="hb__item-remove-text">移出</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ))}
+          </>
         )}
       </View>
     </View>
