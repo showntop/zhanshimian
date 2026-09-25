@@ -52,6 +52,7 @@ const SETTLE_HOLD_MS = 1100
 // 收敛结束 → 揭晓的时序（原型 daily-dressup-asset.html 的 run() 尾部）：
 // caption 先变「今天这一身」，820ms 后文字层淡入（层级逐级上浮）。
 const CAPTION_SETTLE_MS = 200
+/** 定格：池子消失与文字层出现落在同一帧（原子切换，见 index.scss） */
 const REVEAL_IN_MS = 820
 /** 面板停留（原型停在面板上；我们随后交棒给内容海报，留足看清的时间） */
 const REVEAL_HOLD_MS = 1600
@@ -134,12 +135,45 @@ export default function DressShuffle({
   const [pop, setPop] = useState(false)
   const [caption, setCaption] = useState<string>(DAILY_COPY.dressCaptionIdle)
   const [round, setRound] = useState(0)
+  /** 收敛轮：池子先淡出，文字层等它走完再升——左栏一次只发生一件事 */
+  const [poolOut, setPoolOut] = useState(false)
+  /**
+   * 揭晓快照：revealed 翻真那一刻把左栏内容冻结下来。
+   *
+   * 定格之后父组件还会因种种原因重渲染（阶段切换、素材后台预热完成、
+   * 内容晚到……），任何一次晚到的 props 都会让左栏「再刷一下」。
+   * 有了这份快照，已定格的字只能呈现一次。
+   */
+  const [revealSnap, setRevealSnap] = useState<{
+    topic?: string
+    lead?: string
+    cta?: string
+    chips: string[]
+  } | null>(null)
   // 低端机能力位（一次性探测）：benchmarkLevel 是微信给的机器档位，
   // 低于阈值就关掉运动模糊这类离屏合成开销；探测失败按「支持」处理。
   const lowEndRef = useRef(false)
   const probedRef = useRef(false)
   const settledRef = useRef(false)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  // 快照在 timer 回调里执行：闭包拿到的是 effect 首次运行那一刻的值，
+  // 所以全程走 ref 读最新 props/state。
+  const chipsRef = useRef<string[]>([])
+  chipsRef.current = chips
+  const topicRef = useRef<string | undefined>(topic)
+  topicRef.current = topic
+  const leadRef = useRef<string | undefined>(lead)
+  leadRef.current = lead
+  const ctaRef = useRef<string | undefined>(cta)
+  ctaRef.current = cta
+
+  const freezeReveal = () =>
+    setRevealSnap({
+      topic: topicRef.current,
+      lead: leadRef.current,
+      cta: ctaRef.current,
+      chips: chipsRef.current,
+    })
 
   if (!probedRef.current) {
     probedRef.current = true
@@ -302,6 +336,7 @@ export default function DressShuffle({
     if (settling || reduced || hold) return
     setChips([])
     setRevealed(false)
+    setPoolOut(false)
     setCaption(DAILY_COPY.dressCaptionIdle)
     setFigure({ ...INITIAL_FIGURE })
     const t = randomTarget()
@@ -318,7 +353,7 @@ export default function DressShuffle({
     }
   }, [settling, round, reduced])
 
-  // 收敛轮：固定顺序加速锁定 → 盖章 → 揭晓
+  // 收敛轮：固定顺序加速锁定 → 盖章 → 池子淡出 → 揭晓
   useEffect(() => {
     if (!settling) return
     settledRef.current = false
@@ -326,12 +361,15 @@ export default function DressShuffle({
     let t = targetRef.current ?? randomTarget()
     if (colorLockRef.current) t = { ...t, color: 1 } // 锁基准砖红（spec §4）
     setRevealed(false)
+    setPoolOut(false)
     if (reduced) {
       // 减动效：直接呈现最终搭配，稍候揭晓（面板滑入也归零，直接出现在位）
       setFigure({ look: t.look, color: t.color, waist: t.waist, hair: t.look === 0 ? t.hair : null })
       setChips([])
+      setPoolOut(true)
       setCaption(DAILY_COPY.dressCaptionSettled)
       later(() => {
+        freezeReveal()
         setRevealed(true)
         later(() => {
           if (!settledRef.current) {
@@ -347,9 +385,13 @@ export default function DressShuffle({
     setFigure({ look: t.look, color: 1, waist: null, hair: null })
     const dims = buildRunDims(t, { order: ['look', 'color', 'waist', 'hair'], hairAvailable: hairAvailRef.current })
     runRound(dims, 0, true, () => {
-      // 原型序列：caption 先落「今天这一身」→ 面板滑入 → 盖章 → 停留后交棒
+      // 原型序列：caption 先落「今天这一身」→ 定格。
+      // 定格是原子切换：池子消失、文字层出现同帧发生，中间没有任何交叠过渡——
+      // 之前池子淡出与文字分层升起叠在同一块左栏区域，就是「定格后左侧再刷」的来源
       later(() => setCaption(DAILY_COPY.dressCaptionSettled), CAPTION_SETTLE_MS)
       later(() => {
+        setPoolOut(true)
+        freezeReveal()
         setRevealed(true)
         later(() => {
           if (!settledRef.current) {
@@ -369,6 +411,13 @@ export default function DressShuffle({
   const figureSrc = hairKey ? asset(`outfit-${hairKey}.png`) : asset(`${look.key}.png`)
   // 端不支持 filter（colorLocked）：人物保持基准砖红，洗牌照常（spec §4）
   const figureFilter = !colorLocked && color.filter !== 'none' ? color.filter : undefined
+  // 左栏内容：定格后优先读快照，快照某项为空才回退实时 props（内容真晚到仍要显示）
+  const view = {
+    topic: revealSnap?.topic || topic,
+    lead: revealSnap?.lead || lead,
+    cta: revealSnap?.cta || cta,
+    chips: revealSnap?.chips ?? chips,
+  }
 
   return (
     <View className="ds">
@@ -398,7 +447,7 @@ export default function DressShuffle({
       </View>
 
       {/* 揭晓时池子淡出（不卸载：淡出更干净），把画面让给人物与文字 */}
-      <View className={`ds__pool${revealed ? ' ds__pool--out' : ''}`}>
+      <View className={`ds__pool${poolOut ? ' ds__pool--out' : ''}`}>
         <View className="ds__pool-head">
           <Text className="ds__dim-label">{head.label}</Text>
           <Text className="ds__badge">{head.badge}</Text>
@@ -458,15 +507,33 @@ export default function DressShuffle({
         <View className="ds__reveal-topic">
           {(category && DAILY_COPY.dressRevealTitleByCategory[category]) || DAILY_COPY.dressRevealTitle}
         </View>
-        {topic ? <View className="ds__reveal-title">{topic}</View> : null}
+        {view.topic ? <View className="ds__reveal-title">{view.topic}</View> : null}
         <View className="ds__reveal-rule" />
-        {lead ? (
-          <View className="ds__reveal-lead">{lead}</View>
+        {view.lead ? (
+          <View className="ds__reveal-lead">{view.lead}</View>
         ) : (
           <View className="ds__reveal-sub">{DAILY_COPY.dressRevealSub}</View>
         )}
-        <View className="ds__reveal-chips">{chips.map(renderChip)}</View>
-        {cta ? <Text className="ds__reveal-cta">{cta}</Text> : null}
+        <View className="ds__reveal-chips">{view.chips.map(renderChip)}</View>
+        {/* 中段：内容靠上、按钮靠底，这一段把中间的空档接住。
+            三片小布样 + 一段锈铜缝线——纸样车间的语言（缝线与卡堆针脚同源）。
+            弹性占位：标题/导语都占两行的最坏栈里它会收起，绝不挤掉按钮 */}
+        <View className="ds__reveal-mid">
+          <View className="ds__reveal-fabrics">
+            <View className="ds__reveal-fabric ds__reveal-fabric--1" />
+            <View className="ds__reveal-fabric ds__reveal-fabric--2" />
+            <View className="ds__reveal-fabric ds__reveal-fabric--3" />
+          </View>
+          <View className="ds__reveal-mid-stitch" />
+        </View>
+        {/* 行动行 = 按钮 + 弹性细线。揭晓后左栏只剩文字栈，比洗牌期的候选池
+            空得多；细线把按钮右侧的空档接住，是这一栏的「落款」。
+            刻意与按钮同行——卡高预算只剩 ~30rpx，往下加行会把按钮裁掉 */}
+        {view.cta || seq ? (
+          <View className="ds__reveal-cta-row">
+            {view.cta ? <Text className="ds__reveal-cta">{view.cta}</Text> : null}
+          </View>
+        ) : null}
         {seq ? (
           <View className="ds__index">
             <Text className="ds__index-num serif">{seq.slice(3)}</Text>

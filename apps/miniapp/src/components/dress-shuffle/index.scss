@@ -152,12 +152,15 @@
   z-index: 14;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.42s ease-out;
+  // 定格是一次**原子切换**：池子消失与文字出现落在同一帧，不做任何交叠过渡。
+  // 之前池子淡出与文字分层升起叠在同一块左栏区域，看起来就是「刷了一下又刷一下」
+  transition: opacity 0.24s ease-out;
   display: flex;
   flex-direction: column;
-  // 左栏内容整体上移：小标注落在人物肩线稍上，最坏情况（标题两行 + 导语三行
-  // + 标注两行）也给按钮留出底部余量。改内容量级时优先动这里。
-  padding: 96rpx 0 0 36rpx;
+  // 回到自然文流（标注行跟在导语后，不锚底）。垂直预算＝560 卡高 − 上下 padding。
+  // 最坏栈（标题两行 + 导语两行 + 标注两行 + 按钮行）≈423rpx，可用 464rpx，
+  // 余量 ~40rpx 给真机字体度量差（此前 554/560 贴边，低端机仍会被裁半行）。
+  padding: 64rpx 0 32rpx 36rpx;
 }
 .ds__reveal--on {
   opacity: 1;
@@ -169,7 +172,7 @@
 .ds__reveal-lead,
 .ds__reveal-sub,
 .ds__reveal-chips,
-.ds__reveal-cta {
+.ds__reveal-cta-row {
   width: 368rpx;
 }
 // 竖排英文：右上角起（参照稿 TODAY LOOK 的位置），压在人物肩上做注脚
@@ -199,7 +202,8 @@
   width: 4rpx;
   background: #5a7d4a;
 }
-// 大标题 = 当天建议的选题（≤12 字，最多两行）
+// 大标题 = 当天建议的选题（≤12 字）。钳到两行：字号度量差导致的意外换行
+// 不能把下面的标注行挤到卡外
 .ds__reveal-title {
   margin-top: 14rpx;
   font-size: 38rpx;
@@ -207,6 +211,10 @@
   line-height: 1.32;
   letter-spacing: 0.02em;
   color: #2e3a23;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 // 细线：标题与正文之间的停顿（编辑式分隔，不做容器边框）
 .ds__reveal-rule {
@@ -221,7 +229,8 @@
   letter-spacing: 0.08em;
   color: rgba(63, 70, 60, 0.66);
 }
-// 正文：建议导语（服务端生成，≤44 字，限 3 行）
+// 正文：建议导语（服务端生成，≤44 字）。限 2 行：3 行会在「标题两行 +
+// 标注两行」的最坏栈里把胶囊按钮挤出卡底（上线后实测），完整导语在今日页看
 .ds__reveal-lead {
   margin-top: 16rpx;
   font-size: 22rpx;
@@ -229,18 +238,24 @@
   color: rgba(63, 70, 60, 0.92);
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   overflow: hidden;
 }
-// 行动入口：唯一的深绿实色块（15% 预算花在这）。
+// 行动行：按钮 + 弹性细线（与按钮同行，不占垂直预算）。
 // 必须 display:flex —— Text 默认是行内元素，行内盒不计垂直 padding，
 // 胶囊底边会被行盒切掉（上一版按钮「下半截被切」的根因）。
+.ds__reveal-cta-row {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  width: 368rpx;
+  margin-top: 20rpx;
+}
 .ds__reveal-cta {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  align-self: flex-start;
-  margin-top: 24rpx;
   padding: 16rpx 34rpx;
   font-size: 24rpx;
   font-weight: 700;
@@ -250,6 +265,54 @@
   background: #3b4a2e;
   border-radius: 999rpx;
 }
+.ds__reveal-cta-line {
+  flex: 1;
+  min-width: 0;
+  height: 1rpx;
+  background: rgba(63, 70, 60, 0.22);
+}
+// 中段填充：内容靠上、按钮靠底（flex:1 把按钮顶到卡底），中间这块是
+// 裁缝桌上的「布样 + 缝线」。最坏栈（标题/导语都两行）时整段收起，不挤按钮。
+.ds__reveal-mid {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 368rpx;
+  display: flex;
+  align-items: flex-end;
+  gap: 12rpx;
+  padding-top: 20rpx;
+  overflow: hidden;
+}
+.ds__reveal-fabrics {
+  display: flex;
+  align-items: flex-end;
+  gap: 8rpx;
+}
+.ds__reveal-fabric {
+  width: 36rpx;
+  height: 24rpx;
+  border-radius: 3rpx;
+  border: 1rpx solid rgba(63, 70, 60, 0.16);
+}
+.ds__reveal-fabric--1 {
+  background: rgba(88, 115, 68, 0.3);
+}
+.ds__reveal-fabric--2 {
+  background: rgba(238, 240, 236, 0.95);
+}
+.ds__reveal-fabric--3 {
+  background: rgba(196, 98, 45, 0.26);
+}
+// 缝线：锈铜虚线（与洗牌卡堆的针脚同一颜色语言），只走在左栏宽度内
+.ds__reveal-mid-stitch {
+  flex: 1;
+  min-width: 0;
+  height: 0;
+  border-top: 2rpx dashed rgba(196, 98, 45, 0.34);
+  margin-bottom: 11rpx;
+}
+// 标注行：跟在导语后的自然文流（锚底方案会让中间空一大条，已回退）
+// ds-rise 已不再逐级驱动（见上方注释），留给整体一次淡入
 .ds__reveal-chips {
   display: flex;
   flex-wrap: wrap;
@@ -279,7 +342,9 @@
   color: rgba(63, 70, 60, 0.6);
 }
 
-// 入场：逐级上浮（层级顺序即阅读顺序），幅度刻意小
+// 入场：整体一次淡入，不做逐级上浮。
+// 之前每个元素带 0~0.36s 阶梯延迟各自上浮，左栏文字分七波出现——
+// 叠上池子淡出，就是用户说的「定格时左侧刷新两次」。定格只允许一次变化。
 @keyframes ds-rise {
   from {
     opacity: 0;
@@ -290,42 +355,23 @@
     transform: none;
   }
 }
-.ds__reveal--on .ds__reveal-topic {
-  animation: ds-rise 0.5s ease-out both;
-}
-.ds__reveal--on .ds__reveal-title {
-  animation: ds-rise 0.5s ease-out 0.08s both;
-}
-.ds__reveal--on .ds__reveal-rule {
-  animation: ds-rise 0.5s ease-out 0.14s both;
-}
-.ds__reveal--on .ds__reveal-lead,
-.ds__reveal--on .ds__reveal-sub {
-  animation: ds-rise 0.5s ease-out 0.2s both;
-}
-.ds__reveal--on .ds__reveal-chips {
-  animation: ds-rise 0.5s ease-out 0.28s both;
-}
-.ds__reveal--on .ds__reveal-cta {
-  animation: ds-rise 0.5s ease-out 0.36s both;
-}
-.ds__reveal--on .ds__index {
-  animation: ds-rise 0.6s ease-out 0.3s both;
-}
 
 // ---------- 候选池：左侧浮动块（不再占右半栏） ----------
 // 人物占据画面右侧主体，池子改为左侧一块「工作台」，与人物错位不重叠
 //（人物身体从 x≈426 起，池子 24~414）。揭晓时淡出，把画面让给人物 + 文字。
 .ds__pool {
   position: absolute;
+  // 洗牌期的标注行挂在 pool 底部（128+50+300+14 两行到 562 > 560 卡高，
+  // 第二行正好被卡底裁半——「低腰被下边缘截掉」的根因）。上移 32rpx 后
+  // 最坏栈 530 < 560；caption 在 top 40（高约 31），96 不与之相撞。
   left: 24rpx;
-  top: 128rpx;
+  top: 96rpx;
   width: 390rpx;
   height: 396rpx;
   z-index: 10;
   display: flex;
   flex-direction: column;
-  transition: opacity 0.42s ease-out;
+  // 不做淡出过渡：定格是原子切换，池子与文字层必须同帧换手
 }
 .ds__pool--out {
   opacity: 0;
@@ -512,7 +558,8 @@
   .ds__reveal-lead,
   .ds__reveal-sub,
   .ds__reveal-chips,
-  .ds__reveal-cta,
+  .ds__reveal-mid,
+  .ds__reveal-cta-row,
   .ds__index {
     animation: none !important;
     transition: none !important;

@@ -347,6 +347,20 @@ export default function Home() {
   const dressOnSettling = Boolean(dressLockTarget) && dressAssets.ready
   const dressHold = !dressAssets.ready
 
+  // 收敛线一锤定音：进入 settling 那一刻判定走洗牌还是旧揭晓线（DailyMotion），
+  // 之后即使素材到位也不再换。素材晚到时旧线已经揭晓（phase=content），
+  // 此时把 DressShuffle 换上来会带着 settling 重新挂载、把整个收敛+揭晓重播一遍
+  // ——「左栏定格后又刷一次」的根因。缓存命中（跳过 settling 直接 content）
+  // 不经过这里，仍按实时状态判定，「落地即保留」不受影响。
+  const [dressSettleLatched, setDressSettleLatched] = useState(false)
+  const settleEntrySeenRef = useRef(false)
+  useEffect(() => {
+    if (phase !== 'settling' || settleEntrySeenRef.current) return
+    settleEntrySeenRef.current = true
+    setDressSettleLatched(Boolean(dressLockTarget) && dressAssets.ready)
+  }, [phase, dressLockTarget, dressAssets.ready])
+  const dressSettle = settleEntrySeenRef.current ? dressSettleLatched : dressOnSettling
+
   // 海报角落编号用日期而非序号：序号是静态的，日期才有"每天换一张"的时间感
   const todaySeq = useMemo(() => {
     const now = new Date()
@@ -485,7 +499,7 @@ export default function Home() {
                     frameAspect={232 / 344}
                   />
                 </View>
-              ) : dailyReady && dailyContent && !dressOnSettling ? (
+              ) : dailyReady && dailyContent && !dressSettle ? (
                 <View className={enter(1)}>
                   <DailyPoster
                     type={dailyContent.type}
@@ -498,16 +512,16 @@ export default function Home() {
                     onOpen={goToday}
                   />
                 </View>
-              ) : dailySettling || (dailyReady && dressOnSettling) ? (
+              ) : dailySettling || (dailyReady && dressSettle) ? (
                 // 落地即保留：洗牌揭晓面板（人物 + 这一身 + 建议正文）一直留在首页，
                 // 整卡就是进今日页的主入口（内容就绪才可点；洗牌播放中点了没反应）。
                 <View
-                  className={`home__daily-waiting ${dressOnSettling ? 'home__daily-waiting--dress' : ''} ${enter(1)} ${
-                    dailyReady && dailyContent && dressOnSettling ? 'pressable' : ''
+                  className={`home__daily-waiting ${dressSettle ? 'home__daily-waiting--dress' : ''} ${enter(1)} ${
+                    dailyReady && dailyContent && dressSettle ? 'pressable' : ''
                   }`}
-                  onClick={dailyReady && dailyContent && dressOnSettling ? goToday : undefined}
+                  onClick={dailyReady && dailyContent && dressSettle ? goToday : undefined}
                 >
-                  {dressOnSettling ? (
+                  {dressSettle ? (
                     <DressShuffle
                       target={dressLockTarget ?? undefined}
                       settling

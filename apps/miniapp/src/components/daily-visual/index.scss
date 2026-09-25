@@ -170,19 +170,19 @@
     height: 100%;
   }
 
-  // 标签：块内底部小签（奶油底），多行时自左排开不居中悬空
+  // 标签：块内底部小签（深墨半透明底白字，参考稿的对比卡语言）
   &-cp-label {
     position: absolute;
     left: 10rpx;
     bottom: 10rpx;
     max-width: calc(100% - 20rpx);
-    padding: 4rpx 14rpx;
+    padding: 6rpx 16rpx;
     border-radius: 999rpx;
-    background: rgba(244, 245, 242, 0.9);
+    background: var(--badge);
     font-size: 20rpx;
     font-weight: 600;
     line-height: 1.45;
-    color: var(--ink);
+    color: rgba(255, 255, 255, 0.94);
   }
 
   // ---------- 海报式：去容器，素材直接浮在页面上 ----------

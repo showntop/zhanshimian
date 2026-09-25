@@ -378,6 +378,8 @@ export const DAILY_COPY = {
   } as Record<string, string>,
   dressRevealSub: 'uplook · 为你搭好的一身',
   dressRevealGhost: 'TODAY · ONE LOOK',
+  // 按钮旁的斜盖章：裁缝做完在纸样上盖的章（与结算态「♥ 喜欢」同一套语言）
+  dressRevealStamp: '已配好',
   dressStamp: '今日',
   // 洗牌落地后：内容海报退到卡片下方的一行入口（内容主入口仍在今日页）
   dressContentLabel: '今日内容',
