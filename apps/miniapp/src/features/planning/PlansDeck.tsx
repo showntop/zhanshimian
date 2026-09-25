@@ -75,6 +75,10 @@ interface PlansDeckProps {
   pastBadge: boolean
   /** 新一轮受理在途、屏上是上一轮：进度行给「制作中」chip，结算区改口「上一轮」。 */
   generatingNext: boolean
+  /** 重新生成的受理失败公开文案（''= 没有失败）：「生成失败」链接 + 点击弹原因。 */
+  regenError: string
+  /** 新一轮受理的真实进度（0-100，来自受理 operation 轮询）；null = 暂无快照，走扫描动画。 */
+  nextProgress: number | null
   /** 其他方案集数量（含往期）：>0 时进度行右侧出现「往期 N ›」入口。 */
   pastCount: number
   hintVisible: boolean
@@ -89,6 +93,8 @@ interface PlansDeckProps {
   onOpenDetail: (variant: PlanVariant) => void
   onRegenerate: () => void
   onRetryRender: (variant: PlanVariant) => void
+  /** 结算区「重试生成」：把已决但没图的套按顺序补生成（PlansScreen 串行）。 */
+  onRetryAll: (variants: PlanVariant[]) => void
 }
 
 export default function PlansDeck({
@@ -97,6 +103,8 @@ export default function PlansDeck({
   fallbackMedia,
   pastBadge,
   generatingNext,
+  regenError,
+  nextProgress,
   pastCount,
   hintVisible,
   retryingId,
@@ -109,13 +117,19 @@ export default function PlansDeck({
   onOpenDetail,
   onRegenerate,
   onRetryRender,
+  onRetryAll,
 }: PlansDeckProps) {
-  const [showSkipped, setShowSkipped] = useState(false)
-  // 手势提示占文档流一行，显示期间卡让出这 30px；提示收掉后空间还给卡
   const budget = STAGE_BUDGET_BASE - (hintVisible && !busy ? HINT_ROW_PX : 0)
   const [stage, setStage] = useState<StageSize>(() => estimateStageSize(budget))
   const aspectRef = useRef<number | null>(null)
   const ended = isStackEnded(stack)
+  // 成衣拼贴高度 = 一屏吃满再留一点呼吸：视口 - 导航 - 链接行/边距 - 底部呼吸 24px。
+  // 照片顶对齐铺满此框（多余裁底，头永远在）
+  const COLLAGE_CHROME_PX = 120
+  const collageHeight = Math.max(
+    340,
+    Math.min(640, SYSTEM.windowHeight - NAV.navHeight - COLLAGE_CHROME_PX - SAFE_INSET),
+  )
 
   // 预算变化（提示出现/收掉）时按已知的照片比例重排卡尺寸
   useEffect(() => {
@@ -168,6 +182,24 @@ export default function PlansDeck({
   const skipped = decidedCards(stack, 'skip')
   // 渲染内容永远取最新 variant（轮询刷新后生成图/状态跟上来），决策取 stack
   const freshById = new Map(variants.map((variant) => [variant.id, variant]))
+  // 结算区的失败汇总：已决的套里有没图的，给一句说明 + 一次性的「重试生成」
+  const failedDecided = [...liked, ...skipped].filter((variant) => {
+    const render = variantRenderView(freshById.get(variant.id) ?? variant)
+    return render.kind === 'failed' || render.kind === 'unavailable'
+  })
+  const renderFailedNote =
+    failedDecided.length > 0 ? (
+      <View className="plans-deck__result-failed">
+        <Text className="plans-deck__result-failed-text">
+          {failedDecided.length} {PLANNING_COPY.resultRenderFailedNote}
+        </Text>
+        <TextLink
+          className="plans-deck__result-failed-retry"
+          text={PLANNING_COPY.resultRetryAll}
+          onClick={() => onRetryAll(failedDecided)}
+        />
+      </View>
+    ) : null
 
   // 照片真实宽高 → 卡尺寸：一屏放不下就等比缩宽（全身完整的关键，宁小勿裁）
   const handleDims = (event: { detail: { width: number | string; height: number | string } }) => {
@@ -242,31 +274,6 @@ export default function PlansDeck({
     )
   }
 
-  const stripCard = (variant: PlanVariant) => {
-    const fresh = freshById.get(variant.id) ?? variant
-    const render = variantRenderView(fresh)
-    return (
-      <View
-        key={variant.id}
-        className="plans-deck__strip-card pressable"
-        onClick={() => onOpenDetail(fresh)}
-      >
-        <View className="plans-deck__strip-photo">
-          {render.kind === 'ready' ? (
-            <SourceImage className="plans-deck__strip-img" media={render.media} mode="aspectFill" />
-          ) : (
-            <View className="plans-deck__strip-empty">
-              <Text className="plans-deck__strip-empty-text">
-                {render.kind === 'unavailable' ? PLANNING_COPY.renderThumbUnavailable : PLANNING_COPY.renderThumbFailed}
-              </Text>
-            </View>
-          )}
-        </View>
-        <Text className="plans-deck__strip-name">{fresh.name}</Text>
-      </View>
-    )
-  }
-
   return (
     <View className="plans-deck">
       {/* 进度行：本轮 N 套 + 分段进度条 + 「往期 N ›」入口（历史收进弹层，
@@ -298,7 +305,8 @@ export default function PlansDeck({
                 />
               ))}
             </View>
-            {pastCount > 0 ? (
+            {/* ended 后结果区有更大的「往期 N 轮 ›」入口，这里不再重复 */}
+            {pastCount > 0 && !ended ? (
               <Text className="plans-deck__history-entry pressable" onClick={onOpenHistory}>
                 {PLANNING_COPY.historyEntry} {pastCount} ›
               </Text>
@@ -307,58 +315,144 @@ export default function PlansDeck({
         )}
       </View>
 
+      {/* 缝线进度条：新一轮在途时贴在进度行下（8rpx，不挤一屏预算）。
+          有真实进度按百分比走，暂无快照时来回扫描 */}
+      {generatingNext ? (
+        <View className="plans-deck__threadbar">
+          <View
+            className={`plans-deck__threadbar-fill ${nextProgress === null ? 'plans-deck__threadbar-fill--sweep' : ''}`}
+            style={nextProgress === null ? undefined : { transform: `scaleX(${nextProgress / 100})` }}
+          />
+        </View>
+      ) : null}
+
       {ended ? (
-        <View className="plans-deck__result fade-up">
-          <Text className="plans-deck__result-title">
-            {generatingNext ? PLANNING_COPY.resultPrevTitle : PLANNING_COPY.resultLikedTitle}
-          </Text>
-          {/* 喜欢组：组头带计数，空了才说空态 */}
-          <View className="plans-deck__result-group">
-            <Text className="plans-deck__result-group-label">
-              ♥ {PLANNING_COPY.resultLikedGroup} {liked.length}
-            </Text>
-          </View>
-          {liked.length === 0 ? (
-            <Text className="plans-deck__result-empty">{PLANNING_COPY.resultLikedEmpty}</Text>
-          ) : (
-            <ScrollView className="plans-deck__strip" scrollX enhanced showScrollbar={false}>
-              {liked.map((variant) => stripCard(variant))}
-            </ScrollView>
-          )}
-          {/* 跳过组：计数徽标常驻（收着也知道有几张），点组头收起/展开 */}
-          {skipped.length > 0 ? (
-            <>
-              <View
-                className="plans-deck__result-group plans-deck__result-group--toggle pressable"
-                onClick={() => setShowSkipped(!showSkipped)}
-              >
-                <Text className="plans-deck__result-group-label">
-                  ✕ {PLANNING_COPY.resultSkippedGroup} {skipped.length}
-                </Text>
-                <Text className="plans-deck__result-group-caret">{showSkipped ? '收起' : '展开'}</Text>
+        <View className="plans-deck__result">
+          {/* 成衣拼贴：本轮的交付仪式。大图 = 首张喜欢，右上盖「喜欢」章；
+              其余已决方案（最多 2 张，每轮 3 套封顶）作小拍立得斜嵌大图下角，
+              各带自己的态度章（♥ 苔绿 / ✕ 墨灰）。点任何一张进详情。
+              0 喜欢给裁缝店节拍的空态构图 */}
+          {(() => {
+            const first = liked[0]
+            if (!first) {
+              return (
+                <View className="plans-deck__result-none">
+                  <View className="plans-deck__result-none-paper">
+                    <View className="plans-deck__result-none-stitch" />
+                  </View>
+                  <Text className="plans-deck__result-empty">{PLANNING_COPY.resultLikedEmpty}</Text>
+                </View>
+              )
+            }
+            const firstFresh = freshById.get(first.id) ?? first
+            const firstRender = variantRenderView(firstFresh)
+            // 小拍立得 = 其余已决（喜欢在前、跳过在后），每轮 3 套封顶 → 最多 2 张
+            const smalls = [...liked.slice(1), ...skipped].slice(0, 2)
+            return (
+              <View className="plans-deck__collage">
+                <View
+                  className="plans-deck__hero pressable"
+                  style={{ height: `${collageHeight}px` }}
+                  onClick={() => onOpenDetail(firstFresh)}
+                >
+                  <View className="plans-deck__hero-photo">
+                    {firstRender.kind === 'ready' ? (
+                      // anchor="top"：人像短框顶对齐 cover，头不切、腿裁底
+                      <SourceImage media={firstRender.media} anchor="top" />
+                    ) : (
+                      <>
+                        {fallbackMedia ? (
+                          <SourceImage media={fallbackMedia} anchor="top" />
+                        ) : null}
+                        <View className="plans-deck__state">
+                          <View className="plans-deck__state-card">
+                            <RenderState view={firstRender} onRetry={() => onRetryRender(firstFresh)} />
+                          </View>
+                        </View>
+                      </>
+                    )}
+                  </View>
+                  <View className="plans-deck__veil" />
+                  {/* 喜欢章：与卡堆的盖章语言同源，斜盖在右上 */}
+                  <View className="plans-deck__stamp plans-deck__stamp--like">
+                    <Text>♥ {PLANNING_COPY.resultLikedGroup}</Text>
+                  </View>
+                  <View className="plans-deck__meta">
+                    {firstFresh.outcome_tags.length > 0 ? (
+                      <View className="plans-deck__tags">
+                        {firstFresh.outcome_tags.slice(0, 3).map((tag) => (
+                          <Text key={tag} className="plans-deck__tag">{tag}</Text>
+                        ))}
+                      </View>
+                    ) : null}
+                    <Text className="plans-deck__name">{firstFresh.name}</Text>
+                    {firstFresh.descriptor ? <Text className="plans-deck__desc">{firstFresh.descriptor}</Text> : null}
+                    <View className="plans-deck__detail-chip pressable" onClick={() => onOpenDetail(firstFresh)}>
+                      <Text className="plans-deck__detail-chip-text">{PLANNING_COPY.viewDetail}</Text>
+                      <Text className="plans-deck__detail-chip-chevron">›</Text>
+                    </View>
+                  </View>
+                </View>
+                {smalls.map((variant, index) => {
+                  const fresh = freshById.get(variant.id) ?? variant
+                  const render = variantRenderView(fresh)
+                  const decision = liked.slice(1).includes(variant) ? 'like' : 'skip'
+                  return (
+                    <View
+                      key={variant.id}
+                      className={`plans-deck__mini plans-deck__mini--${index === 0 ? 'left' : 'right'} pressable`}
+                      onClick={() => onOpenDetail(fresh)}
+                    >
+                      <View className="plans-deck__mini-photo">
+                        {render.kind === 'ready' ? (
+                          <SourceImage media={render.media} anchor="top" />
+                        ) : (
+                          <Text className="plans-deck__mini-failed">
+                            {render.kind === 'unavailable' ? PLANNING_COPY.renderThumbUnavailable : PLANNING_COPY.renderThumbFailed}
+                          </Text>
+                        )}
+                      </View>
+                      <Text className={`plans-deck__mini-badge plans-deck__mini-badge--${decision}`}>
+                        {decision === 'like' ? '♥' : '✕'} {decision === 'like' ? PLANNING_COPY.resultLikedGroup : PLANNING_COPY.resultSkippedGroup}
+                      </Text>
+                    </View>
+                  )
+                })}
               </View>
-              {showSkipped ? (
-                <ScrollView className="plans-deck__strip" scrollX enhanced showScrollbar={false}>
-                  {skipped.map((variant) => stripCard(variant))}
-                </ScrollView>
-              ) : null}
-            </>
-          ) : null}
-          {/* 往期轮次入口：进度行的「往期 N ›」在结果态容易被略过，
-              结果区里再给一次——历次生成了几轮、每轮情况从这进 */}
-          {pastCount > 0 ? (
-            <TextLink
-              className="plans-deck__result-history"
-              text={`${PLANNING_COPY.historyEntry} ${pastCount} ${PLANNING_COPY.historyRoundUnit} ›`}
-              onClick={onOpenHistory}
-            />
-          ) : null}
-          {/* 新一轮已在路上：不给可点的「生成新的一轮」，防重复提交的入口 */}
-          {generatingNext ? (
-            <Text className="plans-deck__regen plans-deck__regen--pending">{PLANNING_COPY.nextRoundGenerating}</Text>
-          ) : (
-            <TextLink className="plans-deck__regen" text={PLANNING_COPY.resultRegenerate} onClick={onRegenerate} />
-          )}
+            )
+          })()}
+          {renderFailedNote}
+          {/* 底部文字链接：往期（辅助）+ 生成新的一轮（主行动）。
+              生成期间不给「生成新的」（新一轮已在路上，防重复提交） */}
+          <View className="plans-deck__result-actions">
+            {pastCount > 0 ? (
+              <TextLink
+                className="plans-deck__result-history"
+                text={`${PLANNING_COPY.historyEntry} ${pastCount} ${PLANNING_COPY.historyRoundUnit} ›`}
+                onClick={onOpenHistory}
+              />
+            ) : null}
+            {generatingNext ? null : regenError ? (
+              // 失败态：警示色「生成失败」，点开弹原因 + 重新生成
+              <TextLink
+                className="plans-deck__regen plans-deck__regen--error"
+                text={PLANNING_COPY.resultRegenFailed}
+                onClick={() => {
+                  void Taro.showModal({
+                    title: PLANNING_COPY.retryFailedTitle,
+                    content: regenError,
+                    confirmText: PLANNING_COPY.regenerateAction,
+                    cancelText: PLANNING_COPY.cancelText,
+                    success: (res) => {
+                      if (res.confirm) onRegenerate()
+                    },
+                  })
+                }}
+              />
+            ) : (
+              <TextLink className="plans-deck__regen" text={PLANNING_COPY.resultRegenerate} onClick={onRegenerate} />
+            )}
+          </View>
         </View>
       ) : (
         <>

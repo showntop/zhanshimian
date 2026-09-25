@@ -5,11 +5,13 @@
   height: 100%;
   display: flex;
 
-  // ---------- 色卡：色块在上，标签在下 ----------
+  // ---------- 色卡：色票式小样，不是两块大色板 ----------
+  // 大面积平涂单色（300rpx 方块）读作「没画完的色块」；
+  // 缩成色票比例（180rpx），标签进块内小签，选中盖苔绿角章
   &--swatch {
-    align-items: stretch;
-    gap: 16rpx;
-    padding: 40rpx 32rpx 44rpx;
+    align-items: flex-start;
+    gap: 20rpx;
+    padding: 32rpx;
   }
 
   &-sw-col {
@@ -17,31 +19,32 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 14rpx;
   }
 
   &-sw {
     position: relative;
-    flex: 1;
-    min-height: 0;
-    border-radius: 8rpx;
+    height: 180rpx;
+    border-radius: 12rpx;
+    border: 1rpx solid rgba(43, 43, 35, 0.12);
     overflow: hidden;
 
     &.is-pick {
       box-shadow: 0 0 0 4rpx var(--moss), 0 10rpx 24rpx rgba(45, 58, 35, 0.16);
+      border-color: transparent;
     }
 
-    // 不推荐项不用「打叉」施压，只做降饱和
+    // 不推荐项不用「打叉」施压，只做降饱和 + 虚线边界（像被翻过去的色票）
     &.is-drop {
-      opacity: 0.66;
+      opacity: 0.78;
+      border-style: dashed;
     }
   }
 
   &-sw-mark {
     position: absolute;
-    right: 10rpx;
-    bottom: 8rpx;
-    font-size: 22rpx;
+    top: 10rpx;
+    right: 12rpx;
+    font-size: 24rpx;
     font-weight: 800;
     line-height: 1;
     color: var(--moss-deep);
@@ -51,11 +54,21 @@
     }
   }
 
+  // 标签：块内底部小签（奶油底细字），不再悬在块外
   &-sw-label {
-    text-align: center;
-    font-size: 21rpx;
+    position: absolute;
+    left: 10rpx;
+    bottom: 10rpx;
+    max-width: calc(100% - 20rpx);
+    padding: 4rpx 14rpx;
+    border-radius: 999rpx;
+    background: rgba(244, 245, 242, 0.9);
+    font-size: 20rpx;
     font-weight: 600;
-    color: var(--ink-2);
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   // ---------- 对比：左扁平，右有层次 ----------

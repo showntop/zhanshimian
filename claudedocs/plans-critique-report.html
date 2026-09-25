@@ -1,0 +1,242 @@
+<title>结算页设计批评</title>
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #f4f2ea;
+    --paper-2: #edeae0;
+    --ink: #2b2b23;
+    --ink-2: #6b6a5c;
+    --ink-3: #9a987f;
+    --line: #d8d4c2;
+    --moss: #587344;
+    --moss-deep: #39492e;
+    --moss-soft: #e6e9dd;
+    --copper: #c4622d;
+    --copper-soft: #f3e2d5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 20px 64px; }
+  .eyebrow {
+    font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--copper); font-weight: 600; margin: 0 0 6px;
+  }
+  header { padding: 48px 0 28px; border-bottom: 3px double var(--ink); }
+  h1 {
+    font-family: "Songti SC", "Noto Serif SC", serif;
+    font-size: 34px; line-height: 1.25; margin: 0 0 10px; font-weight: 900;
+  }
+  .meta { color: var(--ink-2); font-size: 13px; }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .rule { height: 1px; background: var(--line); margin: 0; }
+  section { padding: 28px 0; border-bottom: 1px solid var(--line); }
+  h2 {
+    font-family: "Songti SC", "Noto Serif SC", serif;
+    font-size: 20px; margin: 0 0 14px; font-weight: 800;
+  }
+  h2 .no {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 12px; color: var(--ink-3); margin-right: 10px; letter-spacing: 0.1em;
+  }
+  /* 评分 */
+  .score-row { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+  .score-big {
+    font-family: "Songti SC", "Noto Serif SC", serif;
+    font-size: 64px; font-weight: 900; line-height: 1; color: var(--moss-deep);
+  }
+  .score-big small { font-size: 22px; color: var(--ink-3); font-weight: 700; }
+  .score-cap { color: var(--ink-2); font-size: 13px; max-width: 300px; padding-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11px; letter-spacing: 0.12em; color: var(--ink-2); font-weight: 600; }
+  td.num { font-variant-numeric: tabular-nums; font-weight: 700; width: 44px; }
+  .pill {
+    display: inline-block; padding: 1px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  }
+  .low  { background: var(--copper-soft); color: var(--copper); }
+  .mid  { background: var(--moss-soft); color: var(--moss-deep); }
+  .na   { background: transparent; color: var(--ink-3); border: 1px solid var(--line); }
+  /* 判定 */
+  .verdict {
+    background: var(--paper-2); border: 1px solid var(--line);
+    padding: 16px 18px; font-size: 14.5px;
+  }
+  .verdict b { color: var(--copper); }
+  /* 问题卡 */
+  .issue { border: 1px solid var(--line); background: #fbfaf5; margin-bottom: 14px; }
+  .issue-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; background: var(--paper-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .sev {
+    font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700;
+    padding: 1px 8px; color: #fff;
+  }
+  .sev.p0 { background: var(--copper); }
+  .sev.p1 { background: var(--moss-deep); }
+  .sev.p2 { background: var(--ink-3); }
+  .issue-head h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  .issue-body { padding: 12px 16px 14px; font-size: 14px; }
+  .issue-body p { margin: 0 0 8px; }
+  .issue-body .fix { color: var(--moss-deep); }
+  .issue-body .fix b { font-size: 11px; letter-spacing: 0.14em; color: var(--moss); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 560px) { .cols { grid-template-columns: 1fr; } }
+  .note { font-size: 13px; color: var(--ink-2); }
+  .note b { color: var(--ink); }
+  ul { margin: 8px 0 0; padding-left: 18px; }
+  li { margin-bottom: 6px; }
+  .q { font-size: 14.5px; margin: 0 0 10px; padding-left: 14px; border-left: 3px solid var(--moss); }
+  .foot { padding: 22px 0 0; color: var(--ink-3); font-size: 12px; }
+  .stamp {
+    float: right; margin: -6px 0 0 16px;
+    border: 2px solid var(--copper); color: var(--copper);
+    font-family: "Songti SC", serif; font-weight: 900;
+    padding: 4px 10px; font-size: 14px; letter-spacing: 0.2em;
+    transform: rotate(4deg); opacity: 0.85;
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">uplook · impeccable critique</p>
+    <h1>方案结算页<br>设计批评报告</h1>
+    <p class="meta"><b>目标</b> PlansDeck.tsx · ended 分支｜<b>方法</b> 双代理（设计评审 + 确定性检测）｜<b>日期</b> 2026-09-24</p>
+  </header>
+
+  <section>
+    <p class="stamp">留档</p>
+    <div class="score-row">
+      <div class="score-big">22<small> / 32</small></div>
+      <div class="score-cap">Nielsen 十项启发式（1 项 n/a）。功能及格；美学（1/4）与识别（2/4）拖垮整体。主诉「空荡、无层次」被证实。</div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="no">01</span>专属性判定</h2>
+    <div class="verdict">
+      <b>品类通用。</b>卡堆是被深度创作的：宝丽来纸堆、苔绿「喜欢」印章、6°/-9° 落卡、奶油渐变、纸屑、5s/7s/9s 质数浮动。结算屏把这些全扔了——这一屏可以原封不动换成任何左滑类 App 的结果页。<b>创作系统在上游存在，但没有活到结果态。</b>
+    </div>
+    <p class="note" style="margin-top:12px">峰终定律：此屏是「上传 → 等 1–2 分钟 → 滑完 N 张」的终点。峰值（看到自己脸的新效果图）在滑卡时已发生，终点却是清单式弱终点。<b>终点应重演峰值，而非盘点峰值。</b></p>
+  </section>
+
+  <section>
+    <h2><span class="no">02</span>启发式评分</h2>
+    <table>
+      <tr><th>#</th><th>启发式</th><th>分</th><th>关键发现</th></tr>
+      <tr><td>1</td><td>系统状态可见</td><td class="num">3</td><td>进度条 / chip / 上一轮改口都对；新轮落地无庆祝</td></tr>
+      <tr><td>2</td><td>贴合真实世界</td><td class="num">2</td><td>「喜欢 1 / 跳过 2」是清单语言，不是裁缝店语言</td></tr>
+      <tr><td>3</td><td>用户控制</td><td class="num">3</td><td>最后一张卡滑错后，结果屏无撤销</td></tr>
+      <tr><td>4</td><td>一致性与标准</td><td class="num">2</td><td>结果区字号挤在 12rpx 区间，层级塌掉</td></tr>
+      <tr><td>5</td><td>错误预防</td><td class="num">3</td><td>防重复提交、busy 禁手势，扎实</td></tr>
+      <tr><td>6</td><td>识别而非回忆</td><td class="num">2</td><td>亲手喜欢的效果图缩至 ~27% 屏宽；往期入口 ×2</td></tr>
+      <tr><td>7</td><td>灵活高效</td><td class="num">3</td><td>密度好；最常见的「只喜欢 1 套」得到最平布局</td></tr>
+      <tr><td>8</td><td>美学与极简</td><td class="num"><span class="pill low">1</span></td><td>1 喜欢时内容仅占视口 ~40%，下方 60% 纯底色虚空</td></tr>
+      <tr><td>9</td><td>错误恢复</td><td class="num">3</td><td>失败汇总 + 逐套/批量重试，堪称典范</td></tr>
+      <tr><td>10</td><td>帮助文档</td><td class="num"><span class="pill na">n/a</span></td><td>终态任务屏不需要</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="no">03</span>优先问题</h2>
+
+    <div class="issue">
+      <div class="issue-head"><span class="sev p0">P0</span><h3>1 喜欢场景的虚空</h3></div>
+      <div class="issue-body">
+        <p>~60% 视口空白，下半屏没有构图锚点——读作「没做完」而非「留白」。</p>
+        <p class="fix"><b>修法</b>　liked ≤ 2 时，首张喜欢方案渲染为全宽「成衣卡」：复用 renderCard 的 veil + meta 构图，点击进详情；缩略条降级为 2+ 喜欢时的胶片条；底部虚空用纸堆 / 纸屑母题收边。</p>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-head"><span class="sev p1">P1</span><h3>主行动是三级视觉</h3></div>
+      <div class="issue-body">
+        <p>「生成新的一轮」是全屏最重要的前进动作，却是 26rpx 居中文字链。</p>
+        <p class="fix"><b>修法</b>　升为苔绿全宽按钮，钉在 tab 栏上方；往期降为次级链接。（流向待定：重新生成 vs 每日线 vs 执行清单——先 shape 再动。）</p>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-head"><span class="sev p1">P1</span><h3>最后一张卡无法撤销</h3></div>
+      <div class="issue-body">
+        <p>结果屏不暴露 undo，误滑不可逆；stack.history 现成。</p>
+        <p class="fix"><b>修法</b>　结果落定初期给一条紧凑「撤销上一决定」。</p>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-head"><span class="sev p2">P2</span><h3>往期入口重复</h3></div>
+      <div class="issue-body">
+        <p>进度行 + 结果体各一个「往期 N ›」，增加的是回忆负载而非识别。</p>
+        <p class="fix"><b>修法</b>　ended 态只留结果体一处。</p>
+      </div>
+    </div>
+
+    <div class="issue">
+      <div class="issue-head"><span class="sev p2">P2</span><h3>字阶过平</h3></div>
+      <div class="issue-body">
+        <p>标题 / 组头 / 链接全部落在 12rpx 区间，没有主导层级。</p>
+        <p class="fix"><b>修法</b>　标题 ~44rpx + 宋体数字母题；组头 26rpx；链接 24rpx ink-3——三层梯。组头 ♥ 补苔绿色（遵守「喜欢 = 苔绿」规则）。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="cols">
+      <div>
+        <h2><span class="no">04</span>做得好的</h2>
+        <ul>
+          <li><b>失败处理是被创作的</b>：逐套重试 chip、带计数批量重试、failed / unavailable 分文案</li>
+          <li><b>状态感知文案</b>：生成中改口「上一轮」、防重复提交、制作中提示去重</li>
+          <li><b>组头常驻计数</b>：跳过收着也知道有几个</li>
+        </ul>
+      </div>
+      <div>
+        <h2><span class="no">05</span>人物红旗</h2>
+        <ul>
+          <li><b>首次使用者</b>：带着最高投入度离场，却没有「已保存、明天回来」的留存钩子</li>
+          <li><b>回访用户</b>：历史被表述为计数而非资产，积累轮次零视觉存在</li>
+          <li><b>场合用户</b>：结算不说「喜欢了之后去哪」（执行清单 / Brief 出口缺失）</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="cols">
+      <div>
+        <h2><span class="no">06</span>次要观察</h2>
+        <ul>
+          <li>结果区唯一动画是通用 fade-up——结果屏比加载屏还少动画</li>
+          <li>__result 右 padding 仅 8rpx，首张缩略图贴边比任何内容都狠</li>
+          <li>组头 ♥ 未用苔绿，违反 SCSS 头注规则</li>
+        </ul>
+      </div>
+      <div>
+        <h2><span class="no">07</span>检测器（B）</h2>
+        <ul>
+          <li>planning：1 warning——<span style="font-family:ui-monospace,monospace;font-size:12px">index.scss:145 transition:width</span>（进度条惯例；可改 transform: scaleX）</li>
+          <li>daily：0 findings</li>
+          <li>浏览器可视化：小程序不可跑，已记录跳过</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="no">08</span>值得争论的问题</h2>
+    <p class="q">如果卡堆是「裁缝桌上的卡」，结算该是什么？喜欢的卡被叠好、包好、放到你面前——现在的清单还成立吗？</p>
+    <p class="q">「生成新的一轮」真的是主 CTA 吗，还是该导向每日线（留存）或执行清单（价值）？</p>
+    <p class="q">0 喜欢场景要不要专属构图？「没留下」是诚实的裁缝店节拍，还是读起来像产品故障？</p>
+    <p class="foot">评审快照：.impeccable/critique/2026-09-24T14-09-50Z__apps-miniapp-src-features-planning-plansdeck-tsx.md · 下一步 /impeccable layout → typeset → delight → polish</p>
+  </section>
+</div>

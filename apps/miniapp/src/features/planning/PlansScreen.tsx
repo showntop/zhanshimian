@@ -35,6 +35,7 @@ import ErrorState from '../../components/error-state'
 import BottomSheet from '../../components/bottom-sheet'
 import PlanProgressView from './PlanProgressView'
 import PrimaryButton from '../../components/primary-button'
+import TextLink from '../../components/text-link'
 import PlansDeck from './PlansDeck'
 import PlansHistory from './PlansHistory'
 import Skeleton from '../../components/skeleton'
@@ -640,6 +641,13 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
     }
   }
 
+  /** 结算区「重试生成」：把没图的套按顺序补一遍（逐套 await，天然不并发）。 */
+  const retryAllFailed = async (variants: PlanVariant[]) => {
+    for (const variant of variants) {
+      await retryVariant(variant)
+    }
+  }
+
   const openDetail = (variant: PlanVariant) => {
     void Taro.navigateTo({
       url:
@@ -946,7 +954,7 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
       ) : null}
 
       {/* 当前场景有在途受理但屏上还是旧方案集：未看完的卡堆挤一屏预算，
-          只给细横幅不给高卡（已看完的结算态走上面 atelierCard） */}
+          只给细横幅；已看完的结算态由进度行 chip 表达，不再叠高卡 */}
       {regenerating && !isStackEnded(stack) ? (
         <View className="plans__generating">
           <View className="plans__generating-spin spinner" />
@@ -954,30 +962,34 @@ export default function PlansScreen({ planSetId: routePlanSetId, operationId: ro
         </View>
       ) : null}
 
+      {/* 受理失败（旧轮在屏）改由结果区「生成失败」链接 + 弹窗表达，不占文档流 */}
       {switching ? (
         <View className="plans__generating">
           <View className="plans__generating-spin spinner" />
-          <Text className="plans__generating-text">{PLANNING_COPY.sceneLoading}</Text>
-        </View>
+          <Text className="plans__generating-text">{PLANNING_COPY.sceneLoading}</Text>        </View>
       ) : null}
 
       {variants.length === 0 ? (
         sceneEmptyCard
       ) : (
         <>
-          {/* 新一轮制作中 + 旧轮已看完：纸样台卡置顶，旧轮结算结果原样在下
-             （结算视图矮，加卡不破一屏；未看完时不加高卡，保持细横幅） */}
-          {regenerating && isStackEnded(stack) ? atelierCard : null}
+          {/* 新一轮制作中：进度行 chip 已表达在途；不再叠纸样台大卡——
+              它会把成衣拼贴挤出锁死的一屏 */}
           <PlansDeck
             stack={stack}
             variants={variants}
             fallbackMedia={leftMedia}
             pastBadge={viewingPast}
             generatingNext={regenerating}
+            regenError={acceptFailed && acceptSceneRef.current === scene ? acceptFailed : ''}
+            nextProgress={
+              planProgressView(operations.filter((op) => op.id === acceptOperationId))?.percent ?? null
+            }
             pastCount={Math.max(0, sets.length - 1)}
             hintVisible={deckHint}
             retryingId={retryingId}
             busy={deciding}
+            onRetryAll={(list) => void retryAllFailed(list)}
             onDecide={handleDecide}
             onUndo={handleUndo}
             onHintDismiss={dismissDeckHint}

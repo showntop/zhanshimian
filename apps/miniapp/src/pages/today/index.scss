@@ -36,6 +36,22 @@
     height: 580rpx;
   }
 
+  // 色卡类是「信息图」不是「海报」：高度随内容走，不撑 400rpx 的舞台
+  &__visual--flat {
+    height: auto;
+    background: transparent;
+  }
+
+  // .dv 自带 height:100%，舞台改 auto 后解除，避免百分比塌陷
+  &__visual--flat .dv {
+    height: auto;
+  }
+
+  // 色卡类是「信息图」不是「海报」：高度随内容走，不撑 400rpx 的舞台
+  &__visual--flat {
+    height: auto;
+  }
+
   // ---------- 正文 ----------
   &__body {
     padding: 40rpx 2rpx 0;
@@ -110,13 +126,84 @@
     color: var(--cream);
   }
 
-  &__link {
-    display: block;
-    margin-top: 26rpx;
-    text-align: center;
-    font-size: 25rpx;
+  // 试试行动行：主按钮下的次级动作，左右贯通的热区、箭头靠右
+  &__try-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 18rpx;
+    padding: 18rpx 6rpx;
+  }
+
+  &__try-row-text {
+    font-size: 26rpx;
     font-weight: 600;
     color: var(--moss);
+  }
+
+  &__try-row-arrow {
+    font-size: 30rpx;
+    color: var(--moss);
+  }
+
+  // 今日造型状态行（闭环枢纽）：缩略图 + 两行文案 + 状态
+  &__tryon {
+    display: flex;
+    align-items: center;
+    gap: 20rpx;
+    padding: 16rpx 2rpx;
+  }
+
+  &__tryon-thumb {
+    width: 96rpx;
+    height: 96rpx;
+    border-radius: 12rpx;
+    flex-shrink: 0;
+
+    &--empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--moss-soft);
+      border: 1rpx solid var(--line);
+    }
+  }
+
+  &__tryon-thumb-mark {
+    font-size: 36rpx;
+    color: var(--moss-deep);
+  }
+
+  &__tryon-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4rpx;
+  }
+
+  &__tryon-title {
+    font-size: 26rpx;
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__tryon-sub {
+    font-size: 21rpx;
+    color: var(--ink-3);
+  }
+
+  &__tryon-arrow {
+    font-size: 30rpx;
+    color: var(--ink-3);
+  }
+
+  &__tryon-spin {
+    width: 26rpx;
+    height: 26rpx;
   }
 
   // ---------- 手册入口：轻量行，不是卡片 ----------

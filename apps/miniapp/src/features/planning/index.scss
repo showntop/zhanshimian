@@ -139,10 +139,13 @@
   }
 
   &__bar-fill {
+    width: 100%;
     height: 100%;
     border-radius: 999rpx;
     background: var(--moss);
-    transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform-origin: left center;
+    // scaleX 而非 width：合成器动画，不触发布局抖动
+    transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   &__percent {

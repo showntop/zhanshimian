@@ -51,7 +51,10 @@ export default function PlanProgressView({ media, snapshot, onWander }: PlanProg
       </View>
 
       <View className="plan-progress__bar">
-        <View className="plan-progress__bar-fill" style={{ width: `${snapshot?.percent ?? 0}%` }} />
+        <View
+          className="plan-progress__bar-fill"
+          style={{ transform: `scaleX(${(snapshot?.percent ?? 0) / 100})` }}
+        />
       </View>
       {snapshot ? <Text className="plan-progress__percent">{snapshot.percent}%</Text> : null}
 

@@ -59,8 +59,8 @@ export default function DailyVisual({ visual, compact = false }: DailyVisualProp
               >
                 {state === 'pick' ? <Text className="dv-sw-mark">✓</Text> : null}
                 {state === 'drop' ? <Text className="dv-sw-mark is-drop">×</Text> : null}
+                {!compact && label !== '' ? <Text className="dv-sw-label">{label}</Text> : null}
               </View>
-              {!compact && label !== '' ? <Text className="dv-sw-label">{label}</Text> : null}
             </View>
           )
         })}

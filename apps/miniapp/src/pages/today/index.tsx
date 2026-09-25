@@ -10,10 +10,11 @@
 //
 // 重模式不在这里并列：它是「看看我穿这样」这个 action 的结果，跳 life 分包的今日造型页。
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
-import { Text, View } from '@tarojs/components'
+import { Image, Text, View } from '@tarojs/components'
 import { DAILY_COPY, dailyTypeName } from '@zsm/core'
+import { peripherals } from '../../app/api/peripherals'
 import { usePageShell } from '../../hooks/use-page-visibility'
 import { useDailyPick, useTodayContext } from '../../features/daily/use-daily-pick'
 import AppHeader from '../../components/app-header'
@@ -45,6 +46,31 @@ export default function Today() {
     void Taro.navigateTo({ url: HANDBOOK_PATH })
   }, [])
 
+  // 今日造型状态行（闭环枢纽）：current 接口缓存优先，onShow 刷新。
+  // planning/rendering = 生成中；ready = 已生成；null = 还没有
+  const [tryonPlan, setTryonPlan] = useState<
+    { state: string; title: string; mediaUrl: string } | null
+  >(null)
+  useDidShow(() => {
+    void peripherals
+      .getCurrentTodayPlan()
+      .then((plan) => {
+        if (!plan) return
+        setTryonPlan({
+          state: plan.state,
+          title: plan.title ?? '',
+          mediaUrl: plan.media?.url ?? '',
+        })
+      })
+      .catch(() => {})
+  })
+  const tryonState =
+    tryonPlan === null
+      ? 'empty'
+      : tryonPlan.state === 'ready' || tryonPlan.state === 'ready_partial'
+        ? 'ready'
+        : 'working'
+
   const seq = String(saves.length + 1).padStart(2, '0')
   const saved = Boolean(content && saves.some((save) => save.key === content.dedupeKey))
   const isFallback = content?.source === 'fallback'
@@ -72,7 +98,11 @@ export default function Today() {
           {content ? (
             <View
               className={`today__visual ${
-                content.visual.modality === 'poster' ? 'today__visual--tall' : ''
+                content.visual.modality === 'poster'
+                  ? 'today__visual--tall'
+                  : content.visual.modality === 'swatch'
+                    ? 'today__visual--flat'
+                    : ''
               }`}
             >
               <DailyVisual visual={content.visual} />
@@ -100,7 +130,51 @@ export default function Today() {
                   {saved ? `${DAILY_COPY.savedPrefix}${bucketName}` : `${DAILY_COPY.saveAction}${bucketName}`}
                 </Text>
               </View>
-              <Text className="today__link" onClick={goPlan}>{DAILY_COPY.seeItAction}</Text>
+              {/* 行动行：试试从「看」升级为「做」——把今日建议拿去生成造型 */}
+              <View className="today__try-row pressable" onClick={goPlan}>
+                <Text className="today__try-row-text">{DAILY_COPY.trySuggestions}</Text>
+                <Text className="today__try-row-arrow">›</Text>
+              </View>
+
+              <View className="today__rule" />
+
+              {/* 今日造型状态行（闭环枢纽）：内容 → 试试 → 反馈 → 明天再来 */}
+              <View className="today__tryon pressable" onClick={goPlan}>
+                {tryonState === 'ready' && (tryonPlan?.mediaUrl ?? '') !== '' ? (
+                  <Image
+                    className="today__tryon-thumb"
+                    src={tryonPlan?.mediaUrl ?? ''}
+                    mode="aspectFill"
+                  />
+                ) : (
+                  <View className="today__tryon-thumb today__tryon-thumb--empty">
+                    <Text className="today__tryon-thumb-mark">
+                      {tryonState === 'working' ? '⟩' : '＋'}
+                    </Text>
+                  </View>
+                )}
+                <View className="today__tryon-main">
+                  <Text className="today__tryon-title">
+                    {tryonState === 'ready'
+                      ? tryonPlan?.title || DAILY_COPY.tryonReady
+                      : tryonState === 'working'
+                        ? DAILY_COPY.tryonWorking
+                        : DAILY_COPY.tryonEmpty}
+                  </Text>
+                  <Text className="today__tryon-sub">
+                    {tryonState === 'ready'
+                      ? DAILY_COPY.tryonReady
+                      : tryonState === 'working'
+                        ? DAILY_COPY.dressCaptionSub
+                        : DAILY_COPY.trySuggestions}
+                  </Text>
+                </View>
+                {tryonState === 'working' ? (
+                  <View className="today__tryon-spin spinner" />
+                ) : (
+                  <Text className="today__tryon-arrow">›</Text>
+                )}
+              </View>
 
               <View className="today__rule" />
               <View className="today__handbook" onClick={goHandbook}>

@@ -403,18 +403,13 @@
     font-size: 22rpx;
   }
 
-  // ---------- 栈空结果态 ----------
+  // ---------- 栈空结果态（成衣交付构图） ----------
   &__result {
     display: flex;
     flex-direction: column;
     gap: 18rpx;
-    padding: 40rpx 8rpx 20rpx;
-  }
-
-  &__result-title {
-    font-size: 34rpx;
-    font-weight: 700;
-    color: var(--ink);
+    // 与页面栅格对齐；顶部收紧（标题已删，卡就是起点）
+    padding: 8rpx 0 20rpx;
   }
 
   &__result-empty {
@@ -422,96 +417,258 @@
     color: var(--ink-2);
   }
 
-  &__strip {
+  // 缝线进度条：苔绿填充 + 斜向虚线流光循环移动（缝纫线迹隐喻）。
+  // 进度走 transform: scaleX（合成器动画，不触发布局抖动），
+  // 暂无快照时整条来回扫描
+  &__threadbar {
+    height: 8rpx;
+    border-radius: 999rpx;
+    background: var(--moss-soft);
+    overflow: hidden;
+  }
+
+  &__threadbar-fill {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 999rpx;
+    transform-origin: left center;
+    background: linear-gradient(90deg, var(--moss) 0%, var(--moss-deep) 100%);
+    transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    // 流光层：奶油色斜虚线，沿缝制方向循环
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        105deg,
+        transparent 0 14rpx,
+        rgba(244, 245, 242, 0.55) 14rpx 22rpx
+      );
+      animation: plans-thread-stitch 0.9s linear infinite;
+    }
+  }
+
+  // 无快照：整条缝线来回扫描
+  &__threadbar-fill--sweep {
+    animation: plans-thread-sweep 1.6s ease-in-out infinite alternate;
+  }
+
+  @keyframes plans-thread-stitch {
+    to {
+      background-position: 44rpx 0;
+    }
+  }
+
+  @keyframes plans-thread-sweep {
+    from {
+      transform: translateX(-60%);
+    }
+    to {
+      transform: translateX(45%);
+    }
+  }
+
+  // 成衣卡：本轮的「交付仪式」——裁好的那套被放到你面前。
+  // 高度由一屏预算给定（吃满剩余视口）；照片 anchor="top" 顶对齐铺满，
+  // 多余裁底、头永远在——卡不随照片自然高走，底部不空
+  &__hero {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: var(--radius-md);
+    border: 1rpx solid var(--line);
+    background: var(--moss-soft);
+    box-shadow: 0 10rpx 28rpx rgba(43, 43, 35, 0.14);
+
+    animation: plans-hero-drop 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  // 成衣卡照片框：absolute 铺满定高相框（文档流 widthFix 会在下缘留空隙）
+  &__hero-photo {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .plans-deck__hero {
+      animation: none;
+    }
+  }
+
+  // 「落桌」：轻旋转下落 + 阴影收拢，回到静止——一次编排，不散落特效
+  @keyframes plans-hero-drop {
+    from {
+      opacity: 0;
+      transform: translateY(-16px) rotate(-1.2deg);
+      box-shadow: 0 24rpx 48rpx rgba(43, 43, 35, 0.2);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      box-shadow: 0 10rpx 28rpx rgba(43, 43, 35, 0.14);
+    }
+  }
+
+  // 0 喜欢的空态节拍：一张虚线针脚的空纸样——诚实但不读作产品故障
+  &__result-none {
     display: flex;
-    white-space: nowrap;
+    flex-direction: column;
+    gap: 18rpx;
+    padding: 24rpx 0 8rpx;
+  }
+
+  &__result-none-paper {
+    width: 100%;
+    height: 420rpx;
+    border-radius: var(--radius-md);
+    background: var(--cream);
+    border: 1rpx solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  // 虚线针脚：裁缝世界里「本该有图的位置」的诚实占位
+  &__result-none-stitch {
+    width: 40%;
+    height: 0;
+    border-top: 2rpx dashed var(--ink-3);
+  }
+
+  // 成衣拼贴：大图 + 斜嵌小拍立得的定位上下文
+  &__collage {
+    position: relative;
     width: 100%;
   }
 
-  &__strip-card {
-    display: inline-flex;
-    flex-direction: column;
-    gap: 8rpx;
-    width: 200rpx;
-    margin-right: 16rpx;
+  // 小拍立得：其余已决方案，斜嵌大图左右两侧（半出血）、避开底部文字区
+  &__mini {
+    position: absolute;
+    width: 190rpx;
+    padding: 8rpx 8rpx 26rpx;
+    border-radius: var(--radius-sm);
+    background: var(--surface, #fff);
+    border: 1rpx solid var(--line);
+    box-shadow: 0 8rpx 20rpx rgba(43, 43, 35, 0.16);
+    z-index: 2;
   }
 
-  &__strip-photo {
-    width: 200rpx;
-    height: 260rpx;
-    border-radius: var(--radius-md);
+  &__mini--left {
+    left: -14rpx;
+    top: 26%;
+    transform: rotate(-5deg);
+  }
+
+  &__mini--right {
+    right: -14rpx;
+    top: 42%;
+    transform: rotate(4deg);
+  }
+
+  &__mini-photo {
+    width: 100%;
+    height: 210rpx;
+    border-radius: 6rpx;
     overflow: hidden;
     background: var(--moss-soft);
-    border: 1rpx solid var(--line);
+    // 定尺寸块容器：.source-image 在 auto 高的 flex item 里会宽度坍缩为 0
     position: relative;
   }
 
-  // aspectFill 的图需要确定高：.source-image 自身是 auto 高，
-  // 不铺满相框的话内部 height:100% 解析为 0，缩略图只剩苔绿底
-  &__strip-img {
-    position: absolute;
-    inset: 0;
-  }
-
-  &__strip-empty {
+  &__mini-failed {
     position: absolute;
     inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 8rpx;
-  }
-
-  &__strip-empty-text {
     font-size: 18rpx;
     color: var(--ink-3);
     text-align: center;
+    padding: 8rpx;
   }
 
-  &__strip-name {
-    font-size: 24rpx;
-    font-weight: 600;
-    color: var(--ink);
-    overflow: hidden;
-    text-overflow: ellipsis;
+  // 态度章：♥ 苔绿 / ✕ 墨灰——与「喜欢 = 苔绿」规则同源
+  &__mini-badge {
+    position: absolute;
+    left: 8rpx;
+    right: 8rpx;
+    bottom: 6rpx;
+    font-size: 18rpx;
+    font-weight: 700;
+    text-align: center;
   }
 
-  // 结算分组条：喜欢/跳过各一条，计数在组头上；跳过组头可点收起/展开
-  &__result-group {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 6rpx;
+  &__mini-badge--like {
+    color: var(--moss-deep);
   }
 
-  &__result-group--toggle {
-    // 可点的组头给热区兜底（组头字小，24rpx 行高不够 44px 热区）
-    padding: 10rpx 0;
-  }
-
-  &__result-group-label {
-    font-size: 26rpx;
-    font-weight: 600;
-    color: var(--ink);
-  }
-
-  &__result-group-caret {
-    font-size: 22rpx;
+  &__mini-badge--skip {
     color: var(--ink-3);
   }
 
+  // 喜欢章：与卡堆的盖章语言同源，斜盖在大图右上
+  &__stamp {
+    position: absolute;
+    top: 20rpx;
+    right: 20rpx;
+    z-index: 2;
+    padding: 6rpx 18rpx;
+    border: 3rpx solid var(--moss-deep);
+    border-radius: 8rpx;
+    transform: rotate(7deg);
+    background: rgba(244, 245, 242, 0.82);
+    color: var(--moss-deep);
+    font-size: 24rpx;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+  }
+
+  // 结算失败汇总：一句说明 + 「重试生成」
+  &__result-failed {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16rpx;
+    padding: 12rpx 16rpx;
+    border-radius: var(--radius-md);
+    background: var(--moss-soft);
+  }
+
+  &__result-failed-text {
+    font-size: 22rpx;
+    color: var(--ink-2);
+  }
+
+  &__result-failed-retry {
+    flex-shrink: 0;
+    font-size: 24rpx;
+    font-weight: 600;
+  }
+
+  // 底部文字链接行：往期（辅助）+ 生成新的一轮（主行动），居中排
+  &__result-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 48rpx;
+    padding: 6rpx 0 2rpx;
+  }
+
   &__result-history {
-    align-self: center;
     font-size: 24rpx;
   }
 
   &__regen {
-    align-self: center;
     font-size: 26rpx;
+    font-weight: 600;
 
-    // 新一轮已在路上：同位文字但去掉链接感（不可点）
-    &--pending {
-      color: var(--ink-3);
+    // 失败态：警示铜色（裁缝世界的「别针警示」色，非系统红），与成功动作区分
+    &--error {
+      color: var(--copper, #c4622d);
+      border-bottom: 2rpx solid currentColor;
     }
   }
 
@@ -573,5 +730,11 @@
   .plans-deck__scrap {
     animation: none;
     transition: none;
+  }
+
+  // 流光虚线与扫描都停：只留静态填充
+  .plans-deck__threadbar-fill::after,
+  .plans-deck__threadbar-fill--sweep {
+    animation: none;
   }
 }
