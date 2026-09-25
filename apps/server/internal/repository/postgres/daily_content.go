@@ -78,6 +78,29 @@ func (s *Store) RecentContents(ctx context.Context, userID string, since time.Ti
 	return items, rows.Err()
 }
 
+// HistoryContents 该用户生成过的每日内容（按 gen_date 倒序，至多 limit 条）。
+// 走 daily_content_user_idx (user_id, gen_date DESC)；公共兜底池行
+// （user_id IS NULL）不属于任何用户，天然被 WHERE 挡掉。
+func (s *Store) HistoryContents(ctx context.Context, userID string, limit int) ([]domain.DailyContent, error) {
+	rows, err := s.pool.Query(ctx, dailyContentSelectSQL+`
+		WHERE user_id=$1::uuid
+		ORDER BY gen_date DESC, created_at DESC
+		LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []domain.DailyContent{}
+	for rows.Next() {
+		item, err := scanDailyContentRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 // RecentContentKeys 近 N 天已推过的内容 key（兜底池去重也用它）。
 func (s *Store) RecentContentKeys(ctx context.Context, userID string, since time.Time) ([]string, error) {
 	rows, err := s.pool.Query(ctx, `

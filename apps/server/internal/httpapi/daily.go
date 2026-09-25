@@ -20,6 +20,7 @@ type DailyService interface {
 	Generate(ctx context.Context, userID string, city string) (daily.GenerateResult, error)
 	CreateCollection(ctx context.Context, userID string, contentID string, note string) (domain.DailyCollection, error)
 	ListCollections(ctx context.Context, userID string, category string, limit int) ([]domain.DailyCollection, error)
+	HistoryContents(ctx context.Context, userID string, limit int) ([]domain.DailyContent, error)
 	UpdateCollection(ctx context.Context, userID string, id string, status string, note string) (domain.DailyCollection, error)
 	DeleteCollection(ctx context.Context, userID string, id string) error
 	CollectionStats(ctx context.Context, userID string) (daily.CollectionStats, error)
@@ -44,6 +45,7 @@ type dailyGenerateResponse struct {
 
 type dailyContentDTO struct {
 	ID        string               `json:"id"`
+	GenDate   string               `json:"gen_date"`
 	Type      string               `json:"type"`
 	Topic     string               `json:"topic"`
 	Lead      string               `json:"lead"`
@@ -78,6 +80,7 @@ type dailyCollectionStatsDTO struct {
 func toDailyContentDTO(content domain.DailyContent) dailyContentDTO {
 	return dailyContentDTO{
 		ID:        content.ID,
+		GenDate:   content.GenDate,
 		Type:      domain.CategoryToContentType(content.Category),
 		Topic:     content.Topic,
 		Lead:      content.Lead,
@@ -211,6 +214,34 @@ func (a *API) listDailyCollection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, http.StatusOK, toDailyCollectionDTOs(items))
+}
+
+// listDailyHistory 每日内容历史：该用户生成过的内容，gen_date 倒序。
+// 与手册（collection）不同——手册是用户主动收下的，历史是系统推送过的全部。
+func (a *API) listDailyHistory(w http.ResponseWriter, r *http.Request) {
+	if a.daily == nil {
+		a.internalError(w, r, errDailyUnavailable)
+		return
+	}
+	limit := 0
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 0 {
+			writeError(w, r, http.StatusBadRequest, "validation_error", "limit 不是合法数字")
+			return
+		}
+		limit = parsed
+	}
+	items, err := a.daily.HistoryContents(r.Context(), currentUser(r).ID, limit)
+	if err != nil {
+		a.writeServiceError(w, r, err)
+		return
+	}
+	dtos := make([]dailyContentDTO, 0, len(items))
+	for _, item := range items {
+		dtos = append(dtos, toDailyContentDTO(item))
+	}
+	writeData(w, http.StatusOK, dtos)
 }
 
 func (a *API) patchDailyCollection(w http.ResponseWriter, r *http.Request) {

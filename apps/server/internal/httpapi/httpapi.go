@@ -121,6 +121,7 @@ func New(deps Dependencies, logger *slog.Logger, devLoginEnabled bool, runtime R
 	mux.Handle("POST /v1/daily/prepare", api.auth(http.HandlerFunc(api.prepareDaily)))
 	mux.Handle("POST /v1/daily/generate", api.auth(http.HandlerFunc(api.generateDaily)))
 	mux.Handle("POST /v1/daily/collection", api.auth(http.HandlerFunc(api.createDailyCollection)))
+	mux.Handle("GET /v1/daily/history", api.auth(http.HandlerFunc(api.listDailyHistory)))
 	mux.Handle("GET /v1/daily/collection", api.auth(http.HandlerFunc(api.listDailyCollection)))
 	mux.Handle("GET /v1/daily/collection/stats", api.auth(http.HandlerFunc(api.getDailyCollectionStats)))
 	mux.Handle("PATCH /v1/daily/collection/{id}", api.auth(http.HandlerFunc(api.patchDailyCollection)))

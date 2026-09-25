@@ -60,6 +60,18 @@ func (s *Service) ListCollections(ctx context.Context, userID string, category s
 	return s.collections.ListCollections(ctx, userID, category, limit)
 }
 
+// HistoryContents 每日内容历史（新到旧）。limit 缺省 60 / 上限 100——
+// 数据量天然受「每天一条」限制，不做游标分页，客户端加载更多递增 limit 即可。
+func (s *Service) HistoryContents(ctx context.Context, userID string, limit int) ([]domain.DailyContent, error) {
+	if limit <= 0 {
+		limit = 60
+	}
+	if limit > maxCollectionLimit {
+		limit = maxCollectionLimit
+	}
+	return s.content.HistoryContents(ctx, userID, limit)
+}
+
 // UpdateCollection 生命周期推进：收下 → 试过 → 留下了。
 func (s *Service) UpdateCollection(ctx context.Context, userID string, id string, status string, note string) (domain.DailyCollection, error) {
 	if strings.TrimSpace(id) == "" {

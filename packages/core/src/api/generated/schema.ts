@@ -557,6 +557,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/daily/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 每日内容历史
+         * @description 该用户生成过的每日内容，按 gen_date 倒序（每天至多一条，由 daily_content 的部分唯一索引保证）。公共兜底池条目不属于任何用户， 一律不进历史。当天那条也包含在内。不做游标分页：数据量天然受天数 限制，客户端「加载更多」递增 limit 即可。
+         */
+        get: operations["listDailyHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/daily/collection": {
         parameters: {
             query?: never;
@@ -1525,6 +1545,11 @@ export interface components {
         DailyContent: {
             /** Format: uuid */
             id: string;
+            /**
+             * Format: date
+             * @description 生成日期（本地时区）；每天至多一条
+             */
+            gen_date: string;
             type: components["schemas"]["DailyContentType"];
             /** @description 选题（杂志式标题，通用内容，不个性化） */
             topic: string;
@@ -3608,6 +3633,32 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listDailyHistory: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 历史内容（新到旧；没有历史时为空数组） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data: components["schemas"]["DailyContent"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };

@@ -520,7 +520,10 @@ export default function Home() {
                       lead={dailyContent?.lead}
                       category={dailyContent?.asset}
                       seq={todaySeq}
-                      cta={dailyReady && dailyContent ? DAILY_COPY.dressContentLink : undefined}
+                      // CTA 不能挂在 dailyReady 上：内容与 settling 是同一次 set 出来的，
+                      // 而按钮若等到 phase 变 content（揭晓定格后约 0.8s）才出现，
+                      // 左栏就会在定格之后再单独弹一次按钮——看着像刷新了两下
+                      cta={dailyContent ? DAILY_COPY.dressContentLink : undefined}
                     />
                   ) : (
                     <DailyMotion

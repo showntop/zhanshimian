@@ -47,28 +47,39 @@ page {
     color: var(--ink-2);
   }
 
-  // ---------- 刊头：手写体刊名 + 宋体大标题 ----------
+  // ---------- 刊头：手写体刊名（带飘线）+ 序号 + 宋体大标题 ----------
   &__masthead {
     padding: 40rpx 4rpx 0;
   }
 
-  &__masthead-row {
-    display: flex;
-    align-items: baseline;
-    gap: 12rpx;
-  }
-
-  // 刊名：楷体手写感（系统楷体，缺字时优雅退化为斜体苔绿）
+  // 刊名：楷体手写感（系统楷体，缺字时优雅退化为斜体苔绿），
+  // 尾部一道手绘飘线（细弧），像编辑签完名顺手勾的那一笔
   &__script {
+    position: relative;
+    display: inline-block;
+    align-self: flex-start;
     font-family: 'Kaiti SC', 'STKaiti', 'KaiTi', 'BiauKai', serif;
     font-style: italic;
     font-size: 52rpx;
     font-weight: 700;
     line-height: 1.1;
     color: var(--moss);
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: 4rpx;
+      bottom: -10rpx;
+      width: 150rpx;
+      height: 14rpx;
+      border-bottom: 4rpx solid rgba(88, 115, 68, 0.55);
+      border-radius: 0 0 100% 40%;
+    }
   }
 
   &__seq {
+    display: block;
+    margin-top: 22rpx;
     font-size: 22rpx;
     font-weight: 600;
     letter-spacing: 1rpx;
@@ -106,30 +117,50 @@ page {
     height: 580rpx;
   }
 
-  // 插画主视觉：白底时装画以 multiply 融进纸面，压在有机底衬上
+  // 插画主视觉：右上出血、顶部出画，压在有机底衬上（multiply 融进纸面）
   &__stage--art {
-    height: 520rpx;
+    height: 540rpx;
   }
 
   &__hero {
     position: absolute;
     z-index: 1;
-    left: 50%;
-    top: 40rpx;
-    width: 430rpx;
-    height: 440rpx;
-    // 略偏右：与左对齐的刊头错位，构图上让插画「站」在苔绿底衬上
-    margin-left: -130rpx;
+    right: -8rpx;
+    top: -20rpx;
+    width: 470rpx;
+    height: 520rpx;
     mix-blend-mode: multiply;
   }
 
-  // 信息图下沉：有插画主视觉时，色票/对比/示意收进白卡下方，高度随内容
-  &__inset {
-    margin-top: 28rpx;
+  // 手写英文批注：斜落在素材右上，像杂志页边的铅笔字
+  &__stage-note {
+    position: absolute;
+    z-index: 2;
+    right: 34rpx;
+    top: 48rpx;
+    width: 120rpx;
+    font-family: 'Kaiti SC', 'STKaiti', 'KaiTi', 'BiauKai', serif;
+    font-style: italic;
+    font-size: 24rpx;
+    line-height: 1.35;
+    text-align: center;
+    color: rgba(63, 70, 60, 0.72);
+    transform: rotate(8deg);
   }
 
-  &__inset .dv {
+  // 白卡内的信息图：贴卡内边距排（覆盖 dv 自带的外 padding，避免双重留白）。
+  // 右缘三枚轮播点已删：单条内容做成假分页器会让人以为能滑
+  &__why-visual {
+    margin-top: 26rpx;
+  }
+
+  &__why-visual .dv {
     height: auto;
+  }
+
+  &__why-visual .dv--compare,
+  &__why-visual .dv--swatch {
+    padding: 6rpx 0 0;
   }
 
   // 色卡/对比是「信息图」不是「海报」：高度随内容走，底衬退场
@@ -141,15 +172,15 @@ page {
     height: auto;
   }
 
-  // 有机形状：不规则的苔绿底，承托素材（纯装饰，素材缺失也不空）
+  // 有机形状：叶状的苔绿底，右上出血，承托素材（纯装饰，素材缺失也不空）
   &__stage-blob {
     position: absolute;
     z-index: 0;
-    right: 16rpx;
-    top: 16rpx;
-    width: 460rpx;
-    height: 390rpx;
-    background: linear-gradient(160deg, var(--moss-soft) 12%, rgba(88, 115, 68, 0.28) 100%);
+    right: -30rpx;
+    top: -24rpx;
+    width: 520rpx;
+    height: 460rpx;
+    background: linear-gradient(160deg, var(--moss-soft) 10%, rgba(88, 115, 68, 0.38) 100%);
     border-radius: 62% 38% 56% 44% / 52% 60% 40% 48%;
   }
 
@@ -252,17 +283,17 @@ page {
     color: var(--ink-3);
   }
 
-  // ---------- 主行动：苔绿大药丸，箭头钉在右边 ----------
+  // ---------- 主行动：深苔绿大药丸收在白卡内，长箭头钉在右边 ----------
   &__cta {
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 14rpx;
-    min-height: 104rpx;
-    margin-top: 40rpx;
+    min-height: 100rpx;
+    margin-top: 32rpx;
     border-radius: var(--radius-pill);
-    background: var(--moss);
+    background: var(--moss-deep);
     box-shadow: var(--shadow-primary-button);
   }
 
@@ -283,37 +314,103 @@ page {
     color: var(--moss-deep);
   }
 
-  // 收藏星标：一枚小小的菱形（CSS 旋转方块），药丸左侧的点缀
+  // 收藏星标：一大一小两枚菱形叠出 ✦ 的意思（CSS 画，不用字符）
   &__cta-spark {
-    width: 18rpx;
-    height: 18rpx;
-    border-radius: 4rpx;
-    background: var(--cream);
-    opacity: 0.9;
-    transform: rotate(45deg);
+    position: relative;
+    width: 20rpx;
+    height: 20rpx;
+
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      background: var(--cream);
+      border-radius: 3rpx;
+    }
+
+    &::before {
+      left: 4rpx;
+      top: 0;
+      width: 12rpx;
+      height: 12rpx;
+      transform: rotate(45deg);
+    }
+
+    &::after {
+      left: 9rpx;
+      top: 5rpx;
+      width: 10rpx;
+      height: 10rpx;
+      transform: rotate(45deg);
+      opacity: 0.85;
+    }
   }
 
-  &__cta--saved &__cta-spark {
+  &__cta--saved &__cta-spark::before,
+  &__cta--saved &__cta-spark::after {
     background: var(--moss);
   }
 
-  // 箭头：CSS 画的 ›，钉在药丸右缘
+  // 长箭头：横线 + 折角头部，CSS 画的 →，钉在药丸右缘
   &__cta-arrow {
     position: absolute;
-    right: 40rpx;
+    right: 36rpx;
     top: 50%;
-    width: 18rpx;
-    height: 18rpx;
-    border-top: 4rpx solid var(--cream);
-    border-right: 4rpx solid var(--cream);
-    transform: translateY(-50%) rotate(45deg);
+    width: 40rpx;
+    height: 20rpx;
+    margin-top: -10rpx;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      width: 34rpx;
+      height: 4rpx;
+      margin-top: -2rpx;
+      border-radius: 2rpx;
+      background: var(--cream);
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 50%;
+      width: 14rpx;
+      height: 14rpx;
+      border-top: 4rpx solid var(--cream);
+      border-right: 4rpx solid var(--cream);
+      transform: translateY(-50%) rotate(45deg);
+    }
   }
 
-  &__cta--saved &__cta-arrow {
+  &__cta--saved &__cta-arrow::before,
+  &__cta--saved &__cta-arrow::after {
     border-color: var(--moss);
+    background: var(--moss);
   }
 
-  // ---------- 行动区：试试这些建议 ----------
+  // 按钮左上的两道装饰短线：像裁缝粉线甩出的收尾（纯装饰）
+  &__cta-tick {
+    position: absolute;
+    left: -22rpx;
+    top: -18rpx;
+    width: 26rpx;
+    height: 4rpx;
+    border-radius: 2rpx;
+    background: rgba(88, 115, 68, 0.5);
+    transform: rotate(-32deg);
+
+    &--short {
+      left: -30rpx;
+      top: -2rpx;
+      width: 18rpx;
+      opacity: 0.7;
+    }
+  }
+
+  // ---------- 行动区：试试这些建议（左侧小竖线是参考稿的记号） ----------
   &__sec {
     display: flex;
     align-items: center;
@@ -322,7 +419,16 @@ page {
     padding: 0 4rpx;
   }
 
+  &__sec-tick {
+    width: 5rpx;
+    height: 26rpx;
+    margin-right: 14rpx;
+    border-radius: 3rpx;
+    background: var(--moss);
+  }
+
   &__sec-title {
+    flex: 1;
     font-size: 28rpx;
     font-weight: 700;
     color: var(--ink);
@@ -423,12 +529,12 @@ page {
     padding: 8rpx 4rpx 0;
   }
 
-  // 小手册：CSS 画的封面 + 书脊
+  // 小手册：CSS 画的封面 + 书脊（苔绿，参考稿里它是这一行唯一的重色）
   &__handbook-icon {
     position: relative;
     width: 30rpx;
     height: 24rpx;
-    border: 3rpx solid var(--ink-2);
+    border: 3rpx solid var(--moss);
     border-radius: 4rpx 8rpx 8rpx 4rpx;
 
     &::before {
@@ -438,7 +544,7 @@ page {
       top: -3rpx;
       bottom: -3rpx;
       width: 3rpx;
-      background: var(--ink-2);
+      background: var(--moss);
     }
   }
 
@@ -471,7 +577,7 @@ page {
     color: var(--ink-3);
   }
 
-  // ---------- 页脚纸样台余韵：一道弧线 + 一角苔绿，不承载信息 ----------
+  // ---------- 页脚纸样台余韵：左一段弧线 + 右一角小叶，不承载信息 ----------
   &__ground {
     position: relative;
     height: 150rpx;
@@ -479,25 +585,27 @@ page {
     overflow: hidden;
   }
 
-  // 细弧线：大椭圆的上缘，像纸样台上摊开的一段粉线
+  // 细弧线：大椭圆的上缘，像纸样台上摊开的一段粉线（偏左）
   &__ground-arc {
     position: absolute;
     left: -12%;
-    right: -12%;
-    top: 52rpx;
+    right: 42%;
+    top: 44rpx;
     height: 240rpx;
-    border: 2rpx solid rgba(88, 115, 68, 0.24);
+    border: 2rpx solid rgba(88, 115, 68, 0.26);
     border-radius: 50%;
   }
 
+  // 小叶：右下一角苔绿，收住页脚的重量
   &__ground-blob {
     position: absolute;
-    right: -90rpx;
-    bottom: -130rpx;
-    width: 340rpx;
-    height: 220rpx;
+    right: 24rpx;
+    bottom: -56rpx;
+    width: 150rpx;
+    height: 100rpx;
     background: var(--moss-soft);
-    border-radius: 58% 42% 55% 45% / 55% 48% 52% 45%;
+    border: 2rpx solid rgba(88, 115, 68, 0.2);
+    border-radius: 62% 38% 56% 44% / 60% 52% 48% 40%;
   }
 
   // ---------- 空态 ----------

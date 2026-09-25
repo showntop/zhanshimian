@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -111,6 +112,18 @@ func (f *fakeContent) RecentContentKeys(context.Context, string, time.Time) ([]s
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]string{}, f.contentKeys...), nil
+}
+
+// HistoryContents 模拟真实仓储：按 gen_date 倒序、至多 limit 条。
+func (f *fakeContent) HistoryContents(_ context.Context, _ string, limit int) ([]domain.DailyContent, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	sorted := append([]domain.DailyContent{}, f.saved...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].GenDate > sorted[j].GenDate })
+	if len(sorted) > limit {
+		sorted = sorted[:limit]
+	}
+	return sorted, nil
 }
 
 func (f *fakeContent) SaveContent(_ context.Context, content domain.DailyContent) (domain.DailyContent, error) {

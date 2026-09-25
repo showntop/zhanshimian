@@ -32,6 +32,10 @@ func (f fakeDailyService) ListCollections(context.Context, string, string, int) 
 	return nil, nil
 }
 
+func (f fakeDailyService) HistoryContents(context.Context, string, int) ([]domain.DailyContent, error) {
+	return nil, nil
+}
+
 func (f fakeDailyService) UpdateCollection(context.Context, string, string, string, string) (domain.DailyCollection, error) {
 	return domain.DailyCollection{}, nil
 }

@@ -12,6 +12,7 @@ import type {
   CollectionStatus,
   DailyCollection,
   DailyCollectionStats,
+  DailyContentDTO,
   DailyGenerateResult,
   DailyPrepare,
   Diagnosis,
@@ -137,6 +138,10 @@ export const peripherals = {
     client
       .GET('/v1/daily/collection', { params: { query: { category, limit } } })
       .then(dataOrThrow),
+
+  /** 每日内容历史：推送过的全部（含当天），gen_date 倒序；与手册（主动收下）不同源。 */
+  listDailyHistory: (limit?: number): Promise<DailyContentDTO[]> =>
+    client.GET('/v1/daily/history', { params: { query: { limit } } }).then(dataOrThrow),
 
   getDailyCollectionStats: (): Promise<DailyCollectionStats> =>
     client.GET('/v1/daily/collection/stats').then(dataOrThrow),

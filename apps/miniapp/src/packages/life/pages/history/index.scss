@@ -1,0 +1,103 @@
+// 历史建议 —— 全部 rpx（designWidth: 750）。条目版式与手册同语言（缩略图 + 文字列），
+// 但多一枚衬线日期：这一页的语义是「回看」，日期就是它的坐标。
+.dh {
+  display: flex;
+  flex-direction: column;
+  padding: 8rpx 0 48rpx;
+
+  &__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0 8rpx 28rpx;
+  }
+
+  &__title {
+    font-size: 38rpx;
+    font-weight: 700;
+    letter-spacing: -1rpx;
+    color: var(--ink);
+  }
+
+  &__count {
+    font-size: 24rpx;
+    color: var(--ink-3);
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 14rpx;
+  }
+
+  &__item {
+    display: flex;
+    align-items: stretch;
+    gap: 20rpx;
+    padding: 20rpx;
+    border-radius: 20rpx;
+    background: var(--surface-strong);
+    border: 1rpx solid var(--line);
+  }
+
+  &__item-visual {
+    width: 132rpx;
+    height: 132rpx;
+    flex: 0 0 132rpx;
+    overflow: hidden;
+    border-radius: 14rpx;
+    background: var(--moss-soft);
+  }
+
+  &__item-copy {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6rpx;
+  }
+
+  &__item-meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12rpx;
+  }
+
+  &__item-cat {
+    font-size: 20rpx;
+    font-weight: 700;
+    color: var(--moss);
+  }
+
+  // 衬线日期：与首页海报角落的编号同一语言（editorial 的「日期即坐标」）
+  &__item-date {
+    flex: none;
+    font-size: 24rpx;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__item-topic {
+    font-size: 27rpx;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--ink);
+  }
+
+  &__item-lead {
+    font-size: 22rpx;
+    line-height: 1.55;
+    color: var(--ink-2);
+  }
+
+  &__item-fit {
+    font-size: 22rpx;
+    line-height: 1.55;
+    color: var(--ink-3);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}

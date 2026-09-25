@@ -38,6 +38,7 @@ export default defineAppConfig({
       pages: [
         'pages/today/index',
         'pages/handbook/index',
+        'pages/history/index',
         'pages/wardrobe/index',
         'pages/advisor/index',
         'pages/share/index',

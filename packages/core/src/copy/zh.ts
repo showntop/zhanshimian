@@ -754,6 +754,21 @@ export const SHARE_COPY = {
   revokeConfirmAction: '撤销'
 } as const
 
+// ---------- 每日内容历史（历史建议页） ----------
+// 与「我的手册」不同源：手册是用户主动收下的，历史是系统推送过的全部。
+export const DAILY_HISTORY_COPY = {
+  title: '历史建议',
+  // 今日页的入口行。刻意不与 DAILY_COPY.trySuggestions 共用——那句已经给了
+  // 下面的「今日造型」行，同一屏上下两行说同一句会让人分不清该点哪个
+  entryLabel: '历史建议',
+  totalPrefix: '共 ',
+  totalSuffix: ' 条',
+  emptyTitle: '还没有历史',
+  emptyBody: '每天推给你的那一条，都会留在这里。',
+  emptyAction: '去看今天这一条 ›',
+  loadFailed: '历史没有加载成功，请重试'
+} as const
+
 export const ADVISOR_COPY = {
   title: '形象助手',
   emptyTitle: '有什么形象问题，直接问',

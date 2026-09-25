@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
-import { APP_SLOGAN, DAILY_COPY, asHeroArtSpec, dailyTypeName } from '@zsm/core'
+import { DAILY_COPY, DAILY_HISTORY_COPY, asHeroArtSpec, dailyTypeName } from '@zsm/core'
 import { peripherals } from '../../app/api/peripherals'
 import { usePageShell } from '../../hooks/use-page-visibility'
 import { useDailyPick, useTodayContext } from '../../features/daily/use-daily-pick'
@@ -27,6 +27,7 @@ import './index.scss'
 
 const TODAY_PLAN_PATH = '/packages/life/pages/today/index'
 const HANDBOOK_PATH = '/packages/life/pages/handbook/index'
+const HISTORY_PATH = '/packages/life/pages/history/index'
 
 export default function Today() {
   const {
@@ -46,6 +47,11 @@ export default function Today() {
 
   const goHandbook = useCallback(() => {
     void Taro.navigateTo({ url: HANDBOOK_PATH })
+  }, [])
+
+  // 「试试这些建议」= 历史建议页：推送过的全部，按日期回看（手册是收下的，这里是全部）
+  const goHistory = useCallback(() => {
+    void Taro.navigateTo({ url: HISTORY_PATH })
   }, [])
 
   // 今日造型状态行（闭环枢纽）：current 接口缓存优先，onShow 刷新。
@@ -120,10 +126,8 @@ export default function Today() {
 
           {content ? (
             <View className="today__masthead">
-              <View className="today__masthead-row">
-                <Text className="today__script">{DAILY_COPY.pageTitle}</Text>
-                <Text className="today__seq">· 第 {seq} 条</Text>
-              </View>
+              <Text className="today__script">{DAILY_COPY.pageTitle}</Text>
+              <Text className="today__seq">· 第 {seq} 条</Text>
               <Text className="today__title serif">{content.topic}</Text>
               <Text className="today__lead">{content.lead}</Text>
             </View>
@@ -142,10 +146,13 @@ export default function Today() {
               ) : (
                 <DailyVisual visual={content.visual} />
               )}
-              <Text className="today__stage-note">{APP_SLOGAN}</Text>
+              {showHero ? (
+                <Text className="today__stage-note">{DAILY_COPY.stageGhost}</Text>
+              ) : null}
             </View>
           ) : null}
 
+          {/* 白卡：为什么值得试试 —— 参考稿里对比卡与主按钮都收在卡内 */}
           {content ? (
             <View className="today__why">
               <View className="today__why-head">
@@ -159,32 +166,35 @@ export default function Today() {
               </View>
               <Text className="today__fit-text">{content.fitText}</Text>
               <Text className="today__why-body">{content.why}</Text>
-            </View>
-          ) : null}
 
-          {/* 信息图下沉：有插画主视觉时，色票/对比/示意收进白卡下方（参考稿的 ✓/✗ 位） */}
-          {content && showHero ? (
-            <View className="today__inset">
-              <DailyVisual visual={content.visual} />
+              {/* 有插画主视觉时，色票/对比/示意收进卡内（参考稿的 ✓/✗ 位） */}
+              {showHero ? (
+                <View className="today__why-visual">
+                  <DailyVisual visual={content.visual} />
+                </View>
+              ) : null}
+
+              <View
+                className={`today__cta pressable ${saved ? 'today__cta--saved' : ''}`}
+                onClick={saveCurrent}
+              >
+                <View className="today__cta-spark" />
+                <Text className="today__cta-text">
+                  {saved
+                    ? `${DAILY_COPY.savedPrefix}${bucketName}`
+                    : `${DAILY_COPY.saveAction}${bucketName}`}
+                </Text>
+                <View className="today__cta-arrow" />
+                <View className="today__cta-tick" />
+                <View className="today__cta-tick today__cta-tick--short" />
+              </View>
             </View>
           ) : null}
 
           {content ? (
-            <View
-              className={`today__cta pressable ${saved ? 'today__cta--saved' : ''}`}
-              onClick={saveCurrent}
-            >
-              <View className="today__cta-spark" />
-              <Text className="today__cta-text">
-                {saved ? `${DAILY_COPY.savedPrefix}${bucketName}` : `${DAILY_COPY.saveAction}${bucketName}`}
-              </Text>
-              <View className="today__cta-arrow" />
-            </View>
-          ) : null}
-
-          {content ? (
-            <View className="today__sec">
-              <Text className="today__sec-title">{DAILY_COPY.trySuggestions}</Text>
+            <View className="today__sec pressable" onClick={goHistory}>
+              <View className="today__sec-tick" />
+              <Text className="today__sec-title">{DAILY_HISTORY_COPY.entryLabel}</Text>
               <Text className="today__sec-go">›</Text>
             </View>
           ) : null}

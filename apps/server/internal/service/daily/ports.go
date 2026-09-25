@@ -65,6 +65,9 @@ type ContentStore interface {
 	FallbackPool(ctx context.Context) ([]domain.DailyContent, error)
 	// RecentContents 近 N 天已生成的内容（新到旧）：prompt 历史 + topic 去重都靠它。
 	RecentContents(ctx context.Context, userID string, since time.Time, limit int) ([]domain.DailyContent, error)
+	// HistoryContents 该用户生成过的每日内容（按 gen_date 倒序，至多 limit 条）：
+	// 每日内容历史页的数据源。公共兜底池条目不属于任何用户，不进历史。
+	HistoryContents(ctx context.Context, userID string, limit int) ([]domain.DailyContent, error)
 	RecentContentKeys(ctx context.Context, userID string, since time.Time) ([]string, error)
 	SaveContent(ctx context.Context, content domain.DailyContent) (domain.DailyContent, error)
 	// ReplaceContent 覆盖当天内容（upsert）。只给非生产调试开关用：
