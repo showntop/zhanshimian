@@ -100,7 +100,7 @@ export default function Today() {
               className={`today__visual ${
                 content.visual.modality === 'poster'
                   ? 'today__visual--tall'
-                  : content.visual.modality === 'swatch'
+                  : content.visual.modality === 'swatch' || content.visual.modality === 'compare'
                     ? 'today__visual--flat'
                     : ''
               }`}

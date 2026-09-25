@@ -89,8 +89,8 @@ export default function DailyVisual({ visual, compact = false }: DailyVisualProp
             ) : null}
             {/* 有真实材质图时不再叠高光：图本身已经表达了层次 */}
             {image === '' && layered ? <View className="dv-cp-sheen" /> : null}
+            {!compact && label !== '' ? <Text className="dv-cp-label">{label}</Text> : null}
           </View>
-          {!compact && label !== '' ? <Text className="dv-cp-label">{label}</Text> : null}
         </View>
       )
     }
