@@ -69,8 +69,12 @@ export default function DailyVisual({ visual, compact = false }: DailyVisualProp
   }
 
   // ---------- 对比：有真实素材就渲图，没有就退回色块（素材缺失不空屏） ----------
+  // 右侧 layered = 推荐项：盖苔绿圆章（CSS 画的勾），左侧盖灰章（CSS 画的叉）。
+  // 右侧未声明 layered 时语义不明，两边都不盖章。
   if (visual.modality === 'compare') {
-    const block = (o: Record<string, unknown>, layered: boolean) => {
+    const right = asRecord(spec.right)
+    const rightLayered = right.layered === true
+    const block = (o: Record<string, unknown>, layered: boolean, mark: '' | 'pick' | 'drop') => {
       const tone = asString(o.tone)
       const image = asString(o.image)
       const label = asString(o.label)
@@ -89,6 +93,17 @@ export default function DailyVisual({ visual, compact = false }: DailyVisualProp
             ) : null}
             {/* 有真实材质图时不再叠高光：图本身已经表达了层次 */}
             {image === '' && layered ? <View className="dv-cp-sheen" /> : null}
+            {!compact && mark === 'pick' ? (
+              <View className="dv-cp-mark dv-cp-mark--pick">
+                <View className="dv-cp-check" />
+              </View>
+            ) : null}
+            {!compact && mark === 'drop' ? (
+              <View className="dv-cp-mark dv-cp-mark--drop">
+                <View className="dv-cp-cross-bar" />
+                <View className="dv-cp-cross-bar dv-cp-cross-bar--v" />
+              </View>
+            ) : null}
             {!compact && label !== '' ? <Text className="dv-cp-label">{label}</Text> : null}
           </View>
         </View>
@@ -96,8 +111,8 @@ export default function DailyVisual({ visual, compact = false }: DailyVisualProp
     }
     return (
       <View className="dv dv--compare">
-        {block(asRecord(spec.left), false)}
-        {block(asRecord(spec.right), asRecord(spec.right).layered === true)}
+        {block(asRecord(spec.left), false, rightLayered ? 'drop' : '')}
+        {block(right, rightLayered, rightLayered ? 'pick' : '')}
       </View>
     )
   }

@@ -74,6 +74,36 @@ export interface PosterArtSpec {
   chip?: { text: string }
 }
 
+// ---------- hero art：服务端按内容分类下发的内置时装插画 ----------
+
+/**
+ * 插画主图（spec.image + spec.source_kind，均由服务端 buildVisual 之后装饰写入）。
+ * 与 swatch/compare/diagram 的程序化视觉平行：插画是「氛围主视觉」，
+ * 程序化视觉仍是信息图，两端各画各的，互不替代。
+ * 解析纪律同上：URL 不合法 / webp 一律返回 null，由调用点降级，绝不猜。
+ */
+export interface HeroArtSpec {
+  image: string
+  /** 内置插画素材（非用户照片、非 AI 生成效果图） */
+  sourceKind?: 'bundled_reference'
+}
+
+export function asHeroArtSpec(visual: ContentVisual): HeroArtSpec | null {
+  if (!isRecord(visual.spec)) return null
+  const { image, source_kind: sourceKind } = visual.spec
+  if (typeof image !== 'string' || image === '') return null
+  if (/\.webp(\?\S*)?$/i.test(image)) return null
+  const displayable =
+    image.startsWith('https://') ||
+    image.startsWith('http://') ||
+    image.startsWith('/assets/')
+  if (!displayable) return null
+  return {
+    image,
+    sourceKind: sourceKind === 'bundled_reference' ? 'bundled_reference' : undefined,
+  }
+}
+
 // ---------- 解析 ----------
 
 function isRecord(value: unknown): value is Record<string, unknown> {

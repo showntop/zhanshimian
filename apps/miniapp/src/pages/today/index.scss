@@ -1,163 +1,354 @@
 // 今日页 —— 全部 rpx（designWidth: 750）。
-// 参照 Aesop / COS：留白为主，细线分隔，重色只出现在该强调的地方。
-// 层次纪律：视觉是主角 → 标题次之 → 正文 → 主按钮 → 文字链 → 手册行。
+// 编辑式海报页（2026-09 重构）：手写体刊头 + 宋体大标题的杂志跨页；
+// 建议本体收进白卡；主行动是苔绿大药丸；视觉区浮在有机形状的苔绿底上。
+// 层次纪律：视觉是主角 → 大标题次之 → 白卡正文 → 主按钮 → 行动卡 → 手册行。
+// 本页纸面比全局底色更暖一点：顶部带苔调的渐变（仅本页 page 选择器）。
+page {
+  background: linear-gradient(180deg, var(--moss-soft) 0%, var(--bg) 52%);
+}
+
 .today {
   display: flex;
   flex-direction: column;
+  padding-bottom: 0;
 
-  // ---------- 语境（最轻的一层） ----------
+  // ---------- 语境条（最轻的一层） ----------
   &__ctx {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    padding: 4rpx 2rpx 20rpx;
+    padding: 6rpx 4rpx 0;
   }
 
   &__ctx-main {
-    font-size: 22rpx;
+    font-size: 24rpx;
     font-weight: 600;
-    color: var(--ink-3);
+    letter-spacing: 1rpx;
+    color: var(--ink-2);
   }
 
   &__ctx-city {
+    display: flex;
+    align-items: center;
+    gap: 8rpx;
+  }
+
+  // 地点小图钉：CSS 画的水滴形，不用 emoji
+  &__ctx-pin {
+    width: 18rpx;
+    height: 18rpx;
+    border: 3rpx solid var(--ink-3);
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+  }
+
+  &__ctx-city-text {
+    font-size: 24rpx;
+    color: var(--ink-2);
+  }
+
+  // ---------- 刊头：手写体刊名 + 宋体大标题 ----------
+  &__masthead {
+    padding: 40rpx 4rpx 0;
+  }
+
+  &__masthead-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12rpx;
+  }
+
+  // 刊名：楷体手写感（系统楷体，缺字时优雅退化为斜体苔绿）
+  &__script {
+    font-family: 'Kaiti SC', 'STKaiti', 'KaiTi', 'BiauKai', serif;
+    font-style: italic;
+    font-size: 52rpx;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--moss);
+  }
+
+  &__seq {
     font-size: 22rpx;
-    color: var(--ink-3);
-  }
-
-  // ---------- 视觉：唯一主角，出血到屏幕两边 ----------
-  &__visual {
-    height: 400rpx;
-    margin: 0 calc(-1 * var(--page-gutter));
-    background: var(--moss-soft);
-  }
-
-  // 海报式要更高的舞台：出血大字 + 错落素材需要纵向空间
-  &__visual--tall {
-    height: 580rpx;
-  }
-
-  // 色卡类是「信息图」不是「海报」：高度随内容走，不撑 400rpx 的舞台
-  &__visual--flat {
-    height: auto;
-    background: transparent;
-  }
-
-  // .dv 自带 height:100%，舞台改 auto 后解除，避免百分比塌陷
-  &__visual--flat .dv {
-    height: auto;
-  }
-
-  // 色卡类是「信息图」不是「海报」：高度随内容走，不撑 400rpx 的舞台
-  &__visual--flat {
-    height: auto;
-  }
-
-  // ---------- 正文 ----------
-  &__body {
-    padding: 40rpx 2rpx 0;
-  }
-
-  &__meta {
-    font-size: 21rpx;
     font-weight: 600;
     letter-spacing: 1rpx;
     color: var(--ink-3);
   }
 
+  // 大标题：宋体衬线，每屏至多一处的品牌排印
   &__title {
     display: block;
-    margin-top: 18rpx;
-    font-size: 40rpx;
-    line-height: 1.22;
+    margin-top: 20rpx;
+    font-size: 56rpx;
+    line-height: 1.3;
     font-weight: 700;
-    letter-spacing: -1rpx;
+    letter-spacing: 1rpx;
     color: var(--ink);
   }
 
   &__lead {
     display: block;
-    margin-top: 20rpx;
+    margin-top: 18rpx;
     font-size: 27rpx;
     line-height: 1.72;
     color: var(--ink-2);
   }
 
-  // 细线：替代色块容器
-  &__rule {
-    height: 1rpx;
-    margin: 34rpx 0;
-    background: var(--line);
+  // ---------- 视觉舞台：有机苔绿底衬，素材浮在其上 ----------
+  &__stage {
+    position: relative;
+    height: 440rpx;
+    margin: 36rpx calc(-1 * var(--page-gutter)) 0;
   }
 
-  // 个性化段落：左侧细线，不用底色块（色块会制造第二个「块」，抢视觉）
-  &__fit {
-    padding-left: 24rpx;
-    border-left: 3rpx solid var(--moss);
+  // 海报式要更高的舞台：出血大字 + 错落素材需要纵向空间
+  &__stage--tall {
+    height: 580rpx;
   }
 
-  &__fit-text {
-    font-size: 27rpx;
-    line-height: 1.75;
+  // 插画主视觉：白底时装画以 multiply 融进纸面，压在有机底衬上
+  &__stage--art {
+    height: 520rpx;
+  }
+
+  &__hero {
+    position: absolute;
+    z-index: 1;
+    left: 50%;
+    top: 40rpx;
+    width: 430rpx;
+    height: 440rpx;
+    // 略偏右：与左对齐的刊头错位，构图上让插画「站」在苔绿底衬上
+    margin-left: -130rpx;
+    mix-blend-mode: multiply;
+  }
+
+  // 信息图下沉：有插画主视觉时，色票/对比/示意收进白卡下方，高度随内容
+  &__inset {
+    margin-top: 28rpx;
+  }
+
+  &__inset .dv {
+    height: auto;
+  }
+
+  // 色卡/对比是「信息图」不是「海报」：高度随内容走，底衬退场
+  &__stage--flat {
+    height: auto;
+  }
+
+  &__stage--flat .dv {
+    height: auto;
+  }
+
+  // 有机形状：不规则的苔绿底，承托素材（纯装饰，素材缺失也不空）
+  &__stage-blob {
+    position: absolute;
+    z-index: 0;
+    right: 16rpx;
+    top: 16rpx;
+    width: 460rpx;
+    height: 390rpx;
+    background: linear-gradient(160deg, var(--moss-soft) 12%, rgba(88, 115, 68, 0.28) 100%);
+    border-radius: 62% 38% 56% 44% / 52% 60% 40% 48%;
+  }
+
+  &__stage--flat &__stage-blob {
+    display: none;
+  }
+
+  // 素材层压在底衬上；海报自带的底色让位给有机形状
+  &__stage .dv {
+    position: relative;
+    z-index: 1;
+  }
+
+  &__stage--tall .dv--poster {
+    background: transparent;
+  }
+
+  // 刊物手记：一句品牌标语斜斜落在角落，像编辑的铅笔批注
+  &__stage-note {
+    position: absolute;
+    z-index: 2;
+    right: 44rpx;
+    top: 4rpx;
+    font-family: 'Kaiti SC', 'STKaiti', 'KaiTi', 'BiauKai', serif;
+    font-style: italic;
+    font-size: 26rpx;
+    color: var(--moss);
+    transform: rotate(7deg);
+  }
+
+  &__stage--flat &__stage-note {
+    display: none;
+  }
+
+  // ---------- 白卡：为什么值得试试 ----------
+  &__why {
+    margin-top: 44rpx;
+    padding: 32rpx 30rpx 36rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface-strong);
+    box-shadow: var(--shadow-card);
+  }
+
+  &__why-head {
+    display: flex;
+    align-items: center;
+    gap: 14rpx;
+  }
+
+  // 小灯泡：圆环 + 灯芯，CSS 画的，不用 emoji
+  &__why-bulb {
+    position: relative;
+    width: 34rpx;
+    height: 34rpx;
+    border: 3rpx solid var(--moss);
+    border-radius: 50%;
+  }
+
+  &__why-bulb-filament {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 10rpx;
+    height: 10rpx;
+    margin: -5rpx 0 0 -5rpx;
+    border-radius: 50%;
+    background: var(--moss);
+  }
+
+  &__why-title {
+    flex: 1;
+    font-size: 26rpx;
+    font-weight: 700;
     color: var(--ink);
   }
 
-  &__why {
+  &__why-badge {
+    padding: 6rpx 18rpx;
+    border-radius: var(--radius-pill);
+    background: var(--moss-soft);
+    font-size: 20rpx;
+    font-weight: 600;
+    color: var(--moss-deep);
+  }
+
+  // 个性化正文：白卡里的主文案（服务端按用户基因渲染）
+  &__fit-text {
     display: block;
     margin-top: 26rpx;
-    font-size: 22rpx;
+    font-size: 28rpx;
+    line-height: 1.78;
+    color: var(--ink);
+  }
+
+  &__why-body {
+    display: block;
+    margin-top: 16rpx;
+    font-size: 23rpx;
     line-height: 1.7;
     color: var(--ink-3);
   }
 
-  // ---------- 行动：一个主按钮 + 一条文字链 ----------
+  // ---------- 主行动：苔绿大药丸，箭头钉在右边 ----------
   &__cta {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 96rpx;
-    margin-top: 44rpx;
-    border-radius: 999rpx;
-    background: var(--moss-deep);
+    gap: 14rpx;
+    min-height: 104rpx;
+    margin-top: 40rpx;
+    border-radius: var(--radius-pill);
+    background: var(--moss);
+    box-shadow: var(--shadow-primary-button);
+  }
+
+  // 已收下：退成安静的苔绿浅底，动作完成就不再喊
+  &__cta--saved {
+    background: var(--moss-soft);
+    box-shadow: none;
   }
 
   &__cta-text {
-    font-size: 28rpx;
+    font-size: 30rpx;
     font-weight: 700;
+    letter-spacing: 2rpx;
     color: var(--cream);
   }
 
-  // 试试行动行：主按钮下的次级动作，左右贯通的热区、箭头靠右
-  &__try-row {
+  &__cta--saved &__cta-text {
+    color: var(--moss-deep);
+  }
+
+  // 收藏星标：一枚小小的菱形（CSS 旋转方块），药丸左侧的点缀
+  &__cta-spark {
+    width: 18rpx;
+    height: 18rpx;
+    border-radius: 4rpx;
+    background: var(--cream);
+    opacity: 0.9;
+    transform: rotate(45deg);
+  }
+
+  &__cta--saved &__cta-spark {
+    background: var(--moss);
+  }
+
+  // 箭头：CSS 画的 ›，钉在药丸右缘
+  &__cta-arrow {
+    position: absolute;
+    right: 40rpx;
+    top: 50%;
+    width: 18rpx;
+    height: 18rpx;
+    border-top: 4rpx solid var(--cream);
+    border-right: 4rpx solid var(--cream);
+    transform: translateY(-50%) rotate(45deg);
+  }
+
+  &__cta--saved &__cta-arrow {
+    border-color: var(--moss);
+  }
+
+  // ---------- 行动区：试试这些建议 ----------
+  &__sec {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 18rpx;
-    padding: 18rpx 6rpx;
+    margin-top: 56rpx;
+    padding: 0 4rpx;
   }
 
-  &__try-row-text {
-    font-size: 26rpx;
-    font-weight: 600;
-    color: var(--moss);
+  &__sec-title {
+    font-size: 28rpx;
+    font-weight: 700;
+    color: var(--ink);
   }
 
-  &__try-row-arrow {
+  &__sec-go {
     font-size: 30rpx;
-    color: var(--moss);
+    color: var(--ink-3);
   }
 
-  // 今日造型状态行（闭环枢纽）：缩略图 + 两行文案 + 状态
+  // 今日造型状态卡（闭环枢纽）：白卡行，缩略图 + 两行文案 + 状态
   &__tryon {
     display: flex;
     align-items: center;
-    gap: 20rpx;
-    padding: 16rpx 2rpx;
+    gap: 22rpx;
+    margin-top: 20rpx;
+    padding: 22rpx 26rpx;
+    border-radius: var(--radius-lg);
+    background: var(--surface-strong);
+    box-shadow: var(--shadow-card);
   }
 
   &__tryon-thumb {
     width: 96rpx;
     height: 96rpx;
-    border-radius: 12rpx;
+    border-radius: 16rpx;
     flex-shrink: 0;
 
     &--empty {
@@ -169,9 +360,26 @@
     }
   }
 
-  &__tryon-thumb-mark {
-    font-size: 36rpx;
-    color: var(--moss-deep);
+  // 加号：CSS 画的两根短棒，不用字符
+  &__tryon-plus {
+    position: relative;
+    width: 28rpx;
+    height: 28rpx;
+  }
+
+  &__tryon-plus-bar {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 4rpx;
+    margin-top: -2rpx;
+    border-radius: 2rpx;
+    background: var(--moss-deep);
+  }
+
+  &__tryon-plus-bar--v {
+    transform: rotate(90deg);
   }
 
   &__tryon-main {
@@ -183,7 +391,7 @@
   }
 
   &__tryon-title {
-    font-size: 26rpx;
+    font-size: 27rpx;
     font-weight: 600;
     color: var(--ink);
     overflow: hidden;
@@ -206,24 +414,90 @@
     height: 26rpx;
   }
 
-  // ---------- 手册入口：轻量行，不是卡片 ----------
+  // ---------- 手册入口：图标 + 计数章 + 箭头 ----------
   &__handbook {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 6rpx 2rpx;
+    gap: 14rpx;
+    margin-top: 28rpx;
+    padding: 8rpx 4rpx 0;
+  }
+
+  // 小手册：CSS 画的封面 + 书脊
+  &__handbook-icon {
+    position: relative;
+    width: 30rpx;
+    height: 24rpx;
+    border: 3rpx solid var(--ink-2);
+    border-radius: 4rpx 8rpx 8rpx 4rpx;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 7rpx;
+      top: -3rpx;
+      bottom: -3rpx;
+      width: 3rpx;
+      background: var(--ink-2);
+    }
   }
 
   &__handbook-title {
+    flex: 1;
     font-size: 26rpx;
     font-weight: 600;
     color: var(--ink-2);
   }
 
-  &__handbook-go {
-    font-size: 26rpx;
+  &__handbook-count {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44rpx;
+    height: 44rpx;
+    padding: 0 14rpx;
+    border-radius: var(--radius-pill);
+    background: var(--moss);
+  }
+
+  &__handbook-count-num {
+    font-size: 22rpx;
     font-weight: 700;
+    color: var(--cream);
+  }
+
+  &__handbook-go {
+    font-size: 28rpx;
     color: var(--ink-3);
+  }
+
+  // ---------- 页脚纸样台余韵：一道弧线 + 一角苔绿，不承载信息 ----------
+  &__ground {
+    position: relative;
+    height: 150rpx;
+    margin-top: 60rpx;
+    overflow: hidden;
+  }
+
+  // 细弧线：大椭圆的上缘，像纸样台上摊开的一段粉线
+  &__ground-arc {
+    position: absolute;
+    left: -12%;
+    right: -12%;
+    top: 52rpx;
+    height: 240rpx;
+    border: 2rpx solid rgba(88, 115, 68, 0.24);
+    border-radius: 50%;
+  }
+
+  &__ground-blob {
+    position: absolute;
+    right: -90rpx;
+    bottom: -130rpx;
+    width: 340rpx;
+    height: 220rpx;
+    background: var(--moss-soft);
+    border-radius: 58% 42% 55% 45% / 55% 48% 52% 45%;
   }
 
   // ---------- 空态 ----------

@@ -114,6 +114,10 @@ func (s *Service) Generate(ctx context.Context, userID string, city string) (res
 		if err != nil || result.Content.ID == "" || result.Presentation != nil {
 			return
 		}
+		// 插画主视觉：所有返回路径（幂等读 / 生成 / 兜底）统一在这里装饰。
+		// 装饰是确定性映射（uid+date 稳定抽样），历史数据回读也能补上；
+		// assetBase 未配置时是 no-op，素材缺席不能造 URL。
+		result.Content = decorateVisual(result.Content, s.assetBase)
 		elapsed := int(time.Since(started).Milliseconds())
 		// variant=dress 且素材基地址就绪 → 换装洗牌收敛（dress_lock）。
 		// assetBase 为空时 dress 素材必然加载不出，回落旧线（不空转）。
