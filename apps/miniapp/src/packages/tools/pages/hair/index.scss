@@ -272,9 +272,10 @@
     }
   }
 
-  // ---------- 结果态：结论色带（深底白字，轻微叠压照片下缘） ----------
+  // ---------- 结果态：结论色带（浅色纸面，轻微叠压照片下缘） ----------
   // 叠压 24rpx 用「上提 + 等量补偿」实现：文档流占位不变，几何与选择态一致，
-  // 切换时不会因为这段而跳。选择态同一位置是白底导语——同位不同质，区分度在这里。
+  // 切换时不会因为这段而跳。与购买判断/穿搭诊断的判词同一语言：浅底 + 大号墨字，
+  // 墨底带已废弃（在浅色页面里是一块突兀的深色，用户实测「太深不协调」）。
   &.hair--done .hair__hint {
     flex-direction: row;
     align-items: center;
@@ -282,74 +283,25 @@
     margin: -24rpx calc(-1 * var(--page-gutter)) 24rpx;
     padding-left: var(--page-gutter);
     padding-right: var(--page-gutter);
-    // A：墨底标题块——杂志编辑感。字用奶油白不用纯白（纯白在墨底上太"数码"），
-    // 顶部苔绿规线锚住品牌。不需要投影：深底自己就从照片里分出来了。
-    background-color: var(--ink);
-    background-image: repeating-linear-gradient(
-      -45deg,
-      rgba(255, 255, 255, 0.035) 0 2rpx,
-      transparent 2rpx 16rpx
-    );
-    border-top: 3rpx solid var(--moss);
-
-    .hair__hint-title {
-      color: var(--cream);
-    }
+    background-color: var(--bg);
+    border-top: 2rpx solid var(--moss);
+    box-shadow: 0 8rpx 24rpx rgba(45, 58, 35, 0.08);
 
     .hair__hint-day {
-      color: rgba(255, 255, 255, 0.66);
-    }
-
-    .hair__hint-desc {
-      color: rgba(255, 255, 255, 0.72);
+      color: var(--ink-3);
     }
   }
 
-  // 四角裁切规线：结果态照片的「杂志大片」记号（纯 CSS，pointer-events 放行长按）
-  &__crop {
-    position: absolute;
-    width: 28rpx;
-    height: 28rpx;
-    z-index: 4;
-    pointer-events: none;
-    border: 0 solid rgba(255, 255, 255, 0.85);
-
-    &--tl {
-      top: 108rpx;
-      left: 16rpx;
-      border-top-width: 2rpx;
-      border-left-width: 2rpx;
-    }
-
-    &--tr {
-      top: 108rpx;
-      right: 16rpx;
-      border-top-width: 2rpx;
-      border-right-width: 2rpx;
-    }
-
-    &--bl {
-      bottom: 88rpx;
-      left: 16rpx;
-      border-bottom-width: 2rpx;
-      border-left-width: 2rpx;
-    }
-
-    &--br {
-      bottom: 88rpx;
-      right: 16rpx;
-      border-bottom-width: 2rpx;
-      border-right-width: 2rpx;
-    }
-  }
+  // 四角裁切规线已删：白色角标压在 scrim/返回按钮附近，读作渲染残缺而非编辑记号
 
   &__hint-detail {
     flex: none;
     font-size: 22rpx;
     font-weight: 600;
-    color: var(--cream);
+    color: var(--ink);
     padding: 10rpx 24rpx;
-    border: 1rpx solid rgba(255, 255, 255, 0.42);
+    border: 1rpx solid var(--line);
+    background: var(--surface-strong);
     border-radius: 999rpx;
     white-space: nowrap;
   }
@@ -518,8 +470,10 @@
     }
   }
 
-  // ---------- 卡面状态角标：已生成（自己的效果图，点了回放）/ 未生成（参考图，点了生成） ----------
-  // 用「有没有生成过」区分，不用来源标识：来源统一由 ref-note 那行文字交代
+  // ---------- 卡面状态角标：仅「已生成」上屏（✓ 短日期）----------
+  // 「未生成」徽章已删：每张没试过的卡都挂一枚白色虚线徽章是最吵的点缀，
+  // 且「点了会发生什么」由主按钮文案（生成「X」效果）承担——徽章是冗余信息。
+  // 语义仍靠「有 ✓ 记号 = 自己的效果图可回放，无记号 = 选中后可生成」区分。
   &__card-state {
     position: absolute;
     top: 10rpx;
@@ -527,18 +481,11 @@
     z-index: 2;
     padding: 4rpx 12rpx;
     border-radius: 999rpx;
-    border: 1rpx dashed rgba(255, 255, 255, 0.72);
-    background: rgba(24, 28, 22, 0.42);
+    background: rgba(24, 28, 22, 0.45);
     font-size: 18rpx;
     line-height: 1.5;
     color: #fff;
     white-space: nowrap;
-
-    // 已生成：透明墨底 + 对号 + 短日期——安静的一枚记号，不跟照片抢
-    &--done {
-      border: none;
-      background: rgba(24, 28, 22, 0.45);
-    }
   }
 
   // 无图可铺的卡（浅色块）：角标反成深色字，白字在浅底上读不出来
@@ -765,13 +712,13 @@
     inset: 0;
   }
 
-  // 照片吃满相框；顶部统一留 56rpx 呼吸——两态同一个起点，构图不顶死也不偏上。
+  // 照片吃满相框；顶部呼吸由 --hair-photo-top 下发（导航高 + 56rpx，与
+  // 购买判断/穿搭诊断的结果态同规范），未下发时 96rpx 兜底。
   // overflow 是关键：本地临时路径（还没上传）走的是裸 Image + widthFix，高度随图走，
   // 不裁就会从框底探出去一截——结果态的下边缘因此跟它对不上。
   .hair__photo {
     height: 100%;
-    // 顶部呼吸加大：照片不顶死，构图偏下一点（96rpx ≈ 48pt）
-    padding-top: 96rpx;
+    padding-top: var(--hair-photo-top, 96rpx);
     overflow: hidden;
   }
 

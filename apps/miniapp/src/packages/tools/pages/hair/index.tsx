@@ -31,7 +31,7 @@ import { resourceCache, resourceKey } from '../../../../app/cache/resource-cache
 import { useOperationPolling } from '../../../../app/operations/use-operation-polling'
 import { handleBillingError } from '../../../../services/billing'
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../../../services/storage'
-import AppHeader from '../../../../components/app-header'
+import AppHeader, { getNavMetrics } from '../../../../components/app-header'
 import { useDisplayablePath } from '../../../../hooks/use-displayable-path'
 import BottomSheet from '../../../../components/bottom-sheet'
 import Pill from '../../../../components/pill'
@@ -144,6 +144,11 @@ export default function Hair() {
   // 用户已亲手选了照片 = 新意图：异步 resume 落地时不得把旧结果 adopt 回来劫持页面
   const freshIntentRef = useRef(false)
   const { pageClass, enter } = usePageShell(!loading || Boolean(preview), 'page--hair', 'hair')
+  // 照片顶部呼吸与购买判断/穿搭诊断同规范：导航高度 + 56rpx（CSS 里 96rpx 的
+  // 写死值会把照片顶进状态栏）。经 CSS 变量下发，所有态的 HeroPhoto 一处生效。
+  const nav = getNavMetrics()
+  const rpxPx = nav.windowWidth / 750
+  const photoTopStyle = { '--hair-photo-top': `${nav.navHeight + 56 * rpxPx}px` } as React.CSSProperties
 
   const touchHistory = (item: HairPreview) => {
     setHistory((prev) => [item, ...prev.filter((p) => p.id !== item.id)])
@@ -511,7 +516,7 @@ export default function Hair() {
           （照片垫到视口顶 + scrim）、同一套一屏收束（hero 吃剩余高度）——
           照片同位同高、判词复用导语段、方向卡同尺寸同 y、主按钮同位（内联）。 */}
       <AppHeader title="发型设计" back onPhoto />
-      <View className={`hair hair--form${hasResult ? ' hair--done' : ''}`}>
+      <View className={`hair hair--form${hasResult ? ' hair--done' : ''}`} style={photoTopStyle}>
         <View className={`hair__hero photo-hero photo-hero--bleed ${enter()}`}>
           <View className="hair__hero-frame">
             <View className="hair__hero-scrim" />
@@ -525,11 +530,6 @@ export default function Hair() {
                 onTouchCancel={() => setHoldOriginal(false)}
               >
                 <HeroPhoto media={preview!.media} frameAspect={heroAspect} />
-                {/* 杂志大片的四角裁切规线：结果态专属的编辑感记号 */}
-                <View className="hair__crop hair__crop--tl" />
-                <View className="hair__crop hair__crop--tr" />
-                <View className="hair__crop hair__crop--bl" />
-                <View className="hair__crop hair__crop--br" />
                 {preview!.source_media ? (
                   <View className={`hair__compare-original${holdOriginal ? ' hair__compare-original--on' : ''}`}>
                     {/* 对比层与结果层同规则：长按切换只是换图，构图不位移 */}
@@ -674,12 +674,10 @@ export default function Hair() {
                       {slot.tag ? <Text className="hair__card-tag">{slot.tag}</Text> : null}
                     </View>
                     {slot.preview ? (
-                      <Text className="hair__card-state hair__card-state--done">
+                      <Text className="hair__card-state">
                         {`✓ ${formatDay(slot.preview.created_at)}`}
                       </Text>
-                    ) : (
-                      <Text className="hair__card-state">{HAIR_COPY.slotTodo}</Text>
-                    )}
+                    ) : null}
                   </View>
                 ))}
               </View>
@@ -754,7 +752,7 @@ export default function Hair() {
                     onClick={() => adoptFromHistory(latestReady)}
                   >
                     <SourceImage className="hair__card-img" media={latestReady.media} anchor="top" />
-                    <Text className="hair__card-state hair__card-state--done">
+                    <Text className="hair__card-state">
                       {`✓ ${formatDay(latestReady.created_at)}`}
                     </Text>
                     <View className="hair__card-body">
@@ -794,12 +792,10 @@ export default function Hair() {
                     </View>
                     {/* 状态角标：已生成＝你自己的效果图（点了回放），未生成＝内置参考图 */}
                     {doneByStyle.get(opt.id) ? (
-                      <Text className="hair__card-state hair__card-state--done">
+                      <Text className="hair__card-state">
                         {`✓ ${formatDay(doneByStyle.get(opt.id)?.created_at)}`}
                       </Text>
-                    ) : (
-                      <Text className="hair__card-state">{HAIR_COPY.slotTodo}</Text>
-                    )}
+                    ) : null}
                   </View>
                 ))}
                 <View
